@@ -191,7 +191,7 @@ export function App() {
         </main>
         <footer className="app-footer">
           <span>HEXU · 让人和 AI，一起交付。</span>
-          <span>开发预览 E1a · 非正式团队服务</span>
+          <span>开发预览 E1b · 非正式团队服务</span>
         </footer>
       </div>
       {searchOpen && <Search onClose={() => setSearchOpen(false)} />}
@@ -1188,7 +1188,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E1a · 本地原生执行</span>
+        <span className="badge neutral">E1b · 本地原生执行</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />

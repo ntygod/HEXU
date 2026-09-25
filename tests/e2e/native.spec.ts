@@ -81,6 +81,10 @@ test('Claude 到 Codex：同任务继续、读取模型、保留未提交文件�
   await page.getByRole('checkbox').check();
   await page.getByText('查看接续上下文与代码来源', { exact: true }).click();
   await expect(page.locator('.native-details pre')).toContainText('native-output.txt');
+  await page.getByText('查看接续上下文与代码来源', { exact: true }).click();
+  await page.locator('.drawer-form .dialog-body').evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await page.screenshot({ path: 'artifacts/09-codex-continuation.png', fullPage: true });
   await page.getByRole('button', { name: '用 Codex 继续', exact: true }).click();
   await expect(
