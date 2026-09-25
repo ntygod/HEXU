@@ -506,17 +506,15 @@ test('未知原进程状态保持实际目录锁，不发停止信号或启动�
   try {
     const f = example(store);
     const old = store.run(f.source.id);
-    store.db
-      .prepare('UPDATE runs SET body=? WHERE id=?')
-      .run(
-        JSON.stringify({
-          ...old,
-          state: 'stopping',
-          observation: 'unknown',
-          native: { ...old.native, terminationConfirmed: false, recoveryRequired: true },
-        }),
-        old.id,
-      );
+    store.db.prepare('UPDATE runs SET body=? WHERE id=?').run(
+      JSON.stringify({
+        ...old,
+        state: 'stopping',
+        observation: 'unknown',
+        native: { ...old.native, terminationConfirmed: false, recoveryRequired: true },
+      }),
+      old.id,
+    );
     store.db.prepare('INSERT INTO native_workspace_locks VALUES(?,?)').run(f.copy.id, old.id);
     const op = coordinator.create(f.task.id, f.input, 'first');
     await coordinator.tick();
