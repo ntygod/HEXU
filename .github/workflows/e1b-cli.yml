@@ -10,20 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Download the pinned official release
+      - name: Download and hash-check pinned official package
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/hexu-codex-reference
           gh api repos/openai/codex/releases/tags/rust-v0.157.0 > /tmp/release.json
-          jq -r '.assets[].name' /tmp/release.json
           python3 - <<'PY'
-          import json, re, subprocess, hashlib
+          import json, subprocess, hashlib
           from pathlib import Path
           release = json.loads(Path('/tmp/release.json').read_text())
-          choices = [a for a in release['assets'] if re.fullmatch(r'codex-x86_64-unknown-linux-gnu(?:\.tar)?\.(?:gz|zst)', a['name'])]
-          assert choices, 'No matching official executable archive'
-          a = choices[0]
+          a = next(a for a in release['assets'] if a['name'] == 'codex-package-x86_64-unknown-linux-musl.tar.gz')
           root = Path('/tmp/hexu-codex-reference')
           subprocess.run(['gh','release','download','rust-v0.157.0','--repo','openai/codex','--pattern',a['name'],'--dir',str(root)], check=True)
           digest = 'sha256:' + hashlib.sha256((root/a['name']).read_bytes()).hexdigest()
