@@ -1,0 +1,31 @@
+name: E1 development bundle
+on:
+  push:
+    branches: ['codex/e1-native-runtime-20260925']
+    paths: ['.github/workflows/e1-dev-bundle.yml']
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts
+      - name: Package tracked sources and public build dependencies
+        run: |
+          mkdir -p /tmp/hexu-dev-bundle
+          git archive --format=tar HEAD | gzip > /tmp/hexu-dev-bundle/source.tar.gz
+          tar -czf /tmp/hexu-dev-bundle/dependencies.tar.gz node_modules
+          cp "$(command -v node)" /tmp/hexu-dev-bundle/node
+          gzip /tmp/hexu-dev-bundle/node
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-e1-dev-bundle
+          path: /tmp/hexu-dev-bundle/
+          retention-days: 1
