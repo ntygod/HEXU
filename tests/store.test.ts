@@ -1,0 +1,209 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Store } from '../packages/db/src/store.js';
+const taskInput = { title: '真实持久化任务', description: '', projectId: null };
+function withStore(fn: (store: Store) => void) {
+  const store = new Store();
+  try {
+    fn(store);
+  } finally {
+    store.close();
+  }
+}
+test('示例仅初始化一次，数据可跨服务重启保留', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hexu-'));
+  const path = join(dir, 'db.sqlite');
+  try {
+    let store = new Store(path);
+    const task = store.createTask(taskInput, 'persist');
+    const count = store.tasks().length;
+    store.close();
+    store = new Store(path);
+    assert.equal(store.getTask(task.id).title, taskInput.title);
+    assert.equal(store.tasks().length, count);
+    store.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('重复创建请求返回同一任务，不重复分配短号', () =>
+  withStore((store) => {
+    const a = store.createTask(taskInput, 'same');
+    const b = store.createTask(taskInput, 'same');
+    assert.deepEqual(a, b);
+    assert.equal(store.tasks().filter((task) => task.id === a.id).length, 1);
+  }));
+test('同键不同内容明确冲突', () =>
+  withStore((store) => {
+    store.createTask(taskInput, 'same');
+    assert.throws(() => store.createTask({ ...taskInput, title: '不同' }, 'same'), /相同操作标识/);
+  }));
+test('过期修订不会覆盖更新', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    store.patchTask(task.id, { expectedRevision: 1, title: '新的标题' }, 'patch');
+    assert.throws(
+      () => store.patchTask(task.id, { expectedRevision: 1, title: '过期' }, 'patch2'),
+      /已被更新/,
+    );
+    assert.equal(store.getTask(task.id).title, '新的标题');
+  }));
+test('完成不要求报告，之后可重开', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const done = store.changeTask(task.id, 'done', 1, 'stop', 'done');
+    assert.equal(done.status, 'done');
+    const reopened = store.changeTask(task.id, 'todo', done.revision, 'keep', 'reopen');
+    assert.equal(reopened.status, 'todo');
+  }));
+test('原生执行结束不自动完成任务', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const run = store.createRun(
+      task.id,
+      {
+        provider: 'mock',
+        requestedTool: 'claude-code',
+        scenario: 'success',
+        prompt: '',
+        expectedRevision: 1,
+        reopenTask: false,
+      },
+      'run',
+    );
+    store.stepRun(run.id, 'preparing');
+    store.stepRun(run.id, 'running');
+    store.stepRun(run.id, 'succeeded');
+    assert.equal(store.getTask(task.id).status, 'in_progress');
+  }));
+test('完成有活动模拟执行时，保留 stopping 直到确认', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const run = store.createRun(
+      task.id,
+      {
+        provider: 'mock',
+        requestedTool: 'codex',
+        scenario: 'success',
+        prompt: '',
+        expectedRevision: 1,
+        reopenTask: false,
+      },
+      'run',
+    );
+    store.stepRun(run.id, 'preparing');
+    store.stepRun(run.id, 'running');
+    const done = store.changeTask(task.id, 'done', store.getTask(task.id).revision, 'stop', 'done');
+    assert.equal(done.status, 'done');
+    assert.equal(store.run(run.id).state, 'stopping');
+    store.stepRun(run.id, 'cancelled');
+    assert.equal(store.run(run.id).state, 'cancelled');
+  }));
+test('显式保留活动执行，不隐去运行状态', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const run = store.createRun(
+      task.id,
+      {
+        provider: 'mock',
+        requestedTool: 'codex',
+        scenario: 'success',
+        prompt: '',
+        expectedRevision: 1,
+        reopenTask: false,
+      },
+      'run',
+    );
+    store.changeTask(task.id, 'done', 2, 'keep', 'done');
+    assert.equal(store.run(run.id).state, 'queued');
+    assert.throws(
+      () =>
+        store.createRun(
+          task.id,
+          {
+            provider: 'mock',
+            requestedTool: 'codex',
+            scenario: 'success',
+            prompt: '',
+            expectedRevision: 3,
+            reopenTask: true,
+          },
+          'run2',
+        ),
+      /还有模拟执行/,
+    );
+  }));
+test('跨任务成果不能被用作评论对象', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    assert.throws(() => store.addMessage(task.id, '评论', 'result-orders', 'msg'), /不属于/);
+  }));
+test('成果和评论无需任务先完成', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const result = store.createResult(task.id, '中间成果', '已有进展', 'result');
+    store.addMessage(task.id, '继续调整', result.id, 'msg');
+    assert.equal(store.getTask(task.id).status, 'todo');
+    assert.equal(store.messages(task.id).length, 1);
+  }));
+test('失败事务不会留下幂等记录或业务半成品', () =>
+  withStore((store) => {
+    assert.throws(() => store.createTask({ ...taskInput, projectId: 'missing' }, 'bad'));
+    assert.equal(
+      store.db.prepare('SELECT COUNT(*) AS n FROM idempotency_records WHERE key=?').get('bad')!.n,
+      0,
+    );
+    store.createTask(taskInput, 'bad');
+  }));
+test('恢复只处理模拟执行，不伪装 native 进程已恢复', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const run = store.createRun(
+      task.id,
+      {
+        provider: 'mock',
+        requestedTool: 'codex',
+        scenario: 'success',
+        prompt: '',
+        expectedRevision: 1,
+        reopenTask: false,
+      },
+      'run',
+    );
+    assert.equal(store.recoverMockRuns(), 1);
+    assert.equal(store.run(run.id).state, 'failed');
+    assert.equal(store.getTask(task.id).status, 'in_progress');
+  }));
+test('写入与 outbox 事件属于同一事务', () =>
+  withStore((store) => {
+    const task = store.createTask(taskInput, 'new');
+    const batch = store.events(0, task.id);
+    assert.equal(batch.events.at(-1)!.kind, 'task.created');
+    assert.ok(batch.cursor > 0);
+  }));
+test('私有数据不会通过事件与成果检索泄露', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hexu-'));
+  const path = join(dir, 'db.sqlite');
+  const a = new Store(path),
+    b = new Store(path, 'user-demo-chen');
+  try {
+    const secret = b.createTask({ title: 'private', description: '', projectId: null }, 'private');
+    b.createResult(secret.id, 'secret', 'secret', 'result');
+    assert.throws(() => a.getTask(secret.id));
+    assert.equal(
+      a.results().some((result) => result.taskId === secret.id),
+      false,
+    );
+    assert.equal(
+      a.events(0).events.some((event) => event.taskId === secret.id),
+      false,
+    );
+  } finally {
+    a.close();
+    b.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
