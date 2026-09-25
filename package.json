@@ -1,0 +1,23 @@
+{
+  "name": "hexu",
+  "version": "0.1.0-dev.1",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/web", "apps/control", "packages/contracts", "packages/domain", "packages/db", "packages/client", "packages/ui", "packages/adapters/mock"],
+  "engines": {"node": ">=22.16.0 <25"},
+  "packageManager": "npm@10.9.2",
+  "scripts": {
+    "dev": "npm run build:server && node scripts/dev.mjs",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:server && vite build --config apps/web/vite.config.ts",
+    "start": "node --env-file-if-exists=.env dist/apps/control/src/main.js",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "test": "npm run build:server && node --test dist/tests/*.test.js",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,css,json,html,svg}\" \"packages/**/*.{ts,tsx,css,json}\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"playwright.config.ts\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,json,html,svg}\" \"packages/**/*.{ts,tsx,css,json}\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"playwright.config.ts\""
+  },
+  "dependencies": {"fastify": "5.12.5", "react": "19.2.0", "react-dom": "19.2.0"},
+  "devDependencies": {"@types/node": "24.0.4", "@types/react": "19.2.2", "@types/react-dom": "19.2.2", "@playwright/test": "1.55.1", "typescript": "5.8.3", "vite": "8.3.1", "prettier": "3.6.2"}
+}

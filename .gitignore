@@ -1,0 +1,12 @@
+node_modules/
+dist/
+apps/web/dist/
+.hexu/
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+artifacts/
+*.tsbuildinfo
+.DS_Store

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+apps/web/dist/
+.hexu/
+artifacts/
+package-lock.json
