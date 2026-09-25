@@ -202,7 +202,7 @@ test('Claude → Codex → Claude 沿用未提交代码、上下文与同一任�
     assert.ok(preview.json().contextText.includes('native-output.txt'));
     const data = { ...f.body('codex', 'CODEX_WRITE'), sourceRunId: first.id };
     const operationKey = randomUUID();
-    const response = await f.post(`tasks/${f.task.id}/continuations`, data, operationKey);
+    const response = await f.post(`tasks/${f.task.id}/runs`, data, operationKey);
     assert.equal(response.statusCode, 201);
     const second = await f.wait(response.json());
     assert.equal(second.state, 'succeeded');
@@ -213,12 +213,12 @@ test('Claude → Codex → Claude 沿用未提交代码、上下文与同一任�
       await readFile(join(f.root, 'codex-output.txt'), 'utf8'),
       'fixture continued\nfixture edit\n',
     );
-    const replay = await f.post(`tasks/${f.task.id}/continuations`, data, operationKey);
+    const replay = await f.post(`tasks/${f.task.id}/runs`, data, operationKey);
     assert.equal(replay.json().id, second.id);
     assert.equal(await readFile(join(f.root, 'codex-count.txt'), 'utf8'), 'one invocation\n');
     const third = await f.wait(
       (
-        await f.post(`tasks/${f.task.id}/continuations`, {
+        await f.post(`tasks/${f.task.id}/runs`, {
           ...f.body('claude-code', 'Summarize the continuation'),
           sourceRunId: second.id,
         })
@@ -227,13 +227,13 @@ test('Claude → Codex → Claude 沿用未提交代码、上下文与同一任�
     assert.equal(third.state, 'succeeded');
     assert.equal(third.previousRunId, second.id);
     assert.equal(third.taskId, first.taskId);
-    const stale = await f.post(`tasks/${f.task.id}/continuations`, {
+    const stale = await f.post(`tasks/${f.task.id}/runs`, {
       ...f.body(),
       sourceRunId: first.id,
     });
     assert.equal(stale.statusCode, 409);
     const changed = await f.post(
-      `tasks/${f.task.id}/continuations`,
+      `tasks/${f.task.id}/runs`,
       { ...data, prompt: 'different' },
       operationKey,
     );
@@ -251,7 +251,7 @@ test('运行中不能跨工具覆盖；interrupt 后再继续', async () => {
     const until = Date.now() + 4000;
     while (!f.store.run(r.id).native?.turnId && Date.now() < until)
       await new Promise((r) => setTimeout(r, 15));
-    const conflict = await f.post(`tasks/${f.task.id}/continuations`, {
+    const conflict = await f.post(`tasks/${f.task.id}/runs`, {
       ...f.body('claude-code'),
       sourceRunId: r.id,
     });
@@ -263,7 +263,7 @@ test('运行中不能跨工具覆盖；interrupt 后再继续', async () => {
     // Old context intentionally includes CODEX_HANG; Claude fixture does not interpret it.
     const next = await f.wait(
       (
-        await f.post(`tasks/${f.task.id}/continuations`, {
+        await f.post(`tasks/${f.task.id}/runs`, {
           ...f.body('claude-code', 'continue'),
           sourceRunId: r.id,
         })
@@ -307,7 +307,7 @@ test('拒绝跨任务来源，且不会自动重开已完成任务', async () =>
       { title: 'other', description: '', projectId: null },
       randomUUID(),
     );
-    const wrong = await f.post(`tasks/${other.id}/continuations`, {
+    const wrong = await f.post(`tasks/${other.id}/runs`, {
       ...f.body('codex', 'continue', other.id),
       sourceRunId: r.id,
     });
@@ -315,12 +315,12 @@ test('拒绝跨任务来源，且不会自动重开已完成任务', async () =>
     await f.post(`tasks/${f.task.id}/complete`, {
       expectedRevision: f.store.getTask(f.task.id).revision,
     });
-    const closed = await f.post(`tasks/${f.task.id}/continuations`, {
+    const closed = await f.post(`tasks/${f.task.id}/runs`, {
       ...f.body(),
       sourceRunId: r.id,
     });
     assert.equal(closed.statusCode, 409);
-    const reopened = await f.post(`tasks/${f.task.id}/continuations`, {
+    const reopened = await f.post(`tasks/${f.task.id}/runs`, {
       ...f.body(),
       sourceRunId: r.id,
       reopenTask: true,

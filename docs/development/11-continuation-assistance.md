@@ -59,8 +59,10 @@ AI 协助默认文本材料、真正只读环境或隔离副本。不支持可�
 
 本包是核心产品能力，不是资源设置页里两个 Logo 的切换。费用信息可获得时展示来源，不在开始前伪造精确报价。
 
-## E1b 当前实现子集
+## E1c 当前实现子集
 
-已实现同机显式跨工具继续及上下文/Git 摘录。`POST /tasks/:taskId/continuations` 当前同步准备后返回 `201 + Run`，含 sourceRunId；GET continuation-preview 供页面查看来源。持久化 Operation、后台等待后自动开始、跨节点恢复和临时协助仍未实现；源执行活动时先停止，确认后由用户开始。未变更最终目标，也不要求额外业务审批。
+`POST /tasks/:taskId/continuations` 现返回 **202 + 持久化 Operation**；必须显式选择 `onActiveRun=wait/request_stop`。`GET /operations/:id`、`GET /tasks/:taskId/continuations` 与带 expectedRevision/幂等键的 `POST /operations/:id/cancel` 已接入。E1b 返回 201+Run 的旧接续契约已经迁移；普通 `/runs` 创建仍返回 201，且同样受接续预约保护。
 
-实际使用与限制见 [原生说明](../engineering/native-execution.md)，最新进度见 [21](21-implementation-status.md)。
+同机双向跨工具继续支持等待/停止、刷新、取消、启动前重查和事务关联。原进程未知不释放目录锁；重启将待接续操作转为需要处理，保留要求但不自动启动。任务修订或人工上下文变化采取保守阻止，标题变化也需要重新配置；这不是最终的细粒度影响判定。
+
+11-01/02/05 仍为部分实现：没有完整共享上下文选择、团队权限、同工具原生 resume 或协助面板。11-03/04/06 尚未实现，本轮接续取消不计作协助取消。真实模型生成仍未联调。工程结果见 [21](21-implementation-status.md)，逐项状态见 [19](19-work-items.md)。

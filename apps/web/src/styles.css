@@ -2781,3 +2781,124 @@ main {
     padding: 10px;
   }
 }
+
+/* Persistent local continuation: separate from both Task and Run state. */
+.continuation-status {
+  margin: 16px 24px 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.continuation-status-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.continuation-status-title {
+  flex: 1;
+  min-width: 0;
+}
+.continuation-status-title strong {
+  font-size: 15px;
+}
+.continuation-status-title p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+.continuation-status.needs-attention {
+  border-left: 3px solid var(--primary);
+}
+.continuation-steps {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+  padding: 16px 0 8px;
+  margin: 0;
+  counter-reset: continuation;
+}
+.continuation-steps li {
+  color: var(--muted);
+  counter-increment: continuation;
+  font-size: 12px;
+}
+.continuation-steps li::before {
+  content: counter(continuation);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  margin-right: 7px;
+}
+.continuation-steps .current {
+  color: var(--primary);
+  font-weight: 650;
+}
+.continuation-steps .current::before {
+  border-color: var(--primary);
+}
+.continuation-steps .passed {
+  color: var(--text);
+}
+.continuation-status-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+.continuation-blocker {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+}
+.continuation-records {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.continuation-records summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.continuation-records article {
+  padding: 14px 0;
+  overflow-wrap: anywhere;
+}
+.continuation-records article + article {
+  border-top: 1px solid var(--line);
+}
+.continuation-prompt {
+  white-space: pre-wrap;
+  margin: 6px 0;
+}
+@media (max-width: 700px) {
+  .continuation-status {
+    margin: 12px 14px 0;
+    padding: 14px;
+  }
+  .continuation-status-heading {
+    flex-wrap: wrap;
+  }
+  .continuation-status-heading > .badge {
+    margin-left: 36px;
+  }
+  .continuation-status-actions {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .continuation-steps {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .continuation-status-title {
+    flex-basis: calc(100% - 48px);
+  }
+}
