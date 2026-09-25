@@ -15,8 +15,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/hexu-codex-reference
-          gh release download rust-v0.157.0 --repo openai/codex --pattern 'codex-x86_64-unknown-linux-gnu.tar.gz' --dir /tmp/hexu-codex-reference
-          sha256sum /tmp/hexu-codex-reference/*.tar.gz > /tmp/hexu-codex-reference/SHA256SUMS.txt
+          gh api repos/openai/codex/releases/tags/rust-v0.157.0 > /tmp/release.json
+          jq -r '.assets[].name' /tmp/release.json
+          python3 - <<'PY'
+          import json, re, subprocess, hashlib
+          from pathlib import Path
+          release = json.loads(Path('/tmp/release.json').read_text())
+          choices = [a for a in release['assets'] if re.fullmatch(r'codex-x86_64-unknown-linux-gnu(?:\.tar)?\.(?:gz|zst)', a['name'])]
+          assert choices, 'No matching official executable archive'
+          a = choices[0]
+          root = Path('/tmp/hexu-codex-reference')
+          subprocess.run(['gh','release','download','rust-v0.157.0','--repo','openai/codex','--pattern',a['name'],'--dir',str(root)], check=True)
+          digest = 'sha256:' + hashlib.sha256((root/a['name']).read_bytes()).hexdigest()
+          assert a.get('digest') == digest, 'Official release digest mismatch'
+          (root/'source.json').write_text(json.dumps({'version':'0.157.0','name':a['name'],'digest':digest,'url':a['browser_download_url']}, indent=2))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: hexu-codex-reference
