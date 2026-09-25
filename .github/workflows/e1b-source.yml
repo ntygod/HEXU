@@ -1,0 +1,21 @@
+name: E1b source snapshot
+on:
+  push:
+    branches: ['codex/e1b-codex-continuation-20260925']
+    paths: ['.github/workflows/e1b-source.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: git archive --format=tar.gz HEAD > /tmp/hexu-e1b-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-e1b-source
+          path: /tmp/hexu-e1b-source.tar.gz
+          retention-days: 1
