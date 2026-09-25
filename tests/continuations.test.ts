@@ -66,6 +66,7 @@ function example(store: Store) {
   store.finishNativeRun(source.id, 'succeeded', 'fixture completion; no process or model', true);
   const body = {
     ...initial,
+    model: '',
     requestedTool: 'codex',
     sourceRunId: source.id,
     confirmExecution: true,
@@ -345,8 +346,8 @@ async function environment(disableCodex = false) {
       () => getOp(id),
       (o) => !['waiting_for_stop', 'preparing'].includes(o.state),
     );
-  const start = async () => {
-    const response = await post(`tasks/${task.id}/runs`, body());
+  const start = async (prompt = 'FIXTURE_HANG') => {
+    const response = await post(`tasks/${task.id}/runs`, body('claude-code', prompt));
     assert.equal(response.statusCode, 201);
     return until(
       () => store.run(response.json().id),
@@ -524,5 +525,33 @@ test('未知原进程状态保持实际目录锁，不发停止信号或启动�
   } finally {
     await coordinator.close();
     store.close();
+  }
+});
+
+test('自然结束策略不发停止请求，原执行成功后接续且不改任务完成状态', async () => {
+  const f = await environment();
+  try {
+    const source = await f.start('FIXTURE_DELAY');
+    const response = await f.post(`tasks/${f.task.id}/continuations`, {
+      ...f.body('codex', 'CODEX_WRITE'),
+      sourceRunId: source.id,
+      onActiveRun: 'wait',
+    });
+    assert.equal(response.statusCode, 202);
+    assert.equal((await f.getOp(response.json().id)).state, 'waiting_for_stop');
+    const op = await f.waitOp(response.json().id);
+    assert.equal(op.state, 'succeeded', JSON.stringify(op.blockers));
+    const original = f.store.run(source.id);
+    assert.equal(original.state, 'succeeded');
+    assert.equal(original.native?.terminationConfirmed, true);
+    const target = await until(
+      () => f.store.run(op.runId!),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(target.state, 'succeeded');
+    assert.ok(target.createdAt >= original.updatedAt);
+    assert.equal(f.store.getTask(f.task.id).status, 'in_progress');
+  } finally {
+    await f.close();
   }
 });

@@ -17,6 +17,8 @@ function emit(value: unknown) {
   console.log(JSON.stringify(value));
 }
 emit({ type: 'system', subtype: 'init', session_id: 'fixture-session' });
+// Test-only bounded natural completion; never invokes a model.
+if (input.includes('FIXTURE_DELAY')) await new Promise((resolve) => setTimeout(resolve, 800));
 if (input.includes('FIXTURE_HANG')) {
   emit({ type: 'assistant', message: { content: [{ type: 'text', text: 'fixture waiting' }] } });
   setInterval(() => {}, 1000);
