@@ -1,3 +1,4 @@
+import type { NativeRunConfig } from './native.js';
 export const taskStatuses = ['todo', 'in_progress', 'done', 'cancelled'] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
 export const runStates = [
@@ -57,7 +58,8 @@ export interface Run {
   taskId: string;
   state: RunState;
   observation: 'fresh' | 'unknown';
-  provider: 'mock';
+  provider: 'mock' | 'native';
+  native?: NativeRunConfig;
   requestedTool: Tool;
   scenario: Scenario;
   previousRunId: string | null;

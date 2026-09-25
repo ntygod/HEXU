@@ -2628,3 +2628,98 @@ main {
 :root[data-theme='dark'] .button.primary {
   color: #171626;
 }
+
+/* Native execution reuses the task surface; it is never disguised as a mock. */
+.native-mode-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.native-details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+.native-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.native-details pre,
+.native-diff {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.7;
+  max-height: 420px;
+  overflow: auto;
+  margin-top: 14px;
+}
+.native-code,
+.native-help {
+  padding: 24px;
+  min-width: 0;
+}
+.native-help pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.native-path {
+  overflow-wrap: anywhere;
+}
+.native-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 16px 0;
+}
+.native-changes button {
+  display: flex;
+  text-align: left;
+  align-items: start;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.native-changes button span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.native-changes button.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.native-changes code {
+  flex-shrink: 0;
+  white-space: pre;
+}
+.native-event {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.native-event p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.native-event small {
+  opacity: 0.75;
+}
+@media (max-width: 600px) {
+  .native-mode-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+  .native-code {
+    padding: 14px;
+  }
+}

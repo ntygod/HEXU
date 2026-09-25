@@ -9,6 +9,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4310',
     browserName: 'chromium',
+    launchOptions: process.env.HEXU_TEST_CHROMIUM
+      ? { executablePath: process.env.HEXU_TEST_CHROMIUM }
+      : {},
     viewport: { width: 1440, height: 1000 },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

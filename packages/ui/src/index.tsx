@@ -199,7 +199,13 @@ const runText: Record<Run['state'], string> = {
 export function RunBadge({ run }: { run?: Run }) {
   return (
     <span className={`badge run-${run?.state ?? 'idle'}`}>
-      {run ? runText[run.state] : '尚未开始执行'}
+      {run
+        ? run.observation === 'unknown'
+          ? '连接未知 · 待核对'
+          : run.provider === 'native'
+            ? runText[run.state].replace('模拟', '原生')
+            : runText[run.state]
+        : '尚未开始执行'}
     </span>
   );
 }

@@ -1,3 +1,4 @@
+import { NativeContinue } from './native.js';
 import { useState } from 'react';
 import type { Result, Run, Scenario, Task, Tool } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
@@ -167,6 +168,7 @@ export function ContinuePanel({
   onClose: () => void;
 }) {
   const { refresh, notice } = useApp();
+  const [nativeMode, setNativeMode] = useState(lastRun?.provider === 'native');
   const [tool, setTool] = useState<Tool>(
       lastRun?.requestedTool === 'claude-code' ? 'codex' : 'claude-code',
     ),
@@ -174,6 +176,15 @@ export function ContinuePanel({
     [prompt, setPrompt] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  if (nativeMode)
+    return (
+      <NativeContinue
+        task={task}
+        lastRun={lastRun}
+        onClose={onClose}
+        onMock={() => setNativeMode(false)}
+      />
+    );
   return (
     <Dialog title="在同一任务中继续" drawer onClose={() => !busy && onClose()}>
       <form
@@ -213,11 +224,14 @@ export function ContinuePanel({
             <div>
               <strong>交互演示 · 非真实模型</strong>
               <p>
-                本版本用模拟适配器展示继续、等待和停止。Claude Code 与 Codex
-                尚未原生接入，不会读取你的目录或产生模型费用。
+                此模式只演示继续、等待和停止，不读取目录、不产生模型费用。需要实际工作，请明确选择原生执行。
               </p>
             </div>
           </div>
+          <Button type="button" onClick={() => setNativeMode(true)}>
+            <Icon name="monitor" />
+            使用本机原生工具
+          </Button>
           <p className="field-title">接下来使用</p>
           <div className="tool-options">
             {(['claude-code', 'codex'] as const).map((value) => (

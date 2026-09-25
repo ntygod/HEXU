@@ -184,14 +184,14 @@ export function Provider({ children }: { children: ReactNode }) {
       {finishing && (
         <Dialog title="标记任务完成" onClose={() => !busy && setFinishing(null)}>
           <div className="dialog-body">
-            <p>「{finishing.title}」仍有模拟执行。任务完成与执行停止是两件事。</p>
+            <p>「{finishing.title}」仍有活动执行。任务完成与执行停止是两件事。</p>
             <label className="check-line">
               <input
                 type="checkbox"
                 checked={stopAlso}
                 onChange={(event) => setStopAlso(event.target.checked)}
               />
-              同时请求停止当前模拟执行
+              同时请求停止当前执行
             </label>
             <p className="muted">取消勾选后，任务会标记完成，执行仍保持可见。</p>
           </div>

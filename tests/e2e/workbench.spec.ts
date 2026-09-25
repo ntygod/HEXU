@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 test('工作台真实打开，并保留桌面截图', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '我的工作', exact: true })).toBeVisible();
-  await expect(page.getByText('本地开发预览 · AI 模拟')).toBeVisible();
+  await expect(page.getByText('本地开发预览 · 执行模式明确标识')).toBeVisible();
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/01-workbench.png', fullPage: true });
 });

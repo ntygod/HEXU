@@ -23,6 +23,7 @@ export class MockAdapter {
     set.add(timer);
   }
   start(id: string) {
+    if (this.store.run(id).provider !== 'mock') return;
     if (this.timers.has(id) || this.store.run(id).state !== 'queued') return;
     this.later(id, 0.3, () => this.store.stepRun(id, 'preparing'));
     this.later(id, 1, () =>
@@ -61,9 +62,11 @@ export class MockAdapter {
   }
   settleStops(taskId: string) {
     for (const run of this.store.runs(taskId))
-      if (run.state === 'stopping' || run.state === 'cancelled') this.stop(run.id);
+      if (run.provider === 'mock' && (run.state === 'stopping' || run.state === 'cancelled'))
+        this.stop(run.id);
   }
   stop(id: string) {
+    if (this.store.run(id).provider !== 'mock') return;
     for (const timer of this.timers.get(id) ?? []) clearTimeout(timer);
     this.timers.delete(id);
     if (this.store.run(id).state === 'stopping')

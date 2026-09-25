@@ -1,3 +1,4 @@
+import { NativeResources, NativeCode, NativeEvents } from './native.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type {
   Message,
@@ -146,7 +147,7 @@ export function App() {
           <div className="topbar-right">
             <span className="preview-label">
               <span className={`connection-dot ${connected ? 'online' : ''}`} />
-              本地开发预览 · AI 模拟
+              本地开发预览 · 执行模式明确标识
             </span>
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
               <Icon name="search" size={16} />
@@ -190,7 +191,7 @@ export function App() {
         </main>
         <footer className="app-footer">
           <span>HEXU · 让人和 AI，一起交付。</span>
-          <span>开发预览 E0 · 非正式团队服务</span>
+          <span>开发预览 E1a · 非正式团队服务</span>
         </footer>
       </div>
       {searchOpen && <Search onClose={() => setSearchOpen(false)} />}
@@ -744,7 +745,11 @@ function MessageList({ messages }: { messages: Message[] }) {
             <div className="message-meta">
               <strong>{message.actorName}</strong>
               <time>{time(message.createdAt)}</time>
-              {message.actorType === 'agent' && <span className="badge neutral">模拟</span>}
+              {message.actorType === 'agent' && (
+                <span className="badge neutral">
+                  {message.actorName.endsWith('原生') ? '原生' : '模拟'}
+                </span>
+              )}
             </div>
             <p>{message.body}</p>
           </div>
@@ -810,11 +815,17 @@ function TaskPage({ id }: { id: string }) {
             <Button
               variant="danger"
               busy={busy}
-              disabled={active.state === 'stopping'}
+              disabled={active.state === 'stopping' || active.observation === 'unknown'}
               onClick={() => void action(`/runs/${active.id}/stop`)}
             >
               <Icon name="stop" />
-              {active.state === 'stopping' ? '正在停止' : '停止模拟'}
+              {active.observation === 'unknown'
+                ? '连接未知'
+                : active.state === 'stopping'
+                  ? '正在停止'
+                  : active.provider === 'native'
+                    ? '停止原生执行'
+                    : '停止模拟'}
             </Button>
           ) : (
             <Button
@@ -843,9 +854,13 @@ function TaskPage({ id }: { id: string }) {
         <div className="task-subtitle">
           <ToolMark tool={lastRun?.requestedTool ?? 'claude-code'} />
           <strong>{lastRun?.requestedTool === 'codex' ? 'Codex' : 'Claude Code'}</strong>
-          <span>模拟适配器</span>
+          <span>
+            {lastRun?.provider === 'native'
+              ? '原生 · ' + (lastRun.native?.mode === 'edit' ? '文件编辑' : '只读分析')
+              : '模拟适配器'}
+          </span>
           <Icon name="monitor" size={14} />
-          <span>无真实执行节点</span>
+          <span>{lastRun?.provider === 'native' ? '本机授权目录' : '无真实执行节点'}</span>
           <RunBadge run={lastRun} />
           <span className="spacer" />
           <Avatar
@@ -879,6 +894,7 @@ function TaskPage({ id }: { id: string }) {
             <>
               <div className="messages-scroll" ref={scroll}>
                 <MessageList messages={messages} />
+                {lastRun?.provider === 'native' && <NativeEvents run={lastRun} />}
                 {!messages.length && (
                   <Empty
                     title="从这里展开工作"
@@ -946,7 +962,7 @@ function TaskPage({ id }: { id: string }) {
               <div className="notice-box">
                 <Icon name="file" />
                 <p>
-                  仓库文件、团队约定与模型上下文组装尚未接入。不会把本地页面显示的示例当作真实项目资料发送给模型。
+                  原生执行使用任务说明、本次要求和最近工作记录；发送前可在继续面板查看。仓库由原生文件工具按需读取，模拟输出不会作为真实工作记录发送。
                 </p>
               </div>
             </div>
@@ -957,14 +973,15 @@ function TaskPage({ id }: { id: string }) {
                   <div className="flex-line">
                     <ToolMark tool={run.requestedTool} />
                     <strong>
-                      {run.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} · 模拟
+                      {run.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} ·{' '}
+                      {run.provider === 'native' ? '原生' : '模拟'}
                     </strong>
                     <span className="spacer" />
                     <RunBadge run={run} />
                   </div>
                   <p>{run.prompt || '未补充要求'}</p>
                   <small>
-                    {time(run.createdAt)} · {run.previousRunId ? '接续此前模拟记录' : '首次模拟'}
+                    {time(run.createdAt)} · {run.previousRunId ? '关联此前执行' : '首次执行'}
                   </small>
                 </div>
               ))}
@@ -1002,10 +1019,7 @@ function TaskPage({ id }: { id: string }) {
               </Empty>
             )
           ) : rightTab === 'code' ? (
-            <Empty
-              title="尚未连接真实代码工作区"
-              description="本轮模拟不会读取目录或生成文件差异。原生执行器接入后，这里显示真实变更。"
-            />
+            <NativeCode run={runs.filter((run) => run.provider === 'native').at(-1)} />
           ) : (
             <div className="task-results">
               {results.map((result) => (
@@ -1174,7 +1188,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E0 · 本地开发预览</span>
+        <span className="badge neutral">E1a · 本地原生执行</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />
@@ -1183,20 +1197,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <p>尚未实现多人登录和远程节点。本版本拒绝对公网监听，不应通过代理开放给团队或互联网。</p>
         </div>
       </div>
-      <h3 className="settings-heading">执行工具</h3>
-      <div className="tool-resource-grid">
-        {(['claude-code', 'codex'] as const).map((tool) => (
-          <div className="panel tool-resource" key={tool}>
-            <ToolMark tool={tool} />
-            <div>
-              <h3>{tool === 'claude-code' ? 'Claude Code' : 'Codex'}</h3>
-              <p>原生适配器</p>
-            </div>
-            <span className="badge neutral">尚未接通</span>
-            <p className="full-row">将在独立执行器接入后提供真实模型、目录、权限和会话能力。</p>
-          </div>
-        ))}
-      </div>
+      <NativeResources />
       <div className="panel settings-line">
         <div className="flex-line">
           <span className="system-avatar">
@@ -1225,7 +1226,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
         </div>
         <div>
           <span>模型费用</span>
-          <strong>未调用真实模型</strong>
+          <strong>模拟不计费；原生费用以工具输出与提供方账单为准</strong>
         </div>
         <div>
           <span>外观</span>

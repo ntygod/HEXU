@@ -4,7 +4,7 @@ Read `docs/product/03-functional-specification.md` and the relevant work package
 
 ## Current implementation
 
-E0 is a **local developer preview**, not a hosted team platform. `docs/development/21-implementation-status.md` distinguishes implemented, simulated and pending capabilities. The only execution provider is `mock`. A label naming Claude Code or Codex in the simulator is NOT a native integration. Do not remove this distinction to make a demo look complete.
+E1a remains a **local single-user developer preview**, not a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex remains unavailable as a native provider.
 
 ## Structure
 
@@ -14,6 +14,8 @@ E0 is a **local developer preview**, not a hosted team platform. `docs/developme
 - `packages/domain`: pure task/run rules. Must not import React, databases, or providers.
 - `packages/db`: local-preview SQLite repository, migrations, transactions and outbox.
 - `packages/adapters/mock`: deterministic simulator. Never spawn shell commands or call a model here.
+- `packages/adapters/claude-code`: explicit JSONL parsing and restricted file-tool arguments; no bypass or hidden SDK/account fallback.
+- `apps/runner/src`: local hosted runtime, Git boundaries and POSIX process groups; not an independent daemon or remote node yet.
 - `packages/ui`: visual tokens and shared components.
 - `packages/client`: browser HTTP client.
 
@@ -26,3 +28,9 @@ Use Node 24 and npm. `npm ci`, `npm run dev`, `npm run typecheck`, `npm test`, `
 Keep source credentials, local databases, screenshots containing real data and `.env` out of Git. Public fixtures must remain fictional. Do not expose local-preview via a tunnel, reverse proxy or 0.0.0.0 binding as a substitute for authentication. Do not add an unrequested license or change repository settings.
 
 Implement small vertical slices. Update the implementation-status document with actual scope and test results, not claims based on documents or mock output. Preserve the original development task IDs and record partial work honestly.
+
+## Native execution boundaries
+
+Native mode is opt-in via local environment and explicit Git roots. Browser requests cannot register arbitrary paths or executable names. Do not enable Bash, MCP, repository hooks, subscription pooling or new network tools merely to make a task succeed. Native tool policies are not an OS sandbox. Preserve working-copy locks when stop cannot be confirmed; never signal a stale persisted PID after restart. Only the offline recovery command accepts the operator's explicit stopped-process confirmation. Task completion still requires no quality report.
+
+Tests must override inherited native settings with a clearly named protocol fixture and fake key. Never use developer/provider credentials in CI. Document Linux-tested, macOS-unverified and Windows-unsupported boundaries. Keep capability detection separate from credential validity and actual model interoperability.
