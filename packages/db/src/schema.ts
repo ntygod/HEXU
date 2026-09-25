@@ -26,4 +26,19 @@ CREATE TABLE native_run_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, run_
 CREATE INDEX native_events_run ON native_run_events(run_id, sequence);
 `,
   },
+  {
+    version: 3,
+    sql: `
+CREATE TABLE continuation_operations (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL REFERENCES tasks(id),
+  working_copy_id TEXT NOT NULL REFERENCES native_workspaces(id),
+  state TEXT NOT NULL CHECK(state IN ('waiting_for_stop','preparing','needs_attention','succeeded','cancelled','failed')),
+  body TEXT NOT NULL
+);
+CREATE INDEX continuation_task ON continuation_operations(task_id);
+CREATE UNIQUE INDEX continuation_active_task ON continuation_operations(task_id) WHERE state IN ('waiting_for_stop','preparing');
+CREATE UNIQUE INDEX continuation_active_copy ON continuation_operations(working_copy_id) WHERE state IN ('waiting_for_stop','preparing');
+`,
+  },
 ];

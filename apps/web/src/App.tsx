@@ -1,3 +1,4 @@
+import { ContinuationStatus } from './continuations.js';
 import { NativeResources, NativeCode, NativeEvents } from './native.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type {
@@ -838,6 +839,12 @@ function TaskPage({ id }: { id: string }) {
               <Icon name="down" size={13} />
             </Button>
           )}
+          {active?.provider === 'native' && (
+            <Button onClick={() => setModal('continue')} disabled={task.status === 'cancelled'}>
+              <Icon name="arrow-right" />
+              准备接续
+            </Button>
+          )}
           <Button disabled title="临时协助将在开发计划 11 中接入；本版本不会伪造真人或 AI 回应。">
             <Icon name="people" />
             请人或 AI 协助
@@ -872,6 +879,7 @@ function TaskPage({ id }: { id: string }) {
           </span>
         </div>
       </div>
+      <ContinuationStatus key={id} taskId={id} onConfigure={() => setModal('continue')} />
       <div className="task-grid">
         <section className="panel collaboration-panel">
           <div className="tabs panel-tabs">

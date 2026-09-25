@@ -1,3 +1,4 @@
+import { ContinuationStore, assertNoPendingContinuation } from './continuations.js';
 import type {
   WorkingCopy,
   NativeRunConfig,
@@ -352,6 +353,7 @@ export class Store {
   ) {
     this.getTask(taskId);
     return this.mutate(`run.create:${taskId}`, key, input, () => {
+      assertNoPendingContinuation(this, taskId);
       const task = this.getTask(taskId);
       assertRevision(task.revision, input.expectedRevision);
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
@@ -524,9 +526,12 @@ export class Store {
     input: NativeRunInput,
     config: NativeRunConfig,
     key: string,
+    operationId?: string,
   ): Run {
     this.getTask(taskId);
     return this.mutate(`native.create:${taskId}`, key, input, () => {
+      assertNoPendingContinuation(this, taskId, input.workingCopyId, operationId);
+      if (operationId) new ContinuationStore(this).assertStart(operationId, taskId, input);
       const task = this.getTask(taskId);
       assertRevision(task.revision, input.expectedRevision);
       if (input.sourceRunId) {
@@ -602,6 +607,7 @@ export class Store {
         'HEXU',
       );
       this.event(taskId, 'run.created');
+      if (operationId) new ContinuationStore(this).attachRun(operationId, run);
       return run;
     });
   }

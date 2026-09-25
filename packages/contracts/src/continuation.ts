@@ -31,8 +31,7 @@ export interface ContinuationOperation {
 export function parseContinuation(value: unknown): ContinuationInput {
   const body = record(value);
   const run = parseNativeRunCreate(body);
-  if (!run.sourceRunId)
-    throw new DomainError('INVALID_CONTINUATION', '继续需要明确来源执行');
+  if (!run.sourceRunId) throw new DomainError('INVALID_CONTINUATION', '继续需要明确来源执行');
   return {
     run,
     onActiveRun: enumValue(body.onActiveRun, ['wait', 'request_stop'] as const, '原执行处理方式'),

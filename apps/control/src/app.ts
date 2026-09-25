@@ -1,3 +1,5 @@
+import { ContinuationCoordinator } from '../../runner/src/continuations.js';
+import { parseContinuation } from '../../../packages/contracts/src/continuation.js';
 import { NativeRuntime, type NativeOptions } from '../../runner/src/runtime.js';
 import { parseNativeRunCreate } from '../../../packages/contracts/src/native.js';
 import Fastify from 'fastify';
@@ -39,6 +41,7 @@ export async function createApp(
     store.close();
     throw error;
   }
+  const continuations = new ContinuationCoordinator(store, native);
   const streams = new Set<ServerResponse>();
   const webRoot = resolve(options.webRoot ?? 'apps/web/dist');
   const allowedOrigins = new Set([
@@ -285,11 +288,26 @@ export async function createApp(
     return run;
   });
   app.post('/api/v1/tasks/:taskId/continuations', async (request, reply) => {
-    const input = parseNativeRunCreate(request.body);
-    if (!input.sourceRunId) throw new DomainError('INVALID_CONTINUATION', '继续需要明确来源执行');
-    const run = await native.create(param(request.params, 'taskId'), input, key(request.headers));
-    return reply.code(201).send(run);
+    const operation = continuations.create(
+      param(request.params, 'taskId'),
+      parseContinuation(request.body),
+      key(request.headers),
+    );
+    return reply.code(202).header('Location', `/api/v1/operations/${operation.id}`).send(operation);
   });
+  app.get('/api/v1/tasks/:taskId/continuations', async (request) => ({
+    items: continuations.records.list(param(request.params, 'taskId')),
+  }));
+  app.get('/api/v1/operations/:operationId', async (request) =>
+    continuations.records.get(param(request.params, 'operationId')),
+  );
+  app.post('/api/v1/operations/:operationId/cancel', async (request) =>
+    continuations.records.cancel(
+      param(request.params, 'operationId'),
+      revision(record(request.body).expectedRevision),
+      key(request.headers),
+    ),
+  );
   app.get('/api/v1/tasks/:taskId/continuation-preview', async (request) =>
     native.continuationPreview(
       param(request.params, 'taskId'),
@@ -431,6 +449,7 @@ export async function createApp(
     streams.clear();
   });
   app.addHook('onClose', async () => {
+    await continuations.close();
     await native.close();
     mock.close();
     store.close();

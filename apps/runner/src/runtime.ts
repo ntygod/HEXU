@@ -298,7 +298,7 @@ export class NativeRuntime {
       ].join('\n\n'),
     );
   }
-  async create(taskId: string, input: NativeRunInput, key: string) {
+  async create(taskId: string, input: NativeRunInput, key: string, operationId?: string) {
     const replay = this.store.replayNativeRun(taskId, input, key);
     if (replay) return replay;
     const capability = input.requestedTool === 'codex' ? this.codexCapability : this.capability;
@@ -329,7 +329,7 @@ export class NativeRuntime {
       contextText,
       contextHash: createHash('sha256').update(contextText).digest('hex'),
     };
-    const run = this.store.createNativeRun(taskId, input, config, key);
+    const run = this.store.createNativeRun(taskId, input, config, key, operationId);
     // A replay returns the same run. Only queued, locally unclaimed work can spawn.
     if (!this.jobs.has(run.id) && this.store.run(run.id).state === 'queued') {
       const job = this.execute(run.id).finally(() => {

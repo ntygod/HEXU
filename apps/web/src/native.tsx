@@ -43,6 +43,7 @@ export function NativeContinue({
   const [loadingModels, setLoadingModels] = useState(false);
   const [budget, setBudget] = useState(1);
   const [consent, setConsent] = useState(false);
+  const [onActiveRun, setOnActiveRun] = useState<'wait' | 'request_stop'>('request_stop');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const chosen = source?.native?.workingCopyId || workingCopyId || native?.workspaces[0]?.id || '';
@@ -68,7 +69,7 @@ export function NativeContinue({
                 provider: 'native',
                 requestedTool: tool,
                 workingCopyId: chosen,
-                ...(source ? { sourceRunId: source.id } : {}),
+                ...(source ? { sourceRunId: source.id, onActiveRun } : {}),
                 mode,
                 prompt,
                 model,
@@ -80,7 +81,9 @@ export function NativeContinue({
             });
             await refresh();
             onClose();
-            notice(source ? `已用 ${label} 接续；任务和代码目录保留` : `已派发 ${label} 原生执行`);
+            notice(
+              source ? `已保存 ${label} 接续安排；进度会保留在任务中` : `已派发 ${label} 原生执行`,
+            );
           } catch (err) {
             setError((err as Error).message);
           } finally {
@@ -192,26 +195,24 @@ export function NativeContinue({
               {awaitingStop && (
                 <div className="notice-box">
                   <div>
-                    <strong>原执行尚未确认停止</strong>
-                    <p>{context?.reason}。刷新或关闭面板不会自动启动新执行。</p>
-                    <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={async () => {
-                        setBusy(true);
-                        setError('');
-                        try {
-                          await request(`/runs/${source.id}/stop`, { method: 'POST', body: {} });
-                          await refresh();
-                        } catch (err) {
-                          setError((err as Error).message);
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      请求停止原执行
-                    </Button>
+                    <strong>原执行尚未确认结束</strong>
+                    <p>接续安排会保存。只有确认原进程停止、目录释放后，才会开始新执行。</p>
+                    <label className="field">
+                      如何处理原执行
+                      <select
+                        aria-label="如何处理原执行"
+                        value={onActiveRun}
+                        disabled={busy}
+                        onChange={(e) => {
+                          setOnActiveRun(e.target.value as 'wait' | 'request_stop');
+                          setConsent(false);
+                        }}
+                      >
+                        <option value="request_stop">请求停止原执行，然后继续</option>
+                        <option value="wait">不打断，等原执行自然结束</option>
+                      </select>
+                    </label>
+                    <p>关闭页面不会取消接续；取消接续也不会撤销已发送的停止请求。</p>
                   </div>
                 </div>
               )}
@@ -319,7 +320,9 @@ export function NativeContinue({
               <details className="native-details">
                 <summary>查看接续上下文与代码来源</summary>
                 <pre>{context?.contextText ?? context?.text ?? '正在整理…'}</pre>
-                <p>本次要求会一并发送；只提供部分变更摘录，不搬运模型隐藏状态。</p>
+                <p>
+                  本次要求会一并发送。等待原执行结束时，会在同一授权目录内重新整理最新输出和部分变更摘录；人工说明变化将暂停接续。
+                </p>
               </details>
               <label className="check-line">
                 <input
@@ -350,16 +353,19 @@ export function NativeContinue({
               !chosen ||
               !consent ||
               !prompt.trim() ||
-              !!awaitingStop ||
               (!!source && !context)
             }
           >
             <Icon name="play" />
-            {task.status === 'done'
-              ? '重新打开并继续'
-              : source
-                ? `用 ${label} 继续`
-                : '开始原生执行'}
+            {awaitingStop
+              ? onActiveRun === 'request_stop'
+                ? `停止后用 ${label} 继续`
+                : '原执行结束后继续'
+              : task.status === 'done'
+                ? '重新打开并继续'
+                : source
+                  ? `用 ${label} 继续`
+                  : '开始原生执行'}
           </Button>
         </div>
       </form>
