@@ -74,20 +74,18 @@ export async function createApp(
         ? statusCode
         : 500;
     if (status >= 500) request.log.error(error);
-    reply
-      .code(status)
-      .send({
-        error: {
-          code: known ? error.code : status === 500 ? 'INTERNAL_ERROR' : 'INVALID_REQUEST',
-          message: known
-            ? error.message
-            : status === 500
-              ? '服务暂时无法完成操作，数据未被清空'
-              : '请求格式不正确',
-          retryable: status >= 500,
-        },
-        requestId: request.id,
-      });
+    reply.code(status).send({
+      error: {
+        code: known ? error.code : status === 500 ? 'INTERNAL_ERROR' : 'INVALID_REQUEST',
+        message: known
+          ? error.message
+          : status === 500
+            ? '服务暂时无法完成操作，数据未被清空'
+            : '请求格式不正确',
+        retryable: status >= 500,
+      },
+      requestId: request.id,
+    });
   });
   app.get('/health', async () => ({ status: 'ok', mode: 'local-preview' }));
   app.get('/ready', async () => {
@@ -105,17 +103,15 @@ export async function createApp(
     if (param(request.params, 'spaceId') !== SPACE_ID)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     const body = record(request.body);
-    return reply
-      .code(201)
-      .send(
-        store.createProject(
-          {
-            name: text(body.name, '项目名称', 100),
-            description: text(body.description, '说明', 2000, true),
-          },
-          key(request.headers),
-        ),
-      );
+    return reply.code(201).send(
+      store.createProject(
+        {
+          name: text(body.name, '项目名称', 100),
+          description: text(body.description, '说明', 2000, true),
+        },
+        key(request.headers),
+      ),
+    );
   });
   app.get('/api/v1/projects/:projectId', async (request) =>
     store.project(param(request.params, 'projectId')),
@@ -337,12 +333,10 @@ export async function createApp(
     });
   app.get('/*', async (request, reply) => {
     if (request.url.startsWith('/api/'))
-      return reply
-        .code(404)
-        .send({
-          error: { code: 'NOT_FOUND', message: '接口尚未实现', retryable: false },
-          requestId: request.id,
-        });
+      return reply.code(404).send({
+        error: { code: 'NOT_FOUND', message: '接口尚未实现', retryable: false },
+        requestId: request.id,
+      });
     const pathname = new URL(request.url, 'http://localhost').pathname;
     let file = resolve(webRoot, '.' + decodeURIComponent(pathname));
     const rel = relative(webRoot, file);
