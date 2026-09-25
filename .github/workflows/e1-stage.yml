@@ -1,0 +1,54 @@
+name: E1 native runtime integration
+on:
+  push:
+    branches: ['codex/e1-native-runtime-20260925']
+    paths: ['.github/e1-staging/**', '.github/workflows/e1-stage.yml']
+permissions:
+  contents: write
+concurrency:
+  group: e1-stage-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply hash-checked authored E1 patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, bz2, hashlib
+          encoded = ''.join(p.read_text().strip() for p in sorted(Path('.github/e1-staging').glob('part-*.b64')))
+          patch = bz2.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(patch).hexdigest() == '80bc7264f2cdefba5ed08fcedec14866f93c845485249d518414f036daeef99d', 'Patch hash mismatch'
+          Path('/tmp/hexu-e1.patch').write_bytes(patch)
+          PY
+          git apply --index /tmp/hexu-e1.patch
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Persist tested sources on development branch
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: add E1a local native Claude file-tool execution and workspace diffs'
+          git push origin "HEAD:$TARGET_BRANCH"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-e1-browser-results
+          path: |
+            artifacts/
+            playwright-report/
+            test-results/
+          retention-days: 7
