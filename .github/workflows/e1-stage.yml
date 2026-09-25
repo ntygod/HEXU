@@ -30,7 +30,30 @@ jobs:
           Path('/tmp/hexu-e1.patch').write_bytes(patch)
           PY
           git apply --index /tmp/hexu-e1.patch
+      - name: Apply native form accessibility refinement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('apps/web/src/native.tsx')
+          s = p.read_text()
+          for before, after in [
+            ('<select\n                  value={chosen}', '<select\n                  aria-label="工作目录"\n                  value={chosen}'),
+            ('<select\n                  value={mode}', '<select\n                  aria-label="本次能力"\n                  value={mode}'),
+            ('<textarea\n                  autoFocus', '<textarea\n                  aria-label="接下来做什么"\n                  autoFocus'),
+          ]:
+            assert before in s
+            s = s.replace(before, after)
+          p.write_text(s)
+          p = Path('tests/e2e/native.spec.ts')
+          s = p.read_text()
+          before = r'page.getByText(/fixture response \[REDACTED\]/)'
+          after = r"page.locator('.message-content').filter({ hasText: /fixture response \[REDACTED\]/ })"
+          assert before in s
+          p.write_text(s.replace(before, after))
+          PY
       - run: npm ci --ignore-scripts
+      - run: npx prettier --write apps/web/src/native.tsx tests/e2e/native.spec.ts
+      - run: git add apps/web/src/native.tsx tests/e2e/native.spec.ts
       - run: npm run format:check
       - run: npm run check
       - run: npx playwright install --with-deps chromium
