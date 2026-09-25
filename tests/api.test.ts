@@ -77,14 +77,21 @@ test('请求验证与 409 并发更新', async () => {
     await app.close();
   }
 });
-test('明确拒绝未接通的原生工具', async () => {
-  const app = await createApp();
+test('明确拒绝未启用的原生工具', async () => {
+  const app = await createApp({ native: { enabled: false, roots: [] } });
   try {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/tasks/task-24/runs',
       headers: headers(),
-      payload: { provider: 'native', requestedTool: 'codex', expectedRevision: 1 },
+      payload: {
+        provider: 'native',
+        requestedTool: 'codex',
+        expectedRevision: 1,
+        confirmExecution: true,
+        workingCopyId: 'not-configured',
+        prompt: 'analyze',
+      },
     });
     assert.equal(response.statusCode, 422);
     assert.equal(response.json().error.code, 'CAPABILITY_UNAVAILABLE');

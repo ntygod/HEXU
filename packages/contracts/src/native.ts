@@ -1,4 +1,4 @@
-import { DomainError, enumValue, record, revision, text } from './index.js';
+import { DomainError, enumValue, record, revision, text, type Tool } from './index.js';
 
 export type NativeMode = 'read-only' | 'edit';
 export interface WorkingCopy {
@@ -8,7 +8,7 @@ export interface WorkingCopy {
   createdAt: string;
 }
 export interface NativeCapability {
-  tool: 'claude-code';
+  tool: Tool;
   available: boolean;
   version: string | null;
   reason: string;
@@ -22,6 +22,7 @@ export interface NativeOverview {
   platform: string;
   workspaces: WorkingCopy[];
   claude: NativeCapability;
+  codex: NativeCapability;
   limitations: string[];
 }
 export interface NativeRunConfig {
@@ -29,12 +30,21 @@ export interface NativeRunConfig {
   mode: NativeMode;
   model: string | null;
   maxTurns: number;
-  maxBudgetUsd: number;
+  maxBudgetUsd: number | null;
   timeoutSeconds: number;
   toolVersion: string;
   contextText: string;
   contextHash: string;
   sessionId?: string;
+  turnId?: string;
+  resolvedModel?: string;
+  inputCheckpoint?: {
+    head: string | null;
+    branch: string | null;
+    paths: string[];
+    capturedAt: string;
+  };
+  continuationSourceId?: string;
   terminationConfirmed?: boolean;
   recoveryRequired?: boolean;
 }
@@ -67,14 +77,15 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
 }
 export function parseNativeRunCreate(value: unknown) {
   const body = record(value);
-  if (body.provider !== 'native' || body.requestedTool !== 'claude-code')
+  if (body.provider !== 'native' || !['claude-code', 'codex'].includes(String(body.requestedTool)))
     throw new DomainError(
       'CAPABILITY_UNAVAILABLE',
-      '当前原生适配仅支持 Claude Code；Codex 尚未接入',
+      '请选择已配置的 Claude Code 或 Codex 原生工具',
       422,
     );
   if (body.confirmExecution !== true)
     throw new DomainError('EXECUTION_CONSENT_REQUIRED', '请确认本次使用本机工具和模型费用', 422);
+  const tool = enumValue(body.requestedTool, ['claude-code', 'codex'] as const, '原生工具');
   const model = text(body.model, '模型', 100, true);
   if (model && !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(model))
     throw new DomainError('INVALID_INPUT', '模型名称格式不正确');
@@ -84,13 +95,17 @@ export function parseNativeRunCreate(value: unknown) {
     throw new DomainError('INVALID_INPUT', '轮数和超时必须为整数');
   return {
     provider: 'native' as const,
-    requestedTool: 'claude-code' as const,
+    requestedTool: tool,
+    sourceRunId: body.sourceRunId == null ? null : text(body.sourceRunId, '来源执行', 100),
     workingCopyId: text(body.workingCopyId, '工作目录', 100),
     mode: enumValue(body.mode ?? 'read-only', ['read-only', 'edit'] as const, '执行方式'),
     prompt: text(body.prompt, '本次要求', 12000),
     model: model || null,
     maxTurns,
-    maxBudgetUsd: boundedNumber(body.maxBudgetUsd, 1, 0.01, 10, '预算上限（美元）'),
+    maxBudgetUsd:
+      tool === 'claude-code'
+        ? boundedNumber(body.maxBudgetUsd, 1, 0.01, 10, '预算上限（美元）')
+        : null,
     timeoutSeconds,
     expectedRevision: revision(body.expectedRevision),
     reopenTask: body.reopenTask === true,

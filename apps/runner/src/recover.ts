@@ -5,7 +5,7 @@ import { Store } from '../../../packages/db/src/store.js';
 const [id, acknowledgement] = process.argv.slice(2);
 if (!id || acknowledgement !== '--confirm-process-stopped') {
   console.error(
-    '请先退出 HEXU，并在系统中确认旧 Claude 及其子进程已经停止。\n然后运行：npm run native:recover -- <runId> --confirm-process-stopped',
+    '请先退出 HEXU，并在系统中确认旧 Claude / Codex 及其子进程已经停止。\n然后运行：npm run native:recover -- <runId> --confirm-process-stopped',
   );
   process.exitCode = 1;
 } else {

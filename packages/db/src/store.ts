@@ -492,6 +492,33 @@ export class Store {
       .get(workingCopyId) as { run_id: string } | undefined;
     return row?.run_id ?? null;
   }
+  replayNativeRun(taskId: string, input: NativeRunInput, key: string): Run | null {
+    this.getTask(taskId);
+    const row = this.db
+      .prepare('SELECT fingerprint,result FROM idempotency_records WHERE scope=? AND key=?')
+      .get(`${this.actorId}:native.create:${taskId}`, key) as
+      | { fingerprint: string; result: string }
+      | undefined;
+    if (!row) return null;
+    if (row.fingerprint !== createHash('sha256').update(canonicalJson(input)).digest('hex'))
+      throw new DomainError('IDEMPOTENCY_CONFLICT', '相同操作标识不能用于不同内容', 409);
+    return this.run((JSON.parse(row.result) as Run).id);
+  }
+  recordNativeReferences(
+    id: string,
+    refs: { sessionId?: string; turnId?: string; resolvedModel?: string },
+  ) {
+    return this.transaction(() => {
+      const run = this.run(id);
+      if (run.provider !== 'native' || !run.native || !isActiveRun(run.state)) return;
+      this.saveRun({
+        ...run,
+        native: { ...run.native, ...refs },
+        revision: run.revision + 1,
+        updatedAt: now(),
+      });
+    });
+  }
   createNativeRun(
     taskId: string,
     input: NativeRunInput,
@@ -502,6 +529,32 @@ export class Store {
     return this.mutate(`native.create:${taskId}`, key, input, () => {
       const task = this.getTask(taskId);
       assertRevision(task.revision, input.expectedRevision);
+      if (input.sourceRunId) {
+        const source = this.run(input.sourceRunId);
+        if (
+          source.taskId !== taskId ||
+          source.provider !== 'native' ||
+          !source.native ||
+          source.native.workingCopyId !== input.workingCopyId
+        )
+          throw new DomainError('INVALID_CONTINUATION', '来源执行与当前任务或目录不一致', 409);
+        if (isActiveRun(source.state) || source.native.terminationConfirmed !== true)
+          throw new DomainError(
+            'SOURCE_RUN_ACTIVE',
+            '先停止原执行并等待确认，再继续；不会强行接管',
+            409,
+          );
+        if (
+          this.runs(taskId)
+            .filter((r) => r.provider === 'native')
+            .at(-1)?.id !== source.id
+        )
+          throw new DomainError(
+            'CONTINUATION_CHANGED',
+            '任务已有更新的原生执行，请重新打开继续面板',
+            409,
+          );
+      }
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
         throw new DomainError('TASK_REOPEN_REQUIRED', '请先重新打开任务', 409);
       if (
@@ -527,13 +580,13 @@ export class Store {
         id: randomUUID(),
         taskId,
         provider: 'native',
-        requestedTool: 'claude-code',
+        requestedTool: input.requestedTool,
         scenario: 'success',
         prompt: input.prompt,
         state: 'queued',
         observation: 'fresh',
         native: config,
-        previousRunId: this.runs(taskId).at(-1)?.id ?? null,
+        previousRunId: input.sourceRunId ?? this.runs(taskId).at(-1)?.id ?? null,
         revision: 1,
         createdAt: at,
         updatedAt: at,
@@ -544,7 +597,7 @@ export class Store {
         .run(input.workingCopyId, run.id);
       this.insertMessage(
         taskId,
-        `开始 Claude Code 原生执行（${config.mode === 'edit' ? '允许文件编辑，不提供 Shell' : '只读文件工具'}）。本次使用本机 API key，可能产生模型费用。\n要求：${input.prompt}`,
+        `开始 ${input.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} 原生执行（${config.mode === 'edit' ? '允许文件编辑，不提供 Shell' : '只读文件工具'}）。本次使用本机 API key，可能产生模型费用。\n要求：${input.prompt}`,
         'system',
         'HEXU',
       );
@@ -588,7 +641,7 @@ export class Store {
         observation: terminationConfirmed ? 'fresh' : 'unknown',
         native: {
           ...run.native,
-          sessionId,
+          sessionId: sessionId ?? run.native.sessionId,
           terminationConfirmed,
           recoveryRequired: !terminationConfirmed,
         },
@@ -597,7 +650,12 @@ export class Store {
       });
       if (terminationConfirmed)
         this.db.prepare('DELETE FROM native_workspace_locks WHERE run_id=?').run(id);
-      this.insertMessage(run.taskId, note.slice(0, 24000), 'agent', 'Claude Code · 原生');
+      this.insertMessage(
+        run.taskId,
+        note.slice(0, 24000),
+        'agent',
+        `${run.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} · 原生`,
+      );
       return next;
     });
   }

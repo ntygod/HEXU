@@ -21,7 +21,8 @@
     "packages/adapters/mock/src/**/*.ts",
     "tests/**/*.ts",
     "apps/runner/src/**/*.ts",
-    "packages/adapters/claude-code/src/**/*.ts"
+    "packages/adapters/claude-code/src/**/*.ts",
+    "packages/adapters/codex/src/**/*.ts"
   ],
   "exclude": ["tests/e2e/**"]
 }

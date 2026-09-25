@@ -11,6 +11,8 @@ export interface ProcessOutcome {
 export interface ProcessHandle {
   done: Promise<ProcessOutcome>;
   stop(): void;
+  send(line: string): void;
+  endInput(): void;
 }
 /** Bounded POSIX process group. Never uses a shell or executes text received from the model. */
 export function runProcess(options: {
@@ -19,6 +21,7 @@ export function runProcess(options: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   input?: string;
+  keepInputOpen?: boolean;
   timeoutMs: number;
   maxOutputBytes?: number;
   killGraceMs?: number;
@@ -104,7 +107,19 @@ export function runProcess(options: {
   child.stdin.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code !== 'EPIPE' && !stopped) abort('无法向原生工具发送本次输入');
   });
-  child.stdin.end(options.input ?? '');
+  const send = (line: string) => {
+    if (closed || stopped || !child.stdin.writable || child.stdin.writableEnded)
+      throw new Error('原生输入通道已关闭');
+    if (Buffer.byteLength(line) > 512 * 1024 || child.stdin.writableLength > 1024 * 1024)
+      throw new Error('原生输入超过缓冲上限');
+    child.stdin.write(line);
+  };
+  const endInput = () => {
+    if (!child.stdin.writableEnded) child.stdin.end();
+  };
+  if (options.keepInputOpen) {
+    if (options.input) send(options.input);
+  } else child.stdin.end(options.input ?? '');
   child.on('exit', () => {
     // Close inherited output pipes from lingering descendants before waiting for close.
     if (groupAlive()) {
@@ -130,5 +145,5 @@ export function runProcess(options: {
       resolve({ code, signal, stopped, terminationConfirmed, error });
     });
   });
-  return { done, stop };
+  return { done, stop, send, endInput };
 }

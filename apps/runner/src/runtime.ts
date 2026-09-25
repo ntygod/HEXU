@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { delimiter, isAbsolute, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import { openCodex } from './codex-host.js';
 import { DomainError } from '../../../packages/contracts/src/index.js';
 import type {
   NativeCapability,
@@ -26,6 +27,8 @@ export interface NativeOptions {
   roots: string[];
   claudeExecutable?: string;
   apiKey?: string;
+  codexExecutable?: string;
+  codexApiKey?: string;
 }
 export function nativeOptionsFromEnvironment(): NativeOptions {
   if (process.env.HEXU_NATIVE_ENABLED !== '1') return { enabled: false, roots: [] };
@@ -47,6 +50,8 @@ export function nativeOptionsFromEnvironment(): NativeOptions {
     roots,
     claudeExecutable: process.env.HEXU_CLAUDE_BIN,
     apiKey: process.env.ANTHROPIC_API_KEY,
+    codexExecutable: process.env.HEXU_CODEX_BIN,
+    codexApiKey: process.env.OPENAI_API_KEY,
   };
 }
 
@@ -57,6 +62,22 @@ export class NativeRuntime {
   private jobs = new Map<string, Promise<void>>();
   private executable: string | null = null;
   private closing = false;
+  private catalogHandle: ProcessHandle | null = null;
+  private codexExecutable: string | null = null;
+  private codexCapability: NativeCapability = {
+    tool: 'codex',
+    available: false,
+    version: null,
+    reason: '原生执行未启用',
+    modes: [],
+    authentication: 'api-key-environment',
+    liveInput: false,
+    nativeResume: false,
+  };
+  private catalogJob: Promise<{
+    items: import('../../../packages/adapters/codex/src/index.js').CodexModel[];
+    source: string;
+  }> | null = null;
   private capability: NativeCapability = {
     tool: 'claude-code',
     available: false,
@@ -77,10 +98,14 @@ export class NativeRuntime {
     this.store.recoverNativeRuns();
     if (!this.options.enabled) return;
     if (process.platform === 'win32') {
-      this.capability.reason = '原生进程树管理尚不支持 Windows';
+      this.capability.reason = this.codexCapability.reason = '原生进程树管理尚不支持 Windows';
       return;
     }
     await this.workspaces.initialize();
+    await this.initializeClaude();
+    await this.initializeCodex();
+  }
+  private async initializeClaude() {
     const candidate = this.options.claudeExecutable ?? 'claude';
     const candidates = isAbsolute(candidate)
       ? [candidate]
@@ -138,6 +163,91 @@ export class NativeRuntime {
       reason: '检测到原生 CLI；凭证有效性将在执行时由提供方确认',
     };
   }
+  private async initializeCodex() {
+    const candidate = this.options.codexExecutable ?? 'codex';
+    const paths = isAbsolute(candidate)
+      ? [candidate]
+      : candidate === 'codex'
+        ? (process.env.PATH ?? '')
+            .split(delimiter)
+            .filter(isAbsolute)
+            .map((p) => resolve(p, 'codex'))
+        : [];
+    for (const path of paths) {
+      try {
+        await access(path, constants.X_OK);
+        this.codexExecutable = await realpath(path);
+        break;
+      } catch {
+        /* try configured PATH */
+      }
+    }
+    if (!this.codexExecutable) {
+      this.codexCapability.reason = '未找到 Codex；请安装或配置绝对路径 HEXU_CODEX_BIN';
+      return;
+    }
+    const probe = async (args: string[]) => {
+      let output = '';
+      const handle = runProcess({
+        executable: this.codexExecutable!,
+        args,
+        cwd: tmpdir(),
+        env: { PATH: process.env.PATH, LANG: 'C.UTF-8' },
+        timeoutMs: 5000,
+        maxOutputBytes: 256 * 1024,
+        onLine: (line) => {
+          output += line + '\n';
+        },
+      });
+      const result = await handle.done;
+      return result.code === 0 && !result.error && result.terminationConfirmed ? output : '';
+    };
+    this.codexCapability.version = (await probe(['--version'])).trim().slice(0, 200) || null;
+    const help = await probe(['app-server', '--help']);
+    if (!this.codexCapability.version || !help.includes('--listen') || !help.includes('--config')) {
+      this.codexCapability.reason =
+        'Codex 缺少所需 App Server 参数；请更新，不会回退到无限权限模式';
+      return;
+    }
+    if (!this.options.codexApiKey?.trim()) {
+      this.codexCapability.reason = '需要本机 OPENAI_API_KEY；本轮不复用订阅登录或个人 Codex 配置';
+      return;
+    }
+    this.codexCapability = {
+      ...this.codexCapability,
+      available: true,
+      modes: ['read-only', 'edit'],
+      reason: '已检测 CLI 与 API key 配置；运行前核对协议与受限配置，未据此证明账户有效',
+    };
+  }
+  async codexModels() {
+    if (this.closing || !this.codexCapability.available)
+      throw new DomainError('CAPABILITY_UNAVAILABLE', this.codexCapability.reason, 422);
+    if (this.catalogJob) return this.catalogJob;
+    this.catalogJob = (async () => {
+      const handle = await openCodex({
+        executable: this.codexExecutable!,
+        root: this.workspaces.list()[0]!.root,
+        apiKey: this.options.codexApiKey!,
+        onEvent: () => {},
+        onReferences: () => {},
+      });
+      this.catalogHandle = handle;
+      if (this.closing) handle.stop();
+      const outcome = await handle.done;
+      this.catalogHandle = null;
+      if (outcome.error || outcome.stopped || !outcome.terminationConfirmed)
+        throw new DomainError(
+          'MODEL_CATALOG_UNAVAILABLE',
+          this.clean(outcome.error ?? '无法结束模型目录连接'),
+          422,
+        );
+      return { items: handle.models, source: 'codex-app-server' };
+    })().finally(() => {
+      this.catalogJob = null;
+    });
+    return this.catalogJob;
+  }
   private environment(withKey: boolean): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {};
     for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL'])
@@ -146,7 +256,10 @@ export class NativeRuntime {
     return env; // Do not forward NODE_OPTIONS, tool customization, database or unrelated credentials.
   }
   clean(value: string) {
-    return redact(value, this.options.apiKey ? [this.options.apiKey] : []);
+    return redact(
+      value,
+      [this.options.apiKey, this.options.codexApiKey].filter((v): v is string => !!v),
+    );
   }
   overview(): NativeOverview {
     return {
@@ -154,11 +267,12 @@ export class NativeRuntime {
       platform: process.platform,
       workspaces: this.workspaces.list(),
       claude: this.capability,
+      codex: this.codexCapability,
       limitations: [
         '仅本机单用户实验接入；不提供公网或远程节点',
         '仅显式文件工具；不提供 Bash、网络工具、MCP 或仓库 Hooks',
         '运行中追加输入与原生会话恢复未接入；下一次执行使用任务上下文',
-        'Codex 暂未原生接入；模拟选择不会产生真实调用',
+        'Codex 使用独立临时配置与 API key；不承诺美元预算硬上限',
         '文件工具限制不是操作系统沙箱，请使用专用开发用户或隔离环境',
       ],
     };
@@ -185,10 +299,22 @@ export class NativeRuntime {
     );
   }
   async create(taskId: string, input: NativeRunInput, key: string) {
-    if (this.closing || !this.capability.available)
-      throw new DomainError('CAPABILITY_UNAVAILABLE', this.capability.reason, 422);
+    const replay = this.store.replayNativeRun(taskId, input, key);
+    if (replay) return replay;
+    const capability = input.requestedTool === 'codex' ? this.codexCapability : this.capability;
+    if (this.closing || !capability.available)
+      throw new DomainError('CAPABILITY_UNAVAILABLE', capability.reason, 422);
     await this.workspaces.get(input.workingCopyId);
-    const contextText = this.context(taskId, input.prompt);
+    let checkpoint: NativeRunConfig['inputCheckpoint'];
+    let contextText = this.context(taskId, input.prompt);
+    if (input.sourceRunId) {
+      const preview = await this.continuationPreview(taskId, input.sourceRunId);
+      if (preview.workingCopyId !== input.workingCopyId)
+        throw new DomainError('INVALID_CONTINUATION', '继续必须沿用来源工作目录', 409);
+      if (!preview.canContinue) throw new DomainError('SOURCE_RUN_ACTIVE', preview.reason, 409);
+      checkpoint = preview.checkpoint;
+      contextText = this.clean(preview.contextText + '\n\n# 本次要求\n' + input.prompt);
+    }
     const config: NativeRunConfig = {
       workingCopyId: input.workingCopyId,
       mode: input.mode,
@@ -196,7 +322,10 @@ export class NativeRuntime {
       maxTurns: input.maxTurns,
       maxBudgetUsd: input.maxBudgetUsd,
       timeoutSeconds: input.timeoutSeconds,
-      toolVersion: this.capability.version!,
+      toolVersion: capability.version!,
+      ...(checkpoint
+        ? { inputCheckpoint: checkpoint, continuationSourceId: input.sourceRunId! }
+        : {}),
       contextText,
       contextHash: createHash('sha256').update(contextText).digest('hex'),
     };
@@ -211,6 +340,59 @@ export class NativeRuntime {
     }
     return run;
   }
+  async continuationPreview(taskId: string, sourceRunId: string) {
+    const task = this.store.getTask(taskId),
+      source = this.store.run(sourceRunId);
+    if (source.taskId !== taskId || source.provider !== 'native' || !source.native)
+      throw new DomainError('INVALID_CONTINUATION', '不是本任务的原生执行', 409);
+    const snapshot = await this.workspaces.snapshot(source.native.workingCopyId);
+    const checkpoint = {
+      head: snapshot.head,
+      branch: snapshot.branch,
+      paths: snapshot.changes.map((c) => c.path),
+      capturedAt: snapshot.capturedAt,
+    };
+    const snippets: string[] = [];
+    let remaining = 16000;
+    for (const change of snapshot.changes.slice(0, 6)) {
+      if (remaining <= 0) break;
+      const diff = await this.workspaces
+        .diff(source.native.workingCopyId, change.path)
+        .catch(() => null);
+      if (diff) {
+        const text = diff.text.slice(0, Math.min(4000, remaining));
+        snippets.push(`${change.path}\n${text}`);
+        remaining -= text.length;
+      }
+    }
+    const canContinue =
+      !isActiveRun(source.state) &&
+      source.native.terminationConfirmed === true &&
+      !snapshot.busyRunId;
+    return {
+      sourceRunId,
+      sourceTool: source.requestedTool,
+      workingCopyId: source.native.workingCopyId,
+      taskRevision: task.revision,
+      canContinue,
+      reason: canContinue
+        ? '沿用当前目录与未提交修改，新建目标工具会话'
+        : '请先停止当前执行并等待确认，再继续',
+      checkpoint,
+      contextText: this.clean(
+        [
+          this.context(taskId),
+          '# 接续来源',
+          `${source.requestedTool} / ${source.id}`,
+          '# 当前代码现场（不代表全部由 AI 修改）',
+          JSON.stringify(checkpoint),
+          '# 部分变更摘录（最多 6 文件、16000 字符；不是完整仓库或模型内部状态）',
+          ...snippets,
+          snapshot.omitted ? `另有 ${snapshot.omitted} 项未提供；不会自动读取敏感文件。` : '',
+        ].join('\n\n'),
+      ),
+    };
+  }
   private async execute(id: string) {
     let processStarted = false;
     try {
@@ -224,6 +406,54 @@ export class NativeRuntime {
           'cancelled',
           '原生执行在启动进程前已取消，没有模型调用。',
           true,
+        );
+        return;
+      }
+      if (run.requestedTool === 'codex') {
+        const handle = await openCodex({
+          executable: this.codexExecutable!,
+          root: copy.root,
+          apiKey: this.options.codexApiKey!,
+          config,
+          onEvent: (kind, text) => this.store.appendNativeEvent(id, kind, this.clean(text)),
+          onReferences: (refs) => this.store.recordNativeReferences(id, refs),
+        });
+        processStarted = true;
+        this.handles.set(id, handle);
+        if (this.closing || this.store.run(id).state === 'stopping') handle.stop();
+        else this.store.stepRun(id, 'running');
+        const outcome = await handle.done,
+          result = handle.summary;
+        const stopped = this.store.run(id).state === 'stopping' || outcome.stopped;
+        const success =
+          !stopped &&
+          !outcome.error &&
+          outcome.terminationConfirmed &&
+          result.resultReceived &&
+          result.success;
+        const note = success
+          ? '本次 Codex 原生执行已结束；任务完成由你决定。'
+          : stopped
+            ? 'Codex 已请求停止，已产生的代码修改保留。'
+            : 'Codex 执行未完成，已保留工作记录。';
+        this.store.finishNativeRun(
+          id,
+          success ? 'succeeded' : stopped && !outcome.error ? 'cancelled' : 'failed',
+          this.clean(
+            [
+              note,
+              result.text,
+              outcome.error,
+              !result.resultReceived && !stopped
+                ? '未收到目标 turn/completed，未将退出码当作成功。'
+                : '',
+              result.denials ? `${result.denials} 项额外交互已拒绝，未扩大权限。` : '',
+            ]
+              .filter(Boolean)
+              .join('\n\n'),
+          ),
+          outcome.terminationConfirmed,
+          result.sessionId,
         );
         return;
       }
@@ -309,6 +539,8 @@ export class NativeRuntime {
   }
   async close() {
     this.closing = true;
+    this.catalogHandle?.stop();
+    if (this.catalogJob) await Promise.allSettled([this.catalogJob]);
     for (const [id, handle] of this.handles) {
       if (isActiveRun(this.store.run(id).state)) this.store.stopRun(id, `shutdown-${id}`);
       handle.stop();

@@ -22,19 +22,39 @@ export function NativeContinue({
   onMock(): void;
 }) {
   const { value: native, error: loadError } = useLoad<NativeOverview>('/native');
-  const { value: context } = useLoad<{ text: string }>(`/tasks/${task.id}/native-context`);
+  const source = lastRun?.provider === 'native' && lastRun.native ? lastRun : undefined;
+  const { value: context, error: contextError } = useLoad<{
+    text?: string;
+    contextText?: string;
+    canContinue?: boolean;
+    reason?: string;
+  }>(
+    source
+      ? `/tasks/${task.id}/continuation-preview?sourceRunId=${encodeURIComponent(source.id)}`
+      : `/tasks/${task.id}/native-context`,
+  );
   const { refresh, notice } = useApp();
-  const [workingCopyId, setWorkingCopyId] = useState(lastRun?.native?.workingCopyId ?? '');
+  const [tool, setTool] = useState<'claude-code' | 'codex'>(source?.requestedTool ?? 'claude-code');
+  const [workingCopyId, setWorkingCopyId] = useState(source?.native?.workingCopyId ?? '');
   const [mode, setMode] = useState<NativeMode>('read-only');
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState('');
+  const [models, setModels] = useState<{ id: string; name: string }[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [budget, setBudget] = useState(1);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
-  const chosen = workingCopyId || native?.workspaces[0]?.id || '';
+  const chosen = source?.native?.workingCopyId || workingCopyId || native?.workspaces[0]?.id || '';
+  const capability = tool === 'codex' ? native?.codex : native?.claude;
+  const label = tool === 'codex' ? 'Codex' : 'Claude Code';
+  const awaitingStop = source && context?.canContinue === false;
   return (
-    <Dialog title="使用本机 Claude Code" drawer onClose={() => !busy && onClose()}>
+    <Dialog
+      title={source ? '接着当前工作继续' : '使用本机原生工具'}
+      drawer
+      onClose={() => !busy && onClose()}
+    >
       <form
         className="drawer-form"
         onSubmit={async (e) => {
@@ -42,16 +62,17 @@ export function NativeContinue({
           setBusy(true);
           setError('');
           try {
-            await request(`/tasks/${task.id}/runs`, {
+            await request(`/tasks/${task.id}/${source ? 'continuations' : 'runs'}`, {
               method: 'POST',
               body: {
                 provider: 'native',
-                requestedTool: 'claude-code',
+                requestedTool: tool,
                 workingCopyId: chosen,
+                ...(source ? { sourceRunId: source.id } : {}),
                 mode,
                 prompt,
                 model,
-                maxBudgetUsd: budget,
+                ...(tool === 'claude-code' ? { maxBudgetUsd: budget } : {}),
                 confirmExecution: consent,
                 expectedRevision: task.revision,
                 reopenTask: task.status === 'done',
@@ -59,7 +80,7 @@ export function NativeContinue({
             });
             await refresh();
             onClose();
-            notice('已派发本机原生执行；不是模拟输出');
+            notice(source ? `已用 ${label} 接续；任务和代码目录保留` : `已派发 ${label} 原生执行`);
           } catch (err) {
             setError((err as Error).message);
           } finally {
@@ -68,19 +89,62 @@ export function NativeContinue({
         }}
       >
         <div className="dialog-body">
+          {contextError && (
+            <p role="alert" className="form-error">
+              {contextError}
+            </p>
+          )}
           <div className="native-mode-heading">
             <span className="badge status-in_progress">原生执行 · 实验接入</span>
             <Button type="button" onClick={onMock} disabled={busy}>
               返回模拟体验
             </Button>
           </div>
+          {source && (
+            <div className="continuation-source">
+              <div className="flex-line">
+                <ToolMark tool={source.requestedTool} />
+                <strong>{source.requestedTool === 'codex' ? 'Codex' : 'Claude Code'}</strong>
+                <Icon name="arrow-right" />
+                <ToolMark tool={tool} />
+                <strong>{label}</strong>
+              </div>
+              <p>同一任务 · 沿用目录和未提交修改 · 创建新会话</p>
+            </div>
+          )}
+          <fieldset className="tool-choice-field">
+            <legend>接下来使用</legend>
+            <div className="native-tool-choice">
+              {(['claude-code', 'codex'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={tool === value}
+                  className={tool === value ? 'selected' : ''}
+                  disabled={busy}
+                  onClick={() => {
+                    setTool(value);
+                    setModel('');
+                    setConsent(false);
+                    setError('');
+                  }}
+                >
+                  <ToolMark tool={value} />
+                  <strong>{value === 'codex' ? 'Codex' : 'Claude Code'}</strong>
+                  <small>
+                    {value === 'codex' ? 'App Server · 独立 API 配置' : 'CLI · 受限文件工具'}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="notice-box">
             <Icon name="monitor" />
             <div>
-              <strong>实际访问所选目录，使用本机 API key</strong>
+              <strong>实际访问授权目录，使用所选工具的 API 账户</strong>
               <p>
-                只提供文件工具，不提供 Shell、MCP 或仓库 Hooks。当前只支持本机 Claude Code；Codex
-                尚未接入。
+                不开放 Shell、MCP
+                或额外插件。不会把一个工具的凭证转给另一个工具；请使用不含敏感资料的独立仓库副本。
               </p>
             </div>
           </div>
@@ -91,29 +155,28 @@ export function NativeContinue({
           )}
           {!native ? (
             <p>正在读取本机能力…</p>
-          ) : !native.claude.available ? (
+          ) : !capability?.available ? (
             <div className="context-card">
               <div>
-                <strong>尚不能开始原生执行</strong>
-                <p>{native.claude.reason}</p>
+                <strong>当前工具尚不能开始</strong>
+                <p>{capability?.reason}</p>
                 <p>
-                  在本机 .env 配置 HEXU_NATIVE_ENABLED、HEXU_NATIVE_ROOTS 与 ANTHROPIC_API_KEY
-                  后重启。不要把密钥输入任务或提交到仓库。
+                  在本机设置{' '}
+                  {tool === 'codex'
+                    ? 'OPENAI_API_KEY / HEXU_CODEX_BIN'
+                    : 'ANTHROPIC_API_KEY / HEXU_CLAUDE_BIN'}{' '}
+                  后重启；密钥不输入任务或提交仓库。
                 </p>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex-line">
-                <ToolMark tool="claude-code" />
-                <strong>Claude Code</strong>
-                <span className="muted">{native.claude.version}</span>
-              </div>
               <label className="field">
                 工作目录
                 <select
                   aria-label="工作目录"
                   value={chosen}
+                  disabled={!!source || busy}
                   onChange={(e) => {
                     setWorkingCopyId(e.target.value);
                     setConsent(false);
@@ -126,6 +189,32 @@ export function NativeContinue({
                   ))}
                 </select>
               </label>
+              {awaitingStop && (
+                <div className="notice-box">
+                  <div>
+                    <strong>原执行尚未确认停止</strong>
+                    <p>{context?.reason}。刷新或关闭面板不会自动启动新执行。</p>
+                    <Button
+                      type="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        setError('');
+                        try {
+                          await request(`/runs/${source.id}/stop`, { method: 'POST', body: {} });
+                          await refresh();
+                        } catch (err) {
+                          setError((err as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      请求停止原执行
+                    </Button>
+                  </div>
+                </div>
+              )}
               <label className="field">
                 本次能力
                 <select
@@ -136,7 +225,7 @@ export function NativeContinue({
                     setConsent(false);
                   }}
                 >
-                  <option value="read-only">只读分析 · 读取、查找文件</option>
+                  <option value="read-only">只读分析</option>
                   <option value="edit">允许文件编辑 · 不提供 Shell</option>
                 </select>
               </label>
@@ -144,51 +233,101 @@ export function NativeContinue({
                 接下来做什么
                 <textarea
                   aria-label="接下来做什么"
-                  autoFocus
                   rows={4}
                   required
                   maxLength={12000}
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="例如：阅读当前分页实现，说明筛选变化后的问题"
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    setConsent(false);
+                  }}
+                  placeholder="例如：保留已完成的页面，继续处理大数据量导出"
                 />
               </label>
               <label className="field">
                 模型名称 <span>可选，留空使用工具默认值</span>
                 <input
+                  aria-label="模型名称"
+                  list={tool === 'codex' ? 'native-codex-models' : undefined}
                   maxLength={100}
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="使用本机支持的模型别名或 ID"
+                  onChange={(e) => {
+                    setModel(e.target.value);
+                    setConsent(false);
+                  }}
+                  placeholder="模型别名或 ID"
                 />
               </label>
-              <label className="field">
-                本次预算上限（USD）
-                <input
-                  type="number"
-                  min="0.01"
-                  max="10"
-                  step="0.01"
-                  value={budget}
-                  onChange={(e) => setBudget(Number(e.target.value))}
-                />
-              </label>
+              {tool === 'codex' && (
+                <>
+                  <datalist id="native-codex-models">
+                    {models.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </datalist>
+                  <Button
+                    type="button"
+                    busy={loadingModels}
+                    onClick={async () => {
+                      setLoadingModels(true);
+                      setError('');
+                      try {
+                        const response = await request<{ items: { id: string; name: string }[] }>(
+                          '/native/codex/models',
+                          { method: 'POST', body: {} },
+                        );
+                        setModels(response.items);
+                        notice(
+                          `已读取 ${response.items.length} 个模型配置，不代表账户都有调用权限`,
+                        );
+                      } catch (err) {
+                        setError((err as Error).message);
+                      } finally {
+                        setLoadingModels(false);
+                      }
+                    }}
+                  >
+                    从 Codex 读取模型
+                  </Button>
+                  <p className="hint">
+                    使用本机 API 配置读取目录，不开始模型生成。Codex 本轮最长 5
+                    分钟；暂无美元硬预算，费用由提供方计费。
+                  </p>
+                </>
+              )}
+              {tool === 'claude-code' && (
+                <>
+                  <label className="field">
+                    本次预算上限（USD）
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="10"
+                      step="0.01"
+                      value={budget}
+                      onChange={(e) => {
+                        setBudget(Number(e.target.value));
+                        setConsent(false);
+                      }}
+                    />
+                  </label>
+                  <p className="hint">最多 8 轮、5 分钟；预算由原生工具处理，不是实际账单保证。</p>
+                </>
+              )}
               <details className="native-details">
-                <summary>查看将提供的任务上下文</summary>
-                <pre>{context?.text ?? '正在整理…'}</pre>
-                <p>本次要求会一并发送；不恢复模型内部状态，不自动上传全部仓库。</p>
+                <summary>查看接续上下文与代码来源</summary>
+                <pre>{context?.contextText ?? context?.text ?? '正在整理…'}</pre>
+                <p>本次要求会一并发送；只提供部分变更摘录，不搬运模型隐藏状态。</p>
               </details>
-              <p className="hint">
-                最多 8 轮、5
-                分钟；遇到需要额外授权的动作会拒绝，不自动扩权。预算由工具执行，不是实际账单保证。
-              </p>
               <label className="check-line">
                 <input
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
                 />
-                我允许本次工具访问以上目录与上下文，并使用本机 API key 产生模型费用。
+                我允许本次 {label} 访问以上目录与上下文，并使用其本机 API key 产生模型费用。
               </label>
             </>
           )}
@@ -206,10 +345,21 @@ export function NativeContinue({
             type="submit"
             variant="primary"
             busy={busy}
-            disabled={!native?.claude.available || !chosen || !consent || !prompt.trim()}
+            disabled={
+              !capability?.available ||
+              !chosen ||
+              !consent ||
+              !prompt.trim() ||
+              !!awaitingStop ||
+              (!!source && !context)
+            }
           >
             <Icon name="play" />
-            {task.status === 'done' ? '重新打开并执行' : '开始原生执行'}
+            {task.status === 'done'
+              ? '重新打开并继续'
+              : source
+                ? `用 ${label} 继续`
+                : '开始原生执行'}
           </Button>
         </div>
       </form>
@@ -239,10 +389,12 @@ export function NativeResources() {
           <ToolMark tool="codex" />
           <div>
             <h3>Codex</h3>
-            <p>原生适配器</p>
+            <p>本机 App Server · 独立 API 配置</p>
           </div>
-          <span className="badge neutral">待接入</span>
-          <p className="full-row">模拟器中的 Codex 仅用于交互演示，不会调用真实工具。</p>
+          <span className={`badge ${value?.codex.available ? 'status-done' : 'neutral'}`}>
+            {value?.codex.available ? '已检测 · 原生可用' : '未启用或不可用'}
+          </span>
+          <p className="full-row">{value?.codex.reason ?? '读取能力中…'}</p>
         </div>
       </div>
       {value?.workspaces.map((w) => (
@@ -260,7 +412,7 @@ export function NativeResources() {
           <p>在本机 .env 设置授权仓库根目录和 API key，然后重启服务。目录不能在网页里任意扩展。</p>
           <pre>
             {
-              'HEXU_NATIVE_ENABLED=1\nHEXU_NATIVE_ROOTS=["/absolute/path/to/repo"]\n# ANTHROPIC_API_KEY 在本机环境设置，不提交仓库'
+              'HEXU_NATIVE_ENABLED=1\nHEXU_NATIVE_ROOTS=["/absolute/path/to/repo"]\n# ANTHROPIC_API_KEY / OPENAI_API_KEY 在本机环境设置，不提交仓库'
             }
           </pre>
           <p>只读与文件编辑均不提供 Shell；完整终端、远程节点和多人身份尚未接入。</p>
@@ -377,7 +529,7 @@ export function NativeEvents({ run }: { run: Run }) {
             {e.kind === 'tool'
               ? '工具'
               : e.kind === 'usage'
-                ? '费用估算'
+                ? '用量报告'
                 : e.kind === 'warning'
                   ? '提示'
                   : '原生输出'}
