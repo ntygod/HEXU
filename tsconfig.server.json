@@ -1,5 +1,25 @@
 {
-  "compilerOptions": {"target":"ES2022","lib":["ES2022","DOM"],"module":"NodeNext","moduleResolution":"NodeNext","rootDir":".","outDir":"dist","strict":true,"noUncheckedIndexedAccess":true,"esModuleInterop":true,"skipLibCheck":true,"forceConsistentCasingInFileNames":true,"types":["node"]},
-  "include":["apps/control/src/**/*.ts","packages/contracts/src/**/*.ts","packages/domain/src/**/*.ts","packages/db/src/**/*.ts","packages/adapters/mock/src/**/*.ts","tests/**/*.ts"],
-  "exclude":["tests/e2e/**"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": [
+    "apps/control/src/**/*.ts",
+    "packages/contracts/src/**/*.ts",
+    "packages/domain/src/**/*.ts",
+    "packages/db/src/**/*.ts",
+    "packages/adapters/mock/src/**/*.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["tests/e2e/**"]
 }

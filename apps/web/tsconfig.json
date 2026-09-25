@@ -1,1 +1,17 @@
-{"compilerOptions":{"target":"ES2022","lib":["ES2022","DOM","DOM.Iterable"],"module":"ESNext","moduleResolution":"Bundler","jsx":"react-jsx","strict":true,"noUncheckedIndexedAccess":true,"skipLibCheck":true,"esModuleInterop":true,"allowImportingTsExtensions":true,"noEmit":true,"types":["vite/client"]},"include":["src","../../packages/ui/src","../../packages/client/src"]}
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src", "../../packages/ui/src", "../../packages/client/src"]
+}
