@@ -70,11 +70,11 @@ async function waitUntil<T>(read: () => T | Promise<T>, check: (v: T) => boolean
   throw new Error('timed out waiting for fixture');
 }
 
-test('原生创建需要显式费用与目录授权，Codex 仍不可冒充', () => {
+test('原生创建需要显式费用与目录授权，不接受未知工具', () => {
   assert.equal(parseNativeRunCreate(input()).mode, 'read-only');
   for (const change of [
     { confirmExecution: false },
-    { requestedTool: 'codex' },
+    { requestedTool: 'unknown-tool' },
     { maxBudgetUsd: 0 },
     { maxTurns: 1.5 },
     { mode: 'bypass' },

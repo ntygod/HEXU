@@ -27,6 +27,14 @@ writeFileSync(
   `#!${process.execPath}\nimport(${JSON.stringify(pathToFileURL(resolve('dist/tests/fixtures/native-tool.js')).href)});\n`,
 );
 chmodSync(executable, 0o700);
+const codexExecutable = join(path, 'codex-fixture');
+writeFileSync(
+  codexExecutable,
+  `#!${process.execPath}\nimport(${JSON.stringify(pathToFileURL(resolve('dist/tests/fixtures/codex-tool.js')).href)});\n`,
+);
+chmodSync(codexExecutable, 0o700);
+process.env.HEXU_CODEX_BIN = codexExecutable;
+process.env.OPENAI_API_KEY = 'sk-openai-browser-protocol-fixture-not-a-real-key';
 process.env.HEXU_DATA_DIR = path;
 process.env.HEXU_HOST = '127.0.0.1';
 process.env.HEXU_PORT = '4310';

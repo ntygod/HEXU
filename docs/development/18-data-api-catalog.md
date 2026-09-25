@@ -202,3 +202,9 @@ interface RunHandle {
 完成命令不查询测试覆盖率。源码变化不自动撤销历史完成。启动 done 任务需显式重新打开。正文/评论不产生授权。相同幂等键不创建重复 Run，旧 generation 不消费新授权。
 
 对外部命令无法只靠数据库保证恰好一次；结果未知先对账。版本化结果与活动现场分开；只读协助不取得主现场写入权。跨空间分享的建议边界见 12 与 DD-07。
+
+## E1b 当前实现子集
+
+已实现同机显式跨工具继续及上下文/Git 摘录。`POST /tasks/:taskId/continuations` 当前同步准备后返回 `201 + Run`，含 sourceRunId；GET continuation-preview 供页面查看来源。持久化 Operation、后台等待后自动开始、跨节点恢复和临时协助仍未实现；源执行活动时先停止，确认后由用户开始。未变更最终目标，也不要求额外业务审批。
+
+实际使用与限制见 [原生说明](../engineering/native-execution.md)，最新进度见 [21](21-implementation-status.md)。

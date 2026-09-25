@@ -284,6 +284,19 @@ export async function createApp(
     mock.resume(id);
     return run;
   });
+  app.post('/api/v1/tasks/:taskId/continuations', async (request, reply) => {
+    const input = parseNativeRunCreate(request.body);
+    if (!input.sourceRunId) throw new DomainError('INVALID_CONTINUATION', '继续需要明确来源执行');
+    const run = await native.create(param(request.params, 'taskId'), input, key(request.headers));
+    return reply.code(201).send(run);
+  });
+  app.get('/api/v1/tasks/:taskId/continuation-preview', async (request) =>
+    native.continuationPreview(
+      param(request.params, 'taskId'),
+      text(record(request.query).sourceRunId, '来源执行', 100),
+    ),
+  );
+  app.post('/api/v1/native/codex/models', async () => native.codexModels());
   app.get('/api/v1/native', async () => native.overview());
   app.get('/api/v1/tasks/:taskId/native-context', async (request) => ({
     text: native.context(param(request.params, 'taskId')),

@@ -63,3 +63,9 @@ turn/interrupt 返回响应只说明请求得到处理；继续等目标 turn/co
 ## 7. 交付边界
 
 本包提供统一 Adapter 契约，不另建 Codex 独立任务列表。HEXU Task、Run、Result 与 Claude 接入使用同一模型；原生特有信息可在详情展开。M2 的跨工具继续由 11 实现，不在本包私自复制 Claude 会话内部状态。
+
+## E1b 当前实现子集
+
+Codex 已新增本机 stdio 初始化、配置检查、API-key 内存认证、thread/start、turn/start、事件、model/list 和 interrupt；原生 resume、运行中输入和完整授权问答仍未实现。官方 0.157.0 仅做无模型协议检查，完整流程用协议替身，真实账户联调未执行。
+
+实际使用与限制见 [原生说明](../engineering/native-execution.md)，最新进度见 [21](21-implementation-status.md)。
