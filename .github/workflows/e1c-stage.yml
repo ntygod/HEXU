@@ -1,0 +1,54 @@
+name: E1c development checks
+on:
+  push:
+    branches: [codex/e1c-continuation-operations-20260926]
+permissions:
+  contents: write
+concurrency:
+  group: e1c-development
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEVELOPMENT_BRANCH: codex/e1c-continuation-operations-20260926
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/e1c-continuation-operations-20260926
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply reviewed integration patches
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "$DEVELOPMENT_BRANCH"
+          for patch in .staging/patch-*.py; do python "$patch"; done
+      - run: npm ci --ignore-scripts
+      - run: npm run format
+      - name: Preserve exact formatted source on the development branch
+        run: |
+          set -euo pipefail
+          git config user.name 'HEXU development'
+          git config user.email 'hexu-development@users.noreply.github.com'
+          git add apps packages tests docs README.md AGENTS.md .staging
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: integrate E1c durable continuation and task progress updates'
+            git push origin HEAD:"$DEVELOPMENT_BRANCH"
+          fi
+          echo "Checked source: $(git rev-parse HEAD)"
+      - run: npm run format:check
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-e1c-browser-results
+          path: |
+            playwright-report/
+            test-results/
+            artifacts/
+          retention-days: 7
