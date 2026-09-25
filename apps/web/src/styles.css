@@ -2784,7 +2784,7 @@ main {
 
 /* Persistent local continuation: separate from both Task and Run state. */
 .continuation-status {
-  margin: 0 0 18px;
+  margin: 16px 24px 0;
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -2878,6 +2878,7 @@ main {
 }
 @media (max-width: 700px) {
   .continuation-status {
+    margin: 12px 14px 0;
     padding: 14px;
   }
   .continuation-status-heading {
@@ -2893,5 +2894,11 @@ main {
   .continuation-steps {
     gap: 12px;
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .continuation-status-title {
+    flex-basis: calc(100% - 48px);
   }
 }
