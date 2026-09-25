@@ -1,0 +1,24 @@
+name: E1b official CLI reference
+on:
+  push:
+    branches: ['codex/e1b-codex-continuation-20260925']
+    paths: ['.github/workflows/e1b-cli.yml']
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download the pinned official release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/hexu-codex-reference
+          gh release download rust-v0.157.0 --repo openai/codex --pattern 'codex-x86_64-unknown-linux-gnu.tar.gz' --dir /tmp/hexu-codex-reference
+          sha256sum /tmp/hexu-codex-reference/*.tar.gz > /tmp/hexu-codex-reference/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-codex-reference
+          path: /tmp/hexu-codex-reference/
+          retention-days: 1
