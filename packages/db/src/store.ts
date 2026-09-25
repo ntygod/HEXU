@@ -1,3 +1,9 @@
+import type {
+  WorkingCopy,
+  NativeRunConfig,
+  NativeRunInput,
+  NativeEvent,
+} from '../../contracts/src/native.js';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -262,7 +268,7 @@ export class Store {
           for (const run of this.runs(id).filter((run) => isActiveRun(run.state)))
             this.saveRun({
               ...run,
-              state: run.state === 'queued' ? 'cancelled' : 'stopping',
+              state: run.state === 'queued' && run.provider === 'mock' ? 'cancelled' : 'stopping',
               revision: run.revision + 1,
               updatedAt: now(),
             });
@@ -400,7 +406,7 @@ export class Store {
           run.taskId,
           note,
           'agent',
-          `${run.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'} · 模拟`,
+          `${run.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'} · ${run.provider === 'native' ? '原生' : '模拟'}`,
         );
       return next;
     });
@@ -412,7 +418,7 @@ export class Store {
       if (!isActiveRun(run.state) || run.state === 'stopping') return run;
       return this.saveRun({
         ...run,
-        state: run.state === 'queued' ? 'cancelled' : 'stopping',
+        state: run.state === 'queued' && run.provider === 'mock' ? 'cancelled' : 'stopping',
         revision: run.revision + 1,
         updatedAt: now(),
       });
@@ -450,7 +456,7 @@ export class Store {
         .prepare('SELECT body FROM runs')
         .all()
         .map((row) => decode<Run>(row)!)
-        .filter((run) => isActiveRun(run.state));
+        .filter((run) => run.provider === 'mock' && isActiveRun(run.state));
       for (const run of runs) {
         this.saveRun({
           ...run,
@@ -468,6 +474,171 @@ export class Store {
       }
       return runs.length;
     });
+  }
+  // Native execution is opt-in. These methods never spawn a process themselves.
+  registerWorkingCopy(item: WorkingCopy): WorkingCopy {
+    const previous = decode<WorkingCopy>(
+      this.db.prepare('SELECT body FROM native_workspaces WHERE root=?').get(item.root),
+    );
+    if (previous) return previous;
+    this.db
+      .prepare('INSERT INTO native_workspaces VALUES(?,?,?)')
+      .run(item.id, item.root, JSON.stringify(item));
+    return item;
+  }
+  nativeLock(workingCopyId: string): string | null {
+    const row = this.db
+      .prepare('SELECT run_id FROM native_workspace_locks WHERE working_copy_id=?')
+      .get(workingCopyId) as { run_id: string } | undefined;
+    return row?.run_id ?? null;
+  }
+  createNativeRun(
+    taskId: string,
+    input: NativeRunInput,
+    config: NativeRunConfig,
+    key: string,
+  ): Run {
+    this.getTask(taskId);
+    return this.mutate(`native.create:${taskId}`, key, input, () => {
+      const task = this.getTask(taskId);
+      assertRevision(task.revision, input.expectedRevision);
+      if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
+        throw new DomainError('TASK_REOPEN_REQUIRED', '请先重新打开任务', 409);
+      if (
+        this.runs(taskId).some((run) => isActiveRun(run.state)) ||
+        this.nativeLock(input.workingCopyId)
+      )
+        throw new DomainError(
+          'WORKING_COPY_BUSY',
+          '任务或工作目录仍有执行；失联执行需要在本机核对后恢复',
+          409,
+        );
+      if (task.status !== 'in_progress') {
+        const next = this.saveTask({
+          ...task,
+          status: 'in_progress',
+          revision: task.revision + 1,
+          updatedAt: now(),
+        });
+        if (task.status === 'done') this.recordCompletion(next, 'reopen');
+      }
+      const at = now();
+      const run: Run = {
+        id: randomUUID(),
+        taskId,
+        provider: 'native',
+        requestedTool: 'claude-code',
+        scenario: 'success',
+        prompt: input.prompt,
+        state: 'queued',
+        observation: 'fresh',
+        native: config,
+        previousRunId: this.runs(taskId).at(-1)?.id ?? null,
+        revision: 1,
+        createdAt: at,
+        updatedAt: at,
+      };
+      this.db.prepare('INSERT INTO runs VALUES(?,?,?)').run(run.id, taskId, JSON.stringify(run));
+      this.db
+        .prepare('INSERT INTO native_workspace_locks VALUES(?,?)')
+        .run(input.workingCopyId, run.id);
+      this.insertMessage(
+        taskId,
+        `开始 Claude Code 原生执行（${config.mode === 'edit' ? '允许文件编辑，不提供 Shell' : '只读文件工具'}）。本次使用本机 API key，可能产生模型费用。\n要求：${input.prompt}`,
+        'system',
+        'HEXU',
+      );
+      this.event(taskId, 'run.created');
+      return run;
+    });
+  }
+  nativeEvents(id: string, after = 0): NativeEvent[] {
+    this.run(id);
+    return this.db
+      .prepare(
+        'SELECT sequence,run_id AS runId,kind,body,created_at AS createdAt FROM native_run_events WHERE run_id=? AND sequence>? ORDER BY sequence LIMIT 200',
+      )
+      .all(id, after) as unknown as NativeEvent[];
+  }
+  appendNativeEvent(id: string, kind: NativeEvent['kind'], body: string) {
+    return this.transaction(() => {
+      const run = this.run(id);
+      if (run.provider !== 'native') throw new DomainError('INVALID_PROVIDER', '不是原生执行');
+      this.db
+        .prepare('INSERT INTO native_run_events(run_id,kind,body,created_at) VALUES(?,?,?,?)')
+        .run(id, kind, body.slice(0, 12000), now());
+      this.event(run.taskId, 'native.event');
+    });
+  }
+  finishNativeRun(
+    id: string,
+    state: 'succeeded' | 'failed' | 'cancelled',
+    note: string,
+    terminationConfirmed: boolean,
+    sessionId?: string,
+  ) {
+    return this.transaction(() => {
+      const run = this.run(id);
+      if (run.provider !== 'native' || !run.native)
+        throw new DomainError('INVALID_PROVIDER', '不是原生执行');
+      if (!isActiveRun(run.state)) return run;
+      const next = this.saveRun({
+        ...run,
+        state: terminationConfirmed ? state : 'stopping',
+        observation: terminationConfirmed ? 'fresh' : 'unknown',
+        native: {
+          ...run.native,
+          sessionId,
+          terminationConfirmed,
+          recoveryRequired: !terminationConfirmed,
+        },
+        revision: run.revision + 1,
+        updatedAt: now(),
+      });
+      if (terminationConfirmed)
+        this.db.prepare('DELETE FROM native_workspace_locks WHERE run_id=?').run(id);
+      this.insertMessage(run.taskId, note.slice(0, 24000), 'agent', 'Claude Code · 原生');
+      return next;
+    });
+  }
+  recoverNativeRuns() {
+    return this.transaction(() => {
+      for (const task of this.tasks())
+        for (const run of this.runs(task.id)) {
+          if (
+            run.provider !== 'native' ||
+            !run.native ||
+            !isActiveRun(run.state) ||
+            run.observation === 'unknown'
+          )
+            continue;
+          this.saveRun({
+            ...run,
+            observation: 'unknown',
+            native: { ...run.native, recoveryRequired: true },
+            revision: run.revision + 1,
+            updatedAt: now(),
+          });
+          this.insertMessage(
+            task.id,
+            '原生执行连接中断，未自动重新运行，也未释放目录占用。请在本机确认旧进程已停止，再使用 native:recover 恢复。',
+            'system',
+            'HEXU',
+          );
+        }
+    });
+  }
+  confirmNativeStopped(id: string) {
+    const run = this.run(id);
+    if (run.provider !== 'native' || run.observation !== 'unknown')
+      throw new DomainError('INVALID_TRANSITION', '只能处理待人工核对的原生执行', 409);
+    return this.finishNativeRun(
+      id,
+      'failed',
+      '本机操作者明确确认旧进程已停止；保留此前记录，目录已解除占用。',
+      true,
+      run.native?.sessionId,
+    );
   }
   results(taskId?: string): Result[] {
     if (taskId) this.getTask(taskId);

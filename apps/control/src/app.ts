@@ -1,3 +1,5 @@
+import { NativeRuntime, type NativeOptions } from '../../runner/src/runtime.js';
+import { parseNativeRunCreate } from '../../../packages/contracts/src/native.js';
 import Fastify from 'fastify';
 import type { ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -23,12 +25,20 @@ export async function createApp(
     stepMs?: number;
     webRoot?: string;
     logger?: boolean;
+    native?: NativeOptions;
   } = {},
 ) {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 32768 });
   const store = options.store ?? new Store(options.databasePath);
   store.recoverMockRuns();
   const mock = new MockAdapter(store, options.stepMs);
+  const native = new NativeRuntime(store, options.native);
+  try {
+    await native.initialize();
+  } catch (error) {
+    store.close();
+    throw error;
+  }
   const streams = new Set<ServerResponse>();
   const webRoot = resolve(options.webRoot ?? 'apps/web/dist');
   const allowedOrigins = new Set([
@@ -194,6 +204,7 @@ export async function createApp(
         key(request.headers),
       );
       mock.settleStops(id);
+      native.settleStops(id);
       return result;
     });
   }
@@ -214,6 +225,14 @@ export async function createApp(
       );
   });
   app.post('/api/v1/tasks/:taskId/runs', async (request, reply) => {
+    if (record(request.body).provider === 'native') {
+      const run = await native.create(
+        param(request.params, 'taskId'),
+        parseNativeRunCreate(request.body),
+        key(request.headers),
+      );
+      return reply.code(201).send(run);
+    }
     const run = store.createRun(
       param(request.params, 'taskId'),
       parseRunCreate(request.body),
@@ -226,11 +245,18 @@ export async function createApp(
   app.post('/api/v1/runs/:runId/stop', async (request) => {
     const id = param(request.params, 'runId');
     const run = store.stopRun(id, key(request.headers));
-    mock.stop(id);
+    if (run.provider === 'native') native.stop(id);
+    else mock.stop(id);
     return run;
   });
   app.post('/api/v1/runs/:runId/inputs', async (request) => {
     const id = param(request.params, 'runId');
+    if (store.run(id).provider === 'native')
+      throw new DomainError(
+        'CAPABILITY_UNAVAILABLE',
+        '此原生适配不支持运行中输入；请在结束后继续',
+        422,
+      );
     const body = record(request.body);
     const run = store.resumeRun(
       id,
@@ -245,6 +271,8 @@ export async function createApp(
   app.post('/api/v1/runs/:runId/authorization', async (request) => {
     const id = param(request.params, 'runId');
     const body = record(request.body);
+    if (store.run(id).provider === 'native')
+      throw new DomainError('CAPABILITY_UNAVAILABLE', '原生执行不允许通过模拟授权入口扩权', 422);
     const choice = enumValue(body.decision, ['allow', 'deny'] as const, '决定');
     const run = store.resumeRun(
       id,
@@ -255,6 +283,26 @@ export async function createApp(
     );
     mock.resume(id);
     return run;
+  });
+  app.get('/api/v1/native', async () => native.overview());
+  app.get('/api/v1/tasks/:taskId/native-context', async (request) => ({
+    text: native.context(param(request.params, 'taskId')),
+  }));
+  app.get('/api/v1/native/workspaces/:workingCopyId', async (request) =>
+    native.workspaces.snapshot(param(request.params, 'workingCopyId')),
+  );
+  app.get('/api/v1/native/workspaces/:workingCopyId/diff', async (request) => {
+    const value = await native.workspaces.diff(
+      param(request.params, 'workingCopyId'),
+      text(record(request.query).path, '文件', 1000),
+    );
+    return { ...value, text: native.clean(value.text) };
+  });
+  app.get('/api/v1/runs/:runId/native-events', async (request) => {
+    const after = Number(record(request.query).after ?? 0);
+    if (!Number.isSafeInteger(after) || after < 0)
+      throw new DomainError('INVALID_CURSOR', '无效事件游标');
+    return { items: store.nativeEvents(param(request.params, 'runId'), after) };
   });
   app.get('/api/v1/results', async () => ({ items: store.results() }));
   app.get('/api/v1/results/:resultId', async (request) => {
@@ -370,6 +418,7 @@ export async function createApp(
     streams.clear();
   });
   app.addHook('onClose', async () => {
+    await native.close();
     mock.close();
     store.close();
   });

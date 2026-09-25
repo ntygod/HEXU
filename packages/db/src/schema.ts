@@ -17,4 +17,13 @@ CREATE TABLE idempotency_records (scope TEXT NOT NULL, key TEXT NOT NULL, finger
 CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `,
   },
+  {
+    version: 2,
+    sql: `
+CREATE TABLE native_workspaces (id TEXT PRIMARY KEY, root TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
+CREATE TABLE native_workspace_locks (working_copy_id TEXT PRIMARY KEY REFERENCES native_workspaces(id), run_id TEXT NOT NULL UNIQUE REFERENCES runs(id));
+CREATE TABLE native_run_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL REFERENCES runs(id), kind TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX native_events_run ON native_run_events(run_id, sequence);
+`,
+  },
 ];
