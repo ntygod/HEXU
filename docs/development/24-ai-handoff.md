@@ -10,22 +10,20 @@
 
 **W1-01—09 已完成。** 旧页面布局、大 `styles.css` 和旧配色别名已删除，不再重新启动 UI 重建。`App.tsx` 只组织路由和全局入口；组件及样式归属见设计文档第 9 节。参考 HTML 和 Figma 是设计资料，不能供给生产状态、模型列表或工具能力。
 
-业务底座仍是 E2c1：preview 是明确的示例身份；team-local 使用真实账号／项目权限和可选本人授权节点。两者都只支持回环地址。SSH 能登录一台测试机，不等于产品已交付跨电脑节点或公开部署。桌面宿主尚未选定，不能因为前端完成就添加 Electron／Tauri 或宣称客户端已交付。
+业务底座为 E2c2：preview 是明确的示例身份；team-local 使用真实账号／项目权限和可选本人授权节点。两者都只支持回环地址。SSH 能登录一台测试机，不等于产品已交付跨电脑节点或公开部署。桌面宿主尚未选定，不能因为前端完成就添加 Electron／Tauri 或宣称客户端已交付。
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-08-03：Claude 原生会话映射与显式恢复**，联动 08-01/05、06、07、10-03、11-02。范围与顺序以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-03-04：项目配置与归档**，联动 03-03/06、04-06 及节点执行/接续。先做名称/说明的修订式编辑，再做归档与新派发/既有 Operation 的联动；范围以 [22](22-next-delivery.md) 为准。
 
 | 工作 | 先查看 |
 | --- | --- |
-| 核对现有 Claude CLI 接入、版本与结构化输出 | [08 工作包](08-claude-code.md)、[Claude 适配器](../../packages/adapters/claude-code/src/index.ts)、[原生边界](../engineering/native-execution.md) |
-| 核对独立节点启动、策略和私有本机状态 | [节点执行器](../../apps/runner/src/agent/executor.ts)、[本机执行策略](../../apps/runner/src/agent/execution-policy.ts)、[执行日志](../../apps/runner/src/agent/execution-journal.ts) |
-| 参考已经交付的保留／恢复边界 | [Codex 会话说明](../engineering/codex-sessions.md)、[Codex 私有会话](../../apps/runner/src/agent/codex-sessions.ts)；不要机械复制提供方参数、存储格式或恢复命令 |
-| 接入当前任务选择与状态展示 | [节点执行配置](../../apps/web/src/node-execution.tsx)、[任务工作区](../../apps/web/src/task-workspace.tsx)，沿用现有契约与 Run/Operation 区分 |
+| 项目基础和成员管理 | [03 工作包](03-identity-projects.md)、[协作数据](../../packages/db/src/collaboration.ts)、[团队页面](../../apps/web/src/team.tsx)、[项目页面](../../apps/web/src/projects.tsx) |
+| 权限、持久化和事件 | [权限](../../packages/db/src/permissions.ts)、[迁移](../../packages/db/src/schema.ts)、[控制 API](../../apps/control/src/app.ts) |
+| 归档和派发/接续联动 | [节点派发](../../packages/db/src/node-execution.ts)、[节点接续](../../packages/db/src/node-continuations.ts)、[节点执行器](../../apps/runner/src/agent/executor.ts)；归档不等于进程结束 |
+| 已补齐的双工具恢复路径 | [Claude 会话](../engineering/claude-sessions.md)、[Codex 会话](../engineering/codex-sessions.md)、[任务运行界面](../../apps/web/src/node-execution.tsx)；不要再次将 Claude resume 写为未实现 |
 
-先核实实际支持版本的官方会话存储和恢复方式，再实现最小可运行切片。默认不保留历史；保留需本机明确授权，绑定任务／节点／目录／工具／账户和策略。恢复必须显式选择，失败不能自动新开会话或重试付费执行。所有流程仍创建新的 HEXU Run，不另造任务系统，不导入个人订阅会话。
-
-协议替身回归、官方无模型兼容性检查、有效账户真实生成／恢复必须分别记录。缺真实模型账户时可以继续实现协议和状态，但不能把替身输出计作模型联调通过。
+双工具显式恢复仅是有界、实验性的节点代码路径。真实账户生成/成功恢复依旧未联调，不把协议替身或无模型兼容性检查计作模型验证。历史默认不保留、仅本机明确授权、同任务/节点/目录/工具/账户/策略绑定、恢复失败不静默新建和未知进程保锁等规则继续适用。
 
 ## 3. 代码查找图
 
@@ -47,7 +45,7 @@
 - 按改动选择现有检查：`npm run typecheck`、`npm test`、`npm run build`；`npm run check` 已包含这三项。
 - 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312 端口；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
 - 原生／独立节点的完整回归以 Linux 为准；macOS 未验证，Windows 原生执行不支持。Windows 可以做页面、格式、类型与构建检查，不能据此宣称进程和凭证边界跨平台完成。
-- 测试必须使用明确协议替身和虚构 Key，不使用开发者或提供方凭证。`check:codex-protocol` 是可选无模型检查，不认证、不发起模型 turn。
+- 测试必须使用明确协议替身和虚构 Key，不使用开发者或提供方凭证。`check:codex-protocol` / `check:claude-protocol` 是可选无模型检查，不使用真实账户或发起真实模型 turn。
 
 W1 功能提交 `43c066f` 已通过 [Linux CI 36238774668](https://github.com/ntygod/HEXU/actions/runs/36238774668)：175 条工程测试、35 条浏览器流程，均无失败、跳过。后续提交的实际结果仍看 [21](21-implementation-status.md) 和对应 CI；不因本页重复运行未受影响的整套测试。
 

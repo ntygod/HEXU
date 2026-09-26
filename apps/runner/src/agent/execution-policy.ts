@@ -9,6 +9,8 @@ import {
   renameSync,
   realpathSync,
   statSync,
+  mkdtempSync,
+  rmSync,
 } from 'node:fs';
 import { join, relative, isAbsolute, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -19,7 +21,7 @@ import {
   parsePolicy,
   type ExecutionPolicy,
 } from '../../../../packages/contracts/src/node-execution.js';
-import { requiredFlags } from '../../../../packages/adapters/claude-code/src/index.js';
+import { claudeCapabilities } from '../../../../packages/adapters/claude-code/src/index.js';
 import { runProcess } from '../process-host.js';
 import type { NodeCredentials } from './storage.js';
 export interface LocalExecution {
@@ -74,13 +76,20 @@ export function writeExecutionPolicy(home: string, value: LocalExecution | null)
 export async function probeExecution(executable: string, policy: ExecutionPolicy) {
   if (!isAbsolute(executable) || !statSync(executable).isFile())
     throw new DomainError('INVALID_EXECUTABLE', '需要本机原生工具的绝对文件路径');
+  const home = mkdtempSync(join(tmpdir(), 'hexu-capability-'));
   const probe = async (args: string[]) => {
     let out = '';
     const handle = runProcess({
       executable,
       args,
       cwd: tmpdir(),
-      env: { PATH: process.env.PATH, LANG: 'C.UTF-8' },
+      env: {
+        PATH: process.env.PATH,
+        HOME: home,
+        CLAUDE_CONFIG_DIR: join(home, 'config'),
+        CODEX_HOME: join(home, 'codex'),
+        LANG: 'C.UTF-8',
+      },
       timeoutMs: 5000,
       maxOutputBytes: 262144,
       onLine: (line) => {
@@ -92,12 +101,19 @@ export async function probeExecution(executable: string, policy: ExecutionPolicy
       throw new DomainError('CAPABILITY_UNAVAILABLE', '原生工具探测失败；未发布执行授权');
     return out;
   };
-  const version = (await probe(['--version'])).trim().slice(0, 200);
-  const help = await probe(policy.tool === 'codex' ? ['app-server', '--help'] : ['--help']);
-  const flags = policy.tool === 'codex' ? ['--listen', '--config'] : requiredFlags;
-  if (!version || flags.some((flag) => !help.includes(flag)))
-    throw new DomainError('CAPABILITY_UNAVAILABLE', '原生工具缺少必要受限参数；不降级权限');
-  return version;
+  try {
+    const version = (await probe(['--version'])).trim().slice(0, 200);
+    const help = await probe(policy.tool === 'codex' ? ['app-server', '--help'] : ['--help']);
+    const compatible =
+      policy.tool === 'codex'
+        ? !!version && ['--listen', '--config'].every((flag) => help.includes(flag))
+        : claudeCapabilities(version, help, !!policy.retainSessions);
+    if (!compatible)
+      throw new DomainError('CAPABILITY_UNAVAILABLE', '原生工具缺少必要受限参数；不降级权限');
+    return version;
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 }
 export async function configureExecution(
   path: string,

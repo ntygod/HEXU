@@ -13,6 +13,9 @@ import {
   type NativeOverview,
 } from '../packages/contracts/src/native.js';
 import {
+  claudeCapabilities,
+  requiredFlags,
+  requiredSessionFlags,
   ClaudeStream,
   claudeArguments,
   redact,
@@ -479,5 +482,116 @@ test('服务重启保留原生未知状态和目录锁，不重复派发', () =>
     assert.equal(store.run(run.id).state, 'failed');
   } finally {
     store.close();
+  }
+});
+
+test('Claude 默认不保存会话；只有节点 UUID 能选择新建或恢复，恢复不携带 fork/continue', () => {
+  assert.ok(claudeArguments(config).includes('--no-session-persistence'));
+  const sessionId = randomUUID();
+  for (const action of ['created', 'resumed'] as const) {
+    const args = claudeArguments(config, { sessionId, action });
+    assert.ok(args.includes(action === 'resumed' ? '--resume' : '--session-id'));
+    assert.ok(args.includes(sessionId));
+    assert.ok(!args.includes('--no-session-persistence'));
+    assert.ok(!args.includes('--continue') && !args.includes('--fork-session'));
+    assert.ok(args.includes('--bare') && args.includes('--restricted'));
+  }
+  for (const sessionId of [
+    'latest',
+    '../foreign.jsonl',
+    '--dangerously-skip-permissions',
+    'x'.repeat(300),
+  ])
+    assert.throws(() => claudeArguments(config, { sessionId, action: 'resumed' }));
+});
+
+test('Claude 保留模式核对 init、会话、目录、模型及受限工具，输出错误身份前即拒绝', () => {
+  const sessionId = randomUUID();
+  const guard = {
+    sessionId,
+    cwd: '/fictional/repo',
+    mode: 'read-only' as const,
+    resolvedModel: 'fixture-model',
+  };
+  const init = {
+    type: 'system',
+    subtype: 'init',
+    session_id: sessionId,
+    cwd: guard.cwd,
+    model: guard.resolvedModel,
+    permissionMode: 'dontAsk',
+    tools: ['Read', 'Glob', 'Grep'],
+    mcp_servers: [],
+  };
+  const result = {
+    type: 'result',
+    subtype: 'success',
+    session_id: sessionId,
+    is_error: false,
+    result: 'valid answer',
+  };
+  for (const changed of [
+    { session_id: randomUUID() },
+    { cwd: '/foreign' },
+    { model: 'foreign-model' },
+    { permissionMode: 'bypassPermissions' },
+    { tools: ['Read', 'Bash'] },
+    { mcp_servers: [{ name: 'foreign' }] },
+  ]) {
+    const events: string[] = [],
+      stream = new ClaudeStream((_k, text) => events.push(text), guard);
+    assert.throws(() => stream.line(JSON.stringify({ ...init, ...changed })));
+    assert.equal(events.length, 0);
+    assert.equal(stream.summary.success, false);
+  }
+  for (const changed of [{ session_id: randomUUID() }, { session_id: undefined }]) {
+    const stream = new ClaudeStream(() => {}, guard);
+    stream.line(JSON.stringify(init));
+    assert.throws(() => stream.line(JSON.stringify({ ...result, ...changed })));
+    assert.equal(stream.summary.success, false);
+  }
+  const stream = new ClaudeStream(() => {}, guard);
+  assert.throws(() => stream.line(JSON.stringify(result)));
+  stream.line(JSON.stringify(init));
+  assert.throws(() => stream.line(JSON.stringify(init)));
+  stream.line(JSON.stringify(result));
+  assert.equal(stream.summary.sessionId, sessionId);
+  assert.equal(stream.summary.resolvedModel, guard.resolvedModel);
+  assert.equal(stream.summary.success, true);
+  assert.throws(() =>
+    stream.line(
+      JSON.stringify({ type: 'assistant', session_id: sessionId, message: { content: [] } }),
+    ),
+  );
+});
+
+test('Claude 2.1.283 的隐藏 max-turns 不误判；未知版本和缺失隔离参数仍拒绝', () => {
+  const help = [...requiredFlags.filter((f) => f !== '--max-turns'), ...requiredSessionFlags].join(
+    ' ',
+  );
+  assert.equal(claudeCapabilities('2.1.283 (Claude Code)', help, true), true);
+  assert.equal(claudeCapabilities('2.1.284 (Claude Code)', help, true), false);
+  assert.equal(
+    claudeCapabilities('2.1.283 (Claude Code)', help.replace('--restricted', ''), true),
+    false,
+  );
+  assert.equal(
+    claudeCapabilities('2.1.283 (Claude Code)', help.replace('--resume', ''), true),
+    false,
+  );
+  assert.equal(
+    claudeCapabilities('2.1.283 (Claude Code)', help.replace('--no-session-persistence', '')),
+    false,
+  );
+});
+
+test('Claude 非保留执行同样拒绝 init/result 会话错配，不截断原生 ID 伪装为一致', () => {
+  const stream = new ClaudeStream(() => {});
+  stream.line(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'fixture-session' }));
+  for (const session_id of ['another-session', 'x'.repeat(201), '/foreign/history', 123]) {
+    assert.throws(() =>
+      stream.line(JSON.stringify({ type: 'result', subtype: 'success', session_id })),
+    );
+    assert.equal(stream.summary.success, false);
   }
 });

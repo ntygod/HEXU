@@ -1,3 +1,4 @@
+import { ClaudeSessions, type ClaudeSessionLease } from './claude-sessions.js';
 import { CodexSessions, type CodexSessionLease } from './codex-sessions.js';
 import type { CodexSummary } from '../../../../packages/adapters/codex/src/index.js';
 import { createHash } from 'node:crypto';
@@ -14,6 +15,7 @@ import {
 import type { NativeRunConfig } from '../../../../packages/contracts/src/native.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import {
+  type ClaudeSummary,
   ClaudeStream,
   claudeArguments,
   redact,
@@ -37,6 +39,7 @@ const hash = (value: unknown) => createHash('sha256').update(canonicalJson(value
 export class NodeExecutor {
   readonly journal: ExecutionJournal;
   readonly sessions: CodexSessions;
+  readonly claudeSessions: ClaudeSessions;
   private local: LocalExecution | null;
   private publishedConnection: string | null = null;
   private closed = false;
@@ -55,6 +58,8 @@ export class NodeExecutor {
     this.journal.recover();
     this.sessions = new CodexSessions(connection.storage);
     this.sessions.recover();
+    this.claudeSessions = new ClaudeSessions(connection.storage);
+    this.claudeSessions.recover();
     this.local = readExecutionPolicy(connection.storage.home);
     // A confirmed terminal journal is enough to release its own stale local claim.
     for (const row of this.journal.commands().filter((r) => r.phase === 'terminal')) {
@@ -107,7 +112,7 @@ export class NodeExecutor {
         'EXECUTION_SCOPE_MISMATCH',
         '服务端命令超出本机确认的执行范围，没有启动',
       );
-    if (b.session !== undefined && (policy.tool !== 'codex' || !policy.retainSessions))
+    if (b.session !== undefined && !policy.retainSessions)
       throw new DomainError('SESSION_NOT_ENABLED', '本机未授权保留或恢复会话');
     return {
       ...(b.session === undefined ? {} : { session: parseSessionRequest(b.session) }),
@@ -258,6 +263,7 @@ export class NodeExecutor {
       home: string | null = null,
       attemptedSpawn = false;
     let retained: CodexSessionLease | undefined;
+    let claudeRetained: ClaudeSessionLease | undefined;
     let emitted = 0;
     const clean = (value: string) =>
       redact(value, [
@@ -265,6 +271,7 @@ export class NodeExecutor {
         this.connection.credentials.nodeToken,
         root,
         this.connection.storage.home,
+        ...(claudeRetained ? [claudeRetained.sessionId] : []),
       ]);
     const emit = (_kind: string, value: string) => {
       if (++emitted <= 60) this.journal.append(command.id, 'output', clean(value).slice(0, 5000));
@@ -317,14 +324,52 @@ export class NodeExecutor {
         handle = codex;
         summary = codex.summary;
       } else {
-        home = await mkdtemp(join(tmpdir(), 'hexu-node-claude-'));
-        const stream = new ClaudeStream(emit);
+        if (command.policy.retainSessions) {
+          const directory = this.connection.credentials.directories.find(
+            (d) => d.id === command.workspaceId,
+          )!;
+          claudeRetained = this.claudeSessions.prepare(
+            command,
+            this.connection.credentials,
+            directory,
+            local.executable,
+            apiKey,
+          );
+        } else home = await mkdtemp(join(tmpdir(), 'hexu-node-claude-'));
+        const privateHome = claudeRetained?.home ?? home!;
+        const stream = new ClaudeStream(
+          emit,
+          claudeRetained
+            ? {
+                sessionId: claudeRetained.sessionId,
+                cwd: root,
+                mode: command.mode,
+                resolvedModel: claudeRetained.resolvedModel,
+              }
+            : undefined,
+        );
+        // Local history checks are synchronous. Recheck a stop that arrived while
+        // preparing the ephemeral HOME before constructing the native process.
+        if (this.closed || this.active!.stopRequested)
+          throw new DomainError('EXECUTION_CANCELLED', '启动前已请求停止，没有调用模型');
         attemptedSpawn = true;
         handle = runProcess({
           executable: local.executable,
-          args: claudeArguments(config),
+          args: claudeArguments(
+            claudeRetained?.resolvedModel
+              ? { ...config, model: claudeRetained.resolvedModel }
+              : config,
+            claudeRetained,
+          ),
           cwd: root,
-          env: { PATH: process.env.PATH, HOME: home, LANG: 'C.UTF-8', ANTHROPIC_API_KEY: apiKey },
+          env: {
+            PATH: process.env.PATH,
+            HOME: privateHome,
+            LANG: 'C.UTF-8',
+            ANTHROPIC_API_KEY: apiKey,
+            CLAUDE_CONFIG_DIR: join(privateHome, 'config'),
+            CLAUDE_CODE_PROJECT_DIR_NAME: 'work',
+          },
           input: config.contextText,
           timeoutMs: config.timeoutSeconds * 1000,
           onSpawn,
@@ -349,7 +394,9 @@ export class NodeExecutor {
           : 'failed';
       const nativeSession = retained
         ? this.sessions.finish(retained, command, summary as CodexSummary, success)
-        : undefined;
+        : claudeRetained
+          ? this.claudeSessions.finish(claudeRetained, command, summary as ClaudeSummary, success)
+          : undefined;
       this.journal.settle(
         command.id,
         state,
@@ -382,7 +429,9 @@ export class NodeExecutor {
       if (outcome?.terminationConfirmed || !attemptedSpawn) {
         this.journal.settle(
           command.id,
-          'failed',
+          error instanceof DomainError && error.code === 'EXECUTION_CANCELLED' && !attemptedSpawn
+            ? 'cancelled'
+            : 'failed',
           error instanceof DomainError
             ? clean(error.message)
             : '执行未完成，已确认没有遗留受管进程。',
@@ -393,6 +442,7 @@ export class NodeExecutor {
         this.journal.append(command.id, 'unknown');
       }
     } finally {
+      if (claudeRetained) this.claudeSessions.block(claudeRetained.ref);
       if (retained) this.sessions.block(retained.ref); // ready is unaffected; interrupted state stays blocked.
       lease.close();
       if (home && this.journal.get(command.id)?.phase === 'terminal')

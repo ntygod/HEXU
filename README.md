@@ -9,11 +9,11 @@
 不用反复解释，不用反复追问，不用四处找成果。
 
 
-> **当前阶段：E2c1 业务底座，Workbench W1 全套界面重建已完成。** 默认 preview 保留示例工作台与本机双工具；team-local 使用真实账号/项目权限，可配对独立节点，并由节点所有者在本机单独启用受限 Claude/Codex 执行。**摘要配对不自动开放代码执行；接单、实际启动与任务完成分别记录。** 仍只支持同一机器上的回环连接，跨电脑部署、PostgreSQL、Claude 会话恢复与有效账户真实模型生成/恢复联调未完成；Codex 原生恢复已接入实验性代码路径。
+> **当前阶段：E2c2 双工具会话代码路径，Workbench W1 全套界面重建已完成。** 默认 preview 保留示例工作台与本机双工具；team-local 使用真实账号/项目权限，可配对独立节点，并由节点所有者在本机单独启用受限 Claude/Codex 执行。**摘要配对不自动开放代码执行；接单、实际启动与任务完成分别记录。** 仍只支持同一机器上的回环连接，跨电脑部署、PostgreSQL 与有效账户真实模型生成/恢复联调未完成；Claude Code / Codex 原生恢复均已接入实验性节点代码路径。
 
 ## 继续开发与 AI 接手
 
-从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1-01—09 已完成；下一主线是 Claude 原生会话映射与显式恢复。原 102 项工作清单及历史继续保留。
+从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1-01—09 已完成；Claude 显式恢复代码路径已补齐；下一主线是项目编辑/归档与已有权限、节点执行的联动。原 102 项工作清单及历史继续保留。
 
 ## 启动
 
@@ -61,7 +61,7 @@ team-local 登录后，在“资源与设置 → 节点与目录”生成配对�
 
 ## 继续处理一个节点任务
 
-在任务输入区选择“下一轮要求”并保存，不会影响活动执行；“要求与使用记录”抽屉可编辑/撤回本人待选要求，刷新保留已保存记录。结束后点击“沿原目录继续”，明确选择材料并创建同目录新会话。未选要求不会偷偷发送，状态未知不自动重跑。节点接续现可明确安排等待/停止后自动派发，Codex 可另外选择实验性原生恢复；自动等待接续仍使用新会话。用法见 [持续工作说明](docs/engineering/node-continuation.md)。
+在任务输入区选择“下一轮要求”并保存，不会影响活动执行；“要求与使用记录”抽屉可编辑/撤回本人待选要求，刷新保留已保存记录。结束后点击“沿原目录继续”，明确选择材料并创建同目录新会话。未选要求不会偷偷发送，状态未知不自动重跑。节点接续现可明确安排等待/停止后自动派发，Claude Code / Codex 可另外选择实验性原生恢复；自动等待接续仍使用新会话。用法见 [持续工作说明](docs/engineering/node-continuation.md)。
 
 ## 运行中安排下一轮
 
@@ -69,11 +69,11 @@ team-local 登录后，在“资源与设置 → 节点与目录”生成配对�
 
 等待期间新的模型输出不会补入已经确认的材料；要带入最终结果，应结束后重新配置。仍是本人节点的新会话，不是原生 resume 或跨电脑执行。详见 [节点持续工作](docs/engineering/node-continuation.md)。
 
-## 可选：恢复 Codex 原生会话
+## 可选：恢复 Claude Code / Codex 原生会话
 
-独立节点的本机执行配置可明确设置 `retainSessions: true`（只支持 Codex，默认不保留）。这会在节点私有目录保存原生历史；后续在同一成功任务的“沿原目录继续”中选择“恢复 Codex 原生会话（实验性）”。仅本人节点、同目录/模式/授权版本和同一 Key 恢复，失败不会静默新建会话。
+独立节点的本机执行配置可明确设置 `retainSessions: true`（支持 Claude Code / Codex，默认不保留）。这会在节点私有目录保存原生历史；后续在同一成功任务的“沿原目录继续”中选择相应工具的“恢复原生会话（实验性）”。仅本人节点、同目录/模式/授权版本和同一 Key 恢复，失败不会静默新建会话。
 
-原生历史不是本次材料预览的全部内容，取消本次勾选不会抹去已有历史。7 天是恢复期限，不是自动删除期限；本机有 `native-sessions` 和 `forget-native-session` 命令。有效账户下真实模型恢复尚未联调；用法和边界见 [Codex 会话](docs/engineering/codex-sessions.md)。
+原生历史不是本次材料预览的全部内容，取消本次勾选不会抹去已有历史。7 天是恢复期限，不是自动删除期限；本机有 `native-sessions` 和 `forget-native-session` 命令。有效账户下真实模型恢复尚未联调；用法和边界见 [Claude Code 会话](docs/engineering/claude-sessions.md) / [Codex 会话](docs/engineering/codex-sessions.md)。
 
 ## 当前能操作什么
 

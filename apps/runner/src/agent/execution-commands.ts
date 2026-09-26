@@ -1,3 +1,4 @@
+import { ClaudeSessions } from './claude-sessions.js';
 import { CodexSessions } from './codex-sessions.js';
 import { createInterface } from 'node:readline/promises';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
@@ -48,7 +49,7 @@ export async function executionCommand(
     );
     if (local.policy.retainSessions)
       console.log(
-        '另外保留 Codex 原生历史到节点私有目录（可能含代码及敏感材料），恢复有效期 7 天；到期不自动删除，请用 forget-native-session 清理。不会上传原生历史到控制服务。',
+        `另外保留 ${local.policy.tool === 'codex' ? 'Codex' : 'Claude Code'} 原生历史到节点私有目录（可能含代码及敏感材料），恢复有效期 7 天；到期不自动删除，请用 forget-native-session 清理。不会上传原生历史到控制服务。`,
       );
     await confirm('确认以上范围，输入 EXECUTE：', 'EXECUTE');
     writeExecutionPolicy(storage.home, local);
@@ -88,6 +89,15 @@ export async function forgetNativeSession(storage: AgentStorage, ref: string) {
     `仅清理此节点保留的原生历史，不删除代码或 HEXU 任务。输入 FORGET ${ref}：`,
     `FORGET ${ref}`,
   );
-  new CodexSessions(storage).forget(ref);
+  const claude = new ClaudeSessions(storage);
+  if (claude.list().some((s) => s.ref === ref)) claude.forget(ref);
+  else new CodexSessions(storage).forget(ref);
   console.log('本机原生历史已清理；旧会话引用不能恢复，任务公开历史不受影响。');
+}
+
+export function listNativeSessions(storage: AgentStorage) {
+  return [
+    ...new CodexSessions(storage).list().map((s) => ({ tool: 'codex' as const, ...s })),
+    ...new ClaudeSessions(storage).list().map((s) => ({ tool: 'claude-code' as const, ...s })),
+  ];
 }

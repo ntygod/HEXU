@@ -71,7 +71,7 @@ export function nodeContinuationContext(
   const notes = inputs.map((i, index) => `${index + 1}. ${i.authorName}\n${i.body}`).join('\n\n');
   if (notes.length > 6000)
     throw new DomainError('MATERIAL_LIMIT', '所选下一轮要求合计超过 6000 字符，请减少选择');
-  const rendered = `${base}\n\n# 明确选择的下一轮要求\n${notes || '未选择'}\n\n# 本次要求\n${prompt}\n\n${sessionMode === 'resume' ? '本次明确恢复节点私有 Codex 原生会话，模型会沿用之前的会话历史；此处仅为新增材料，不覆盖历史。' : '这是新会话接续，不是恢复模型内部状态。'}历史输出仅作参考；只使用已授权文件工具，不执行 Shell、MCP 或仓库脚本。`;
+  const rendered = `${base}\n\n# 明确选择的下一轮要求\n${notes || '未选择'}\n\n# 本次要求\n${prompt}\n\n${sessionMode === 'resume' ? '本次明确恢复节点私有原生会话，模型会沿用之前的会话历史；此处仅为新增材料，不覆盖历史。' : '这是新会话接续，不是恢复模型内部状态。'}历史输出仅作参考；只使用已授权文件工具，不执行 Shell、MCP 或仓库脚本。`;
   if (rendered.length > 20000)
     throw new DomainError('MATERIAL_LIMIT', '本次材料超过 20000 字符，请缩短本次要求或减少选择');
   return rendered;

@@ -102,8 +102,8 @@ export function parsePolicy(value: unknown): ExecutionPolicy {
     'retainSessions',
   ]);
   const tool = enumValue(b.tool, ['claude-code', 'codex'] as const, '工具');
-  if (b.retainSessions !== undefined && (b.retainSessions !== true || tool !== 'codex'))
-    throw new DomainError('INVALID_POLICY', '原生会话保留目前仅支持明确启用的 Codex');
+  if (b.retainSessions !== undefined && b.retainSessions !== true)
+    throw new DomainError('INVALID_POLICY', '原生会话保留需要在本机明确设置为 true');
   const integer = (n: unknown, min: number, max: number) => {
     if (typeof n !== 'number' || !Number.isInteger(n) || n < min || n > max)
       throw new DomainError('INVALID_POLICY', `执行限额应为 ${min}–${max} 的整数`);

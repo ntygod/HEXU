@@ -18,7 +18,7 @@ import {
   ClaudeStream,
   claudeArguments,
   redact,
-  requiredFlags,
+  claudeCapabilities,
 } from '../../../packages/adapters/claude-code/src/index.js';
 import { runProcess, type ProcessHandle } from './process-host.js';
 import { LocalWorkspaces } from './workspaces.js';
@@ -148,7 +148,7 @@ export class NativeRuntime {
     const version = (await probe('--version')).trim().slice(0, 200);
     const help = await probe('--help');
     this.capability.version = version || null;
-    if (!version || requiredFlags.some((flag) => !help.includes(flag))) {
+    if (!claudeCapabilities(version, help)) {
       this.capability.reason =
         '工具缺少 --bare / --restricted 等必要能力；请更新 Claude Code，不会回退到无隔离模式';
       return;

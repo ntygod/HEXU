@@ -1,4 +1,4 @@
-import { CodexSessions } from './agent/codex-sessions.js';
+import { listNativeSessions } from './agent/execution-commands.js';
 import { forgetNativeSession } from './agent/execution-commands.js';
 import { ExecutionJournal } from './agent/execution-journal.js';
 import { NodeExecutor } from './agent/executor.js';
@@ -176,7 +176,7 @@ async function main() {
   const { command, options, home } = argumentsFor(process.argv.slice(2));
   if (command === 'help') {
     console.log(
-      'HEXU Runner E2c1 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n列出待处理执行：pending-executions [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]\n原生会话状态：native-sessions [--state ...]\n清理原生历史：forget-native-session --session ID [--state ...]\nCodex 可在本机 execution.json 明确设置 retainSessions:true；默认不保留。',
+      'HEXU Runner E2c1 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n列出待处理执行：pending-executions [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]\n原生会话状态：native-sessions [--state ...]\n清理原生历史：forget-native-session --session ID [--state ...]\nClaude Code / Codex 可在本机 execution.json 明确设置 retainSessions:true；默认不保留。',
     );
     return;
   }
@@ -204,7 +204,7 @@ async function main() {
   const storage = new AgentStorage(home);
   try {
     if (command === 'native-sessions') {
-      console.log(JSON.stringify(new CodexSessions(storage).list(), null, 2));
+      console.log(JSON.stringify(listNativeSessions(storage), null, 2));
       return;
     }
     if (command === 'forget-native-session') {
