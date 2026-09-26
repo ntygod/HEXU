@@ -610,7 +610,9 @@ test('Codex 原生会话：重启独立节点后明确恢复，使用同一私�
     agent = cli(['start', '--state', f.home]);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     const way = page.getByLabel('接续会话方式', { exact: true });
-    await expect(way.locator('option[value="resume"]')).toBeEnabled({ timeout: 15000 });
+    await expect(way.locator('option[value="resume"]')).toHaveJSProperty('disabled', false, {
+      timeout: 15000,
+    });
     await way.selectOption('resume');
     await expect(
       page.getByText('下方预览仅是新增文本，不是完整历史。', { exact: false }),
@@ -683,8 +685,21 @@ test('Codex 会话清理后恢复失败不降级，下一次明确新会话仍�
         .filter({ hasText: '原生会话不存在、已删除或未确认安全结束' }),
     ).toBeVisible();
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
-    await expect(page.getByLabel('接续会话方式').locator('option[value="resume"]')).toBeDisabled();
+    await expect(
+      page.getByLabel('接续会话方式').locator('option[value="resume"]'),
+    ).toHaveJSProperty('disabled', true);
     await expect(page.getByLabel('接续会话方式')).toHaveValue('new');
+    await page.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
+    await page.getByLabel('本次要求', { exact: true }).fill('CODEX_WRITE');
+    await expect(page.getByRole('checkbox').last()).toBeEnabled();
+    await page.getByRole('checkbox').last().check();
+    await page.getByRole('button', { name: '确认同目录接续', exact: true }).click();
+    await expect.poll(async () => (await detail(page, f)).runs.length, { timeout: 20000 }).toBe(3);
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('succeeded');
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
+    expect((await detail(page, f)).runs.at(-1).node.nativeSession.ref).not.toBe(ref);
   } finally {
     if (agent) await agent.stop();
     await rm(f.dir, { recursive: true, force: true });
