@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
+import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
+import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
 import { Avatar, Button, Empty, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, useApp, canEditTask } from './state.js';
@@ -76,8 +78,7 @@ export function Projects() {
 export function ProjectPage({ id }: { id: string }) {
   const { data, changeStatus } = useApp();
   const [tab, setTab] = useState('tasks');
-  const [view, setView] = useState('board');
-  const [filter, setFilter] = useState('');
+  const { view, setView, filters, setFilter, clear } = useProjectTaskFilters();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
@@ -100,9 +101,7 @@ export function ProjectPage({ id }: { id: string }) {
   const allTasks = data.tasks.filter(
     (task) => task.projectId === id && task.status !== 'cancelled',
   );
-  const tasks = allTasks.filter((task) =>
-    task.title.toLocaleLowerCase().includes(filter.toLocaleLowerCase()),
-  );
+  const tasks = allTasks.filter((task) => matchesTaskPeopleFilters(task, filters));
   const results = data.results.filter((result) =>
     allTasks.some((task) => task.id === result.taskId),
   );
@@ -202,15 +201,12 @@ export function ProjectPage({ id }: { id: string }) {
                 列表
               </button>
             </div>
-            <label className="work-filter">
-              <Icon name="search" size={15} />
-              <input
-                aria-label="筛选项目任务"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder="按标题筛选任务…"
-              />
-            </label>
+            <ProjectTaskFilters
+              projectId={id}
+              filters={filters}
+              setFilter={setFilter}
+              clear={clear}
+            />
             <span className="muted">{tasks.length} 项任务</span>
           </div>
           {view === 'board' ? (

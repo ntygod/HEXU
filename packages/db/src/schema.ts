@@ -182,4 +182,26 @@ UPDATE runs SET body=json_set(body,'$.createdByUserId',NULL)
  WHERE json_type(body,'$.createdByUserId') IS NULL;
 `,
   },
+  {
+    version: 12,
+    sql: `
+CREATE TABLE task_participant_sets (
+ task_id TEXT PRIMARY KEY REFERENCES tasks(id), revision INTEGER NOT NULL CHECK(revision>=1)
+);
+CREATE TABLE task_participants (
+ task_id TEXT NOT NULL REFERENCES tasks(id), user_id TEXT NOT NULL, name TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('active','left','removed','access_revoked')), updated_at TEXT NOT NULL,
+ PRIMARY KEY(task_id,user_id)
+);
+CREATE INDEX task_participants_user ON task_participants(user_id,state,task_id);
+CREATE TABLE task_participant_events (
+ task_id TEXT NOT NULL REFERENCES tasks(id), revision INTEGER NOT NULL,
+ user_id TEXT NOT NULL, name TEXT NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('joined','added','left','removed','access_revoked')),
+ actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, created_at TEXT NOT NULL,
+ PRIMARY KEY(task_id,revision)
+);
+-- Legacy tasks start with an empty relation set; do not invent participation or authorship.
+`,
+  },
 ];

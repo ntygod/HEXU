@@ -34,6 +34,8 @@ export interface Project {
   revision: number;
 }
 export interface Task {
+  /** Current participants projected for reads; never persisted in Task JSON or sent as model input. */
+  participantUserIds?: string[];
   /** Unknown for legacy records; never inferred from the current owner. */
   createdByUserId?: string | null;
   id: string;
