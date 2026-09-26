@@ -2,6 +2,8 @@
 
 Read `docs/product/03-functional-specification.md` and the relevant work package under `docs/development/` before changing behavior. Product v1.1 is authoritative; do not restore mandatory quality-evidence gates or create an AI-employee hierarchy.
 
+When taking over development, start with `docs/development/24-ai-handoff.md`. Current capabilities and checks are in `21-implementation-status.md`; the next delivery is in `22-next-delivery.md`. W1-01—09 is delivered, so do not restart the completed UI migration from older planning text. Optional ignored `.hexu/local-environment.md` records machine-local preview/test details, not portable product capabilities.
+
 ## Approved product, design and client direction
 
 Before changing UI or interaction, read `docs/design/README.md` (Workbench W1) and the relevant `02`/`10` work package. Before changing client packaging, deployment topology or local execution boundaries, also read `docs/engineering/adr-0008-client-surfaces.md`. These decisions supersede older light/indigo-first styling and web-only product assumptions; current delivered capabilities still come from `docs/development/21-implementation-status.md` and code.
