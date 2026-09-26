@@ -195,7 +195,10 @@ export function NodeRunPanel({
         {source && (
           <div className="node-source-summary">
             <strong>
-              保留原任务和目录 · {sessionMode === 'resume' ? '恢复 Codex 原生会话' : '新建工具会话'}
+              保留原任务和目录 ·{' '}
+              {sessionMode === 'resume'
+                ? `恢复 ${source?.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'} 原生会话`
+                : '新建工具会话'}
             </strong>
             <p>
               {source.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} →{' '}
@@ -325,7 +328,8 @@ export function NodeRunPanel({
                   >
                     <option value="new">新会话 · 只带入本次材料</option>
                     <option value="resume" disabled={!continuation?.nativeSession?.available}>
-                      恢复 Codex 原生会话（实验性）
+                      恢复 {source?.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'}{' '}
+                      原生会话（实验性）
                     </option>
                   </select>
                 </label>
@@ -333,7 +337,8 @@ export function NodeRunPanel({
                 {sessionMode === 'resume' && (
                   <div className="notice-box">
                     <p>
-                      原生历史只保存在节点，将由 Codex
+                      原生历史只保存在节点，将由{' '}
+                      {source.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'}{' '}
                       重新读取。模型会看到原会话历史，不能通过本次取消勾选来删除历史材料。
                       下方预览仅是新增文本，不是完整历史。仅在原执行成功结束、同一账户/工具/模式下恢复；失败不自动新建或重试。
                     </p>
@@ -539,8 +544,8 @@ export function NodeRunStatus({ run }: { run: Run }) {
         <div className="native-session-record">
           <strong>
             {n.nativeSession.action === 'resumed'
-              ? 'Codex 原生恢复完成'
-              : 'Codex 会话已在节点私有保留'}
+              ? `${run.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'} 原生恢复完成`
+              : `${run.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'} 会话已在节点私有保留`}
           </strong>
           <p>
             节点报告恢复有效期至 {new Date(n.nativeSession.expiresAt).toLocaleString()}

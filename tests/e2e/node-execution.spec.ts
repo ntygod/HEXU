@@ -54,7 +54,8 @@ function cli(args: string[], input?: string) {
     },
   };
 }
-async function prepare(page: Page, codexSessions = false) {
+async function prepare(page: Page, retainedTool?: 'codex' | 'claude-code') {
+  const codexSessions = retainedTool === 'codex';
   const initial = await (await page.request.get(`${origin}/api/v1/identity`)).json();
   const identity = { email: 'node-browser-owner@example.invalid', password };
   if (initial.setupRequired)
@@ -120,7 +121,7 @@ async function prepare(page: Page, codexSessions = false) {
     execution,
     JSON.stringify({
       tool: codexSessions ? 'codex' : 'claude-code',
-      ...(codexSessions ? { retainSessions: true } : {}),
+      ...(retainedTool ? { retainSessions: true } : {}),
       executable,
       mode: 'edit',
       workspaces: ['订单工作副本'],
@@ -616,120 +617,146 @@ test('等待接续期间修改人工材料会暂停，历史保留原要求而�
   }
 });
 
-test('Codex 原生会话：重启独立节点后明确恢复，使用同一私有历史并保留新 Run', async ({ page }) => {
-  test.setTimeout(90000);
-  const f = await prepare(page, true);
-  let agent: ReturnType<typeof cli> | null = null;
-  try {
-    agent = await authorize(f);
-    await startUI(page, 'CODEX_WRITE', 'Codex');
-    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
-    await expect
-      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
-      .toBe('succeeded');
-    await expect(page.locator('.native-session-record')).toContainText(
-      'Codex 会话已在节点私有保留',
-    );
-    const first = (await detail(page, f)).runs[0];
-    await agent.stop();
-    agent = cli(['start', '--state', f.home]);
-    await closeNextInputs(page);
-    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
-    const way = page.getByLabel('接续会话方式', { exact: true });
-    await expect(way.locator('option[value="resume"]')).toHaveJSProperty('disabled', false, {
-      timeout: 15000,
-    });
-    await way.selectOption('resume');
-    await expect(
-      page.getByText('下方预览仅是新增文本，不是完整历史。', { exact: false }),
-    ).toBeVisible();
-    await page.getByLabel('本次要求', { exact: true }).fill('SESSION_RECALL');
-    await expect(page.getByRole('checkbox').last()).toBeEnabled();
-    await page.getByRole('checkbox').last().check();
-    await mkdir('artifacts', { recursive: true });
-    await page.screenshot({ path: 'artifacts/32-codex-native-resume-choice.png', fullPage: true });
-    await page.getByRole('button', { name: '恢复原生会话并开始', exact: true }).click();
-    await expect.poll(async () => (await detail(page, f)).runs.length).toBe(2);
-    await expect
-      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
-      .toBe('succeeded');
-    await expect(page.locator('.native-session-record')).toContainText('Codex 原生恢复完成');
-    const second = (await detail(page, f)).runs.at(-1);
-    expect(second.previousRunId).toBe(first.id);
-    expect(second.node.nativeSession.ref).toBe(first.node.nativeSession.ref);
-    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
-    await page.reload();
-    await expect(page.locator('.native-session-record')).toContainText('Codex 原生恢复完成');
-    await page.screenshot({ path: 'artifacts/33-codex-native-resumed.png', fullPage: true });
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    await page.setViewportSize({ width: 390, height: 844 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
-      true,
-    );
-    await page.screenshot({ path: 'artifacts/34-codex-native-mobile-dark.png', fullPage: true });
-  } finally {
-    if (agent) await agent.stop();
-    await rm(f.dir, { recursive: true, force: true });
-  }
-});
+for (const tool of ['codex', 'claude-code'] as const) {
+  const toolName = tool === 'codex' ? 'Codex' : 'Claude Code';
+  const writePrompt = tool === 'codex' ? 'CODEX_WRITE' : 'FIXTURE_WRITE';
+  test(`${toolName} 原生会话：重启独立节点后明确恢复，使用同一私有历史并保留新 Run`, async ({
+    page,
+  }) => {
+    test.setTimeout(90000);
+    const f = await prepare(page, tool);
+    let agent: ReturnType<typeof cli> | null = null;
+    try {
+      agent = await authorize(f);
+      await startUI(page, writePrompt, toolName);
+      await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+      await expect
+        .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+        .toBe('succeeded');
+      await expect(page.locator('.native-session-record')).toContainText(
+        `${toolName} 会话已在节点私有保留`,
+      );
+      const first = (await detail(page, f)).runs[0];
+      await agent.stop();
+      agent = cli(['start', '--state', f.home]);
+      await closeNextInputs(page);
+      await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+      const way = page.getByLabel('接续会话方式', { exact: true });
+      await expect(way.locator('option[value="resume"]')).toHaveJSProperty('disabled', false, {
+        timeout: 15000,
+      });
+      await way.selectOption('resume');
+      const historyNotice = page.locator('.native-session-choice .notice-box');
+      await expect(historyNotice).toContainText(`将由 ${toolName} 重新读取`);
+      await expect(historyNotice).not.toContainText(
+        `将由 ${tool === 'codex' ? 'Claude Code' : 'Codex'} 重新读取`,
+      );
+      await expect(
+        page.getByText('下方预览仅是新增文本，不是完整历史。', { exact: false }),
+      ).toBeVisible();
+      await page.getByLabel('本次要求', { exact: true }).fill('SESSION_RECALL');
+      await expect(page.getByRole('checkbox').last()).toBeEnabled();
+      await page.getByRole('checkbox').last().check();
+      await mkdir('artifacts', { recursive: true });
+      await page.screenshot({
+        path: `artifacts/32-${tool}-native-resume-choice.png`,
+        fullPage: true,
+      });
+      await page.getByRole('button', { name: '恢复原生会话并开始', exact: true }).click();
+      await expect.poll(async () => (await detail(page, f)).runs.length).toBe(2);
+      await expect
+        .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+        .toBe('succeeded');
+      await expect(page.locator('.native-session-record')).toContainText(
+        `${toolName} 原生恢复完成`,
+      );
+      const second = (await detail(page, f)).runs.at(-1);
+      expect(second.previousRunId).toBe(first.id);
+      expect(second.node.nativeSession.ref).toBe(first.node.nativeSession.ref);
+      expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
+      await page.reload();
+      await expect(page.locator('.native-session-record')).toContainText(
+        `${toolName} 原生恢复完成`,
+      );
+      await page.screenshot({ path: `artifacts/33-${tool}-native-resumed.png`, fullPage: true });
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+      await page.setViewportSize({ width: 390, height: 844 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+      ).toBe(true);
+      await page.screenshot({
+        path: `artifacts/34-${tool}-native-mobile-dark.png`,
+        fullPage: true,
+      });
+    } finally {
+      if (agent) await agent.stop();
+      await rm(f.dir, { recursive: true, force: true });
+    }
+  });
 
-test('Codex 会话清理后恢复失败不降级，下一次明确新会话仍可使用', async ({ page }) => {
-  test.setTimeout(90000);
-  const f = await prepare(page, true);
-  let agent: ReturnType<typeof cli> | null = null;
-  try {
-    agent = await authorize(f);
-    await startUI(page, 'CODEX_WRITE', 'Codex');
-    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
-    await expect
-      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
-      .toBe('succeeded');
-    const source = (await detail(page, f)).runs[0],
-      ref = source.node.nativeSession.ref;
-    await agent.stop();
-    agent = null;
-    const cleanup = cli(
-      ['forget-native-session', '--state', f.home, '--session', ref],
-      `FORGET ${ref}\n`,
-    );
-    expect(await cleanup.finished, cleanup.output()).toBe(0);
-    agent = cli(['start', '--state', f.home]);
-    await closeNextInputs(page);
-    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
-    await page.getByLabel('接续会话方式', { exact: true }).selectOption('resume');
-    await page.getByLabel('本次要求', { exact: true }).fill('SESSION_RECALL');
-    await expect(page.getByRole('checkbox').last()).toBeEnabled({ timeout: 15000 });
-    await page.getByRole('checkbox').last().check();
-    await page.getByRole('button', { name: '恢复原生会话并开始', exact: true }).click();
-    await expect.poll(async () => (await detail(page, f)).runs.length).toBe(2);
-    await expect
-      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
-      .toBe('failed');
-    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
-    await expect(
-      page
-        .locator('.message-content')
-        .filter({ hasText: '原生会话不存在、已删除或未确认安全结束' }),
-    ).toBeVisible();
-    await closeNextInputs(page);
-    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
-    await expect(
-      page.getByLabel('接续会话方式').locator('option[value="resume"]'),
-    ).toHaveJSProperty('disabled', true);
-    await expect(page.getByLabel('接续会话方式')).toHaveValue('new');
-    await page.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
-    await page.getByLabel('本次要求', { exact: true }).fill('CODEX_WRITE');
-    await expect(page.getByRole('checkbox').last()).toBeEnabled();
-    await page.getByRole('checkbox').last().check();
-    await page.getByRole('button', { name: '确认同目录接续', exact: true }).click();
-    await expect.poll(async () => (await detail(page, f)).runs.length, { timeout: 20000 }).toBe(3);
-    await expect
-      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
-      .toBe('succeeded');
-    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
-    expect((await detail(page, f)).runs.at(-1).node.nativeSession.ref).not.toBe(ref);
-  } finally {
-    if (agent) await agent.stop();
-    await rm(f.dir, { recursive: true, force: true });
-  }
-});
+  test(`${toolName} 会话清理后恢复失败不降级，下一次明确新会话仍可使用`, async ({ page }) => {
+    test.setTimeout(90000);
+    const f = await prepare(page, tool);
+    let agent: ReturnType<typeof cli> | null = null;
+    try {
+      agent = await authorize(f);
+      await startUI(page, writePrompt, toolName);
+      await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+      await expect
+        .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+        .toBe('succeeded');
+      const source = (await detail(page, f)).runs[0],
+        ref = source.node.nativeSession.ref;
+      await agent.stop();
+      agent = null;
+      const cleanup = cli(
+        ['forget-native-session', '--state', f.home, '--session', ref],
+        `FORGET ${ref}\n`,
+      );
+      expect(await cleanup.finished, cleanup.output()).toBe(0);
+      agent = cli(['start', '--state', f.home]);
+      await closeNextInputs(page);
+      await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+      await page.getByLabel('接续会话方式', { exact: true }).selectOption('resume');
+      await page.getByLabel('本次要求', { exact: true }).fill('SESSION_RECALL');
+      await expect(page.getByRole('checkbox').last()).toBeEnabled({ timeout: 15000 });
+      await page.getByRole('checkbox').last().check();
+      await page.getByRole('button', { name: '恢复原生会话并开始', exact: true }).click();
+      await expect.poll(async () => (await detail(page, f)).runs.length).toBe(2);
+      await expect
+        .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+        .toBe('failed');
+      expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
+      await expect(
+        page.locator('.message-content').filter({
+          hasText:
+            tool === 'codex'
+              ? '原生会话不存在、已删除或未确认安全结束'
+              : '本机 Claude 会话未确认安全结束或已移除',
+        }),
+      ).toBeVisible();
+      await closeNextInputs(page);
+      await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+      await expect(
+        page.getByLabel('接续会话方式').locator('option[value="resume"]'),
+      ).toHaveJSProperty('disabled', true);
+      await expect(page.getByLabel('接续会话方式')).toHaveValue('new');
+      await page.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
+      await page.getByLabel('本次要求', { exact: true }).fill(writePrompt);
+      await expect(page.getByRole('checkbox').last()).toBeEnabled();
+      await page.getByRole('checkbox').last().check();
+      await page.getByRole('button', { name: '确认同目录接续', exact: true }).click();
+      await expect
+        .poll(async () => (await detail(page, f)).runs.length, { timeout: 20000 })
+        .toBe(3);
+      await expect
+        .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+        .toBe('succeeded');
+      expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
+      expect((await detail(page, f)).runs.at(-1).node.nativeSession.ref).not.toBe(ref);
+    } finally {
+      if (agent) await agent.stop();
+      await rm(f.dir, { recursive: true, force: true });
+    }
+  });
+}

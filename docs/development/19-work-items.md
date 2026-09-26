@@ -1,7 +1,7 @@
 # 19｜可领取工作项与团队分工
 
 > D1 · 17 个工作包 × 6 项 = 102 个工作项。  
-> **2026-09-26（UTC+8）逐项核对，E2c1。保留原 102 个编号与标题，新增实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**  
+> **2026-09-26（UTC+8）逐项核对，E2c2。保留原 102 个编号与标题，新增实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**
 > [计划入口](README.md) · [先后依赖](00-delivery-map.md) · [接口总表](18-data-api-catalog.md)
 
 ## 1. 使用方式
@@ -16,9 +16,9 @@
 
 按原工作项完整定义记录：**已完成 2 项、部分实现 61 项、未实现 39 项，共 102 项**。这些工作项大小不同，不能将条目数换算为产品完成百分比。
 
-“已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3/E2b4/E2c1 是实际代码批次，二者不互相替代。
+“已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3/E2b4/E2c1/E2c2 是实际代码批次，二者不互相替代。
 
-本轮推进 **09-02/05/06** 的 Codex 节点私有会话与显式恢复，联动 **06-06、10-03、11-02**。**仅本人、同范围、最新成功会话；真实提供方恢复未验证，Claude resume 和自动等待恢复未实现。** 下一步见 [22](22-next-delivery.md)。
+本轮推进 **08-03** 的 Claude 节点私有会话与显式恢复，联动 **08-01/05、06-06、10-03、11-02**。**两工具均仅本人、同范围、最新成功会话；真实提供方恢复未联调，自动等待恢复未实现。** 下一步见 [22](22-next-delivery.md)。
 
 设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1 全套新页面已接入真实应用并删除旧呈现层，整套回归通过；桌面尚未交付。原工作项完整范围未全部收口，**2 完成 / 61 部分实现 / 39 未实现的统计不变**。
 
@@ -70,11 +70,11 @@
 | HX-DEV-07-04 | 运行输入与下一轮队列 | BE/RN | 部分实现 | 节点下一轮要求、编辑/撤回与实际启动状态已有；等待接续固定选择的版本，变更暂停而非静默采用。原生即时输入、澄清和 provider receipt 未实现。 | [队列](../../packages/db/src/next-inputs.ts) / [界面](../../apps/web/src/next-inputs.tsx) |
 | HX-DEV-07-05 | 绑定式动作授权与真实拒绝 | BE/RN | 部分实现 | 模拟授权与原生额外请求默认拒绝已有；真实动作绑定授权问答尚未实现。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
 | HX-DEV-07-06 | 停止、取消、竞争与恢复 | RN/BE | 部分实现 | 本机/节点停止、队列取消、未知保锁已有；E2b4 增加等待取消、超时、重启暂停及停止后复核。完整跨平台/远程对账仍未完成。 | [派发](../../packages/db/src/node-execution.ts) / [恢复](../../apps/runner/src/agent/execution-commands.ts) |
-| HX-DEV-08-01 | Claude 路径、账号方式与能力声明 | RN | 部分实现 | CLI 路径、必要参数探测和独立 API 配置已有；其他账号方式与有效账户联调未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
+| HX-DEV-08-01 | Claude 路径、账号方式与能力声明 | RN | 部分实现 | CLI 路径、独立 API 配置与必要参数探测已有；官方 2.1.283 无模型检查通过并修正隐藏 max-turns 误判。其他账号方式、真实账户联调未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-08-02 | Claude 启动与结构化流 | RN | 部分实现 | preview 与独立节点均接受限 Claude CLI 结构化流；真实进程/Git 测试为显式协议替身。真实提供方模型生成仍未联调。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [独立节点](../../apps/runner/src/agent/executor.ts) |
-| HX-DEV-08-03 | Claude 原生会话与恢复映射 | RN | 部分实现 | 原生 session 引用已记录；同工具 resume/恢复映射未实现。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
+| HX-DEV-08-03 | Claude 原生会话与恢复映射 | RN | 部分实现 | E2c2 节点私有历史、UUID 映射、显式 --resume、绑定/指纹与初始化/终态核对、任务入口和本机清理已实现。真实账户成功恢复及失败历史对账仍未联调。 | [Claude 会话](../../apps/runner/src/agent/claude-sessions.ts) / [执行器](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-08-04 | Claude 输入、澄清与权限桥接 | RN | 未实现 | 原生运行中输入、澄清和完整权限桥接未实现；默认拒绝额外请求不算完成。 | —（尚无可用实现） |
-| HX-DEV-08-05 | Claude 中断与失败降级 | RN | 部分实现 | 实际进程停止、超时与错误保留已有；完整提供方失败降级与跨平台恢复未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
+| HX-DEV-08-05 | Claude 中断与失败降级 | RN | 部分实现 | 实际停止、超时、未知保锁已有；恢复缺历史/错 ID/模型/权限失败不自动新建或重试。真实账户恢复诊断及跨平台恢复未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-08-06 | Claude 用量、结果与资源配置 | RN/FE | 部分实现 | 原生结果、用量来源及本机预算配置已有；真实费用核对、完整资源配置与账户能力未验证。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-09-01 | Codex stdio、握手与版本能力 | RN | 部分实现 | 本机 stdio、握手与能力探测已有，既有官方无模型检查有记录；完整版本兼容矩阵未完成。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-09-02 | Codex thread/turn 与引用 | RN | 部分实现 | E2c1 增加节点私有会话、read/resume/turn 引用与同范围显式恢复；默认仍新会话。有效账户真实历史恢复未联调，完整恢复/失败会话对账尚缺。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
@@ -84,12 +84,12 @@
 | HX-DEV-09-06 | Codex 用量、配置与限制展示 | RN/FE | 部分实现 | 增加保留授权、恢复期限、继承历史提示、本机列表/清理与创建/恢复标记；真实模型计费、账户互操作及完整用量仍未验证。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-10-01 | 任务页面与双状态头 | FE | 部分实现 | W1 单一任务容器、业务／执行双状态、实际代码来源、可折叠调宽双栏和手机面板切换、上下文／执行历史抽屉已有；复杂多工作线仍未交付。 | [任务](../../apps/web/src/task-workspace.tsx) |
 | HX-DEV-10-02 | 协作消息、事件与草稿 | FE | 部分实现 | 已迁移实际消息／原生事件，新增身份空间内存草稿、发送失败保留与历史阅读保护；完整流式增量合并、分页历史加载及刷新草稿恢复仍未实现。 | [讨论](../../apps/web/src/discussion.tsx) / [草稿](../../apps/web/src/state.tsx) |
-| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | W1 稳定输入栏区分讨论和节点下一轮要求；实际工具／模型／节点配置、停止、接续与显式 Codex 恢复按原 API 可用。实时 steer、跨电脑执行与完整双工具恢复仍缺。 | [输入](../../apps/web/src/prompt-bar.tsx) / [执行](../../apps/web/src/node-execution.tsx) |
+| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | W1 稳定输入栏区分讨论和节点下一轮要求；实际工具／模型／节点配置、停止、接续与显式 Claude/Codex 恢复按原 API 可用，保留/请求/已恢复区分展示。实时 steer、跨电脑执行与真实模型联调仍缺。 | [输入](../../apps/web/src/prompt-bar.tsx) / [执行](../../apps/web/src/node-execution.tsx) |
 | HX-DEV-10-04 | 文件、diff 与外部 IDE | FE/RN | 部分实现 | W1 面板显示本机授权目录的文件列表、diff、分支及实际采集时间，读取失败隐藏旧快照；节点远程 diff、编辑器、固定代码快照和 IDE 衔接仍未交付。 | [代码](../../apps/web/src/native.tsx) |
 | HX-DEV-10-05 | 受控交互终端与输入权 | FE/RN | 未实现 | 带输入权的受控交互终端、重连和会话清理未实现。 | —（尚无可用实现） |
 | HX-DEV-10-06 | 上下文、协助、成果插槽整合 | FE | 部分实现 | W1 已整合工作说明、过程、成果、配置／队列抽屉和接续异常状态；完整 ContextBundle、真实协助与其他未交付能力继续缺失。 | [工作区](../../apps/web/src/task-workspace.tsx) |
 | HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 与 node 均有 202 持久化 Operation、显式 wait/request_stop、查询/取消和幂等；节点固定本次材料与授权。完整 ContextBundle、跨节点和有限协助权限未实现。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
-| HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | E2b4 自动等待仍新会话；E2c1 Codex 可在成功终态后显式恢复原生会话，保留来源与原目录。Claude resume、自动等待原生恢复、跨成员/机器接手与真实模型联调仍缺。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
+| HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | E2b4 自动等待仍新会话；E2c1/E2c2 Codex 与 Claude 可在成功终态后显式恢复私有原生会话，保留来源与原目录。自动等待原生恢复、跨成员/机器接手与真实模型联调仍缺。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-11-03 | Assistance、所选快照与有限访问 | BE | 未实现 | Assistance、固定协助快照与有限 AccessGrant 未实现；依赖 03 的真实权限基础。 | —（尚无可用实现） |
 | HX-DEV-11-04 | 真人回应与 AI 协助 Run | BE/RN | 未实现 | 真人协助回复、AI assist Run 和独立只读/隔离协助流程未实现。 | —（尚无可用实现） |
 | HX-DEV-11-05 | 继续/协助抽屉与就地回复 | FE | 部分实现 | 节点接续抽屉新增等待/停止选择、任务中的持久进度卡、取消、历史材料与重新配置入口；协助抽屉及就地回应尚未实现。 | [接续界面](../../apps/web/src/node-execution.tsx) |

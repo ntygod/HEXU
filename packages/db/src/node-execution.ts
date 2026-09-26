@@ -319,8 +319,8 @@ export class NodeExecution {
         available: resumeAvailable,
         expiresAt: retained?.expiresAt ?? null,
         reason: resumeAvailable
-          ? '节点曾报告保留了 Codex 原生会话，启动前仍核对账户、文件与范围；真实模型联调未完成'
-          : '没有当前可恢复的成功 Codex 会话，或授权/期限已变化；仍可明确新建会话',
+          ? '节点曾报告保留了原生会话，启动前仍核对账户、文件与范围；真实模型联调未完成'
+          : '没有当前可恢复的成功原生会话，或授权/期限已变化；仍可明确新建会话',
       },
       sourceRunId: source.id,
       sourceTool: source.requestedTool,
@@ -342,7 +342,7 @@ export class NodeExecution {
       !source ||
       source.taskId !== taskId ||
       source.provider !== 'node' ||
-      source.requestedTool !== 'codex' ||
+      !['codex', 'claude-code'].includes(source.requestedTool) ||
       source.state !== 'succeeded' ||
       !source.node?.terminationConfirmed ||
       source.observation === 'unknown' ||
@@ -355,6 +355,7 @@ export class NodeExecution {
       source.node.policyHash !== input.policyHash ||
       p?.policy_hash !== input.policyHash ||
       JSON.parse(p.body).retainSessions !== true ||
+      JSON.parse(p.body).tool !== source.requestedTool ||
       Date.parse(source.node.nativeSession.expiresAt) <= Date.now()
     )
       throw new DomainError(
@@ -672,7 +673,7 @@ export class NodeExecution {
           const info = input.nativeSession;
           if (
             input.result !== 'succeeded' ||
-            command.policy.tool !== 'codex' ||
+            !['codex', 'claude-code'].includes(command.policy.tool) ||
             !command.policy.retainSessions ||
             info.ref !== (command.session?.ref ?? command.id) ||
             info.action !== (command.session ? 'resumed' : 'created') ||

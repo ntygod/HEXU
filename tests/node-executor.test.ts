@@ -899,3 +899,216 @@ test('私有会话过期或存在符号链接拒绝恢复，原始文件和进�
     }
   }
 });
+
+async function completedClaude(f: Awaited<ReturnType<typeof fixture>>) {
+  const { run } = await f.create('FIXTURE_WRITE');
+  const done = await f.until(
+    () => f.getRun(run.id),
+    (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+  );
+  assert.equal(done.state, 'succeeded', JSON.stringify(done));
+  assert.ok(done.node?.nativeSession, JSON.stringify(done));
+  return done;
+}
+
+test('Claude 私有原生会话经节点重启后显式 --resume；新 Run 不等于新会话或任务完成', async () => {
+  const f = await fixture('claude-code', true);
+  try {
+    const source = await completedClaude(f),
+      ref = source.node!.nativeSession!.ref;
+    const row = f.storage.db
+      .prepare('SELECT session_id FROM native_claude_sessions WHERE ref=?')
+      .get(ref)!;
+    const vault = join(f.home, 'claude-sessions', ref);
+    await f.restart();
+    const body = await resumeBody(f, source),
+      key = randomUUID();
+    const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key);
+    assert.equal(posted.statusCode, 201, posted.body);
+    const next = await f.until(
+      () => f.getRun(posted.json().id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(next.state, 'succeeded', JSON.stringify(next));
+    assert.equal(next.node?.nativeSession?.action, 'resumed');
+    assert.equal(next.node?.nativeSession?.ref, ref);
+    assert.equal(next.previousRunId, source.id);
+    assert.equal(
+      await readFile(join(vault, 'fixture-invocations.txt'), 'utf8'),
+      '--session-id\n--resume\n',
+    );
+    const detail = (await f.call(`tasks/${f.task.id}`, f.bob)).json();
+    const rendered = JSON.stringify(detail);
+    assert.match(rendered, /restored-private-memory=true/);
+    for (const secret of [
+      String(row.session_id),
+      'private-history-must-not-show',
+      fakeKey,
+      f.home,
+      f.root,
+    ])
+      assert.ok(!rendered.includes(secret), secret);
+    assert.equal(detail.task.status, 'in_progress');
+    assert.equal((await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key)).json().id, next.id);
+    await f.restart();
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\none\n');
+    const fresh = await completedClaude(f);
+    assert.notEqual(fresh.node?.nativeSession?.ref, ref);
+    assert.equal(fresh.node?.nativeSession?.action, 'created');
+  } finally {
+    await f.close();
+  }
+});
+
+test('Claude 恢复拒绝他人派发、模式改变、浏览器原生 ID 与自动等待恢复', async () => {
+  const f = await fixture('claude-code', true);
+  try {
+    const source = await completedClaude(f),
+      body = await resumeBody(f, source);
+    assert.equal((await f.call(`tasks/${f.task.id}/runs`, f.bob, body)).statusCode, 403);
+    for (const change of [{ mode: 'read-only' }, { policyHash: '0'.repeat(64) }])
+      assert.equal(
+        (await f.call(`tasks/${f.task.id}/runs`, f.alice, { ...body, ...change })).statusCode,
+        409,
+      );
+    for (const change of [
+      { sessionId: randomUUID() },
+      { transcriptPath: '/personal/history.jsonl' },
+    ])
+      assert.equal(
+        (await f.call(`tasks/${f.task.id}/runs`, f.alice, { ...body, ...change })).statusCode,
+        400,
+      );
+    assert.equal(
+      (await f.call(`tasks/${f.task.id}/continuations`, f.alice, { ...body, onActiveRun: 'wait' }))
+        .statusCode,
+      400,
+    );
+    assert.equal((await f.call(`tasks/${f.task.id}`, f.alice)).json().runs.length, 1);
+  } finally {
+    await f.close();
+  }
+});
+
+test('Claude 恢复启动前拒绝账户轮换、丢失/篡改历史、链接、过期与未确认状态；不启动第二个进程', async () => {
+  for (const fault of [
+    'key',
+    'missing',
+    'changed',
+    'symlink',
+    'expired',
+    'interrupted',
+    'deleted',
+  ] as const) {
+    const f = await fixture('claude-code', true);
+    try {
+      const source = await completedClaude(f),
+        ref = source.node!.nativeSession!.ref;
+      const row = f.storage.db
+        .prepare('SELECT session_id FROM native_claude_sessions WHERE ref=?')
+        .get(ref)!;
+      const vault = join(f.home, 'claude-sessions', ref);
+      const transcript = join(vault, 'config/projects/work', `${row.session_id}.jsonl`);
+      if (fault === 'key')
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-different-fictional-account-never-real';
+      if (fault === 'missing') await rm(transcript);
+      if (fault === 'changed') await writeFile(transcript, 'changed-private-history');
+      if (fault === 'symlink') await symlink(f.root, join(vault, 'foreign-link'));
+      if (fault === 'expired')
+        f.storage.db
+          .prepare('UPDATE native_claude_sessions SET expires_at=? WHERE ref=?')
+          .run('2000-01-01T00:00:00.000Z', ref);
+      if (fault === 'interrupted') {
+        f.storage.db
+          .prepare("UPDATE native_claude_sessions SET state='active' WHERE ref=?")
+          .run(ref);
+        await f.restart();
+        assert.equal(f.executor.claudeSessions.list()[0]!.state, 'blocked');
+      }
+      if (fault === 'deleted') {
+        f.executor.claudeSessions.forget(ref);
+        assert.deepEqual(f.executor.claudeSessions.list(), []);
+      }
+      const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, await resumeBody(f, source));
+      assert.equal(posted.statusCode, 201, posted.body);
+      const next = await f.until(
+        () => f.getRun(posted.json().id),
+        (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+      );
+      assert.equal(next.state, 'failed', fault);
+      assert.equal(next.node?.nativeSession, undefined);
+      assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+      assert.ok(await readFile(join(f.root, 'native-output.txt'), 'utf8'));
+      assert.ok(
+        (await f.call(`tasks/${f.task.id}`, f.alice))
+          .json()
+          .runs.some((r: Run) => r.id === source.id),
+      );
+    } finally {
+      await f.close();
+    }
+  }
+});
+
+test('Claude 提供方拒绝、init/result 身份错配或模型变化时失败并封存历史，不静默重建', async () => {
+  for (const prompt of [
+    'CLAUDE_RESUME_DENIED',
+    'CLAUDE_WRONG_INIT',
+    'CLAUDE_WRONG_CWD',
+    'CLAUDE_WRONG_MODEL',
+    'CLAUDE_WRONG_RESULT',
+  ]) {
+    const f = await fixture('claude-code', true);
+    try {
+      const source = await completedClaude(f),
+        ref = source.node!.nativeSession!.ref;
+      const body = { ...(await resumeBody(f, source)), prompt };
+      const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body);
+      const next = await f.until(
+        () => f.getRun(posted.json().id),
+        (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+      );
+      assert.equal(next.state, 'failed', prompt);
+      assert.equal(next.node?.nativeSession, undefined);
+      assert.equal(f.executor.claudeSessions.list()[0]!.state, 'blocked');
+      assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\none\n');
+      const methods = await readFile(
+        join(f.home, 'claude-sessions', ref, 'fixture-invocations.txt'),
+        'utf8',
+      );
+      assert.equal(
+        methods,
+        prompt === 'CLAUDE_RESUME_DENIED' ? '--session-id\n' : '--session-id\n--resume\n',
+      );
+    } finally {
+      await f.close();
+    }
+  }
+});
+
+test('Claude 未落盘有效原生历史不能宣称可恢复；停止中的历史不能清理绕过占用', async () => {
+  const f = await fixture('claude-code', true);
+  try {
+    const { run } = await f.create('CLAUDE_NO_TRANSCRIPT');
+    const done = await f.until(
+      () => f.getRun(run.id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(done.state, 'failed');
+    assert.equal(done.node?.nativeSession, undefined);
+    const { run: hanging } = await f.create('FIXTURE_HANG');
+    await f.until(
+      () => f.getRun(hanging.id),
+      (r) => r.state === 'running',
+    );
+    const session = f.executor.claudeSessions.list()[0]!;
+    assert.throws(() => f.executor.claudeSessions.forget(session.ref), /原执行未确认结束/);
+    await f.executor.close();
+    const stopped = await f.getRun(hanging.id);
+    assert.equal(stopped.state, 'cancelled');
+    assert.equal(stopped.node?.nativeSession, undefined);
+    assert.equal(f.executor.claudeSessions.list()[0]!.state, 'blocked');
+  } finally {
+    await f.close();
+  }
+});
