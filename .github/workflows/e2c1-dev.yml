@@ -50,18 +50,19 @@ jobs:
       - name: Official Codex pinned no-model compatibility
         run: |
           python - <<'PY'
-          import urllib.request, json, hashlib, tarfile, pathlib, io
+          import urllib.request, json, hashlib, tarfile, pathlib, io, subprocess
           req = urllib.request.Request('https://api.github.com/repos/openai/codex/releases/tags/rust-v0.157.0', headers={'User-Agent': 'HEXU-no-model-compatibility'})
           release = json.load(urllib.request.urlopen(req, timeout=30))
-          asset = next(a for a in release['assets'] if a['name'] == 'codex-x86_64-unknown-linux-gnu.tar.gz')
+          asset = next(a for a in release['assets'] if a['name'] == 'codex-x86_64-unknown-linux-gnu.tar.zst')
           url = asset['browser_download_url']
-          assert url.startswith('https://github.com/openai/codex/releases/download/rust-v0.157.0/')
+          assert url == 'https://github.com/openai/codex/releases/download/rust-v0.157.0/codex-x86_64-unknown-linux-gnu.tar.zst'
           raw = urllib.request.urlopen(url, timeout=120).read()
           digest = 'sha256:' + hashlib.sha256(raw).hexdigest()
-          assert asset.get('digest') == digest, (asset.get('digest'), digest)
+          assert asset.get('digest') == digest == 'sha256:aa662949f34e1db0ba7e09f7f5bcbf92b5d6ba681fbd9348cf1e80b1d9b6a3d4', (asset.get('digest'), digest)
           print('Official pinned asset:', asset['name'], digest)
           out = pathlib.Path('/tmp/hexu-official-codex'); out.mkdir()
-          with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
+          unpacked = subprocess.run(['zstd', '-d', '-c'], input=raw, stdout=subprocess.PIPE, check=True).stdout
+          with tarfile.open(fileobj=io.BytesIO(unpacked), mode='r:') as archive:
               member = next(m for m in archive.getmembers() if m.isfile() and pathlib.PurePosixPath(m.name).name == 'codex-x86_64-unknown-linux-gnu')
               binary = out / 'codex'
               binary.write_bytes(archive.extractfile(member).read())
