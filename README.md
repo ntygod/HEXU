@@ -45,7 +45,7 @@ npm start
 
 ## 可选：配对独立节点
 
-team-local 登录后，在“空间与账号 → 独立节点与授权目录”生成配对码。本机准备仓库外的 runner.json，执行 `npm run build`，再执行 `npm run runner -- connect --config /path/runner.json`，在终端确认账号、项目和目录；随后 `npm run runner -- start`。配对码不放入命令参数，节点凭证与路径不上传服务。
+team-local 登录后，在“空间与账号 → 独立节点与授权目录”生成配对码。本机准备仓库外的 runner.json，执行 `npm run build`，再执行 `npm run runner -- connect --config /path/runner.json`，在终端确认账号、项目和目录；随后 `npm run runner -- start`。配对码不放入命令参数。本机目录路径不上传；节点令牌用于回环协议认证，服务端只持久化其哈希，不保存令牌原文。
 
 当前只同步目录别名和变更数量。Git 会在获授权的本机目录读取文件以计算状态，但代码、文件名和路径不会上传，也不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
 
@@ -154,7 +154,7 @@ tests                    单元、存储、API 与浏览器测试
 | [v1.1 修订](docs/product/09-planning-revision.md) | 已移除的强制流程 |
 | [详细开发计划](docs/development/README.md) | 17 个工作包、102 个原始工作项 |
 | [逐项任务状态](docs/development/19-work-items.md) | 原 102 项的真实状态、代码入口和剩余内容 |
-| [下一步交付](docs/development/22-next-delivery.md) | 收口接续后补真实身份、权限与独立节点 |
+| [下一步交付](docs/development/22-next-delivery.md) | 独立节点的执行授权、任务派发、停止与恢复 |
 | [当前实现进度](docs/development/21-implementation-status.md) | 本次完成、部分实现与后续工作 |
 | [接口总表](docs/development/18-data-api-catalog.md) | 完整契约草案；当前实现子集见代码与状态文档 |
 | [本地启动与问题处理](docs/engineering/local-preview.md) | 端口、数据库、模拟模式与已知限制 |
