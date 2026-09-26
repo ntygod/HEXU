@@ -1,3 +1,7 @@
+import { ExecutionJournal } from './agent/execution-journal.js';
+import { NodeExecutor } from './agent/executor.js';
+import { executionCommand } from './agent/execution-commands.js';
+import { readExecutionPolicy, writeExecutionPolicy } from './agent/execution-policy.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -29,7 +33,19 @@ const say = (v: string) => console.log(safe(v));
 
 function argumentsFor(args: string[]) {
   const [command, ...rest] = args;
-  if (!command || !['connect', 'start', 'status', 'disconnect', 'help'].includes(command))
+  if (
+    !command ||
+    ![
+      'connect',
+      'start',
+      'status',
+      'disconnect',
+      'help',
+      'enable-execution',
+      'disable-execution',
+      'recover-execution',
+    ].includes(command)
+  )
     throw new DomainError(
       'USAGE',
       '使用 runner connect/start/status/disconnect/help；密钥不得作为参数',
@@ -38,7 +54,7 @@ function argumentsFor(args: string[]) {
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i]!;
     if (Object.hasOwn(options, flag)) throw new DomainError('USAGE', '参数不能重复');
-    if (['--state', '--config'].includes(flag)) {
+    if (['--state', '--config', '--dispatch'].includes(flag)) {
       if (!rest[i + 1] || rest[i + 1]!.startsWith('--'))
         throw new DomainError('USAGE', '参数缺少路径');
       options[flag] = rest[++i]!;
@@ -49,7 +65,8 @@ function argumentsFor(args: string[]) {
   if (
     (options['--once'] && command !== 'start') ||
     (options['--local-only'] && command !== 'disconnect') ||
-    (options['--config'] && command !== 'connect')
+    (options['--config'] && !['connect', 'enable-execution'].includes(command)) ||
+    (options['--dispatch'] && command !== 'recover-execution')
   )
     throw new DomainError('USAGE', '此命令不支持该选项');
   return {
@@ -126,7 +143,9 @@ async function connect(storage: AgentStorage, configPath: string) {
     };
     // Persist before exchange. A lost response is recovered using this same token,
     // never by making another node or repeating any paid operation.
+    new ExecutionJournal(storage).assertCanDisconnect();
     storage.resetForPairing();
+    writeExecutionPolicy(storage.home, null);
     writeCredentials(storage.home, credentials);
     const result = await nodeRequest<{ nodeId: string }>(origin, 'pair', {
       protocol: 1,
@@ -151,7 +170,7 @@ async function main() {
   const { command, options, home } = argumentsFor(process.argv.slice(2));
   if (command === 'help') {
     console.log(
-      'HEXU Runner E2b1 · 本机独立节点 / Git 摘要，不是代码执行器\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。',
+      'HEXU Runner E2b2 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]',
     );
     return;
   }
@@ -161,14 +180,14 @@ async function main() {
     console.log(
       JSON.stringify(
         {
-          mode: 'metadata-only',
+          mode: readExecutionPolicy(path) ? 'owner-execution-enabled' : 'metadata-only',
           name: c.name,
           controlUrl: c.controlUrl,
           nodeId: c.nodeId,
           projectId: c.projectId,
           directoryCount: c.directories.length,
           observation: '本机配置，不代表在线；实时状态见网页',
-          executionEnabled: false,
+          executionEnabled: !!readExecutionPolicy(path),
         },
         null,
         2,
@@ -178,6 +197,15 @@ async function main() {
   }
   const storage = new AgentStorage(home);
   try {
+    if (['enable-execution', 'disable-execution', 'recover-execution'].includes(command)) {
+      await executionCommand(
+        storage,
+        command,
+        options['--config'] as string | undefined,
+        options['--dispatch'] as string | undefined,
+      );
+      return;
+    }
     if (command === 'connect') {
       if (!options['--config'])
         throw new DomainError('USAGE', 'connect 需要 --config 本地配置路径');
@@ -185,6 +213,7 @@ async function main() {
       return;
     }
     if (command === 'disconnect') {
+      new ExecutionJournal(storage).assertCanDisconnect();
       const c = readCredentials(storage.home);
       if (!options['--local-only']) {
         try {
@@ -207,7 +236,11 @@ async function main() {
     }
     const agent = new AgentConnection(storage, say),
       abort = new AbortController();
-    const stop = () => abort.abort();
+    const executor = new NodeExecutor(agent, say);
+    const stop = () => {
+      executor.transportLost();
+      abort.abort();
+    };
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);
     let retry = 1000,
@@ -216,14 +249,18 @@ async function main() {
       while (!abort.signal.aborted) {
         try {
           await agent.cycle(abort.signal);
+          await executor.tick(abort.signal);
           retry = 1000;
           reported = false;
           if (options['--once']) {
             say('一次同步已获持久化 ACK。');
             break;
           }
-          await delay(NODE_INTERVAL_MS, undefined, { signal: abort.signal });
+          await delay(executor.enabled ? 1000 : NODE_INTERVAL_MS, undefined, {
+            signal: abort.signal,
+          });
         } catch (error) {
+          executor.transportLost();
           if (abort.signal.aborted) break;
           const transient =
             !(error instanceof DomainError) ||
@@ -237,7 +274,9 @@ async function main() {
           if (!transient || options['--once']) throw error;
           agent.connected = false;
           if (!reported) {
-            say('连接中断；未确认摘要已留在本地，重连后按原序号重放。没有启动任务。');
+            say(
+              '连接中断；未确认摘要已留在本地，重连后按原序号重放。活动执行已请求停止，不会重复启动。',
+            );
             reported = true;
           }
           try {
@@ -251,6 +290,7 @@ async function main() {
         }
       }
     } finally {
+      await executor.close();
       await agent.goodbye();
       process.removeListener('SIGINT', stop);
       process.removeListener('SIGTERM', stop);

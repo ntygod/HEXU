@@ -60,7 +60,8 @@ export interface Run {
   taskId: string;
   state: RunState;
   observation: 'fresh' | 'unknown';
-  provider: 'mock' | 'native';
+  provider: 'mock' | 'native' | 'node';
+  node?: import('./node-execution.js').NodeRunInfo;
   native?: NativeRunConfig;
   requestedTool: Tool;
   scenario: Scenario;

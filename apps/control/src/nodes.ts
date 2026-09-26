@@ -1,3 +1,4 @@
+import { attachNodeExecution } from './node-execution.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { NodeRegistry } from '../../../packages/db/src/nodes.js';
 import type { Store } from '../../../packages/db/src/store.js';
@@ -80,4 +81,5 @@ export function attachNodes(app: FastifyInstance, store: Store) {
     exact(r.body, []);
     return nodes.disconnect(token(r));
   });
+  return attachNodeExecution(app, store, nodes);
 }

@@ -1,7 +1,7 @@
 # 19｜可领取工作项与团队分工
 
 > D1 · 17 个工作包 × 6 项 = 102 个工作项。  
-> **2026-09-26（UTC+8）逐项核对，E2b1。保留原 102 个编号与标题，新增实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**  
+> **2026-09-26（UTC+8）逐项核对，E2b2。保留原 102 个编号与标题，新增实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**  
 > [计划入口](README.md) · [先后依赖](00-delivery-map.md) · [接口总表](18-data-api-catalog.md)
 
 ## 1. 使用方式
@@ -16,9 +16,9 @@
 
 按原工作项完整定义记录：**已完成 2 项、部分实现 61 项、未实现 39 项，共 102 项**。这些工作项大小不同，不能将条目数换算为产品完成百分比。
 
-“已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1 是实际代码批次，二者不互相替代。
+“已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2 是实际代码批次，二者不互相替代。
 
-本轮推进 **06-01 / 06-02 / 06-03 / 06-06** 的独立节点身份与目录摘要切片。**只有配对、心跳和实际 Git 摘要；没有团队 Run 派发，不把节点在线当作模型执行。11-03 临时协助尚未开始。** 后续依赖和选择见 [下一步交付](22-next-delivery.md)。
+本轮推进 **07-01 / 07-02 / 07-03 / 07-06** 联动 **06-04 / 06-05 / 06-06** 的独立节点本人执行切片：本机明确授权、事务派发、接单与一次性启动许可、事件 ACK、实际进程与停止恢复。**仍只限本机回环、节点所有者执行；不代表跨电脑或完整协作授权。** 真实模型联调、原生续接和协助未完成。下一步见 [22](22-next-delivery.md)。
 
 ## 2. 工作项索引
 
@@ -26,8 +26,8 @@
 | --- | --- | --- | --- | --- | --- |
 | HX-DEV-01-01 | 技术建议落为实际工程基线与版本锁定 | TL | 部分实现 | React/Vite、Fastify、TypeScript 与锁文件已有；E2a 固定 Better Auth 1.7.6，经 IdentityPort 接入。正式存储适配、完整许可证与升级维护仍待收口。 | [工程](../../package.json) / [认证](../../packages/identity/src/index.ts) |
 | HX-DEV-01-02 | Monorepo 骨架与开发入口 | BE/RN | 已完成 | 应用与共享包、环境样例、统一启动/构建/类型检查入口已建立；本项仅工程骨架，不包含独立 Runner。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
-| HX-DEV-01-03 | HTTP、事件、节点与适配器公共契约 | TL/BE/RN | 部分实现 | 本机 HTTP、DTO、错误码、运行和接续契约已落地；远程节点协议、完整权限 schema 与类型生成未完成。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
-| HX-DEV-01-04 | 迁移、事务、outbox 与附件存储端口 | BE | 部分实现 | SQLite 迁移 5、事务/outbox、账号隔离和节点注册/摘要 ACK 已落地；PostgreSQL、附件存储和旧数据导入仍未实现。 | [迁移](../../packages/db/src/schema.ts) / [节点](../../packages/db/src/nodes.ts) |
+| HX-DEV-01-03 | HTTP、事件、节点与适配器公共契约 | TL/BE/RN | 部分实现 | 已增加独立节点的有界执行策略/派发/事件契约与一次性启动许可；不是任意 RPC。远程 WSS、完整权限 schema 与类型生成仍缺。 | [执行契约](../../packages/contracts/src/node-execution.ts) |
+| HX-DEV-01-04 | 迁移、事务、outbox 与附件存储端口 | BE | 部分实现 | SQLite 迁移 6、Run/派发/输入/幂等/outbox 原子写入和节点事件持久 ACK 已有；PostgreSQL、附件存储与旧数据导入仍缺。 | [迁移](../../packages/db/src/schema.ts) / [派发](../../packages/db/src/node-execution.ts) |
 | HX-DEV-01-05 | 模拟适配器与统一演示数据 | RN/FE | 部分实现 | 虚构数据及成功/失败/输入/授权模拟流程已实现；节点失联、缺模型等完整场景集和生产隔离仍需完善。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-01-06 | 最小自托管开发组合与构建任务 | OPS/BE | 部分实现 | 本机构建、health/ready 与只读 CI 已有；正式数据库/文件服务的自托管组合与配置诊断未完整实现。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-02-01 | 设计变量、浅深色与状态 tokens | UX/FE | 部分实现 | 浅深色、颜色与状态变量已实现；字体、间距等仍有页面硬编码，完整语义 tokens 与使用说明未收口。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
@@ -38,7 +38,7 @@
 | HX-DEV-02-06 | 响应式、键盘、文案与异常状态 | FE | 部分实现 | 窄屏、浅深色、搜索/弹层键盘路径及部分异常状态已有；布局偏好、历史阅读保护与完整文案字典未完成。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
 | HX-DEV-03-01 | 认证组件、登录与会话恢复 | BE/FE | 部分实现 | Better Auth 真实密码账号、初始化代码、登录/退出、改密、会话恢复及撤销已实现；邮件验证、忘记密码恢复、SSO 和正式部署未接入。 | [认证](../../packages/identity/src/index.ts) / [界面](../../apps/web/src/identity.tsx) |
 | HX-DEV-03-02 | 空间、成员与邀请 | BE/FE | 部分实现 | 真实个人/团队空间、绑定邮箱的邀请、接受/撤销/过期与成员退出/移除已有；无邮件发送、完整空间角色管理与所有者转移。 | [协作数据](../../packages/db/src/collaboration.ts) / [空间](../../apps/web/src/team.tsx) |
-| HX-DEV-03-03 | 统一访问策略与资源授权 | BE | 部分实现 | 统一 Task/Run/Result/Operation 和项目权限已实现；E2b1 节点凭证与浏览器会话分离，摘要按项目过滤。通用 AccessGrant、文件读取与任务派发的节点授权仍未实现。 | [权限](../../packages/db/src/permissions.ts) / [节点](../../packages/db/src/nodes.ts) |
+| HX-DEV-03-03 | 统一访问策略与资源授权 | BE | 部分实现 | 统一真实项目/私有数据权限已有，节点本人执行权限与目录摘要可见性分离；指定他人执行、通用 AccessGrant、附件和远程授权仍未实现。 | [权限](../../packages/db/src/permissions.ts) / [派发](../../packages/db/src/node-execution.ts) |
 | HX-DEV-03-04 | 项目、仓库引用与成员配置 | BE/FE | 部分实现 | 真实空间中的项目创建、读取、成员添加/移除及角色配置已实现；项目编辑/归档、仓库引用与完整目标配置尚缺。 | [项目成员](../../packages/db/src/collaboration.ts) / [界面](../../apps/web/src/team.tsx) |
 | HX-DEV-03-05 | 个人/团队渐进入门 | FE | 部分实现 | 账号建立、团队创建/加入与节点配对入口已有；完整渐进入门偏好和节点任务执行授权尚未实现。 | [身份](../../apps/web/src/identity.tsx) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-06 | 成员撤销、归档与权限事件 | BE | 部分实现 | 成员、项目和会话撤销已有；节点及待配对码随所有者项目撤权永久失效，重新加回成员不复活旧凭证。项目归档和活动远程执行的撤销联动未实现。 | [撤销触发器](../../packages/db/src/schema.ts) |
@@ -54,33 +54,33 @@
 | HX-DEV-05-04 | AI 草稿与局部编辑/采用 | FE/BE | 未实现 | AI 草稿及局部编辑/采用流程未实现。 | —（尚无可用实现） |
 | HX-DEV-05-05 | 按权限与目的准备上下文 | BE/RN | 部分实现 | 任务说明、近期记录与有界 Git 摘录可装配；完整按权限/目的选材的 ContextBundle 未实现。 | [消息](../../packages/db/src/store.ts) / [上下文](../../apps/runner/src/runtime.ts) |
 | HX-DEV-05-06 | 上下文面板、送达状态与总结接入 | FE/RN | 部分实现 | 可查看执行/接续上下文；运行中送达状态、项目资料引用与总结接入未实现。 | [消息](../../packages/db/src/store.ts) / [上下文](../../apps/runner/src/runtime.ts) |
-| HX-DEV-06-01 | Runner CLI、配对与节点身份 | RN/BE | 部分实现 | E2b1 独立 CLI connect/start/status/disconnect、一次性配对、节点身份、私有凭证文件与注册已实现；仅回环服务和摘要能力，系统凭证存储、安装分发与正式远程连接未完成。 | [CLI](../../apps/runner/src/cli.ts) / [节点协议](../../apps/control/src/nodes.ts) |
-| HX-DEV-06-02 | 主动连接、心跳、spool 与重放 | RN/BE | 部分实现 | E2b1 独立进程主动 HTTP 连接、代次、心跳、有界本地摘要 spool、落盘 ACK 和断线重放已实现；WSS、命令派发/接受 ACK、Run 事件 spool 和远程重连尚未实现。 | [连接](../../apps/runner/src/agent/connection.ts) / [spool](../../apps/runner/src/agent/storage.ts) |
-| HX-DEV-06-03 | 目录权限、WorkingCopy 与 Git 状态 | RN | 部分实现 | 既有 preview Git 状态/diff 保留；E2b1 在节点本地规范化目录、拒绝重叠、绑定目录身份并分享实际数量摘要。节点文件/diff 读取授权、代码 WorkingCopy 派发与跨平台覆盖未完成。 | [节点目录](../../apps/runner/src/agent/workspaces.ts) / [原现场](../../apps/runner/src/workspaces.ts) |
-| HX-DEV-06-04 | 独立工作区、写入约束与资源登记 | RN/BE | 部分实现 | 本机写入互斥和接续预约已有；独立代码工作区/分支隔离与远程资源登记未实现。 | [现场](../../apps/runner/src/workspaces.ts) / [进程](../../apps/runner/src/process-host.ts) |
-| HX-DEV-06-05 | 进程树、输入输出与取消 | RN | 部分实现 | POSIX 进程组、输出与有界取消已有；原生运行中输入、Windows 和跨平台实测未完成。 | [现场](../../apps/runner/src/workspaces.ts) / [进程](../../apps/runner/src/process-host.ts) |
-| HX-DEV-06-06 | 重启对账、能力发现与诊断 | RN | 部分实现 | E2b1 区分在线/陈旧/离线/待确认，节点重启重放摘要、服务重启重新握手、status 不伪报在线；没有 Run 对账、原生工具探测、安装升级或全平台诊断。 | [连接](../../apps/runner/src/agent/connection.ts) / [节点界面](../../apps/web/src/nodes.tsx) |
-| HX-DEV-07-01 | Run、配置快照和状态 reducer | BE/RN | 部分实现 | Run、配置快照、状态规则已有；主执行/协助/并行的完整统一模型未完成。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
-| HX-DEV-07-02 | 持久化派发、ACK 与幂等 | BE/RN | 部分实现 | 既有本机幂等派发和接续原子关联保留；E2b1 ACK 仅针对目录摘要，不计作团队 Run 派发完成。独立节点命令派发、接受 ACK 和执行去重尚未实现。 | [本机 Run](../../packages/db/src/store.ts) / [摘要协议](../../packages/db/src/nodes.ts) |
-| HX-DEV-07-03 | 归一化事件、游标和权限 SSE | BE/FE | 部分实现 | 本机事件、游标和 SSE 已接真实会话/空间/项目权限，会话与成员撤销会断流；独立节点远程事件通道未完成。 | [事件](../../apps/control/src/app.ts) |
+| HX-DEV-06-01 | Runner CLI、配对与节点身份 | RN/BE | 部分实现 | 独立 CLI、配对、节点身份及本人执行的本机明确授权已有；系统凭证存储、跨电脑传输与完整安装分发未完成。 | [CLI](../../apps/runner/src/cli.ts) / [本机授权](../../apps/runner/src/agent/execution-policy.ts) |
+| HX-DEV-06-02 | 主动连接、心跳、spool 与重放 | RN/BE | 部分实现 | 回环主动连接、心跳、摘要和执行证据持久化 ACK/重放已有；重复启动许可拒绝，歧义不重跑。远程 WSS 与完整流量/版本协商未完成。 | [连接](../../apps/runner/src/agent/connection.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
+| HX-DEV-06-03 | 目录权限、WorkingCopy 与 Git 状态 | RN | 部分实现 | 本机目录身份、Git 数量摘要及明确执行目录子集已接节点；完整远程 diff/文件读取、跨平台与通用目录授权未完成。 | [目录](../../apps/runner/src/agent/workspaces.ts) / [本机授权](../../apps/runner/src/agent/execution-policy.ts) |
+| HX-DEV-06-04 | 独立工作区、写入约束与资源登记 | RN/BE | 部分实现 | 节点本地与 preview 共用持久化目录/重叠目录占用；未知旧进程不释放。隔离 worktree、跨 OS 用户协调和完整资源治理未实现。 | [目录锁](../../apps/runner/src/workspace-lease.ts) / [执行器](../../apps/runner/src/agent/executor.ts) |
+| HX-DEV-06-05 | 进程树、输入输出与取消 | RN | 部分实现 | 独立节点实际进程、结构化输出、原生停止与 POSIX 进程组确认已接入；原生输入、Windows 和完整跨平台管理未完成。 | [执行器](../../apps/runner/src/agent/executor.ts) / [进程](../../apps/runner/src/process-host.ts) |
+| HX-DEV-06-06 | 重启对账、能力发现与诊断 | RN | 部分实现 | 独立执行日志、重启未知、人工核对恢复、工具版本探测和断线保守停止已有；不重放付费工作，不杀旧 PID。自动原生会话恢复、跨平台诊断仍缺。 | [日志](../../apps/runner/src/agent/execution-journal.ts) / [恢复命令](../../apps/runner/src/agent/execution-commands.ts) |
+| HX-DEV-07-01 | Run、配置快照和状态 reducer | BE/RN | 部分实现 | 同一 Run 模型支持 node provider 和固定派发/本机策略快照；接单、许可、实际启动各有证据。协助/并行/模板完整模型与原生会话映射仍缺。 | [执行契约](../../packages/contracts/src/node-execution.ts) / [派发](../../packages/db/src/node-execution.ts) |
+| HX-DEV-07-02 | 持久化派发、ACK 与幂等 | BE/RN | 部分实现 | Run/派发/幂等事务、本机 accepted 日志、一次性启动许可及精确序号 ACK 已实现；未知窗口保守核对不重跑。跨电脑调度与正式存储未完成。 | [派发](../../packages/db/src/node-execution.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
+| HX-DEV-07-03 | 归一化事件、游标和权限 SSE | BE/FE | 部分实现 | 节点状态/有界输出/终态通过持久事件回到原任务和权限 SSE；撤权后丢弃内容只收结算证据。完整原生差异、用量、流式增量和远程通道仍缺。 | [事件](../../packages/db/src/node-execution.ts) / [节点](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-07-04 | 运行输入与下一轮队列 | BE/RN | 部分实现 | 模拟输入/授权回复可用；原生运行中输入与下一轮要求队列未实现，接续队列不是输入队列。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
 | HX-DEV-07-05 | 绑定式动作授权与真实拒绝 | BE/RN | 部分实现 | 模拟授权与原生额外请求默认拒绝已有；真实动作绑定授权问答尚未实现。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
-| HX-DEV-07-06 | 停止、取消、竞争与恢复 | RN/BE | 部分实现 | 本机停止、目录互斥、未知状态保锁及接续取消竞态已有；跨节点停止/恢复与平台覆盖未完成。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
+| HX-DEV-07-06 | 停止、取消、竞争与恢复 | RN/BE | 部分实现 | 节点队列取消、一次性许可竞争、实际停止、断线保守停止和重启保锁已有；未知现场仅本机明确确认后释放。跨节点迁移与完整平台恢复未完成。 | [派发](../../packages/db/src/node-execution.ts) / [恢复](../../apps/runner/src/agent/execution-commands.ts) |
 | HX-DEV-08-01 | Claude 路径、账号方式与能力声明 | RN | 部分实现 | CLI 路径、必要参数探测和独立 API 配置已有；其他账号方式与有效账户联调未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
-| HX-DEV-08-02 | Claude 启动与结构化流 | RN | 部分实现 | 受限 CLI 启动和 JSONL 结构流已实现；实际提供方生成尚未联调，流程检查使用协议替身。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
+| HX-DEV-08-02 | Claude 启动与结构化流 | RN | 部分实现 | preview 与独立节点均接受限 Claude CLI 结构化流；真实进程/Git 测试为显式协议替身。真实提供方模型生成仍未联调。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [独立节点](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-08-03 | Claude 原生会话与恢复映射 | RN | 部分实现 | 原生 session 引用已记录；同工具 resume/恢复映射未实现。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-08-04 | Claude 输入、澄清与权限桥接 | RN | 未实现 | 原生运行中输入、澄清和完整权限桥接未实现；默认拒绝额外请求不算完成。 | —（尚无可用实现） |
 | HX-DEV-08-05 | Claude 中断与失败降级 | RN | 部分实现 | 实际进程停止、超时与错误保留已有；完整提供方失败降级与跨平台恢复未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-08-06 | Claude 用量、结果与资源配置 | RN/FE | 部分实现 | 原生结果、用量来源及本机预算配置已有；真实费用核对、完整资源配置与账户能力未验证。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-09-01 | Codex stdio、握手与版本能力 | RN | 部分实现 | 本机 stdio、握手与能力探测已有，既有官方无模型检查有记录；完整版本兼容矩阵未完成。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-09-02 | Codex thread/turn 与引用 | RN | 部分实现 | 新 thread/turn 和引用隔离已实现；原生会话恢复未实现。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
-| HX-DEV-09-03 | Codex 事件、增量和结果映射 | RN | 部分实现 | 事件、增量、结果和异常映射已有；真实提供方生成未联调。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
+| HX-DEV-09-03 | Codex 事件、增量和结果映射 | RN | 部分实现 | preview 与独立节点均接 Codex 事件/结果/异常映射；节点只共享有界文本，完整原生引用/用量及真实提供方生成未联调。 | [Codex](../../packages/adapters/codex/src/index.ts) / [独立节点](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-09-04 | Codex 模型目录、输入与反向请求 | RN | 部分实现 | 模型目录与额外反向请求拒绝已有；实时输入、steer 与完整授权交互未实现。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-09-05 | Codex 中断、重连与对账 | RN | 部分实现 | 中断、超时和本机未知状态处理已有；原生重连/恢复对账未完成。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-09-06 | Codex 用量、配置与限制展示 | RN/FE | 部分实现 | 用量来源、隔离配置和限制文案已有；真实计费及完整账户可用性未验证。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-10-01 | 任务页面与双状态头 | FE | 部分实现 | TaskDetail 双状态布局已接真实成员访问范围，只读成员禁用编辑；高级布局/共享范围功能仍待完善。 | [任务页面](../../apps/web/src/App.tsx) |
 | HX-DEV-10-02 | 协作消息、事件与草稿 | FE | 部分实现 | 协作消息、本机事件和错误提示已有；历史分页、草稿恢复与完整发送状态未完成。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
-| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | 双工具/模型、本机开始、停止和持久化接续已有；远程节点选择与原生运行输入未实现。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
+| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | 任务 UI 可选择本人已授权节点/目录/读写模式，展示固定工具/限额并派发、停止；指定他人节点、原生运行输入和跨电脑连接未实现。 | [节点面板](../../apps/web/src/node-execution.tsx) / [任务](../../apps/web/src/App.tsx) |
 | HX-DEV-10-04 | 文件、diff 与外部 IDE | FE/RN | 部分实现 | 实际 Git 文件差异已有；完整文件树、不可变成果快照和外部 IDE 衔接未实现。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
 | HX-DEV-10-05 | 受控交互终端与输入权 | FE/RN | 未实现 | 带输入权的受控交互终端、重连和会话清理未实现。 | —（尚无可用实现） |
 | HX-DEV-10-06 | 上下文、协助、成果插槽整合 | FE | 部分实现 | 上下文与成果插槽、接续恢复卡已有；协助卡和完整多面板异常状态未完成。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
@@ -157,3 +157,5 @@ E1a 推进本机目录/Git/进程与 Claude；E1b 推进 Codex 和显式跨工�
 E2a 推进真实账号、个人/团队空间、邀请、项目角色与访问撤销。03-01/02/05/06 从未实现调整为部分实现；保留原工作项完整范围和未完成内容。
 
 E2b1 将 06-01/02 从未实现调整为部分实现；03-03/06 和 06-03/06 增补实际范围，07-02 明确目录摘要 ACK 不是 Run 接单。
+
+E2b2 新增独立节点本人授权执行、一次性启动许可、持久证据和保守恢复，推进的工作项原本均为部分实现。仍为 2 项完成、61 项部分实现、39 项未实现；不以新增测试数量将整包改为完成。

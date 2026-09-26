@@ -257,6 +257,30 @@ export class NodeRegistry {
     }
     return row;
   }
+  /** Device identity for the separate execution protocol, not a user principal. */
+  executionConnection(token: string, connectionId: string) {
+    const row = this.authenticate(token);
+    this.assertConnection(row, connectionId);
+    return row;
+  }
+  /** Revoked tokens may only submit bounded terminal/unknown evidence, never fetch commands. */
+  settlementIdentity(token: string) {
+    const row = this.store.db
+      .prepare('SELECT * FROM runner_nodes WHERE token_hash=?')
+      .get(digest(nodeSecret(token))) as NodeRow | undefined;
+    if (!row) throw new DomainError('NODE_AUTH_REQUIRED', '节点身份未获确认', 401);
+    return { ...row, settlementOnly: !!row.revoked_at || !this.authorized(row) };
+  }
+  ownedExecutionNode(id: string) {
+    const row = this.row(id);
+    this.visible(row);
+    this.store.permissions.project(row.project_id, 'edit');
+    if (row.owner_id !== this.store.actorId)
+      throw new DomainError('NODE_OWNER_REQUIRED', '当前只允许节点所有者发起执行', 403);
+    if (row.revoked_at || !this.authorized(row))
+      throw new DomainError('NODE_REVOKED', '节点授权已撤销', 409);
+    return row;
+  }
   private handshake(node: NodeRow, connectionId: string): NodeHello {
     return {
       protocol: 1,

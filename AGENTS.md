@@ -4,7 +4,7 @@ Read `docs/product/03-functional-specification.md` and the relevant work package
 
 ## Current implementation
 
-E2b1 has two loopback-only modes: **preview** preserves the fictional single-user native-tool workbench; **team-local** uses real accounts and project data permissions but forbids host execution. Neither is a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex is an experimental App Server provider with isolated temporary HOME/CODEX_HOME, API-key authentication over stdin, and explicit restricted configuration. The official 0.157.0 binary has passed no-model initialization/configuration checks; live model generation is still untested. Both providers can continue in the same local working copy via a new Run.
+E2b2 has two loopback-only modes: **preview** preserves the fictional single-user native-tool workbench; **team-local** uses real accounts and project data permissions but forbids host execution. Neither is a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex is an experimental App Server provider with isolated temporary HOME/CODEX_HOME, API-key authentication over stdin, and explicit restricted configuration. The official 0.157.0 binary has passed no-model initialization/configuration checks; live model generation is still untested. Both providers can continue in the same local working copy via a new Run.
 
 ## Structure
 
@@ -16,7 +16,7 @@ E2b1 has two loopback-only modes: **preview** preserves the fictional single-use
 - `packages/adapters/mock`: deterministic simulator. Never spawn shell commands or call a model here.
 - `packages/adapters/claude-code`: explicit JSONL parsing and restricted file-tool arguments; no bypass or hidden SDK/account fallback.
 - `packages/adapters/codex`: bounded JSONL RPC; kebab-case thread sandbox vs camelCase turn sandbox; no raw reasoning or credentials in UI events.
-- `apps/runner/src`: preview hosted native runtime plus the independent E2b1 metadata CLI in cli.ts/agent. No independent task dispatch or remote execution yet.
+- `apps/runner/src`: preview hosted native runtime plus the independent CLI in cli.ts/agent. Default metadata; optional owner-only restricted task execution. No cross-computer deployment yet.
 - `packages/ui`: visual tokens and shared components.
 - `packages/client`: browser HTTP client.
 
@@ -53,3 +53,11 @@ Use request-scoped principals and PermissionService for direct objects, lists, s
 Node pairing authorizes only a fixed project and locally confirmed Git summary directories, never task execution. Keep browser Cookie and node Bearer channels separate. Server stores code/token hashes only; client credentials are fsynced before pairing exchange into a private state directory outside repositories. Do not upload absolute paths, filenames, code, branch/remotes, environment or provider keys. Never turn the summary endpoint into arbitrary RPC/command dispatch.
 
 Preserve permanent node revocation on project/space removal; rejoining cannot revive credentials. Recheck project visibility for node metadata, even when the requester originally owned a revoked node. Connection presence is not Run state. A snapshot ACK means committed metadata, not accepted model work. Bounded local spool and exact sequence/hash replay must survive dropped replies; fail closed on divergence. Restart cannot spawn a model or signal a stale PID. Current protocol remains loopback HTTP and POSIX credentials; Windows, remote WSS/HTTPS and system credential storage are incomplete.
+
+## E2b2 independent execution
+
+Metadata pairing remains metadata-only. enable-execution adds a separate locally confirmed bounded policy; only the node owner can dispatch to that node. Team control must never initialize host native resources or receive provider keys. Project editors may stop existing project executions; viewing a project is not permission to launch on another machine. Keep Cookie and Bearer channels separate and preserve strict request schemas.
+
+Commit Run/dispatch/input/idempotency/outbox atomically. Journal accepted before ACK, preparing before requesting the one-use permit, and running only from actual spawn. Never replay launch permission or spawn a command already in the local journal. Persist overlapping-workspace claims shared with preview; crashes do not clear claims. Unknown process state requires explicit local stopped-process confirmation, never a stale PID signal or lease expiry. Unsettled evidence blocks credential deletion/re-pairing.
+
+Persist bounded execution events before transport; ACK only committed matching sequence/hash. Revoked device credentials may settle only their already-bound dispatch, discarding output, never receive new commands. Terminal messages cannot complete a Task. Do not label independent node output as mock, or claim all startup phases were reached when a queued Run was cancelled. This remains loopback/POSIX owner execution with protocol fixtures; native resume/steer, delegated access, remote deployment and live-model generation are not delivered.
