@@ -1,6 +1,6 @@
 # HEXU 设计语言 · Workbench W1
 
-> 2026-09-26（UTC+8）确认。状态：**W1 全套呈现层已实现，最终回归进行中**。
+> 2026-09-26（UTC+8）确认。状态：**W1 全套呈现层已完成并通过回归**。
 > [仓库入口](../../README.md) · [产品行为 v1.1](../product/03-functional-specification.md) · [客户端决定](../engineering/adr-0008-client-surfaces.md) · [实现状态](../development/21-implementation-status.md)
 
 ## 1. 本次确定什么
