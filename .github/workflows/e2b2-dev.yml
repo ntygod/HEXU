@@ -1,0 +1,42 @@
+name: E2b2 development checks
+on:
+  push:
+    branches: [codex/e2b2-node-execution-20260926]
+permissions:
+  contents: read
+concurrency:
+  group: e2b2-development
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Export credential-free source snapshot
+        run: git archive --format=tar.gz HEAD > /tmp/hexu-e2b2-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-e2b2-source
+          path: /tmp/hexu-e2b2-source.tar.gz
+          retention-days: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-e2b2-browser-results
+          path: |
+            playwright-report/
+            test-results/
+            artifacts/
+          retention-days: 7
