@@ -32,17 +32,18 @@
     "check:codex-protocol": "npm run build:server && node scripts/check-codex-protocol.mjs"
   },
   "dependencies": {
+    "better-auth": "1.7.6",
     "fastify": "5.12.5",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.1",
     "@types/node": "24.0.4",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
-    "@playwright/test": "1.55.1",
+    "prettier": "3.6.2",
     "typescript": "5.8.3",
-    "vite": "8.3.1",
-    "prettier": "3.6.2"
+    "vite": "8.3.1"
   }
 }
