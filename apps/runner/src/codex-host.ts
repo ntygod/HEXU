@@ -20,6 +20,7 @@ export async function openCodex(options: {
   root: string;
   apiKey: string;
   config?: NativeRunConfig;
+  onSpawn?(): void;
   onEvent(kind: NativeEvent['kind'], body: string): void;
   onReferences(refs: { sessionId?: string; turnId?: string; resolvedModel?: string }): void;
 }): Promise<CodexHandle> {
@@ -53,6 +54,7 @@ export async function openCodex(options: {
       env: { PATH: process.env.PATH, HOME: home, CODEX_HOME: home, LANG: 'C.UTF-8' },
       keepInputOpen: true,
       timeoutMs: (options.config?.timeoutSeconds ?? 30) * 1000,
+      onSpawn: options.onSpawn,
       onLine: (line) => session.line(line),
     });
   } catch (e) {

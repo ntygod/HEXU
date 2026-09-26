@@ -1,3 +1,4 @@
+import { WorkspaceLease } from './workspace-lease.js';
 import { access, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { delimiter, isAbsolute, resolve } from 'node:path';
@@ -395,6 +396,7 @@ export class NativeRuntime {
   }
   private async execute(id: string) {
     let processStarted = false;
+    let directoryLease: WorkspaceLease | null = null;
     try {
       this.store.stepRun(id, 'preparing');
       const run = this.store.run(id),
@@ -409,6 +411,7 @@ export class NativeRuntime {
         );
         return;
       }
+      directoryLease = new WorkspaceLease(copy.root, id);
       if (run.requestedTool === 'codex') {
         const handle = await openCodex({
           executable: this.codexExecutable!,
@@ -524,6 +527,14 @@ export class NativeRuntime {
         );
       } catch {
         /* database closing or failed: keep persisted lock */
+      }
+    } finally {
+      if (directoryLease) {
+        try {
+          if (this.store.run(id).native?.terminationConfirmed) directoryLease.release();
+        } finally {
+          directoryLease.close();
+        }
       }
     }
   }

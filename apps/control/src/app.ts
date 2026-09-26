@@ -1,3 +1,4 @@
+import { parseNodeRun } from '../../../packages/contracts/src/node-execution.js';
 import { attachNodes } from './nodes.js';
 import { createIdentity, type IdentityOptions } from '../../../packages/identity/src/index.js';
 import { attachIdentity, identityHeaders } from './identity.js';
@@ -140,7 +141,7 @@ export async function createApp(
     if (request.url.startsWith('/api/') || nodeProtocol) reply.header('Cache-Control', 'no-store');
   });
   attachIdentity(app, store, identity);
-  attachNodes(app, store);
+  const nodeExecution = attachNodes(app, store);
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof DomainError;
     const statusCode =
@@ -278,6 +279,7 @@ export async function createApp(
       );
       mock.settleStops(id);
       native.settleStops(id);
+      nodeExecution?.reconcile();
       return result;
     });
   }
@@ -298,6 +300,16 @@ export async function createApp(
       );
   });
   app.post('/api/v1/tasks/:taskId/runs', async (request, reply) => {
+    if (store.teamMode && record(request.body).provider === 'node' && nodeExecution)
+      return reply
+        .code(201)
+        .send(
+          nodeExecution.create(
+            param(request.params, 'taskId'),
+            parseNodeRun(request.body),
+            key(request.headers),
+          ),
+        );
     if (record(request.body).provider === 'native') {
       const run = await native.create(
         param(request.params, 'taskId'),
@@ -318,13 +330,14 @@ export async function createApp(
   app.post('/api/v1/runs/:runId/stop', async (request) => {
     const id = param(request.params, 'runId');
     const run = store.stopRun(id, key(request.headers));
-    if (run.provider === 'native') native.stop(id);
+    if (run.provider === 'node') nodeExecution?.reconcile();
+    else if (run.provider === 'native') native.stop(id);
     else mock.stop(id);
     return run;
   });
   app.post('/api/v1/runs/:runId/inputs', async (request) => {
     const id = param(request.params, 'runId');
-    if (store.run(id).provider === 'native')
+    if (store.run(id).provider !== 'mock')
       throw new DomainError(
         'CAPABILITY_UNAVAILABLE',
         '此原生适配不支持运行中输入；请在结束后继续',
@@ -344,7 +357,7 @@ export async function createApp(
   app.post('/api/v1/runs/:runId/authorization', async (request) => {
     const id = param(request.params, 'runId');
     const body = record(request.body);
-    if (store.run(id).provider === 'native')
+    if (store.run(id).provider !== 'mock')
       throw new DomainError('CAPABILITY_UNAVAILABLE', '原生执行不允许通过模拟授权入口扩权', 422);
     const choice = enumValue(body.decision, ['allow', 'deny'] as const, '决定');
     const run = store.resumeRun(

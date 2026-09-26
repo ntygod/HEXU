@@ -26,6 +26,7 @@ export function runProcess(options: {
   maxOutputBytes?: number;
   killGraceMs?: number;
   onLine(line: string): void;
+  onSpawn?(): void;
 }): ProcessHandle {
   if (process.platform === 'win32')
     throw new Error('本轮原生进程管理暂不支持 Windows；不会降级为只停止父进程');
@@ -100,6 +101,13 @@ export function runProcess(options: {
     bytes += chunk.length;
     stderr = (stderr + chunk.toString('utf8')).slice(-4000);
     if (bytes > (options.maxOutputBytes ?? 4 * 1024 * 1024)) abort('工具输出超过限制');
+  });
+  child.once('spawn', () => {
+    try {
+      options.onSpawn?.();
+    } catch {
+      abort('不能保存启动确认，已请求停止');
+    }
   });
   child.on('error', (err: NodeJS.ErrnoException) => {
     error = err.code === 'ENOENT' ? '原生工具不可执行或已经移除' : '原生工具无法启动';

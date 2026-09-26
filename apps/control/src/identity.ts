@@ -105,7 +105,13 @@ export function attachIdentity(
     if (
       path.startsWith('/api/v1/native') ||
       /\/(continuation-preview|native-context)(\/|$)/.test(path) ||
-      (/\/(runs|continuations)(\/|$)/.test(path) && request.method !== 'GET')
+      (/\/(runs|continuations)(\/|$)/.test(path) &&
+        request.method !== 'GET' &&
+        !(/\/tasks\/[^/]+\/runs$/.test(path) && record(request.body).provider === 'node') &&
+        !(
+          /\/runs\/[^/]+\/stop$/.test(path) &&
+          store.run(text(p.runId, '执行', 150)).provider === 'node'
+        ))
     )
       throw new DomainError(
         'RUNNER_REQUIRED',

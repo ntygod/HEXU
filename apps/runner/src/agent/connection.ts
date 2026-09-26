@@ -35,7 +35,20 @@ export async function nodeRequest<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   const url = controlOrigin(origin);
-  if (!['pairing-preview', 'pair', 'hello', 'sync', 'goodbye', 'disconnect'].includes(path))
+  if (
+    ![
+      'pairing-preview',
+      'pair',
+      'hello',
+      'sync',
+      'goodbye',
+      'disconnect',
+      'execution-policy',
+      'execution-poll',
+      'execution-permit',
+      'execution-event',
+    ].includes(path)
+  )
     throw new Error('Unsupported node endpoint');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -60,7 +73,7 @@ export async function nodeRequest<T>(
       const { value, done } = await reader.read();
       if (done) break;
       length += value.length;
-      if (length > 32768) {
+      if (length > (path.startsWith('execution-') ? 131072 : 32768)) {
         await reader.cancel();
         throw new DomainError('INVALID_RESPONSE', '节点响应超出上限');
       }

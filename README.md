@@ -9,7 +9,7 @@
 不用反复解释，不用反复追问，不用四处找成果。
 
 
-> **当前阶段：E2b1 独立节点配对与目录摘要。** 默认 `preview` 保留示例工作台、实验性 Claude/Codex 和持久化接续；可选 `team-local` 使用真实账号、项目权限，并可配对独立节点进程查看本地明确授权的 Git 数量摘要。**节点不接收任务或代码执行命令；在线不是模型已接通。** 两种模式仍只限本机回环，独立 Run 派发、跨电脑部署、PostgreSQL 和真实模型生成联调未完成。
+> **当前阶段：E2b2 独立节点本人授权执行。** 默认 preview 保留示例工作台与本机双工具；team-local 使用真实账号/项目权限，可配对独立节点，并由节点所有者在本机单独启用受限 Claude/Codex 执行。**摘要配对不自动开放代码执行；接单、实际启动与任务完成分别记录。** 仍只支持同一机器上的回环连接，跨电脑部署、PostgreSQL、原生会话恢复与有效账户真实模型生成联调未完成。
 
 ## 启动
 
@@ -41,13 +41,19 @@ npm start
 
 在本机 `.env` 设置 `HEXU_MODE=team-local`、`HEXU_NATIVE_ENABLED=0` 后启动。未指定数据目录时使用 `.hexu/team`，首次初始化代码在该目录的 `setup-code` 文件；已有 HEXU_DATA_DIR 设置优先。账号建立后可以创建团队、手动转交邀请，并在项目中配置只读/编辑/管理成员。
 
-旧 preview 数据不自动公开或导入。team-local 已有独立节点身份与目录摘要，仍不提供任何模拟/原生执行，等待独立执行授权及派发；两个浏览器会话能协作数据，不代表已支持两台电脑。详见 [本机账号模式](docs/engineering/team-local.md)。
+旧 preview 数据不自动公开或导入。team-local 不调用控制服务宿主机工具；可派发到节点所有者在本机明确启用的独立节点；两个浏览器会话能协作数据，不代表已支持两台电脑。详见 [本机账号模式](docs/engineering/team-local.md)。
 
 ## 可选：配对独立节点
 
 team-local 登录后，在“空间与账号 → 独立节点与授权目录”生成配对码。本机准备仓库外的 runner.json，执行 `npm run build`，再执行 `npm run runner -- connect --config /path/runner.json`，在终端确认账号、项目和目录；随后 `npm run runner -- start`。配对码不放入命令参数。本机目录路径不上传；节点令牌用于回环协议认证，服务端只持久化其哈希，不保存令牌原文。
 
-当前只同步目录别名和变更数量。Git 会在获授权的本机目录读取文件以计算状态，但代码、文件名和路径不会上传，也不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
+默认只同步目录别名和变更数量。Git 会在获授权的本机目录读取文件以计算状态，但代码、文件名和路径不会上传，也不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
+
+## 可选：在本人节点执行任务
+
+完成配对后，在节点本机提供自己的 API key 环境配置，使用 `npm run runner -- enable-execution --config /absolute/path/execution.json --state /absolute/private-state` 查看并确认工具、目录、读写和限额。随后运行 `npm run runner -- start --state /absolute/private-state` 发布执行能力。网页登录节点所有者，在同项目任务中选择“在节点上执行”。
+
+执行可把模型输出共享到项目，区别于纯摘要模式；网页不能增加本机路径或代用别人的账户。重复派发不会重复启动，未知进程保留占用；完整配置和恢复见 [节点执行说明](docs/engineering/runner-execution.md)。
 
 ## 当前能操作什么
 
@@ -64,8 +70,9 @@ team-local 登录后，在“空间与账号 → 独立节点与授权目录”�
 | 显式目录授权、实际 Git 变更、结果输出与停止 | 已实现；测试通过协议替身执行真实本地文件操作 |
 | 原生会话恢复／运行中追加要求／Bash／MCP | 尚未接入；新执行使用任务说明和最近工作记录 |
 | 实际账号、空间、邀请、项目角色、会话/权限撤销 | team-local 本机模式已实现；邮件验证、找回密码、正式部署等仍缺 |
-| 独立节点 CLI、配对、心跳、目录摘要与撤销 | E2b1 已实现本机切片；没有团队 Run 派发或远程连接 |
-| 临时协助、并行分支、独立节点任务执行和远程部署 | 尚未实现 |
+| 独立节点 CLI、配对、心跳、目录摘要与撤销 | 已实现本机切片，默认不授予执行权 |
+| 本人节点任务执行、输出与停止 | E2b2 已实现受限新会话；本机明确授权，协议替身工程流程已检查，真实模型未联调 |
+| 临时协助、并行分支、节点原生续接与远程部署 | 尚未实现 |
 | 示例订单预览 | 虚构业务示例，不是通用预览隧道 |
 
 模拟名称不代表原生工具已接通。设置页分别显示 Claude Code / Codex 的能力探测与各自的 API 配置；工具检测可用不代表凭证有效或真实模型已经测试。
@@ -130,7 +137,7 @@ packages/db              SQLite 开发适配、迁移与事件
 packages/adapters/mock   明确标识的模拟执行器
 packages/adapters/claude-code  Claude JSONL 协议与受限文件工具配置
 packages/adapters/codex        Codex 双向 RPC、模型目录和受限策略
-apps/runner/src          preview 原生 runtime 与 E2b1 独立摘要节点（尚无团队 Run 执行）
+apps/runner/src          preview 原生 runtime 与独立节点（摘要 / 可选本人授权执行）
 packages/ui              共用组件与设计变量
 packages/client          浏览器 HTTP 客户端
 tests                    单元、存储、API 与浏览器测试
@@ -154,7 +161,7 @@ tests                    单元、存储、API 与浏览器测试
 | [v1.1 修订](docs/product/09-planning-revision.md) | 已移除的强制流程 |
 | [详细开发计划](docs/development/README.md) | 17 个工作包、102 个原始工作项 |
 | [逐项任务状态](docs/development/19-work-items.md) | 原 102 项的真实状态、代码入口和剩余内容 |
-| [下一步交付](docs/development/22-next-delivery.md) | 独立节点的执行授权、任务派发、停止与恢复 |
+| [下一步交付](docs/development/22-next-delivery.md) | 节点持续工作、接续与远程协作的前置边界 |
 | [当前实现进度](docs/development/21-implementation-status.md) | 本次完成、部分实现与后续工作 |
 | [接口总表](docs/development/18-data-api-catalog.md) | 完整契约草案；当前实现子集见代码与状态文档 |
 | [本地启动与问题处理](docs/engineering/local-preview.md) | 端口、数据库、模拟模式与已知限制 |

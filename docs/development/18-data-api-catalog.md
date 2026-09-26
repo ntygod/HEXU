@@ -243,3 +243,11 @@ interface RunHandle {
 独立进程使用 `/runner/v1/` 的 POST pairing-preview、pair、hello、sync、goodbye、disconnect。配对接口消费短时随机码，其余接口验证专用节点 Bearer；请求不使用浏览器 Cookie/Origin，不能调用 /api/v1 的业务接口。hello 返回固定协议版本、项目、连接代次和 ACK 水位；sync 只接受固定目录 ID 的数量摘要。没有 execute/dispatch/stop 命令。
 
 输入类型以 `contracts/src/nodes.ts` 为准；未知字段、额外目录、序号冲突和跳号均拒绝。API 不接受本地路径、文件内容或模型密钥。此 ACK 不代表 Run 接单、进程启动或模型成功。
+
+## E2b2 实现子集：独立节点本人执行
+
+浏览器 `GET /tasks/:id/node-options` 返回本人已授权节点、固定工具/模型/目录/限额和待发送任务材料。`POST /tasks/:id/runs` 的 provider=node 输入 nodeId、workingCopyId、policyHash、mode、prompt、expectedRevision、reopenTask、confirmExecution；返回 201+Run。权限先于幂等重放检查。既有 Run stop 和 Task 状态接口联动派发，Task 完成不由 Run 文本决定。
+
+节点 Bearer 通道 `/runner/v1/execution-policy` 发布本机明确的有界策略；`execution-poll` 获取固定派发；`execution-permit` 消费单次启动许可；`execution-event` 持久化 accepted/running/output/terminal/unknown 及序号。正文严格拒绝额外字段；没有文件路径、可执行参数或 API key。节点只支持一个活动派发，许可失联不会重发 launch。
+
+类型源为 contracts/node-execution.ts，业务迁移 6。节点凭证被撤销后仅对原绑定派发排空事件并提交停止证据，内容丢弃，不重新发布策略或领取任务。只读成员不能派发或停止；项目编辑者可停止既有执行，派发额外要求节点所有者。完整他人授权/AccessGrant、原生 resume/steer、远程传输仍未实现。

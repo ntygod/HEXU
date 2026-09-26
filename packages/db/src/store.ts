@@ -508,7 +508,7 @@ export class Store {
     });
   }
   stopRun(id: string, key: string) {
-    this.run(id);
+    this.getTask(this.run(id).taskId, true);
     return this.mutate(`run.stop:${id}`, key, {}, () => {
       const run = this.run(id);
       if (!isActiveRun(run.state) || run.state === 'stopping') return run;

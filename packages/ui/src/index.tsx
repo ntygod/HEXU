@@ -202,9 +202,11 @@ export function RunBadge({ run }: { run?: Run }) {
       {run
         ? run.observation === 'unknown'
           ? '连接未知 · 待核对'
-          : run.provider === 'native'
-            ? runText[run.state].replace('模拟', '原生')
-            : runText[run.state]
+          : run.provider === 'node'
+            ? runText[run.state].replace('模拟', '节点')
+            : run.provider === 'native'
+              ? runText[run.state].replace('模拟', '原生')
+              : runText[run.state]
         : '尚未开始执行'}
     </span>
   );

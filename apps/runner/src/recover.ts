@@ -1,3 +1,4 @@
+import { WorkspaceLease } from './workspace-lease.js';
 import { resolve } from 'node:path';
 import { Store } from '../../../packages/db/src/store.js';
 
@@ -11,7 +12,14 @@ if (!id || acknowledgement !== '--confirm-process-stopped') {
 } else {
   const store = new Store(resolve(process.env.HEXU_DATA_DIR ?? '.hexu', 'preview.sqlite'));
   try {
+    const run = store.run(id);
+    const workspace = run.native
+      ? (store.db
+          .prepare('SELECT root FROM native_workspaces WHERE id=?')
+          .get(run.native.workingCopyId) as { root: string } | undefined)
+      : undefined;
     store.confirmNativeStopped(id);
+    if (workspace) new WorkspaceLease(workspace.root, id, true).release();
     console.log('已记录人工停止确认，保留执行历史并解除目录占用。');
   } catch (error) {
     console.error(error instanceof Error ? error.message : '恢复失败');

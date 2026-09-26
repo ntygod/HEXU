@@ -92,4 +92,27 @@ CREATE TRIGGER runner_member_removed AFTER DELETE ON collab_memberships BEGIN
 END;
 `,
   },
+  {
+    version: 6,
+    sql: `
+CREATE TABLE node_execution_policies (
+ node_id TEXT PRIMARY KEY REFERENCES runner_nodes(id), connection_id TEXT NOT NULL,
+ policy_hash TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE TABLE node_dispatches (
+ id TEXT PRIMARY KEY, run_id TEXT NOT NULL UNIQUE REFERENCES runs(id), task_id TEXT NOT NULL REFERENCES tasks(id),
+ node_id TEXT NOT NULL REFERENCES runner_nodes(id), space_id TEXT NOT NULL,
+ workspace_id TEXT NOT NULL, owner_id TEXT NOT NULL, command TEXT NOT NULL,
+ context_hash TEXT NOT NULL, task_revision INTEGER NOT NULL,
+ stage TEXT NOT NULL, last_sequence INTEGER NOT NULL DEFAULT 0, last_hash TEXT,
+ updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX one_pending_node_dispatch ON node_dispatches(node_id) WHERE stage != 'terminal';
+CREATE UNIQUE INDEX one_pending_task_dispatch ON node_dispatches(task_id) WHERE stage != 'terminal';
+CREATE TABLE node_run_events (
+ dispatch_id TEXT NOT NULL REFERENCES node_dispatches(id), sequence INTEGER NOT NULL,
+ event_hash TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(dispatch_id, sequence)
+);
+`,
+  },
 ];

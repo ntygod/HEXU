@@ -1,3 +1,4 @@
+import { NodeRunPanel, NodeRunStatus } from './node-execution.js';
 import { SpaceSwitcher } from './identity.js';
 import { TeamSettings, ProjectAccess } from './team.js';
 import { ContinuationStatus } from './continuations.js';
@@ -151,7 +152,7 @@ export function App() {
             <span className="preview-label">
               <span className={`connection-dot ${connected ? 'online' : ''}`} />
               {data.mode === 'team-local'
-                ? '本机团队模式 · 节点仅同步状态'
+                ? '本机团队模式 · 本人授权节点执行'
                 : '本地开发预览 · 执行模式明确标识'}
             </span>
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
@@ -197,7 +198,9 @@ export function App() {
         <footer className="app-footer">
           <span>HEXU · 让人和 AI，一起交付。</span>
           <span>
-            {data.mode === 'team-local' ? 'E2b1 · 真实账号 / 节点状态' : '开发预览 E2b1 · 示例数据'}
+            {data.mode === 'team-local'
+              ? 'E2b2 · 真实账号 / 本人节点执行'
+              : '开发预览 E2b2 · 示例数据'}
           </span>
         </footer>
       </div>
@@ -768,7 +771,11 @@ function MessageList({ messages }: { messages: Message[] }) {
               <time>{time(message.createdAt)}</time>
               {message.actorType === 'agent' && (
                 <span className="badge neutral">
-                  {message.actorName.endsWith('原生') ? '原生' : '模拟'}
+                  {message.actorName.endsWith('独立节点')
+                    ? '节点'
+                    : message.actorName.endsWith('原生')
+                      ? '原生'
+                      : '模拟'}
                 </span>
               )}
             </div>
@@ -839,7 +846,11 @@ function TaskPage({ id }: { id: string }) {
             <Button
               variant="danger"
               busy={busy}
-              disabled={active.state === 'stopping' || active.observation === 'unknown'}
+              disabled={
+                !editable ||
+                active.state === 'stopping' ||
+                (active.provider !== 'node' && active.observation === 'unknown')
+              }
               onClick={() => void action(`/runs/${active.id}/stop`)}
             >
               <Icon name="stop" />
@@ -847,27 +858,29 @@ function TaskPage({ id }: { id: string }) {
                 ? '连接未知'
                 : active.state === 'stopping'
                   ? '正在停止'
-                  : active.provider === 'native'
-                    ? '停止原生执行'
-                    : '停止模拟'}
+                  : active.provider === 'node'
+                    ? '停止节点执行'
+                    : active.provider === 'native'
+                      ? '停止原生执行'
+                      : '停止模拟'}
             </Button>
           ) : (
             <Button
               variant="primary"
               onClick={() => setModal('continue')}
-              disabled={team || !editable || task.status === 'cancelled'}
-              title={team ? '独立执行器尚未接入，当前仅进行任务协作' : undefined}
+              disabled={!editable || task.status === 'cancelled'}
+              title={team ? '选择本人在本机明确授权的独立节点' : undefined}
             >
               <Icon name="play" />
-              {task.status === 'done' ? '重新打开并继续' : '继续'}
+              {task.status === 'done' ? '重新打开并继续' : team ? '在节点上执行' : '继续'}
               <Icon name="down" size={13} />
             </Button>
           )}
           {active?.provider === 'native' && (
             <Button
               onClick={() => setModal('continue')}
-              disabled={team || !editable || task.status === 'cancelled'}
-              title={team ? '独立执行器尚未接入，当前仅进行任务协作' : undefined}
+              disabled={!editable || task.status === 'cancelled'}
+              title={team ? '选择本人在本机明确授权的独立节点' : undefined}
             >
               <Icon name="arrow-right" />
               准备接续
@@ -890,20 +903,30 @@ function TaskPage({ id }: { id: string }) {
           <ToolMark tool={lastRun?.requestedTool ?? 'claude-code'} />
           <strong>
             {team && !lastRun
-              ? '节点执行尚未接入'
+              ? '选择获授权的节点'
               : lastRun?.requestedTool === 'codex'
                 ? 'Codex'
                 : 'Claude Code'}
           </strong>
           <span>
-            {lastRun?.provider === 'native'
-              ? '原生 · ' + (lastRun.native?.mode === 'edit' ? '文件编辑' : '只读分析')
-              : team
-                ? '任务协作可用'
-                : '模拟适配器'}
+            {lastRun?.provider === 'node'
+              ? '独立节点 · ' + (lastRun.node?.mode === 'edit' ? '文件编辑' : '只读分析')
+              : lastRun?.provider === 'native'
+                ? '原生 · ' + (lastRun.native?.mode === 'edit' ? '文件编辑' : '只读分析')
+                : team
+                  ? '任务协作可用'
+                  : '模拟适配器'}
           </span>
           <Icon name="monitor" size={14} />
-          <span>{lastRun?.provider === 'native' ? '本机授权目录' : '无真实执行节点'}</span>
+          <span>
+            {lastRun?.provider === 'node'
+              ? lastRun.node?.nodeName
+              : lastRun?.provider === 'native'
+                ? '本机授权目录'
+                : team
+                  ? '执行须选择本人授权节点'
+                  : '无真实执行节点'}
+          </span>
           <RunBadge run={lastRun} />
           <span className="spacer" />
           <Avatar
@@ -916,6 +939,7 @@ function TaskPage({ id }: { id: string }) {
         </div>
       </div>
       <ContinuationStatus key={id} taskId={id} onConfigure={() => setModal('continue')} />
+      {lastRun?.provider === 'node' && <NodeRunStatus run={lastRun} />}
       <div className="task-grid">
         <section className="panel collaboration-panel">
           <div className="tabs panel-tabs">
@@ -1020,7 +1044,11 @@ function TaskPage({ id }: { id: string }) {
                     <ToolMark tool={run.requestedTool} />
                     <strong>
                       {run.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} ·{' '}
-                      {run.provider === 'native' ? '原生' : '模拟'}
+                      {run.provider === 'node'
+                        ? '独立节点'
+                        : run.provider === 'native'
+                          ? '原生'
+                          : '模拟'}
                     </strong>
                     <span className="spacer" />
                     <RunBadge run={run} />
@@ -1036,7 +1064,7 @@ function TaskPage({ id }: { id: string }) {
                   title="还没有执行记录"
                   description={
                     team
-                      ? '独立执行器接入后可以在这里查看执行记录。'
+                      ? '可在本人已授权节点执行；配对本身不授予执行权限。'
                       : '可以用模拟适配器体验执行过程。'
                   }
                 />
@@ -1074,7 +1102,14 @@ function TaskPage({ id }: { id: string }) {
               </Empty>
             )
           ) : rightTab === 'code' ? (
-            <NativeCode run={runs.filter((run) => run.provider === 'native').at(-1)} />
+            lastRun?.provider === 'node' ? (
+              <Empty
+                title="代码保留在节点目录"
+                description="本轮尚未同步独立节点 diff；请在本机查看修改。模型输出位于左侧协作记录。"
+              />
+            ) : (
+              <NativeCode run={runs.filter((run) => run.provider === 'native').at(-1)} />
+            )
           ) : (
             <div className="task-results">
               {results.map((result) => (
@@ -1112,9 +1147,12 @@ function TaskPage({ id }: { id: string }) {
           </div>
         </section>
       </div>
-      {modal === 'continue' && (
-        <ContinuePanel task={task} lastRun={lastRun} onClose={() => setModal(null)} />
-      )}{' '}
+      {modal === 'continue' &&
+        (team ? (
+          <NodeRunPanel task={task} onClose={() => setModal(null)} />
+        ) : (
+          <ContinuePanel task={task} lastRun={lastRun} onClose={() => setModal(null)} />
+        ))}{' '}
       {modal === 'share' && <ShareResult task={task} onClose={() => setModal(null)} />}{' '}
       {modal === 'edit' && <EditTask task={task} onClose={() => setModal(null)} />}
     </div>
@@ -1246,7 +1284,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E2b1 · 本机预览</span>
+        <span className="badge neutral">E2b2 · 本机预览</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />
