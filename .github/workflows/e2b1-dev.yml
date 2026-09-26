@@ -1,0 +1,52 @@
+name: E2b1 development checks
+on:
+  push:
+    branches: [codex/e2b1-node-pairing-20260926]
+permissions:
+  contents: write
+concurrency:
+  group: e2b1-development
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/e2b1-node-pairing-20260926
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply reviewed development integration
+        run: |
+          set -euo pipefail
+          for patch in .staging/patch-*.py; do python "$patch"; done
+      - run: npm ci --ignore-scripts
+      - run: npm run format
+      - name: Preserve exact formatted development source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = codex/e2b1-node-pairing-20260926
+          git config user.name 'HEXU development'
+          git config user.email 'hexu-development@users.noreply.github.com'
+          git add apps packages tests scripts docs README.md AGENTS.md package.json package-lock.json .staging
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: integrate E2b1 independent node pairing and metadata sync'
+            git push origin HEAD:codex/e2b1-node-pairing-20260926
+          fi
+          echo "Checked source: $(git rev-parse HEAD)"
+      - run: npm run format:check
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-e2b1-browser-results
+          path: |
+            playwright-report/
+            test-results/
+            artifacts/
+          retention-days: 7
