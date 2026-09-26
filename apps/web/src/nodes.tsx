@@ -86,8 +86,8 @@ export function NodeResources() {
       <div className="node-boundary">
         <Icon name="monitor" size={18} />
         <p>
-          <strong>E2b1 · 目录状态同步</strong>
-          　当前只支持回环服务上的独立进程。在线不代表任务正在运行；任务派发、代码修改和跨电脑连接尚未开放。
+          <strong>独立节点 · 默认目录摘要</strong>
+          　当前只支持回环服务上的独立进程。在线不代表任务正在运行；执行需要本人在节点单独授权，跨电脑连接尚未开放。
         </p>
       </div>
       {error && (
@@ -324,7 +324,9 @@ export function NodeResources() {
             )}
             <div className="notice-box">
               <Icon name="warning" />
-              <p>配对并不允许项目成员执行代码。节点目前只连接与上报摘要，不使用任何模型账户。</p>
+              <p>
+                配对本身只连接与上报摘要，不授予代码执行或模型账户权限。启用执行必须由本人在节点本机另行确认。
+              </p>
             </div>
           </div>
         </Dialog>
@@ -338,7 +340,7 @@ export function NodeResources() {
         >
           <p>
             撤销“{revoke.name}
-            ”的节点凭证，停止后续同步。不会删除本地代码，也不会撤回此前已分享的摘要。
+            ”的节点凭证，阻止后续同步和任务派发。活动执行会请求停止，但仍须等待节点确认。不会删除本地代码，也不能追回已分享的内容。
           </p>
           <div className="dialog-actions">
             <Button onClick={() => setRevoke(null)} disabled={busy}>

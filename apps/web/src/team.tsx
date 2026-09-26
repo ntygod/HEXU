@@ -156,10 +156,9 @@ export function TeamSettings() {
       <div className="notice-box team-execution-boundary">
         <Icon name="monitor" />
         <div>
-          <strong>开发环境尚未接入，不共享宿主机执行权限。</strong>
+          <strong>代码执行使用你明确授权的独立节点。</strong>
           <p>
-            这里可以真实管理任务、讨论、成果和成员。独立
-            Runner、远程部署与真实模型联调仍未完成；团队模式不启用模拟或原生执行，也不读取宿主机工具配置。
+            控制服务不使用宿主机工具与模型账户。配对默认只共享目录摘要，在节点本机单独启用后可由本人发起执行；跨电脑部署与真实模型联调仍未完成。
           </p>
         </div>
       </div>

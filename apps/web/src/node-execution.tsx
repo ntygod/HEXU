@@ -93,7 +93,7 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
           <div className="node-execution-empty">
             <h3>还没有启用执行的节点</h3>
             <p>
-              先在“资源与设置”配对节点，然后在节点本机运行 enable-execution
+              先在“空间与账号”配对节点，然后在节点本机运行 enable-execution
               并确认范围。摘要配对不会自动开放执行。
             </p>
             <code>npm run runner -- enable-execution --config /path/execution.json</code>

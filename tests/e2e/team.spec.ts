@@ -102,7 +102,7 @@ test('真实账号建立、邀请同事、项目只读转编辑与个人隔离�
       member.getByRole('heading', { name: '共同实现订单筛选', exact: true }),
     ).toBeVisible();
     await expect(member.getByRole('button', { name: '编辑工作说明', exact: true })).toBeDisabled();
-    await expect(member.getByRole('button', { name: '继续', exact: true })).toBeDisabled();
+    await expect(member.getByRole('button', { name: '在节点上执行', exact: true })).toBeDisabled();
     await page.goto(projectURL);
     await page.locator('.project-access summary').click();
     await page.getByLabel('许宁（测试）的项目权限', { exact: true }).selectOption('edit');

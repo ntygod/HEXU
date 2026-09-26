@@ -51,7 +51,7 @@ team-local 登录后，在“空间与账号 → 独立节点与授权目录”�
 
 ## 可选：在本人节点执行任务
 
-完成配对后，在节点本机提供自己的 API key 环境配置，使用 `npm run runner -- enable-execution --config /absolute/path/execution.json --state /absolute/private-state` 查看并确认工具、目录、读写和限额。随后 `runner start` 发布执行能力。网页登录节点所有者，在同项目任务中选择“在节点上执行”。
+完成配对后，在节点本机提供自己的 API key 环境配置，使用 `npm run runner -- enable-execution --config /absolute/path/execution.json --state /absolute/private-state` 查看并确认工具、目录、读写和限额。随后运行 `npm run runner -- start --state /absolute/private-state` 发布执行能力。网页登录节点所有者，在同项目任务中选择“在节点上执行”。
 
 执行可把模型输出共享到项目，区别于纯摘要模式；网页不能增加本机路径或代用别人的账户。重复派发不会重复启动，未知进程保留占用；完整配置和恢复见 [节点执行说明](docs/engineering/runner-execution.md)。
 
@@ -161,7 +161,7 @@ tests                    单元、存储、API 与浏览器测试
 | [v1.1 修订](docs/product/09-planning-revision.md) | 已移除的强制流程 |
 | [详细开发计划](docs/development/README.md) | 17 个工作包、102 个原始工作项 |
 | [逐项任务状态](docs/development/19-work-items.md) | 原 102 项的真实状态、代码入口和剩余内容 |
-| [下一步交付](docs/development/22-next-delivery.md) | 独立节点的执行授权、任务派发、停止与恢复 |
+| [下一步交付](docs/development/22-next-delivery.md) | 节点持续工作、接续与远程协作的前置边界 |
 | [当前实现进度](docs/development/21-implementation-status.md) | 本次完成、部分实现与后续工作 |
 | [接口总表](docs/development/18-data-api-catalog.md) | 完整契约草案；当前实现子集见代码与状态文档 |
 | [本地启动与问题处理](docs/engineering/local-preview.md) | 端口、数据库、模拟模式与已知限制 |

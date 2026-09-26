@@ -127,7 +127,7 @@ async function connect(storage: AgentStorage, configPath: string) {
     say(`所有者：${preview.ownerName} · 空间：${preview.spaceName} · 项目：${preview.projectName}`);
     for (const w of directories)
       say(`本地目录：${w.root} → 对项目公开别名“${w.name}”及 Git 变更数量`);
-    say('不上传路径、文件名、文件内容、Git 远程地址或模型密钥；不接受代码执行命令。');
+    say('本次配对只共享摘要，不上传路径、文件名、代码或模型密钥；启用执行须在本机另行确认。');
     if ((await ask('确认上述账号、项目和目录范围，输入 CONNECT：')) !== 'CONNECT')
       throw new DomainError('CONFIRMATION_REQUIRED', '已取消本机配对');
     const credentials: NodeCredentials = {

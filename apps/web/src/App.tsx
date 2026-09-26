@@ -921,7 +921,9 @@ function TaskPage({ id }: { id: string }) {
               ? lastRun.node?.nodeName
               : lastRun?.provider === 'native'
                 ? '本机授权目录'
-                : '无真实执行节点'}
+                : team
+                  ? '执行须选择本人授权节点'
+                  : '无真实执行节点'}
           </span>
           <RunBadge run={lastRun} />
           <span className="spacer" />
