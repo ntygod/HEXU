@@ -135,6 +135,63 @@ test('窄屏没有整个页面的横向溢出', async ({ page }) => {
   }
   await page.screenshot({ path: 'artifacts/05-mobile.png', fullPage: true });
 });
+test('任务草稿随路由保留，阅读历史不被新记录打断', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '新建任务', exact: true }).click();
+  await page.getByLabel('要做什么').fill('W1 草稿与阅读位置检查');
+  await page.getByRole('button', { name: '创建任务', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'W1 草稿与阅读位置检查', exact: true }),
+  ).toBeVisible();
+  const taskId = new URL(page.url()).pathname.split('/').at(-1)!;
+  const composer = page.getByRole('textbox', { name: '任务评论', exact: true });
+  await composer.fill('尚未发送的讨论，只属于这个任务');
+  await page.getByRole('button', { name: '上下文', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '任务上下文', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '上下文', exact: true })).toBeFocused();
+  await page.locator('.navigation-rail').getByRole('link', { name: '工作台', exact: true }).click();
+  await page.getByRole('button', { name: '搜索与快捷操作', exact: true }).click();
+  await page.getByRole('textbox', { name: '全局搜索' }).fill('W1 草稿与阅读位置检查');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /W1 草稿与阅读位置检查/ })
+    .click();
+  await expect(composer).toHaveValue('尚未发送的讨论，只属于这个任务');
+  await page.route(`**/tasks/${taskId}/messages`, (route) => route.abort('failed'));
+  await page.getByRole('button', { name: '发送评论', exact: true }).click();
+  await expect(page.locator('.toast.error')).toBeVisible();
+  await expect(composer).toHaveValue('尚未发送的讨论，只属于这个任务');
+  await page.unroute(`**/tasks/${taskId}/messages`);
+  const addMessage = async (body: string) => {
+    const response = await page.request.post(`/api/v1/tasks/${taskId}/messages`, {
+      headers: { 'X-Hexu-Client': 'web', 'Idempotency-Key': crypto.randomUUID() },
+      data: { body, resultId: null },
+    });
+    expect(response.status()).toBe(201);
+  };
+  for (let i = 0; i < 10; i++)
+    await addMessage(`历史记录 ${i}\n` + '这是一段用于阅读位置检查的虚构讨论。\n'.repeat(10));
+  await expect(page.locator('.message')).toHaveCount(10);
+  const history = page.getByLabel('任务讨论记录', { exact: true });
+  await history.evaluate((el) => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event('scroll'));
+  });
+  await addMessage('来自其他参与者的新记录');
+  await expect(
+    page.getByRole('button', { name: '有新记录 · 回到最新', exact: true }),
+  ).toBeVisible();
+  expect(await history.evaluate((el) => el.scrollTop)).toBeLessThan(10);
+  await page.getByRole('button', { name: '有新记录 · 回到最新', exact: true }).click();
+  await expect(page.getByText('来自其他参与者的新记录', { exact: true })).toBeInViewport();
+  await expect(composer).toHaveValue('尚未发送的讨论，只属于这个任务');
+  await page.getByRole('button', { name: '收起成果面板', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '展开成果面板', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '展开成果面板', exact: true }).click();
+});
+
 test('评论按文本呈现，不执行 HTML', async ({ page }) => {
   await page.goto('/tasks/task-24');
   const payload = '<img src=x onerror="window.__hexuXss=1">';

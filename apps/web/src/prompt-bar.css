@@ -1,0 +1,118 @@
+.prompt-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--hx-border-subtle);
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-panel);
+}
+.prompt-intents {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  margin-bottom: var(--hx-space-2);
+}
+.prompt-intents button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: var(--hx-radius-control);
+  font-size: var(--hx-font-secondary);
+  color: var(--hx-text-secondary);
+}
+.prompt-intents button[aria-pressed='true'] {
+  color: var(--hx-brand);
+  background: var(--hx-brand-soft);
+}
+.prompt-delivery {
+  font-size: var(--hx-font-metadata);
+  color: var(--hx-text-secondary);
+  margin-top: var(--hx-space-2);
+}
+.prompt-continue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-2);
+}
+.prompt-continue > span {
+  font-size: var(--hx-font-secondary);
+  color: var(--hx-text-secondary);
+}
+.next-input-panel {
+  min-width: 0;
+}
+.next-input-compose {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-bg-app);
+}
+.next-input-compose textarea {
+  min-height: 74px;
+  max-height: 180px;
+  width: 100%;
+  resize: vertical;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+}
+.next-input-compose:focus-within {
+  border-color: var(--hx-brand);
+}
+.next-input-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-2);
+}
+.next-input-toolbar > .spacer {
+  flex: 1;
+}
+.next-input-queue {
+  overflow: auto;
+  padding: var(--hx-space-4);
+}
+.next-input-item {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  padding: var(--hx-space-3);
+  margin-bottom: var(--hx-space-3);
+}
+.next-input-item > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--hx-font-secondary);
+}
+.next-input-item p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: var(--hx-space-3) 0;
+}
+.next-input-item small {
+  display: block;
+  color: var(--hx-text-secondary);
+  overflow-wrap: anywhere;
+}
+.next-input-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-3);
+}
+@media (max-width: 760px) {
+  .prompt-continue {
+    flex-wrap: wrap;
+  }
+  .prompt-intents {
+    flex-wrap: wrap;
+  }
+  .prompt-continue > .button {
+    margin-left: auto;
+  }
+}

@@ -264,6 +264,16 @@ test('只配对摘要或本机拒绝执行授权时，网页不能启动模型',
   }
 });
 
+async function openNextInputs(page: Page) {
+  if (!(await page.getByRole('dialog', { name: '下一轮要求与记录', exact: true }).isVisible()))
+    await page.getByRole('button', { name: /^要求与使用记录/ }).click();
+}
+async function closeNextInputs(page: Page) {
+  const drawer = page.getByRole('dialog', { name: '下一轮要求与记录', exact: true });
+  if (await drawer.isVisible())
+    await drawer.getByRole('button', { name: '关闭', exact: true }).click();
+}
+
 test('运行中记录下一轮要求，结束后沿原目录接续，选择与来源可刷新追踪', async ({ page }) => {
   test.setTimeout(90000);
   const f = await prepare(page);
@@ -277,10 +287,13 @@ test('运行中记录下一轮要求，结束后沿原目录接续，选择与�
       .toBe('running');
     await page.getByLabel('下一轮要求', { exact: true }).fill('保留订单数据，下一轮补空状态');
     await page.getByRole('button', { name: '保存到下一轮', exact: true }).click();
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item')).toContainText('待下一轮选择');
     expect((await detail(page, f)).runs).toHaveLength(1);
     await page.reload();
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item')).toContainText('保留订单数据');
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     await expect(page.getByLabel('原执行处理方式', { exact: true })).toHaveValue('wait');
     await expect(page.getByRole('button', { name: '保存等待接续', exact: true })).toBeDisabled();
@@ -294,7 +307,9 @@ test('运行中记录下一轮要求，结束后沿原目录接续，选择与�
     await writeFile(join(f.root, 'keep-dirty.txt'), 'User uncommitted file\n');
     await page.getByLabel('下一轮要求', { exact: true }).fill('这条不选择，不要自动带入');
     await page.getByRole('button', { name: '保存到下一轮', exact: true }).click();
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item')).toHaveCount(2);
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     await expect(page.getByLabel('执行节点', { exact: true })).toBeDisabled();
     await expect(page.getByLabel('授权工作目录', { exact: true })).toBeDisabled();
@@ -330,12 +345,15 @@ test('运行中记录下一轮要求，结束后沿原目录接续，选择与�
     expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
     await page.reload();
     await expect(page.locator('.node-continuation-origin')).toContainText('带入 1 条要求');
+    await openNextInputs(page);
     await expect(
       page.locator('.next-input-item').filter({ hasText: '保留订单数据' }),
     ).toContainText('已随新执行启动');
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item').filter({ hasText: '这条不选择' })).toContainText(
       '待下一轮选择',
     );
+    await closeNextInputs(page);
     await page.screenshot({ path: 'artifacts/27-node-continuation-completed.png', fullPage: true });
   } finally {
     if (agent) await agent.stop();
@@ -356,9 +374,11 @@ test('下一轮要求可编辑撤回并持久保存，手机深色不溢出，�
       .toBe('succeeded');
     await page.getByLabel('下一轮要求', { exact: true }).fill('补充筛选条件');
     await page.getByRole('button', { name: '保存到下一轮', exact: true }).click();
+    await openNextInputs(page);
     await page.getByRole('button', { name: '编辑要求', exact: true }).click();
     await page.getByLabel('下一轮要求', { exact: true }).fill('补充月份筛选，保留未提交修改');
     await page.getByRole('button', { name: '保存修改', exact: true }).click();
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item')).toContainText('补充月份筛选');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
@@ -368,8 +388,10 @@ test('下一轮要求可编辑撤回并持久保存，手机深色不溢出，�
     await expect(page.locator('.toast')).not.toBeVisible();
     await page.screenshot({ path: 'artifacts/28-next-round-mobile-dark.png', fullPage: true });
     await page.getByRole('button', { name: '撤回要求', exact: true }).click();
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item')).toContainText('已撤回');
     await page.reload();
+    await openNextInputs(page);
     await expect(page.locator('.next-input-item')).toContainText('已撤回');
     expect((await detail(page, f)).runs).toHaveLength(1);
     expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
@@ -390,6 +412,7 @@ test('接续材料变化需重新确认，已完成任务接续明确重开而�
     await expect
       .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
       .toBe('succeeded');
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     await page.getByLabel('本次要求', { exact: true }).fill('继续分析，不改文件');
     await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
@@ -412,6 +435,7 @@ test('接续材料变化需重新确认，已完成任务接续明确重开而�
       f.space.id,
     );
     await page.reload();
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     await page.getByLabel('本次要求', { exact: true }).fill('重新打开后继续分析');
     await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
@@ -437,6 +461,7 @@ test('接续材料变化需重新确认，已完成任务接续明确重开而�
 });
 
 async function arrangeUI(page: Page, mode: 'wait' | 'request_stop') {
+  await closeNextInputs(page);
   await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
   await page.getByLabel('原执行处理方式', { exact: true }).selectOption(mode);
   await page.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
@@ -608,6 +633,7 @@ test('Codex 原生会话：重启独立节点后明确恢复，使用同一私�
     const first = (await detail(page, f)).runs[0];
     await agent.stop();
     agent = cli(['start', '--state', f.home]);
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     const way = page.getByLabel('接续会话方式', { exact: true });
     await expect(way.locator('option[value="resume"]')).toHaveJSProperty('disabled', false, {
@@ -668,6 +694,7 @@ test('Codex 会话清理后恢复失败不降级，下一次明确新会话仍�
     );
     expect(await cleanup.finished, cleanup.output()).toBe(0);
     agent = cli(['start', '--state', f.home]);
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     await page.getByLabel('接续会话方式', { exact: true }).selectOption('resume');
     await page.getByLabel('本次要求', { exact: true }).fill('SESSION_RECALL');
@@ -684,6 +711,7 @@ test('Codex 会话清理后恢复失败不降级，下一次明确新会话仍�
         .locator('.message-content')
         .filter({ hasText: '原生会话不存在、已删除或未确认安全结束' }),
     ).toBeVisible();
+    await closeNextInputs(page);
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
     await expect(
       page.getByLabel('接续会话方式').locator('option[value="resume"]'),

@@ -1,3 +1,4 @@
+import './execution.css';
 import { useState } from 'react';
 import {
   continuationLabels,

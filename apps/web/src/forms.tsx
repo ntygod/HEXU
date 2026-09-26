@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { Result, Run, Scenario, Task, Tool } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon, ToolMark } from '../../../packages/ui/src/index.js';
-import { useApp, go } from './state.js';
+import { useApp, go, useTaskDraft } from './state.js';
 export function NewTask({ onClose, projectId }: { onClose: () => void; projectId?: string }) {
   const { data, refresh, notice } = useApp();
   const [title, setTitle] = useState(''),
@@ -173,12 +173,12 @@ export function ContinuePanel({
   onClose: () => void;
 }) {
   const { data, refresh, notice } = useApp();
+  const [prompt, setPrompt] = useTaskDraft(task.id, 'mock-run');
   const [nativeMode, setNativeMode] = useState(lastRun?.provider === 'native');
   const [tool, setTool] = useState<Tool>(
       lastRun?.requestedTool === 'claude-code' ? 'codex' : 'claude-code',
     ),
     [scenario, setScenario] = useState<Scenario>('success'),
-    [prompt, setPrompt] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   if (nativeMode)
@@ -212,6 +212,7 @@ export function ContinuePanel({
             });
             await refresh();
             onClose();
+            setPrompt('');
             notice('已开始模拟执行；没有调用外部模型');
           } catch (error) {
             setError((error as Error).message);

@@ -1,3 +1,4 @@
+import './execution.css';
 import { useEffect, useState } from 'react';
 import type { Run, Task } from '../../../packages/contracts/src/index.js';
 import type {
@@ -8,7 +9,7 @@ import type {
 } from '../../../packages/contracts/src/native.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Empty, Icon, ToolMark } from '../../../packages/ui/src/index.js';
-import { useApp, useLoad } from './state.js';
+import { useApp, useLoad, useTaskDraft, time } from './state.js';
 
 export function NativeContinue({
   task,
@@ -37,7 +38,7 @@ export function NativeContinue({
   const [tool, setTool] = useState<'claude-code' | 'codex'>(source?.requestedTool ?? 'claude-code');
   const [workingCopyId, setWorkingCopyId] = useState(source?.native?.workingCopyId ?? '');
   const [mode, setMode] = useState<NativeMode>('read-only');
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useTaskDraft(task.id, `native-run:${source?.id ?? 'new'}`);
   const [model, setModel] = useState('');
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -79,6 +80,7 @@ export function NativeContinue({
                 reopenTask: task.status === 'done',
               },
             });
+            setPrompt('');
             await refresh();
             onClose();
             notice(
@@ -174,156 +176,164 @@ export function NativeContinue({
             </div>
           ) : (
             <>
-              <label className="field">
-                工作目录
-                <select
-                  aria-label="工作目录"
-                  value={chosen}
-                  disabled={!!source || busy}
-                  onChange={(e) => {
-                    setWorkingCopyId(e.target.value);
-                    setConsent(false);
-                  }}
-                >
-                  {native.workspaces.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} · {w.root}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {awaitingStop && (
-                <div className="notice-box">
-                  <div>
-                    <strong>原执行尚未确认结束</strong>
-                    <p>接续安排会保存。只有确认原进程停止、目录释放后，才会开始新执行。</p>
-                    <label className="field">
-                      如何处理原执行
-                      <select
-                        aria-label="如何处理原执行"
-                        value={onActiveRun}
-                        disabled={busy}
-                        onChange={(e) => {
-                          setOnActiveRun(e.target.value as 'wait' | 'request_stop');
-                          setConsent(false);
-                        }}
-                      >
-                        <option value="request_stop">请求停止原执行，然后继续</option>
-                        <option value="wait">不打断，等原执行自然结束</option>
-                      </select>
-                    </label>
-                    <p>关闭页面不会取消接续；取消接续也不会撤销已发送的停止请求。</p>
-                  </div>
-                </div>
-              )}
-              <label className="field">
-                本次能力
-                <select
-                  aria-label="本次能力"
-                  value={mode}
-                  onChange={(e) => {
-                    setMode(e.target.value as NativeMode);
-                    setConsent(false);
-                  }}
-                >
-                  <option value="read-only">只读分析</option>
-                  <option value="edit">允许文件编辑 · 不提供 Shell</option>
-                </select>
-              </label>
-              <label className="field">
-                接下来做什么
-                <textarea
-                  aria-label="接下来做什么"
-                  rows={4}
-                  required
-                  maxLength={12000}
-                  value={prompt}
-                  onChange={(e) => {
-                    setPrompt(e.target.value);
-                    setConsent(false);
-                  }}
-                  placeholder="例如：保留已完成的页面，继续处理大数据量导出"
-                />
-              </label>
-              <label className="field">
-                模型名称 <span>可选，留空使用工具默认值</span>
-                <input
-                  aria-label="模型名称"
-                  list={tool === 'codex' ? 'native-codex-models' : undefined}
-                  maxLength={100}
-                  value={model}
-                  onChange={(e) => {
-                    setModel(e.target.value);
-                    setConsent(false);
-                  }}
-                  placeholder="模型别名或 ID"
-                />
-              </label>
-              {tool === 'codex' && (
-                <>
-                  <datalist id="native-codex-models">
-                    {models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </datalist>
-                  <Button
-                    type="button"
-                    busy={loadingModels}
-                    onClick={async () => {
-                      setLoadingModels(true);
-                      setError('');
-                      try {
-                        const response = await request<{ items: { id: string; name: string }[] }>(
-                          '/native/codex/models',
-                          { method: 'POST', body: {} },
-                        );
-                        setModels(response.items);
-                        notice(
-                          `已读取 ${response.items.length} 个模型配置，不代表账户都有调用权限`,
-                        );
-                      } catch (err) {
-                        setError((err as Error).message);
-                      } finally {
-                        setLoadingModels(false);
-                      }
+              <fieldset className="execution-section" disabled={busy}>
+                <legend>工具配置与目录</legend>
+                <label className="field">
+                  工作目录
+                  <select
+                    aria-label="工作目录"
+                    value={chosen}
+                    disabled={!!source || busy}
+                    onChange={(e) => {
+                      setWorkingCopyId(e.target.value);
+                      setConsent(false);
                     }}
                   >
-                    从 Codex 读取模型
-                  </Button>
-                  <p className="hint">
-                    使用本机 API 配置读取目录，不开始模型生成。Codex 本轮最长 5
-                    分钟；暂无美元硬预算，费用由提供方计费。
-                  </p>
-                </>
-              )}
-              {tool === 'claude-code' && (
-                <>
-                  <label className="field">
-                    本次预算上限（USD）
-                    <input
-                      type="number"
-                      min="0.01"
-                      max="10"
-                      step="0.01"
-                      value={budget}
-                      onChange={(e) => {
-                        setBudget(Number(e.target.value));
-                        setConsent(false);
+                    {native.workspaces.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} · {w.root}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {awaitingStop && (
+                  <div className="notice-box">
+                    <div>
+                      <strong>原执行尚未确认结束</strong>
+                      <p>接续安排会保存。只有确认原进程停止、目录释放后，才会开始新执行。</p>
+                      <label className="field">
+                        如何处理原执行
+                        <select
+                          aria-label="如何处理原执行"
+                          value={onActiveRun}
+                          disabled={busy}
+                          onChange={(e) => {
+                            setOnActiveRun(e.target.value as 'wait' | 'request_stop');
+                            setConsent(false);
+                          }}
+                        >
+                          <option value="request_stop">请求停止原执行，然后继续</option>
+                          <option value="wait">不打断，等原执行自然结束</option>
+                        </select>
+                      </label>
+                      <p>关闭页面不会取消接续；取消接续也不会撤销已发送的停止请求。</p>
+                    </div>
+                  </div>
+                )}
+                <label className="field">
+                  本次能力
+                  <select
+                    aria-label="本次能力"
+                    value={mode}
+                    onChange={(e) => {
+                      setMode(e.target.value as NativeMode);
+                      setConsent(false);
+                    }}
+                  >
+                    <option value="read-only">只读分析</option>
+                    <option value="edit">允许文件编辑 · 不提供 Shell</option>
+                  </select>
+                </label>
+                <label className="field">
+                  模型名称 <span>可选，留空使用工具默认值</span>
+                  <input
+                    aria-label="模型名称"
+                    list={tool === 'codex' ? 'native-codex-models' : undefined}
+                    maxLength={100}
+                    value={model}
+                    onChange={(e) => {
+                      setModel(e.target.value);
+                      setConsent(false);
+                    }}
+                    placeholder="模型别名或 ID"
+                  />
+                </label>
+                {tool === 'codex' && (
+                  <>
+                    <datalist id="native-codex-models">
+                      {models.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </datalist>
+                    <Button
+                      type="button"
+                      busy={loadingModels}
+                      onClick={async () => {
+                        setLoadingModels(true);
+                        setError('');
+                        try {
+                          const response = await request<{ items: { id: string; name: string }[] }>(
+                            '/native/codex/models',
+                            { method: 'POST', body: {} },
+                          );
+                          setModels(response.items);
+                          notice(
+                            `已读取 ${response.items.length} 个模型配置，不代表账户都有调用权限`,
+                          );
+                        } catch (err) {
+                          setError((err as Error).message);
+                        } finally {
+                          setLoadingModels(false);
+                        }
                       }}
-                    />
-                  </label>
-                  <p className="hint">最多 8 轮、5 分钟；预算由原生工具处理，不是实际账单保证。</p>
-                </>
-              )}
-              <details className="native-details">
-                <summary>查看接续上下文与代码来源</summary>
-                <pre>{context?.contextText ?? context?.text ?? '正在整理…'}</pre>
-                <p>
-                  本次要求会一并发送。等待原执行结束时，会在同一授权目录内重新整理最新输出和部分变更摘录；人工说明变化将暂停接续。
-                </p>
-              </details>
+                    >
+                      从 Codex 读取模型
+                    </Button>
+                    <p className="hint">
+                      使用本机 API 配置读取目录，不开始模型生成。Codex 本轮最长 5
+                      分钟；暂无美元硬预算，费用由提供方计费。
+                    </p>
+                  </>
+                )}
+                {tool === 'claude-code' && (
+                  <>
+                    <label className="field">
+                      本次预算上限（USD）
+                      <input
+                        type="number"
+                        min="0.01"
+                        max="10"
+                        step="0.01"
+                        value={budget}
+                        onChange={(e) => {
+                          setBudget(Number(e.target.value));
+                          setConsent(false);
+                        }}
+                      />
+                    </label>
+                    <p className="hint">
+                      最多 8 轮、5 分钟；预算由原生工具处理，不是实际账单保证。
+                    </p>
+                  </>
+                )}
+              </fieldset>
+              <fieldset className="execution-section" disabled={busy}>
+                <legend>本次要求与材料</legend>
+                <label className="field">
+                  接下来做什么
+                  <textarea
+                    aria-label="接下来做什么"
+                    rows={4}
+                    required
+                    maxLength={12000}
+                    value={prompt}
+                    onChange={(e) => {
+                      setPrompt(e.target.value);
+                      setConsent(false);
+                    }}
+                    placeholder="例如：保留已完成的页面，继续处理大数据量导出"
+                  />
+                </label>
+                <details className="native-details">
+                  <summary>查看接续上下文与代码来源</summary>
+                  <pre>{context?.contextText ?? context?.text ?? '正在整理…'}</pre>
+                  <p>
+                    本次要求会一并发送。等待原执行结束时，会在同一授权目录内重新整理最新输出和部分变更摘录；人工说明变化将暂停接续。
+                  </p>
+                </details>
+              </fieldset>
               <label className="check-line">
                 <input
                   type="checkbox"
@@ -446,7 +456,11 @@ export function NativeCode({ run }: { run?: Run }) {
     request<WorkingCopySnapshot>(`/native/workspaces/${id}`, { signal: controller.signal })
       .then(setSnapshot)
       .catch((e) => {
-        if (e.name !== 'AbortError') setError(e.message);
+        if (e.name !== 'AbortError') {
+          setSnapshot(null);
+          setDiff('');
+          setError(e.message);
+        }
       });
     return () => controller.abort();
   }, [id, version, refreshKey]);
@@ -459,7 +473,11 @@ export function NativeCode({ run }: { run?: Run }) {
     })
       .then((v) => setDiff(v.text || '当前文件没有可显示的文本差异'))
       .catch((e) => {
-        if (e.name !== 'AbortError') setError(e.message);
+        if (e.name !== 'AbortError') {
+          setSnapshot(null);
+          setDiff('');
+          setError(e.message);
+        }
       });
     return () => controller.abort();
   }, [id, path, version, refreshKey]);
@@ -477,10 +495,17 @@ export function NativeCode({ run }: { run?: Run }) {
         <span className="spacer" />
         <Button onClick={() => setRefreshKey((v) => v + 1)}>刷新变更</Button>
       </div>
-      <p className="muted">
-        {snapshot?.branch ?? '未命名分支'} · {snapshot?.head?.slice(0, 8) ?? '尚无提交'} ·
-        当前活动现场
-      </p>
+      {snapshot ? (
+        <p className="muted">
+          {snapshot.branch ?? '未命名分支'} · {snapshot.head?.slice(0, 8) ?? '尚无提交'} ·
+          当前活动现场
+          <br />
+          采集于 {time(snapshot.capturedAt)}
+          {snapshot.busyRunId ? ' · 目录有活动执行' : ''}
+        </p>
+      ) : (
+        !error && <p className="muted">正在读取当前代码现场…</p>
+      )}
       {error && (
         <p role="alert" className="form-error">
           {error}

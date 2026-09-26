@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
   type MouseEvent,
@@ -69,6 +70,8 @@ interface AppState {
   notice: (text: string, error?: boolean) => void;
   changeStatus: (task: Task, status: TaskStatus) => Promise<void>;
   connected: boolean;
+  readDraft(taskId: string, purpose: string): string | undefined;
+  saveDraft(taskId: string, purpose: string, text: string): void;
 }
 const Context = createContext<AppState | null>(null);
 export const useApp = () => {
@@ -77,6 +80,20 @@ export const useApp = () => {
   return context;
 };
 export function Provider({ children }: { children: ReactNode }) {
+  // This memory belongs to the mounted identity/space provider, never browser storage.
+  const drafts = useRef(new Map<string, Map<string, string>>()).current;
+  const readDraft = useCallback(
+    (taskId: string, purpose: string) => drafts.get(taskId)?.get(purpose),
+    [drafts],
+  );
+  const saveDraft = useCallback(
+    (taskId: string, purpose: string, text: string) => {
+      if (!drafts.has(taskId)) drafts.set(taskId, new Map());
+      if (text) drafts.get(taskId)!.set(purpose, text);
+      else drafts.get(taskId)!.delete(purpose);
+    },
+    [drafts],
+  );
   const [data, setData] = useState<Workbench | null>(null),
     [version, setVersion] = useState(0),
     [fatal, setFatal] = useState(''),
@@ -95,9 +112,13 @@ export function Provider({ children }: { children: ReactNode }) {
     )
       throw new Error('服务返回的工作台数据格式不正确');
     setData(next);
+    for (const taskId of drafts.keys()) {
+      const task = next.tasks.find((item) => item.id === taskId);
+      if (!task || !canEditTask(next, task)) drafts.delete(taskId);
+    }
     setVersion((value) => value + 1);
     setFatal('');
-  }, []);
+  }, [drafts]);
   useEffect(() => {
     refresh().catch((error) => setFatal(error.message));
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -192,7 +213,9 @@ export function Provider({ children }: { children: ReactNode }) {
       </div>
     );
   return (
-    <Context.Provider value={{ data, version, refresh, notice, changeStatus, connected }}>
+    <Context.Provider
+      value={{ data, version, refresh, notice, changeStatus, connected, readDraft, saveDraft }}
+    >
       {children}
       {toast && (
         <div
@@ -246,6 +269,28 @@ export function Provider({ children }: { children: ReactNode }) {
       )}
     </Context.Provider>
   );
+}
+export function useTaskDraft(
+  taskId: string,
+  purpose: string,
+  initial = '',
+): [string, (text: string) => void] {
+  const { data, readDraft, saveDraft } = useApp();
+  const task = data.tasks.find((item) => item.id === taskId);
+  const editable = !!task && canEditTask(data, task);
+  const key = `${taskId}:${purpose}:${editable}`;
+  const restored = () => (editable ? (readDraft(taskId, purpose) ?? initial) : '');
+  const [draft, setDraft] = useState(() => ({ key, text: restored() }));
+  const current = draft.key === key ? draft : { key, text: restored() };
+  if (draft.key !== key) setDraft(current);
+  return [
+    current.text,
+    (text) => {
+      if (!editable) return;
+      saveDraft(taskId, purpose, text);
+      setDraft({ key, text });
+    },
+  ];
 }
 export function useLoad<T>(path: string) {
   const { version } = useApp();

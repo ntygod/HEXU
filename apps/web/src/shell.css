@@ -8,7 +8,8 @@
 }
 .app-shell {
   min-height: 100dvh;
-  --shell-topbar-height: max(56px, calc(var(--hx-control-height) + 16px));
+  --shell-topbar-height: max(56px, calc(var(--hx-control-height) + 17px));
+  --shell-location-height: max(46px, calc(var(--hx-control-height) + 11px));
 }
 .workbench-topbar {
   position: sticky;
@@ -288,7 +289,7 @@
   display: flex;
   align-items: center;
   gap: var(--hx-space-2);
-  min-height: 46px;
+  min-height: var(--shell-location-height);
   padding: 5px 20px;
   border-bottom: 1px solid var(--hx-border-muted);
 }
@@ -442,7 +443,7 @@
 }
 @media (pointer: coarse) {
   .app-shell {
-    --shell-topbar-height: 60px;
+    --shell-topbar-height: 61px;
   }
   .command-trigger {
     min-height: 44px;

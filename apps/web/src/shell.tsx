@@ -252,7 +252,7 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
             </div>
           </div>
         </aside>
-        <div className="workbench-main">
+        <div className={`workbench-main ${active === 'tasks' ? 'task-surface' : ''}`}>
           <div className="workbench-location">
             <button
               className="icon-button"

@@ -1,0 +1,354 @@
+.execution-section {
+  min-width: 0;
+  margin: var(--hx-space-4) 0;
+  padding: var(--hx-space-4);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  display: grid;
+  gap: var(--hx-space-3);
+}
+.execution-section > legend {
+  padding: 0 6px;
+  color: var(--hx-text-primary);
+  font-weight: 600;
+}
+.execution-section .field {
+  margin: 0;
+}
+.execution-section .notice-box {
+  margin: 0;
+}
+.native-mode-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+  justify-content: space-between;
+}
+.tool-choice-field {
+  border: 0;
+  padding: 0;
+  margin: var(--hx-space-4) 0;
+  min-width: 0;
+}
+.tool-choice-field legend {
+  margin-bottom: var(--hx-space-2);
+  font-weight: 600;
+}
+.native-tool-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--hx-space-2);
+}
+.native-tool-choice button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: var(--hx-space-3);
+  background: var(--hx-bg-app);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  text-align: left;
+}
+.native-tool-choice button.selected {
+  color: var(--hx-brand);
+  background: var(--hx-brand-soft);
+  border-color: var(--hx-brand);
+}
+.native-tool-choice small {
+  flex-basis: 100%;
+  color: var(--hx-text-secondary);
+}
+.continuation-source,
+.node-source-summary {
+  padding: var(--hx-space-3);
+  margin: var(--hx-space-3) 0;
+  border-left: 2px solid var(--hx-brand);
+  background: var(--hx-bg-app);
+}
+.continuation-source p,
+.node-source-summary p {
+  margin-top: var(--hx-space-2);
+}
+.node-source-summary small {
+  display: block;
+  color: var(--hx-text-secondary);
+  overflow-wrap: anywhere;
+  margin-top: var(--hx-space-2);
+}
+.native-details,
+.node-context-preview {
+  min-width: 0;
+}
+.native-details summary,
+.node-context-preview summary,
+.continuation-records summary {
+  cursor: pointer;
+  color: var(--hx-brand);
+  font-size: var(--hx-font-secondary);
+  padding-block: var(--hx-space-2);
+}
+.native-details pre,
+.node-context-preview pre,
+.native-diff {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-bg-app);
+  color: var(--hx-code-text);
+  font-family: var(--hx-font-code);
+  font-size: var(--hx-font-code-size);
+  line-height: 1.65;
+  max-height: 380px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.native-details > p,
+.node-context-preview > p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  margin: var(--hx-space-2) 0;
+}
+.node-input-selection {
+  min-width: 0;
+  margin: 0;
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+}
+.node-input-selection legend {
+  font-size: var(--hx-font-secondary);
+}
+.node-input-selection p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.node-input-selection label {
+  align-items: flex-start;
+  margin: var(--hx-space-2) 0;
+}
+.node-execution-form {
+  overflow: auto;
+  padding: var(--hx-space-4);
+  flex: 1;
+  min-height: 0;
+}
+.node-execution-form > .form-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--hx-space-4));
+  margin: var(--hx-space-4) calc(-1 * var(--hx-space-4)) calc(-1 * var(--hx-space-4));
+  padding: var(--hx-space-4);
+  background: var(--hx-surface-panel);
+  border-top: 1px solid var(--hx-border-subtle);
+  z-index: 1;
+}
+.node-execution-empty {
+  padding: var(--hx-space-4);
+  border: 1px dashed var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+}
+.node-execution-empty code {
+  display: block;
+  margin-top: var(--hx-space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.native-session-choice,
+.native-session-record {
+  padding: var(--hx-space-3);
+  background: var(--hx-ai-soft);
+  border-radius: var(--hx-radius-control);
+}
+.native-session-choice p,
+.native-session-record p {
+  margin-top: var(--hx-space-2);
+  font-size: var(--hx-font-secondary);
+}
+.native-session-record small {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-secondary);
+}
+.continuation-status {
+  margin-bottom: var(--hx-space-4);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-left: 3px solid var(--hx-brand);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-bg-app);
+}
+.continuation-status.needs-attention {
+  border-left-color: var(--hx-pending-text);
+}
+.continuation-status-heading {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.continuation-status-title {
+  flex: 1;
+  min-width: 160px;
+}
+.continuation-status-title p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  margin-top: 4px;
+}
+.continuation-steps,
+.node-run-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-3);
+  list-style: none;
+  padding: 0;
+  margin: var(--hx-space-3) 0;
+  font-size: var(--hx-font-secondary);
+}
+.continuation-steps li,
+.node-run-steps li {
+  color: var(--hx-text-secondary);
+}
+.continuation-steps li::before,
+.node-run-steps li::before {
+  content: '○';
+  margin-right: 5px;
+}
+.continuation-steps .current {
+  color: var(--hx-pending-text);
+  font-weight: 600;
+}
+.continuation-steps .passed,
+.node-run-steps li.reached {
+  color: var(--hx-running-text);
+}
+.continuation-steps .passed::before,
+.node-run-steps li.reached::before {
+  content: '✓';
+}
+.continuation-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-3);
+  font-size: var(--hx-font-secondary);
+}
+.continuation-blocker {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--hx-pending-text);
+  margin-block: var(--hx-space-2);
+}
+.continuation-records {
+  border-top: 1px solid var(--hx-border-subtle);
+  margin-top: var(--hx-space-3);
+}
+.continuation-records article {
+  padding-block: var(--hx-space-3);
+}
+.continuation-records article + article {
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.continuation-records small {
+  overflow-wrap: anywhere;
+  color: var(--hx-text-secondary);
+}
+.continuation-prompt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: var(--hx-space-2) 0;
+}
+.node-run-status {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  padding: var(--hx-space-3);
+  margin-bottom: var(--hx-space-4);
+}
+.node-policy-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+.node-policy-summary > div {
+  flex: 1;
+  min-width: 140px;
+}
+.node-policy-summary p,
+.node-policy-summary small {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.node-run-status details {
+  margin-top: var(--hx-space-3);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.node-run-status details p {
+  margin-top: var(--hx-space-2);
+  overflow-wrap: anywhere;
+}
+.node-continuation-origin {
+  font-size: var(--hx-font-secondary);
+  color: var(--hx-text-secondary);
+  overflow-wrap: anywhere;
+  margin-bottom: var(--hx-space-3);
+}
+.native-code {
+  min-width: 0;
+  flex: 1;
+  padding: var(--hx-space-4);
+  overflow: auto;
+}
+.native-code > .flex-line {
+  flex-wrap: wrap;
+}
+.native-code > .muted {
+  font-size: var(--hx-font-secondary);
+  margin-top: var(--hx-space-2);
+}
+.native-changes {
+  display: grid;
+  gap: 4px;
+  margin: var(--hx-space-4) 0;
+}
+.native-changes button {
+  display: flex;
+  gap: var(--hx-space-2);
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-bg-app);
+  text-align: left;
+  min-width: 0;
+}
+.native-changes button.selected {
+  background: var(--hx-brand-soft);
+  border-color: var(--hx-brand);
+}
+.native-changes button span {
+  overflow-wrap: anywhere;
+}
+.native-changes code {
+  color: var(--hx-brand);
+  min-width: 2ch;
+}
+.native-event {
+  padding: var(--hx-space-3) 0;
+  border-bottom: 1px solid var(--hx-border-muted);
+}
+.native-event p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--hx-font-code);
+  font-size: var(--hx-font-code-size);
+}
+.native-event small {
+  color: var(--hx-text-secondary);
+}
