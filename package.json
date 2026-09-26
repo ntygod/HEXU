@@ -29,7 +29,8 @@
     "format": "prettier --write \"apps/**/*.{ts,tsx,css,json,html,svg}\" \"packages/**/*.{ts,tsx,css,json}\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"playwright.config.ts\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,json,html,svg}\" \"packages/**/*.{ts,tsx,css,json}\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"playwright.config.ts\"",
     "native:recover": "npm run build:server && node --env-file-if-exists=.env dist/apps/runner/src/recover.js",
-    "check:codex-protocol": "npm run build:server && node scripts/check-codex-protocol.mjs"
+    "check:codex-protocol": "npm run build:server && node scripts/check-codex-protocol.mjs",
+    "runner": "node dist/apps/runner/src/cli.js"
   },
   "dependencies": {
     "better-auth": "1.7.6",

@@ -61,5 +61,22 @@ for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => {
     void teamApp.close();
   });
+// Independent node-browser identities; never share setup state with team.spec.ts.
+const nodeApp = await createApp({
+  port: 4312,
+  databasePath: join(path, 'node-workspace.sqlite'),
+  identity: {
+    databasePath: join(path, 'node-identity.sqlite'),
+    secret: 'fictional-node-browser-auth-secret-0123456789',
+    setupCode: 'fictional-node-browser-setup-code-0123456789',
+    baseURL: 'http://127.0.0.1:4312',
+    trustedOrigins: ['http://127.0.0.1:4312'],
+  },
+});
+await nodeApp.listen({ host: '127.0.0.1', port: 4312 });
+for (const signal of ['SIGINT', 'SIGTERM'])
+  process.once(signal, () => {
+    void nodeApp.close();
+  });
 process.env.HEXU_MODE = 'preview';
 await import('../dist/apps/control/src/main.js');

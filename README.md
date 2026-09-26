@@ -9,7 +9,7 @@
 不用反复解释，不用反复追问，不用四处找成果。
 
 
-> **当前阶段：E2a 本机真实账号、空间与项目权限。** 默认 `preview` 保留示例工作台、实验性 Claude/Codex 和持久化接续；可选 `team-local` 新增实际密码账号、邀请、项目成员权限和多人数据协作。**两种模式隔离，团队账号不能使用宿主机目录或模型密钥。** 当前仍仅限本机，不是可公网部署的团队服务；独立 Runner、PostgreSQL、远程执行及有效账户下真实模型生成联调仍未完成。
+> **当前阶段：E2b1 独立节点配对与目录摘要。** 默认 `preview` 保留示例工作台、实验性 Claude/Codex 和持久化接续；可选 `team-local` 使用真实账号、项目权限，并可配对独立节点进程查看本地明确授权的 Git 数量摘要。**节点不接收任务或代码执行命令；在线不是模型已接通。** 两种模式仍只限本机回环，独立 Run 派发、跨电脑部署、PostgreSQL 和真实模型生成联调未完成。
 
 ## 启动
 
@@ -41,7 +41,13 @@ npm start
 
 在本机 `.env` 设置 `HEXU_MODE=team-local`、`HEXU_NATIVE_ENABLED=0` 后启动。未指定数据目录时使用 `.hexu/team`，首次初始化代码在该目录的 `setup-code` 文件；已有 HEXU_DATA_DIR 设置优先。账号建立后可以创建团队、手动转交邀请，并在项目中配置只读/编辑/管理成员。
 
-旧 preview 数据不自动公开或导入。team-local 暂不提供任何模拟/原生执行，等待独立节点及执行授权；两个浏览器会话能协作数据，不代表已支持两台电脑。详见 [本机账号模式](docs/engineering/team-local.md)。
+旧 preview 数据不自动公开或导入。team-local 已有独立节点身份与目录摘要，仍不提供任何模拟/原生执行，等待独立执行授权及派发；两个浏览器会话能协作数据，不代表已支持两台电脑。详见 [本机账号模式](docs/engineering/team-local.md)。
+
+## 可选：配对独立节点
+
+team-local 登录后，在“空间与账号 → 独立节点与授权目录”生成配对码。本机准备仓库外的 runner.json，执行 `npm run build`，再执行 `npm run runner -- connect --config /path/runner.json`，在终端确认账号、项目和目录；随后 `npm run runner -- start`。配对码不放入命令参数，节点凭证与路径不上传服务。
+
+当前只同步目录别名和变更数量，不读取/上传代码，不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
 
 ## 当前能操作什么
 
@@ -58,7 +64,8 @@ npm start
 | 显式目录授权、实际 Git 变更、结果输出与停止 | 已实现；测试通过协议替身执行真实本地文件操作 |
 | 原生会话恢复／运行中追加要求／Bash／MCP | 尚未接入；新执行使用任务说明和最近工作记录 |
 | 实际账号、空间、邀请、项目角色、会话/权限撤销 | team-local 本机模式已实现；邮件验证、找回密码、正式部署等仍缺 |
-| 临时协助、并行分支、独立 Runner 和远程执行 | 尚未实现 |
+| 独立节点 CLI、配对、心跳、目录摘要与撤销 | E2b1 已实现本机切片；没有团队 Run 派发或远程连接 |
+| 临时协助、并行分支、独立节点任务执行和远程部署 | 尚未实现 |
 | 示例订单预览 | 虚构业务示例，不是通用预览隧道 |
 
 模拟名称不代表原生工具已接通。设置页分别显示 Claude Code / Codex 的能力探测与各自的 API 配置；工具检测可用不代表凭证有效或真实模型已经测试。
@@ -123,7 +130,7 @@ packages/db              SQLite 开发适配、迁移与事件
 packages/adapters/mock   明确标识的模拟执行器
 packages/adapters/claude-code  Claude JSONL 协议与受限文件工具配置
 packages/adapters/codex        Codex 双向 RPC、模型目录和受限策略
-apps/runner/src          本机进程与 Git 边界（尚非独立网络执行器）
+apps/runner/src          preview 原生 runtime 与 E2b1 独立摘要节点（尚无团队 Run 执行）
 packages/ui              共用组件与设计变量
 packages/client          浏览器 HTTP 客户端
 tests                    单元、存储、API 与浏览器测试
