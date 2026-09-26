@@ -1,3 +1,4 @@
+import './resources.css';
 import { useEffect, useState } from 'react';
 import type {
   PairingView,
@@ -96,7 +97,7 @@ export function NodeResources() {
         </p>
       )}
       {!error && value && !value.items.length && (
-        <div className="panel node-empty">
+        <div className="node-empty">
           <Icon name="monitor" size={30} />
           <h3>把你的工作环境接进来</h3>
           <p>一次性配对码只负责连接身份；目录必须由本机操作者另行确认。不会扫描或共享整个电脑。</p>
@@ -105,7 +106,7 @@ export function NodeResources() {
       )}
       <div className="node-grid">
         {value?.items.map((node) => (
-          <article className="panel node-card" key={node.id} data-node-id={node.id}>
+          <article className="node-card" key={node.id} data-node-id={node.id}>
             <div className="node-card-heading">
               <span className="system-avatar">
                 <Icon name="monitor" />
@@ -188,7 +189,7 @@ export function NodeResources() {
         ))}
       </div>
       {!!pending.length && (
-        <div className="panel node-pairings">
+        <div className="node-pairings">
           <h3>待连接的配对码</h3>
           {pending.map((p) => (
             <div key={p.id}>

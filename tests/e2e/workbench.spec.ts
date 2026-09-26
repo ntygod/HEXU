@@ -129,6 +129,12 @@ test('窄屏没有整个页面的横向溢出', async ({ page }) => {
     await expect(page.getByRole('complementary', { name: '项目导引栏' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: '展开项目导航', exact: true })).toBeFocused();
+    if (path === '/tasks/task-24') {
+      await page.getByRole('button', { name: '代码与成果', exact: true }).click();
+      await expect(page.getByRole('button', { name: '代码变更', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: '讨论', exact: true }).click();
+      await expect(page.getByRole('textbox', { name: '任务评论', exact: true })).toBeVisible();
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);

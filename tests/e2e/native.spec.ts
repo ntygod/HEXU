@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises';
 test('两种工具与执行目录来自明确配置，能力检测不代表账户联调', async ({ page }) => {
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Claude Code', exact: true })).toBeVisible();
-  await expect(page.getByText('已检测 · 原生可用', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('已检测配置', { exact: true })).toHaveCount(2);
   await expect(page.getByRole('heading', { name: 'Codex', exact: true })).toBeVisible();
   await expect(page.getByText('本机显式授权', { exact: true })).toBeVisible();
   await mkdir('artifacts', { recursive: true });

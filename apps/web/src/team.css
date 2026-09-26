@@ -1,0 +1,199 @@
+.team-settings {
+  padding: var(--hx-space-5);
+  max-width: 1320px;
+  margin: 0 auto;
+}
+.team-settings-heading {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  margin-bottom: var(--hx-space-5);
+}
+.team-settings-heading h1 {
+  font-size: var(--hx-font-page-title);
+  margin-block: 6px;
+}
+.team-settings-heading p {
+  color: var(--hx-text-secondary);
+}
+.identity-sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--hx-space-4);
+  align-items: start;
+}
+.identity-section {
+  min-width: 0;
+  padding: var(--hx-space-4);
+  background: var(--hx-surface-panel);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+}
+.team-card-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+  margin-bottom: var(--hx-space-4);
+}
+.team-card-heading > svg {
+  color: var(--hx-brand);
+  margin-top: 3px;
+}
+.team-card-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+.team-card-heading p {
+  margin-top: 4px;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.team-members {
+  display: grid;
+}
+.team-member {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3) 0;
+  border-bottom: 1px solid var(--hx-border-muted);
+}
+.team-member > div {
+  flex: 1;
+  min-width: 120px;
+}
+.team-member small,
+.project-access-member small {
+  display: block;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.team-note {
+  display: flex;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-3);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.team-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-4);
+}
+.team-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--hx-space-3);
+}
+.team-inline-form .field {
+  flex: 1;
+  min-width: 150px;
+  margin: 0;
+}
+.team-execution-boundary {
+  margin: var(--hx-space-5) 0;
+}
+.invitation-link-box {
+  display: grid;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3);
+  margin-top: var(--hx-space-4);
+  background: var(--hx-bg-app);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+}
+.invitation-link-box input {
+  width: 100%;
+}
+.invitation-link-box .button {
+  justify-self: start;
+}
+.invitation-link-box p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.invitation-history {
+  margin-top: var(--hx-space-4);
+}
+.invitation-history > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+  justify-content: space-between;
+  padding-block: var(--hx-space-3);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.invitation-history small {
+  display: block;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.invitation-history strong {
+  overflow-wrap: anywhere;
+}
+.project-access {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-panel);
+  padding: var(--hx-space-4);
+}
+.project-access > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+  cursor: pointer;
+}
+.project-access > summary > span {
+  margin-left: auto;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.project-access-body {
+  margin-top: var(--hx-space-4);
+}
+.project-access-member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) 0;
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.project-access-member > span:first-child {
+  flex: 1;
+  min-width: 130px;
+}
+.project-access .team-inline-form {
+  margin-top: var(--hx-space-4);
+}
+.team-readonly {
+  padding: var(--hx-space-3);
+  background: var(--hx-bg-app);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+@media (max-width: 1000px) {
+  .identity-sections {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .team-settings {
+    padding: var(--hx-space-4);
+  }
+  .team-inline-form .field {
+    flex-basis: 100%;
+  }
+  .project-access-member > span:first-child {
+    flex-basis: 100%;
+  }
+}

@@ -43,6 +43,7 @@ export function TaskPage({ id }: { id: string }) {
     [rightTab, setRightTab] = useState('results'),
     [busy, setBusy] = useState(false);
   const [continuationSource, setContinuationSource] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<'discussion' | 'output'>('discussion');
   const scroll = useRef<HTMLDivElement>(null);
   const following = useRef(true);
   const initialized = useRef(false);
@@ -157,7 +158,7 @@ export function TaskPage({ id }: { id: string }) {
               disabled={!editable || task.status === 'cancelled'}
               title={team ? '选择本人在本机明确授权的独立节点' : undefined}
             >
-              <Icon name="arrow-right" />
+              <Icon name="arrow" />
               准备接续
             </Button>
           )}
@@ -229,8 +230,19 @@ export function TaskPage({ id }: { id: string }) {
       </div>
       <div className="w1-workspace-toolbar">
         <span>
-          <Icon name="message" size={15} /> 过程与讨论
+          <Icon name="chat" size={15} /> 过程与讨论
         </span>
+        <div className="task-mobile-tabs" aria-label="任务面板">
+          <button
+            aria-pressed={mobilePane === 'discussion'}
+            onClick={() => setMobilePane('discussion')}
+          >
+            讨论
+          </button>
+          <button aria-pressed={mobilePane === 'output'} onClick={() => setMobilePane('output')}>
+            代码与成果
+          </button>
+        </div>
         <button className="text-button" onClick={() => setDrawer('context')}>
           上下文
         </button>
@@ -263,6 +275,7 @@ export function TaskPage({ id }: { id: string }) {
       </div>
       <div
         className={`task-grid w1-task-grid ${layout.hidden ? 'output-hidden' : ''}`}
+        data-mobile-pane={mobilePane}
         style={{ '--discussion-width': `${layout.width}%` } as CSSProperties}
       >
         <section className="collaboration-panel" aria-label="过程与讨论">
@@ -378,7 +391,7 @@ export function TaskPage({ id }: { id: string }) {
             </div>
           </>
         </section>
-        <section className="output-panel" aria-label="代码与成果" hidden={layout.hidden}>
+        <section className="output-panel" aria-label="代码与成果">
           <div className="workspace-tabs">
             {[
               ['preview', '预览'],
@@ -427,7 +440,7 @@ export function TaskPage({ id }: { id: string }) {
                   <h2>{result.title}</h2>
                   <p className="text-block">{result.body}</p>
                   <Link className="button secondary" to={`/results/${result.id}`}>
-                    查看与反馈 <Icon name="arrow-right" size={14} />
+                    查看与反馈 <Icon name="arrow" size={14} />
                   </Link>
                 </article>
               ))}

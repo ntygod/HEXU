@@ -1,0 +1,159 @@
+.account-workbench {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--hx-bg-app);
+}
+.account-brandbar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-4) var(--hx-space-6);
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+.account-brandbar > span {
+  margin-left: auto;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.account-layout {
+  width: min(1100px, 100%);
+  margin: auto;
+  padding: 48px 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  align-items: center;
+  gap: 70px;
+}
+.account-context h2 {
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.6px;
+  margin: var(--hx-space-4) 0;
+}
+.account-context > p {
+  color: var(--hx-text-secondary);
+  line-height: 1.9;
+  max-width: 380px;
+}
+.account-context dl {
+  margin: var(--hx-space-5) 0 0;
+  display: grid;
+  gap: var(--hx-space-4);
+}
+.account-context dl > div {
+  border-left: 2px solid var(--hx-border-subtle);
+  padding-left: var(--hx-space-3);
+}
+.account-context dt {
+  color: var(--hx-text-primary);
+  font-weight: 500;
+}
+.account-context dd {
+  margin: 4px 0 0;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.account-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3);
+  margin-top: var(--hx-space-5);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  color: var(--hx-brand);
+  font-size: var(--hx-font-secondary);
+}
+.account-form-panel {
+  min-width: 0;
+  padding: var(--hx-space-5);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-dialog);
+  background: var(--hx-surface-panel);
+}
+.account-form-header h2 {
+  font-size: 22px;
+  margin-top: var(--hx-space-3);
+}
+.account-form-header p {
+  color: var(--hx-text-secondary);
+  margin-top: var(--hx-space-2);
+  line-height: 1.7;
+}
+.account-form-panel form {
+  margin-top: var(--hx-space-5);
+}
+.account-form-panel form > .button {
+  width: 100%;
+  margin-top: var(--hx-space-5);
+}
+.account-form-panel .field small {
+  display: block;
+  color: var(--hx-text-secondary);
+  margin-top: 6px;
+  font-weight: 400;
+  font-size: var(--hx-font-secondary);
+}
+.account-form-panel .form-error {
+  margin-top: var(--hx-space-3);
+}
+.account-current {
+  padding: var(--hx-space-4);
+  background: var(--hx-bg-app);
+  border-radius: var(--hx-radius-panel);
+}
+.account-current p {
+  margin: var(--hx-space-2) 0;
+  overflow-wrap: anywhere;
+}
+.account-text-button {
+  display: block;
+  border: 0;
+  background: transparent;
+  color: var(--hx-brand);
+  padding: var(--hx-space-3) 0 0;
+  text-align: left;
+}
+.account-help {
+  font-size: var(--hx-font-secondary);
+  color: var(--hx-text-secondary);
+  margin-top: var(--hx-space-4);
+}
+.account-footer {
+  padding: var(--hx-space-4) var(--hx-space-6);
+  border-top: 1px solid var(--hx-border-subtle);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-3);
+  justify-content: space-between;
+}
+@media (max-width: 800px) {
+  .account-layout {
+    padding: var(--hx-space-5);
+    gap: var(--hx-space-5);
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 520px;
+  }
+  .account-context h2 {
+    font-size: 26px;
+  }
+  .account-context dl,
+  .account-path {
+    display: none;
+  }
+  .account-context h2 br {
+    display: none;
+  }
+  .account-form-panel {
+    padding: var(--hx-space-4);
+  }
+  .account-brandbar,
+  .account-footer {
+    padding: var(--hx-space-3) var(--hx-space-4);
+  }
+}

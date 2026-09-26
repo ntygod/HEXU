@@ -57,8 +57,8 @@ select:disabled {
   color: var(--hx-brand-foreground);
 }
 .button.primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
+  background: color-mix(in srgb, var(--hx-brand) 90%, var(--hx-brand-foreground));
+  border-color: color-mix(in srgb, var(--hx-brand) 90%, var(--hx-brand-foreground));
 }
 .button.ghost {
   background: transparent;
@@ -67,7 +67,7 @@ select:disabled {
 }
 .button.soft {
   background: var(--hx-brand-soft);
-  border-color: var(--primary-line);
+  border-color: color-mix(in srgb, var(--hx-brand) 30%, var(--hx-border-subtle));
   color: var(--hx-brand);
 }
 .button.small {
@@ -77,7 +77,7 @@ select:disabled {
 .button.danger {
   color: var(--hx-danger-text);
   background: var(--hx-danger-soft);
-  border-color: var(--red-line);
+  border-color: color-mix(in srgb, var(--hx-danger-text) 30%, var(--hx-border-subtle));
 }
 .icon-button {
   display: inline-flex;
@@ -377,7 +377,7 @@ select:disabled {
 }
 .toast.error {
   background: var(--hx-danger-soft);
-  border-color: var(--red-line);
+  border-color: color-mix(in srgb, var(--hx-danger-text) 30%, var(--hx-border-subtle));
   color: var(--hx-danger-text);
 }
 .toast button {

@@ -1,4 +1,4 @@
-import { NodeResources } from './nodes.js';
+import './team.css';
 import { useState } from 'react';
 import type { Project } from '../../../packages/contracts/src/index.js';
 import type { ProjectRole, SpaceMember } from '../../../packages/contracts/src/identity.js';
@@ -27,17 +27,17 @@ export function TeamSettings() {
     [newPassword, setNewPassword] = useState('');
   const manage = space.kind === 'team' && ['owner', 'admin'].includes(space.role);
   return (
-    <div className="page team-settings">
-      <div className="page-heading">
+    <div className="team-settings">
+      <div className="team-settings-heading">
         <div>
           <span className="eyebrow">共同工作，边界清楚</span>
           <h1>空间与账号</h1>
           <p>个人工作只对自己可见；团队项目按项目成员权限开放。</p>
         </div>
-        <span className="badge neutral">E2b1 · 本机团队模式</span>
+        <span className="badge neutral">本机账号模式</span>
       </div>
-      <div className="team-settings-grid">
-        <section className="panel team-card">
+      <div className="identity-sections">
+        <section className="identity-section">
           <div className="team-card-heading">
             <Icon name="people" />
             <div>
@@ -78,7 +78,7 @@ export function TeamSettings() {
             <p className="team-note">加入空间不自动获得全部项目权限；请在项目页分配访问范围。</p>
           )}
         </section>
-        <section className="panel team-card">
+        <section className="identity-section">
           <div className="team-card-heading">
             <Avatar user={data.user} />
             <div>
@@ -86,9 +86,7 @@ export function TeamSettings() {
               <p>{identity.state.user?.email}</p>
             </div>
           </div>
-          <p className="muted">
-            登录状态通过 HttpOnly Cookie 保留。退出或撤销会话后，服务端会重新检查访问。
-          </p>
+          <p className="muted">管理当前账号的登录状态。退出所有会话会让其他设备重新登录。</p>
           <div className="team-account-actions">
             <Button onClick={() => setPasswordOpen(true)}>修改密码</Button>
             <Button onClick={() => void identity.signOut().catch((e) => notice(e.message, true))}>
@@ -109,7 +107,7 @@ export function TeamSettings() {
           </div>
         </section>
         {manage && <InvitationManager spaceId={space.id} />}
-        <section className="panel team-card">
+        <section className="identity-section">
           <div className="team-card-heading">
             <Icon name="folder" />
             <div>
@@ -153,16 +151,6 @@ export function TeamSettings() {
           </form>
         </section>
       </div>
-      <div className="notice-box team-execution-boundary">
-        <Icon name="monitor" />
-        <div>
-          <strong>代码执行使用你明确授权的独立节点。</strong>
-          <p>
-            控制服务不使用宿主机工具与模型账户。配对默认只共享目录摘要，在节点本机单独启用后可由本人发起执行；跨电脑部署与真实模型联调仍未完成。
-          </p>
-        </div>
-      </div>
-      <NodeResources key={space.id} />
       {remove && (
         <Dialog
           title={remove.id === data.user.id ? '退出团队空间' : '移除空间成员'}
@@ -280,7 +268,7 @@ function InvitationManager({ spaceId }: { spaceId: string }) {
     [link, setLink] = useState(''),
     [busy, setBusy] = useState(false);
   return (
-    <section className="panel team-card invitation-card">
+    <section className="identity-section invitation-card">
       <div className="team-card-heading">
         <Icon name="people" />
         <div>
@@ -405,7 +393,7 @@ export function ProjectAccess({ project }: { project: Project }) {
   };
   const managed = project.access === 'manage';
   return (
-    <details className="project-access panel">
+    <details className="project-access">
       <summary>
         <Icon name="people" />
         <strong>项目访问</strong>

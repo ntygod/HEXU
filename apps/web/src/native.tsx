@@ -1,3 +1,4 @@
+import './resources.css';
 import './execution.css';
 import { useEffect, useState } from 'react';
 import type { Run, Task } from '../../../packages/contracts/src/index.js';
@@ -110,7 +111,7 @@ export function NativeContinue({
               <div className="flex-line">
                 <ToolMark tool={source.requestedTool} />
                 <strong>{source.requestedTool === 'codex' ? 'Codex' : 'Claude Code'}</strong>
-                <Icon name="arrow-right" />
+                <Icon name="arrow" />
                 <ToolMark tool={tool} />
                 <strong>{label}</strong>
               </div>
@@ -390,31 +391,43 @@ export function NativeResources() {
       <h3 className="settings-heading">执行工具与授权目录</h3>
       {error && <p role="alert">{error}</p>}
       <div className="tool-resource-grid">
-        <div className="panel tool-resource">
+        <div className="tool-resource">
           <ToolMark tool="claude-code" />
           <div>
             <h3>Claude Code</h3>
             <p>本机原生 CLI · 受限文件工具</p>
           </div>
           <span className={`badge ${value?.claude.available ? 'status-done' : 'neutral'}`}>
-            {value?.claude.available ? '已检测 · 原生可用' : '未启用或不可用'}
+            {!value
+              ? error
+                ? '读取失败'
+                : '读取中'
+              : value.claude.available
+                ? '已检测配置'
+                : '未启用或不可用'}
           </span>
           <p className="full-row">{value?.claude.reason ?? '读取能力中…'}</p>
         </div>
-        <div className="panel tool-resource">
+        <div className="tool-resource">
           <ToolMark tool="codex" />
           <div>
             <h3>Codex</h3>
             <p>本机 App Server · 独立 API 配置</p>
           </div>
           <span className={`badge ${value?.codex.available ? 'status-done' : 'neutral'}`}>
-            {value?.codex.available ? '已检测 · 原生可用' : '未启用或不可用'}
+            {!value
+              ? error
+                ? '读取失败'
+                : '读取中'
+              : value.codex.available
+                ? '已检测配置'
+                : '未启用或不可用'}
           </span>
           <p className="full-row">{value?.codex.reason ?? '读取能力中…'}</p>
         </div>
       </div>
       {value?.workspaces.map((w) => (
-        <div className="panel settings-line" key={w.id}>
+        <div className="settings-line" key={w.id}>
           <div>
             <strong>{w.name}</strong>
             <p className="native-path">{w.root}</p>
@@ -422,8 +435,8 @@ export function NativeResources() {
           <span className="badge neutral">本机显式授权</span>
         </div>
       ))}
-      {!value?.enabled && (
-        <div className="panel native-help">
+      {value && !value.enabled && (
+        <div className="native-help">
           <h3>开启真实文件工作</h3>
           <p>在本机 .env 设置授权仓库根目录和 API key，然后重启服务。目录不能在网页里任意扩展。</p>
           <pre>
@@ -431,7 +444,7 @@ export function NativeResources() {
               'HEXU_NATIVE_ENABLED=1\nHEXU_NATIVE_ROOTS=["/absolute/path/to/repo"]\n# ANTHROPIC_API_KEY / OPENAI_API_KEY 在本机环境设置，不提交仓库'
             }
           </pre>
-          <p>只读与文件编辑均不提供 Shell；完整终端、远程节点和多人身份尚未接入。</p>
+          <p>本机预览的只读与文件编辑不提供 Shell；配置检测不代表账户或真实模型已经联调通过。</p>
         </div>
       )}
     </>

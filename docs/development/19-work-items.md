@@ -20,7 +20,7 @@
 
 本轮推进 **09-02/05/06** 的 Codex 节点私有会话与显式恢复，联动 **06-06、10-03、11-02**。**仅本人、同范围、最新成功会话；真实提供方恢复未验证，Claude resume 和自动等待恢复未实现。** 下一步见 [22](22-next-delivery.md)。
 
-设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1-01/02 已接入真实应用的共享视觉、外观与导航壳层，具体页面仍待后续切片；桌面尚未交付。原工作项完整范围未全部收口，**2 完成 / 61 部分实现 / 39 未实现的统计不变**。
+设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1 全套新页面已接入真实应用并删除旧呈现层，最后整套回归进行中；桌面尚未交付。原工作项完整范围未全部收口，**2 完成 / 61 部分实现 / 39 未实现的统计不变**。
 
 执行拆分见 [23｜W1 前端重建](23-workbench-rebuild.md)：W1-01—09 映射到原 02／03／04／07／09／10／11／14／15 项，状态按各子任务实际交付记录。旧 UI 的已完成历史保留，接管后清理呈现代码；已有接口、权限、执行器和原生能力不归零。原表是唯一总账，W1 标签不另计为新增全局工作项。
 
@@ -34,12 +34,12 @@
 | HX-DEV-01-04 | 迁移、事务、outbox 与附件存储端口 | BE | 部分实现 | SQLite 迁移 8 增加节点接续 Operation 与任务/节点唯一预约；Run、派发、所选要求、Operation 关联和 outbox 原子提交。PostgreSQL、附件存储和旧数据导入仍未实现。 | [迁移](../../packages/db/src/schema.ts) / [派发](../../packages/db/src/node-execution.ts) |
 | HX-DEV-01-05 | 模拟适配器与统一演示数据 | RN/FE | 部分实现 | 虚构数据及成功/失败/输入/授权模拟流程已实现；节点失联、缺模型等完整场景集和生产隔离仍需完善。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-01-06 | 最小自托管开发组合与构建任务 | OPS/BE | 部分实现 | 本机构建、health/ready 与只读 CI 已有；正式数据库/文件服务的自托管组合与配置诊断未完整实现。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
-| HX-DEV-02-01 | 设计变量、浅深色与状态 tokens | UX/FE | 部分实现 | W1 tokens 已成为 UI 包的运行源，设计入口转引同一文件；新增默认深色、保留已有主题、紧凑／舒适密度，登录前后统一。旧页面仍消费过渡别名，完整页面硬编码清理未完成。 | [运行变量](../../packages/ui/src/tokens.css) / [外观](../../apps/web/src/appearance.tsx) |
+| HX-DEV-02-01 | 设计变量、浅深色与状态 tokens | UX/FE | 部分实现 | W1 语义 tokens 是 UI 包唯一运行来源，浅深色／紧凑舒适密度已接入全套页面，旧配色映射已删除；后续业务功能控件仍按原包补齐。 | [变量](../../packages/ui/src/tokens.css) / [外观](../../apps/web/src/appearance.tsx) |
 | HX-DEV-02-02 | 应用外壳、导航与空间切换 | FE | 部分实现 | W1 顶栏、导航轨、项目导引栏、面包屑和命令入口已替换旧壳层；原路由和空间切换保留，导引栏偏好按身份／空间隔离。完整工作区布局偏好与正式个人客户端仍未交付。 | [新外壳](../../apps/web/src/shell.tsx) / [客户端决定](../engineering/adr-0008-client-surfaces.md) |
-| HX-DEV-02-03 | 任务、执行、人物、工具、成果组件 | FE | 部分实现 | 共享按钮／输入／状态／Dialog／Drawer／Empty 已采用 W1，busy、禁用、焦点与 provider 文案保留；页面组件、完整上下文引用和全部状态示例尚未完成。 | [共享组件](../../packages/ui/src/index.tsx) / [共享样式](../../packages/ui/src/components.css) |
+| HX-DEV-02-03 | 任务、执行、人物、工具、成果组件 | FE | 部分实现 | W1 共享控件、输入与配置面板、状态与抽屉已接入。旧全局页面样式删除并按功能归属；未交付业务对应控件不以演示补足。 | [控件](../../packages/ui/src/index.tsx) / [任务](../../apps/web/src/task-workspace.tsx) |
 | HX-DEV-02-04 | 四类核心页面的模拟交互 | UX/FE | 已完成 | 工作台、项目、任务和成果四类页面骨架已接统一示例数据并可交互；此完成状态仅指页面骨架。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
 | HX-DEV-02-05 | 继续、协助、并行与反馈面板 | UX/FE | 部分实现 | 继续、反馈、接续状态界面已有；W1 归档交互参考并选用 Figma 求助材料／交接信息结构。真实协助、并行与接手仍未实现，参考按钮不计作功能交付。 | [设计参考](../design/workbench-reference.html) / [界面](../../apps/web/src/App.tsx) |
-| HX-DEV-02-06 | 响应式、键盘、文案与异常状态 | FE | 部分实现 | 窄屏、浅深色、搜索/弹层键盘路径及部分异常状态已有；布局偏好、历史阅读保护与完整文案字典未完成。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
+| HX-DEV-02-06 | 响应式、键盘、文案与异常状态 | FE | 部分实现 | W1 已接浅深色／密度、按身份空间保存的布局偏好、键盘焦点、窄屏面板切换、草稿与历史阅读保护；完整业务文案字典及后续功能状态仍未收口。 | [工作区](../../apps/web/src/task-workspace.tsx) / [浏览器检查](../../tests/e2e/workbench.spec.ts) |
 | HX-DEV-03-01 | 认证组件、登录与会话恢复 | BE/FE | 部分实现 | Better Auth 真实密码账号、初始化代码、登录/退出、改密、会话恢复及撤销已实现；邮件验证、忘记密码恢复、SSO 和正式部署未接入。 | [认证](../../packages/identity/src/index.ts) / [界面](../../apps/web/src/identity.tsx) |
 | HX-DEV-03-02 | 空间、成员与邀请 | BE/FE | 部分实现 | 真实个人/团队空间、绑定邮箱的邀请、接受/撤销/过期与成员退出/移除已有；无邮件发送、完整空间角色管理与所有者转移。 | [协作数据](../../packages/db/src/collaboration.ts) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-03 | 统一访问策略与资源授权 | BE | 部分实现 | 统一真实项目/私有数据权限已有，节点本人执行权限与目录摘要可见性分离；指定他人执行、通用 AccessGrant、附件和远程授权仍未实现。 | [权限](../../packages/db/src/permissions.ts) / [派发](../../packages/db/src/node-execution.ts) |
@@ -48,7 +48,7 @@
 | HX-DEV-03-06 | 成员撤销、归档与权限事件 | BE | 部分实现 | 成员、项目和会话撤销已有；节点及待配对码随所有者项目撤权永久失效，重新加回成员不复活旧凭证。项目归档和活动远程执行的撤销联动未实现。 | [撤销触发器](../../packages/db/src/schema.ts) |
 | HX-DEV-04-01 | Task 基础、归属和修订 | BE | 部分实现 | Task 修订、创建者归属和真实个人/项目访问范围已有；改派、参与者及正式存储的完整模型尚缺。 | [任务](../../packages/db/src/store.ts) |
 | HX-DEV-04-02 | 完成、重开、取消与活动执行联动 | BE/FE | 部分实现 | 完成/重开/取消及活动执行后端联动已有，团队编辑权限已校验；完整动作 UI 与远程执行联动仍待收口。 | [任务](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
-| HX-DEV-04-03 | 列表、看板、排序、筛选与等待原因 | FE/BE | 部分实现 | 列表、看板、关键词查找和等待原因展示已有；完整排序与成员/等待原因组合筛选未完成。 | [任务](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
+| HX-DEV-04-03 | 列表、看板、排序、筛选与等待原因 | FE/BE | 部分实现 | W1 项目列表、看板和任务列表共用真实 Task 状态，保留标题筛选和轻量新建；持久排序、完整多条件筛选仍未交付。 | [项目](../../apps/web/src/projects.tsx) |
 | HX-DEV-04-04 | 可选需求说明、修订与局部采用 | FE/BE | 未实现 | 可编辑 Task 说明不等于独立需求模型；Requirement 修订和局部采用未实现。 | —（尚无可用实现） |
 | HX-DEV-04-05 | 子任务、依赖、标签与里程碑 | BE/FE | 未实现 | 子任务、依赖、可维护标签和里程碑未实现。 | —（尚无可用实现） |
 | HX-DEV-04-06 | 项目/个人入口与 Task DTO 统一 | BE/FE | 部分实现 | 真实项目/个人 Task 共用 DTO、创建和权限；跨空间选择性转移与完整归属切换未完成。 | [任务](../../packages/db/src/store.ts) |
@@ -82,12 +82,12 @@
 | HX-DEV-09-04 | Codex 模型目录、输入与反向请求 | RN | 部分实现 | 模型目录与额外反向请求拒绝已有；实时输入、steer 与完整授权交互未实现。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-09-05 | Codex 中断、重连与对账 | RN | 部分实现 | 恢复引导取消、错 ID/模型/权限拒绝、历史缺失/换 Key/过期/异常重启阻止恢复已有；运行中 steer、未知原生会话自动对账与跨平台验证未完成。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-09-06 | Codex 用量、配置与限制展示 | RN/FE | 部分实现 | 增加保留授权、恢复期限、继承历史提示、本机列表/清理与创建/恢复标记；真实模型计费、账户互操作及完整用量仍未验证。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
-| HX-DEV-10-01 | 任务页面与双状态头 | FE | 部分实现 | TaskDetail 双状态布局已接真实成员访问范围，只读成员禁用编辑；高级布局/共享范围功能仍待完善。 | [任务页面](../../apps/web/src/App.tsx) |
-| HX-DEV-10-02 | 协作消息、事件与草稿 | FE | 部分实现 | 协作消息、本机事件和错误提示已有；历史分页、草稿恢复与完整发送状态未完成。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
-| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | 任务可选择 Codex 原生恢复或新会话；恢复要求同范围成功来源，界面明确继承历史。既有等待接续保留；原生即时输入、跨电脑执行与完整双工具恢复未完成。 | [任务](../../apps/web/src/node-execution.tsx) / [队列](../../apps/web/src/next-inputs.tsx) |
-| HX-DEV-10-04 | 文件、diff 与外部 IDE | FE/RN | 部分实现 | 实际 Git 文件差异已有；完整文件树、不可变成果快照和外部 IDE 衔接未实现。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
+| HX-DEV-10-01 | 任务页面与双状态头 | FE | 部分实现 | W1 单一任务容器、业务／执行双状态、实际代码来源、可折叠调宽双栏和手机面板切换、上下文／执行历史抽屉已有；复杂多工作线仍未交付。 | [任务](../../apps/web/src/task-workspace.tsx) |
+| HX-DEV-10-02 | 协作消息、事件与草稿 | FE | 部分实现 | 已迁移实际消息／原生事件，新增身份空间内存草稿、发送失败保留与历史阅读保护；完整流式增量合并、分页历史加载及刷新草稿恢复仍未实现。 | [讨论](../../apps/web/src/discussion.tsx) / [草稿](../../apps/web/src/state.tsx) |
+| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | W1 稳定输入栏区分讨论和节点下一轮要求；实际工具／模型／节点配置、停止、接续与显式 Codex 恢复按原 API 可用。实时 steer、跨电脑执行与完整双工具恢复仍缺。 | [输入](../../apps/web/src/prompt-bar.tsx) / [执行](../../apps/web/src/node-execution.tsx) |
+| HX-DEV-10-04 | 文件、diff 与外部 IDE | FE/RN | 部分实现 | W1 面板显示本机授权目录的文件列表、diff、分支及实际采集时间，读取失败隐藏旧快照；节点远程 diff、编辑器、固定代码快照和 IDE 衔接仍未交付。 | [代码](../../apps/web/src/native.tsx) |
 | HX-DEV-10-05 | 受控交互终端与输入权 | FE/RN | 未实现 | 带输入权的受控交互终端、重连和会话清理未实现。 | —（尚无可用实现） |
-| HX-DEV-10-06 | 上下文、协助、成果插槽整合 | FE | 部分实现 | 上下文与成果插槽、接续恢复卡已有；协助卡和完整多面板异常状态未完成。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
+| HX-DEV-10-06 | 上下文、协助、成果插槽整合 | FE | 部分实现 | W1 已整合工作说明、过程、成果、配置／队列抽屉和接续异常状态；完整 ContextBundle、真实协助与其他未交付能力继续缺失。 | [工作区](../../apps/web/src/task-workspace.tsx) |
 | HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 与 node 均有 202 持久化 Operation、显式 wait/request_stop、查询/取消和幂等；节点固定本次材料与授权。完整 ContextBundle、跨节点和有限协助权限未实现。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
 | HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | E2b4 自动等待仍新会话；E2c1 Codex 可在成功终态后显式恢复原生会话，保留来源与原目录。Claude resume、自动等待原生恢复、跨成员/机器接手与真实模型联调仍缺。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-11-03 | Assistance、所选快照与有限访问 | BE | 未实现 | Assistance、固定协助快照与有限 AccessGrant 未实现；依赖 03 的真实权限基础。 | —（尚无可用实现） |
@@ -107,15 +107,15 @@
 | HX-DEV-13-05 | 固定版本的选择性整合 | RN/BE | 未实现 | 固定版本的选择性代码整合未实现。 | —（尚无可用实现） |
 | HX-DEV-13-06 | 分支停止、丢弃与清理保护 | RN/FE | 未实现 | 分支停止、丢弃与清理保护未实现。 | —（尚无可用实现） |
 | HX-DEV-14-01 | Result/Revision 与基础产物 | BE | 部分实现 | 基础 Result、文字成果和来源关联已有；不可变 Revision 与完整产物模型未实现。 | [成果](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
-| HX-DEV-14-02 | 成果卡、版本与说明编辑 | FE | 部分实现 | 成果卡、页面和创建说明已有；版本历史与成果说明修订编辑未完成。 | [成果](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
+| HX-DEV-14-02 | 成果卡、版本与说明编辑 | FE | 部分实现 | W1 任务内成果、分享入口、项目成果与独立反馈页已重建；仍仅文字／明确示例预览，不可变版本切换与成果说明版本编辑未交付。 | [成果](../../apps/web/src/results.tsx) / [分享](../../apps/web/src/forms.tsx) |
 | HX-DEV-14-03 | 预览会话与主动隧道 | RN/BE | 未实现 | 通用预览会话与主动隧道未实现；订单示例页不是用户项目预览。 | —（尚无可用实现） |
 | HX-DEV-14-04 | 预览独立身份与失效回退 | BE/FE | 未实现 | 独立预览身份、授权失效与真实预览回退未实现。 | —（尚无可用实现） |
-| HX-DEV-14-05 | 版本反馈、回复与后续任务 | FE/BE | 部分实现 | 成果评论与回复已持久化；固定版本反馈和由反馈生成后续任务未完成。 | [成果](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
+| HX-DEV-14-05 | 版本反馈、回复与后续任务 | FE/BE | 部分实现 | W1 成果反馈保存在原任务并可继续处理，完成无需报告；不可变 ResultRevision 锚点、文件区域评论与正式版本化反馈仍缺。 | [反馈](../../apps/web/src/results.tsx) / [讨论](../../apps/web/src/discussion.tsx) |
 | HX-DEV-14-06 | 可选报告、发布引用与完成整合 | FE/BE | 未实现 | 可选报告、发布引用与成果完成整合未实现；无需报告即可完成任务已在 04 范围实现。 | —（尚无可用实现） |
 | HX-DEV-15-01 | 我的工作和项目概览查询 | BE | 部分实现 | 工作台和项目聚合按真实主体/空间/项目权限过滤；完整团队汇总与协助/接手查询仍缺。 | [工作台](../../packages/db/src/store.ts) |
-| HX-DEV-15-02 | 工作台、待回复与成果视图 | FE | 部分实现 | 工作台、等待提示和成果视图已有；真实协助/接手待回复聚合未完成。 | [查询](../../apps/control/src/app.ts) / [工作台](../../apps/web/src/App.tsx) |
+| HX-DEV-15-02 | 工作台、待回复与成果视图 | FE | 部分实现 | W1 工作台从当前可见 Task/Run/Result 聚合个人／团队工作、关注事项和最近成果，已完成任务的活动执行仍展示；完整通知、协助与接手提醒未交付。 | [工作台](../../apps/web/src/workbench.tsx) |
 | HX-DEV-15-03 | 通知投影、去重与偏好 | BE/FE | 未实现 | 通知投影、去重和个人偏好未实现。 | —（尚无可用实现） |
-| HX-DEV-15-04 | 有权限的中文关键词搜索 | BE/FE | 部分实现 | 任务中文关键词搜索按真实会话/项目和私有任务权限过滤；跨资料、成果等实体搜索未完成。 | [查询](../../apps/control/src/app.ts) |
+| HX-DEV-15-04 | 有权限的中文关键词搜索 | BE/FE | 部分实现 | W1 命令入口复用实际权限过滤的标题／编号搜索；请求取消与错误清空旧结果已有。资料／消息全文、语义搜索及完整检索分页未交付。 | [搜索](../../apps/web/src/command-menu.tsx) |
 | HX-DEV-15-05 | 用量去重、费用来源与预算提示 | BE | 部分实现 | 原生用量事件和费用来源说明已有；计量账本、统一去重聚合和预算提示未完成。 | [查询](../../apps/control/src/app.ts) / [工作台](../../apps/web/src/App.tsx) |
 | HX-DEV-15-06 | 费用、成员工作与陈旧状态 UI | FE | 未实现 | 完整费用面板、真实成员工作与统一陈旧状态界面未实现；示例成员和局部 Run 状态不算完成。 | —（尚无可用实现） |
 | HX-DEV-16-01 | 模板、版本与步骤编辑 | BE/FE | 未实现 | 协作模板、版本和步骤编辑未实现。 | —（尚无可用实现） |

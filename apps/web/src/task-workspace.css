@@ -146,7 +146,10 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
 }
-.output-panel[hidden] {
+.output-hidden > .output-panel {
+  display: none;
+}
+.task-mobile-tabs {
   display: none;
 }
 .messages-scroll {
@@ -291,8 +294,8 @@
 }
 @media (max-width: 760px) {
   .task-page {
-    height: auto;
-    min-height: 0;
+    height: calc(100dvh - var(--shell-topbar-height) - var(--shell-location-height));
+    min-height: 600px;
     padding: 0 var(--hx-space-3) var(--hx-space-3);
   }
   .task-title {
@@ -305,18 +308,59 @@
   .task-actions {
     width: 100%;
   }
+  .task-actions .button {
+    padding: 7px 8px;
+    gap: 5px;
+    font-size: var(--hx-font-secondary);
+  }
+  .w1-task-scope .spacer,
+  .w1-task-scope .text-button {
+    display: none;
+  }
+  .w1-task-scope {
+    font-size: var(--hx-font-metadata);
+  }
   .task-grid {
     display: flex;
     flex-direction: column;
-    height: auto;
+    min-height: 0;
   }
   .collaboration-panel {
-    min-height: 480px;
-    height: 70dvh;
+    min-height: 0;
+    height: auto;
+    flex: 1;
   }
   .output-panel {
-    min-height: 320px;
-    max-height: 80dvh;
+    display: none;
+    min-height: 0;
+    max-height: none;
+    flex: 1;
+  }
+  .task-grid[data-mobile-pane='output'] > .output-panel {
+    display: flex;
+  }
+  .task-grid[data-mobile-pane='output'] > .collaboration-panel {
+    display: none;
+  }
+  .task-mobile-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .task-mobile-tabs button {
+    border: 0;
+    border-radius: var(--hx-radius-control);
+    padding: 6px;
+    font-size: var(--hx-font-secondary);
+    background: transparent;
+    color: var(--hx-text-secondary);
+  }
+  .task-mobile-tabs button[aria-pressed='true'] {
+    background: var(--hx-brand-soft);
+    color: var(--hx-brand);
+  }
+  .w1-workspace-toolbar > .icon-button {
+    display: none;
   }
   .w1-layout-options {
     display: none;
@@ -326,6 +370,6 @@
     gap: 6px;
   }
   .w1-workspace-toolbar > span:first-child {
-    font-size: var(--hx-font-secondary);
+    display: none;
   }
 }
