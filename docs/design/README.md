@@ -116,6 +116,8 @@ Figma 参考只决定信息组织，不自动批准示例模型、隐藏会话�
 
 ## 7. 组件与落地顺序
 
+具体重建范围、旧 UI 删除条件和原工作项对应见 [23｜W1 前端重建](../development/23-workbench-rebuild.md)。布局和呈现组件可以重新开发，无需迁就旧 DOM／CSS；现有真实行为由新页面接管后，删除对应旧实现，避免长期维护两套前端。
+
 沿用 React/TypeScript、`packages/ui`、`packages/client` 和现有业务契约。先建立 W1 tokens 与共享控件，再逐步迁移 AppShell、TaskHeader、RunStatus、CodeStatus、PromptBar、ContextSelection、AssistanceDrawer、HandoffDrawer、VariantCompare 和 ResultFeedback。具体功能仍沿用原开发任务 ID。
 
 1. 迁移壳层、浅深色、密度与任务工作区，同时保留当前真实权限和接续流程。

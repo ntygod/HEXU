@@ -181,6 +181,7 @@ tests                    单元、存储、API 与浏览器测试
 | [v1.1 修订](docs/product/09-planning-revision.md) | 已移除的强制流程 |
 | [详细开发计划](docs/development/README.md) | 17 个工作包、102 个原始工作项 |
 | [逐项任务状态](docs/development/19-work-items.md) | 原 102 项的真实状态、代码入口和剩余内容 |
+| [W1 前端重建任务](docs/development/23-workbench-rebuild.md) | 旧 UI 替换／删除范围、9 个子任务与原工作项映射 |
 | [下一步交付](docs/development/22-next-delivery.md) | 节点持续工作、接续与远程协作的前置边界 |
 | [当前实现进度](docs/development/21-implementation-status.md) | 本次完成、部分实现与后续工作 |
 | [接口总表](docs/development/18-data-api-catalog.md) | 完整契约草案；当前实现子集见代码与状态文档 |
