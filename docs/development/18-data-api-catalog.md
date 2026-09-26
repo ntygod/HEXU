@@ -227,3 +227,11 @@ interface RunHandle {
 状态是 waiting_for_stop / preparing / needs_attention / succeeded / cancelled / failed。succeeded 仅说明新 Run 与操作关联已经原子提交；Task 和 Run 仍各自表达完成与执行结果。开始后的操作取消返回 RUN_ALREADY_STARTED，随后使用 Run 停止动作。
 
 本机实现将人工说明变化、任务修订变化、未知源进程、目录占用、目标能力缺失、等待过期变为明确阻碍；不会因此转移责任、跨目录、扩大权限或自动改用其他账号。重启不重试待开始的付费执行。完整 AccessGrant、Operation 跨节点调度与共享上下文选择仍未实现。
+
+## E2a 实现子集：真实账号与访问范围
+
+只在 team-local 启用，仍为回环服务。`GET /identity` 返回模式、初始化状态、当前用户和空间；POST `/identity/setup`、`sign-in`、`sign-out`、`change-password`、`revoke-sessions`、`invitation-preview`、`join` 是明确允许的认证入口。原始 `/api/auth` 不开放，不返回页面可读取的 session token。
+
+业务请求用 HttpOnly Cookie 认证及 `X-Hexu-Space` 选择当前已加入的空间；SSE 以 spaceId 参数选择但仍由 Cookie 校验成员关系。写入要求来源、客户端标识和现有业务幂等键。POST `/spaces` 建团队；GET/POST `/spaces/:spaceId/invitations`、POST `.../:invitationId/revoke`；GET `/spaces/:spaceId/members`、POST `.../:userId/remove`；GET `/projects/:projectId/members`、POST `.../:userId` 配置 view/edit/manage 或 null 移除。完整输入以 contracts/identity 和 control/identity 代码为准。
+
+直接 Task/Run/Result/Operation、列表、搜索与事件受同一权限约束。既有普通任务、讨论、文字成果和完成接口在团队空间可用。原生资源、上下文预览、全部 Run/接续派发在团队模式返回 RUNNER_REQUIRED，不以登录赋予本机文件或模型权限。正式节点、附件 AccessGrant 与跨空间发布仍未实现。
