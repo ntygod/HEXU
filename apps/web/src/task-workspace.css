@@ -314,7 +314,7 @@
     font-size: var(--hx-font-secondary);
   }
   .w1-task-scope > .spacer,
-  .w1-task-scope > .text-button {
+  .w1-task-scope > .w1-context-shortcut {
     display: none;
   }
   .w1-task-scope {

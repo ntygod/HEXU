@@ -193,7 +193,7 @@ export function TaskPage({ id }: { id: string }) {
           <TaskOwner task={task} />
           <TaskParticipants task={task} />
           <span className="spacer" />
-          <button className="text-button" onClick={() => setDrawer('context')}>
+          <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明
           </button>
         </div>

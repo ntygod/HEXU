@@ -113,10 +113,7 @@ function ParticipantsDrawer({
         refreshed = false;
       });
       if (!alive.current) return;
-      notice(
-        refreshed ? '参与操作已确认，当前关系已刷新' : '参与操作已保存，页面刷新失败，请重新加载',
-        !refreshed,
-      );
+      notice(refreshed ? '参与操作已确认' : '参与操作已保存，页面刷新失败，请重新加载', !refreshed);
       search.current?.focus();
     } catch (cause) {
       if (!alive.current) return;
@@ -124,7 +121,7 @@ function ParticipantsDrawer({
       setUncertain(known ? null : attempt);
       setError(
         cause instanceof ApiError && cause.status === 409
-          ? '参与关系或成员权限已变化。已重新读取，请核对后再次选择。'
+          ? '参与关系或成员权限已变化，请核对最新信息后再次选择。'
           : cause instanceof Error
             ? cause.message
             : '参与操作失败',
