@@ -170,7 +170,7 @@ function AssignmentDrawer({
             <p className="muted">当前为示例工作台，候选人是示例成员，不代表真实团队账号。</p>
           )}
           {editable && (
-            <label>
+            <label className="field">
               新的负责人
               <select
                 aria-label="新的负责人"
@@ -253,7 +253,7 @@ function AssignmentDrawer({
             {historyOpen && <AssignmentHistory taskId={task.id} />}
           </section>
         </div>
-        <div className="dialog-actions">
+        <div className="dialog-footer">
           <Button type="button" disabled={busy} onClick={onClose}>
             关闭
           </Button>

@@ -377,7 +377,8 @@ test('真实项目成员改派、撤权清理与退出显示，负责人不自�
     await page.getByRole('button', { name: '更改负责人', exact: true }).click();
     await expect(
       page.getByLabel('新的负责人', { exact: true }).locator(`option[value="${bob.id}"]`),
-    ).toBeDisabled();
+    ).toHaveJSProperty('disabled', true);
+    await expect(page.getByRole('button', { name: '保存负责人', exact: true })).toBeDisabled();
     await page.getByLabel('新的负责人', { exact: true }).selectOption(alice.id);
     await page.getByRole('button', { name: '保存负责人', exact: true }).click();
     await expect(page.getByLabel('任务负责人', { exact: true })).toContainText(alice.name);
