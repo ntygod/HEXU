@@ -251,3 +251,9 @@ interface RunHandle {
 节点 Bearer 通道 `/runner/v1/execution-policy` 发布本机明确的有界策略；`execution-poll` 获取固定派发；`execution-permit` 消费单次启动许可；`execution-event` 持久化 accepted/running/output/terminal/unknown 及序号。正文严格拒绝额外字段；没有文件路径、可执行参数或 API key。节点只支持一个活动派发，许可失联不会重发 launch。
 
 类型源为 contracts/node-execution.ts，业务迁移 6。节点凭证被撤销后仅对原绑定派发排空事件并提交停止证据，内容丢弃，不重新发布策略或领取任务。只读成员不能派发或停止；项目编辑者可停止既有执行，派发额外要求节点所有者。完整他人授权/AccessGrant、原生 resume/steer、远程传输仍未实现。
+
+## E2b3 已实现接口
+
+GET /tasks/:taskId/next-inputs 返回任务可见范围内的待处理/历史要求；node 的 POST /runs/:runId/inputs 接受 {body} 返回 {delivery:queued_for_next_turn,input}。PATCH /next-inputs/:id 接受 {body,expectedRevision}；POST /next-inputs/:id/cancel 接受 {expectedRevision}；修改均需原作者及任务编辑权限，业务幂等键不变。
+
+GET /tasks/:id/node-continuation-preview?sourceRunId=... 仅供节点所有者，返回固定来源/节点/目录、材料与哈希、ready/blockers。POST /tasks/:id/runs 的 node 输入可增加 continuation {sourceRunId,expectedContextHash,inputs:[{id,revision}]}；未加则保留原执行创建语义。节点续接返回 201+Run，不冒充 preview 的 202 Operation。请求严格校验额外字段，材料和要求状态在同一事务再核对。

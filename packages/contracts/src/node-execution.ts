@@ -1,3 +1,4 @@
+import { parseNodeContinuation, type NodeContinuationSelection } from './next-input.js';
 import { DomainError, enumValue, revision, text, type Tool, type RunState } from './index.js';
 import { exact, nodeId, parseSequence } from './nodes.js';
 
@@ -29,6 +30,7 @@ export interface NodeRunInfo {
   acceptedAt?: string;
   permittedAt?: string;
   startedAt?: string;
+  continuationInputIds?: string[];
 }
 export interface NodeRunInput {
   provider: 'node';
@@ -40,6 +42,7 @@ export interface NodeRunInput {
   expectedRevision: number;
   reopenTask: boolean;
   confirmExecution: true;
+  continuation?: NodeContinuationSelection;
 }
 export interface DispatchCommand {
   id: string;
@@ -128,6 +131,7 @@ export function parseNodeRun(value: unknown): NodeRunInput {
     'expectedRevision',
     'reopenTask',
     'confirmExecution',
+    'continuation',
   ]);
   if (b.provider !== 'node' || b.confirmExecution !== true)
     throw new DomainError('EXECUTION_CONSENT_REQUIRED', '请确认共享输出、目录范围及模型费用', 422);
@@ -143,6 +147,9 @@ export function parseNodeRun(value: unknown): NodeRunInput {
     expectedRevision: revision(b.expectedRevision),
     reopenTask: b.reopenTask === true,
     confirmExecution: true,
+    ...(b.continuation === undefined
+      ? {}
+      : { continuation: parseNodeContinuation(b.continuation) }),
   };
 }
 export function parseExecutionEvent(value: unknown): ExecutionEvent {

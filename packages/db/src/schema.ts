@@ -115,4 +115,20 @@ CREATE TABLE node_run_events (
 );
 `,
   },
+  {
+    version: 7,
+    sql: `
+CREATE TABLE task_next_inputs (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ state TEXT NOT NULL CHECK(state IN ('queued','attached','started','cancelled')),
+ target_run_id TEXT REFERENCES runs(id), body TEXT NOT NULL
+);
+CREATE INDEX next_inputs_task ON task_next_inputs(task_id,state);
+CREATE INDEX next_inputs_target ON task_next_inputs(target_run_id,state);
+CREATE TABLE node_continuation_links (
+ run_id TEXT PRIMARY KEY REFERENCES runs(id), source_run_id TEXT NOT NULL REFERENCES runs(id),
+ preview_hash TEXT NOT NULL, input_ids TEXT NOT NULL
+);
+`,
+  },
 ];

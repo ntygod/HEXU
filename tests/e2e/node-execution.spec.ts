@@ -261,3 +261,168 @@ test('只配对摘要或本机拒绝执行授权时，网页不能启动模型',
     await rm(f.dir, { recursive: true, force: true });
   }
 });
+
+test('运行中记录下一轮要求，结束后沿原目录接续，选择与来源可刷新追踪', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_HANG');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('running');
+    await page.getByLabel('下一轮要求', { exact: true }).fill('保留订单数据，下一轮补空状态');
+    await page.getByRole('button', { name: '保存到下一轮', exact: true }).click();
+    await expect(page.locator('.next-input-item')).toContainText('待下一轮选择');
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    await page.reload();
+    await expect(page.locator('.next-input-item')).toContainText('保留订单数据');
+    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+    await expect(
+      page.getByText('原执行尚未确认结束。可先保存下一轮要求，确认结束后再继续', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: '确认同目录接续', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '返回', exact: true }).click();
+    await page.getByRole('button', { name: '停止节点执行', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('cancelled');
+    await writeFile(join(f.root, 'keep-dirty.txt'), 'User uncommitted file\n');
+    await page.getByLabel('下一轮要求', { exact: true }).fill('这条不选择，不要自动带入');
+    await page.getByRole('button', { name: '保存到下一轮', exact: true }).click();
+    await expect(page.locator('.next-input-item')).toHaveCount(2);
+    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+    await expect(page.getByLabel('执行节点', { exact: true })).toBeDisabled();
+    await expect(page.getByLabel('授权工作目录', { exact: true })).toBeDisabled();
+    await expect(
+      page.getByRole('checkbox', { name: '带入：保留订单数据，下一轮补空状态', exact: true }),
+    ).not.toBeChecked();
+    await page
+      .getByRole('checkbox', { name: '带入：保留订单数据，下一轮补空状态', exact: true })
+      .check();
+    await page.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
+    await page.getByLabel('本次要求', { exact: true }).fill('FIXTURE_CAPTURE_INPUT');
+    await page.locator('.node-context-preview summary').click();
+    await expect(page.locator('.node-context-preview pre')).toContainText(
+      '保留订单数据，下一轮补空状态',
+    );
+    await expect(page.locator('.node-context-preview pre')).not.toContainText('这条不选择');
+    await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/26-node-continuation-selection.png', fullPage: true });
+    await page.getByRole('button', { name: '确认同目录接续', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('succeeded');
+    const data = await detail(page, f);
+    expect(data.runs).toHaveLength(2);
+    expect(data.runs[1].previousRunId).toBe(data.runs[0].id);
+    expect(data.runs[1].node.workingCopyId).toBe(data.runs[0].node.workingCopyId);
+    expect(data.task.status).toBe('in_progress');
+    const input = await readFile(join(f.root, 'received-context.txt'), 'utf8');
+    expect(input).toContain('保留订单数据，下一轮补空状态');
+    expect(input).not.toContain('这条不选择');
+    expect(await readFile(join(f.root, 'keep-dirty.txt'), 'utf8')).toBe('User uncommitted file\n');
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
+    await page.reload();
+    await expect(page.locator('.node-continuation-origin')).toContainText('带入 1 条要求');
+    await expect(
+      page.locator('.next-input-item').filter({ hasText: '保留订单数据' }),
+    ).toContainText('已随新执行启动');
+    await expect(page.locator('.next-input-item').filter({ hasText: '这条不选择' })).toContainText(
+      '待下一轮选择',
+    );
+    await page.screenshot({ path: 'artifacts/27-node-continuation-completed.png', fullPage: true });
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});
+
+test('下一轮要求可编辑撤回并持久保存，手机深色不溢出，保存不自动执行', async ({ page }) => {
+  test.setTimeout(60000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_WRITE');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('succeeded');
+    await page.getByLabel('下一轮要求', { exact: true }).fill('补充筛选条件');
+    await page.getByRole('button', { name: '保存到下一轮', exact: true }).click();
+    await page.getByRole('button', { name: '编辑要求', exact: true }).click();
+    await page.getByLabel('下一轮要求', { exact: true }).fill('补充月份筛选，保留未提交修改');
+    await page.getByRole('button', { name: '保存修改', exact: true }).click();
+    await expect(page.locator('.next-input-item')).toContainText('补充月份筛选');
+    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
+    await expect(page.locator('.toast')).not.toBeVisible();
+    await page.screenshot({ path: 'artifacts/28-next-round-mobile-dark.png', fullPage: true });
+    await page.getByRole('button', { name: '撤回要求', exact: true }).click();
+    await expect(page.locator('.next-input-item')).toContainText('已撤回');
+    await page.reload();
+    await expect(page.locator('.next-input-item')).toContainText('已撤回');
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});
+
+test('接续材料变化需重新确认，已完成任务接续明确重开而不丢历史', async ({ page }) => {
+  test.setTimeout(60000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_WRITE');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('succeeded');
+    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+    await page.getByLabel('本次要求', { exact: true }).fill('继续分析，不改文件');
+    await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
+    await post(
+      page,
+      `tasks/${f.task.id}/messages`,
+      { body: '新的人工说明：注意空数据' },
+      f.space.id,
+    );
+    await expect(page.getByRole('checkbox', { name: /我确认本次目录与模式/ })).not.toBeChecked({
+      timeout: 12000,
+    });
+    await expect(page.getByRole('button', { name: '确认同目录接续', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '返回', exact: true }).click();
+    const current = await detail(page, f);
+    await post(
+      page,
+      `tasks/${f.task.id}/complete`,
+      { expectedRevision: current.task.revision, activeRunAction: 'keep' },
+      f.space.id,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+    await page.getByLabel('本次要求', { exact: true }).fill('重新打开后继续分析');
+    await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
+    await page.getByRole('button', { name: '重开任务并接续', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('succeeded');
+    const next = await detail(page, f);
+    expect(next.task.status).toBe('in_progress');
+    expect(next.runs).toHaveLength(2);
+    expect(next.runs[1].previousRunId).toBe(next.runs[0].id);
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});

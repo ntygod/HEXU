@@ -44,6 +44,7 @@ function argumentsFor(args: string[]) {
       'enable-execution',
       'disable-execution',
       'recover-execution',
+      'pending-executions',
     ].includes(command)
   )
     throw new DomainError(
@@ -170,7 +171,7 @@ async function main() {
   const { command, options, home } = argumentsFor(process.argv.slice(2));
   if (command === 'help') {
     console.log(
-      'HEXU Runner E2b2 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]',
+      'HEXU Runner E2b3 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n列出待处理执行：pending-executions [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]',
     );
     return;
   }
@@ -197,6 +198,19 @@ async function main() {
   }
   const storage = new AgentStorage(home);
   try {
+    if (command === 'pending-executions') {
+      console.log(
+        JSON.stringify(
+          {
+            observation: '本机日志，不推断原进程已停止；无权自动解锁或重跑',
+            items: new ExecutionJournal(storage).pendingSummaries(),
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
     if (['enable-execution', 'disable-execution', 'recover-execution'].includes(command)) {
       await executionCommand(
         storage,

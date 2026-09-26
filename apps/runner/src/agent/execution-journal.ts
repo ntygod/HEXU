@@ -13,6 +13,31 @@ export class ExecutionJournal {
       .exec(`CREATE TABLE IF NOT EXISTS execution_commands(id TEXT PRIMARY KEY, body TEXT NOT NULL, phase TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS execution_events(dispatch_id TEXT NOT NULL, sequence INTEGER NOT NULL, body TEXT NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(dispatch_id,sequence));`);
   }
+  pendingSummaries() {
+    // No prompt/context, paths, credentials, or inferred PID status in diagnostics.
+    return this.commands().flatMap((row) => {
+      const pending = Number(
+        this.storage.db
+          .prepare(
+            'SELECT COUNT(*) AS n FROM execution_events WHERE dispatch_id=? AND acknowledged=0',
+          )
+          .get(row.id)!.n,
+      );
+      if (row.phase === 'terminal' && !pending) return [];
+      const c = JSON.parse(row.body) as DispatchCommand;
+      return [
+        {
+          dispatchId: row.id,
+          runId: c.runId,
+          taskId: c.taskId,
+          workspaceId: c.workspaceId,
+          phase: row.phase,
+          pendingEvents: pending,
+          requiresLocalReview: row.phase !== 'terminal',
+        },
+      ];
+    });
+  }
   assertCanDisconnect() {
     if (this.commands().some((c) => c.phase !== 'terminal') || this.pending())
       throw new DomainError(

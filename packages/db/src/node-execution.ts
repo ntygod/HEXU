@@ -1,3 +1,8 @@
+import { NextInputs } from './next-inputs.js';
+import {
+  nodeContinuationContext,
+  type NodeContinuationPreview,
+} from '../../contracts/src/next-input.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { DomainError, type Message, type Run, type Task } from '../../contracts/src/index.js';
 import type {
@@ -129,6 +134,10 @@ export class NodeExecution {
       { ...r, state, observation: 'fresh', node: { ...r.node!, terminationConfirmed: true } },
       'terminal',
     );
+    if (!r.node?.startedAt && !['preparing', 'running', 'unknown'].includes(d.stage))
+      new NextInputs(this.store).notStarted(r.id);
+    // A permit without a running event is an ambiguous launch, not proof of no launch.
+    // Keep attached notes for explicit review rather than silently queuing them again.
     this.message(d, body);
   }
   private context(task: Task) {
@@ -212,6 +221,61 @@ export class NodeExecution {
         }),
     };
   }
+  continuationPreview(taskId: string, sourceRunId: string): NodeContinuationPreview {
+    const task = this.store.getTask(taskId, true);
+    const source = this.store.run(sourceRunId);
+    if (source.taskId !== taskId || source.provider !== 'node' || !source.node)
+      throw new DomainError('INVALID_CONTINUATION', '来源不是当前任务的独立节点执行', 409);
+    const owner = this.nodes.ownedExecutionNode(source.node.nodeId);
+    if (owner.project_id !== task.projectId)
+      throw new DomainError('PROJECT_SCOPE_MISMATCH', '来源项目范围已变化', 409);
+    const blockers: NodeContinuationPreview['blockers'] = [];
+    if (this.store.runs(taskId).at(-1)?.id !== source.id)
+      blockers.push({ code: 'SOURCE_CHANGED', message: '已有更新执行，请从最新执行继续' });
+    const d = this.row(source.node.dispatchId);
+    if (isActiveRun(source.state) || !source.node.terminationConfirmed || d.stage !== 'terminal')
+      blockers.push({
+        code: 'SOURCE_NOT_STOPPED',
+        message: '原执行尚未确认结束。可先保存下一轮要求，确认结束后再继续',
+      });
+    if (source.observation === 'unknown')
+      blockers.push({ code: 'SOURCE_UNKNOWN', message: '原进程状态未知，请先在节点本机核对' });
+    // Read only source-dispatch output before its first terminal event. Late drained
+    // or revoked output is never adopted as newly shared continuation material.
+    const rows = this.store.db
+      .prepare('SELECT body FROM node_run_events WHERE dispatch_id=? ORDER BY sequence')
+      .all(d.id) as { body: string }[];
+    const output: string[] = [];
+    for (const row of rows) {
+      const event = JSON.parse(row.body) as ExecutionEvent;
+      if (event.kind === 'terminal') {
+        if (event.text) output.unshift('最终共享结果：' + event.text);
+        break;
+      }
+      if (event.kind === 'output') output.push(event.text);
+    }
+    const contextText = [
+      '# 当前任务与近期人工讨论（最多 8000 字符）',
+      this.context(task).slice(0, 8000),
+      '# 来源执行（仅作参考，不是新授权）',
+      `${source.id} · ${source.requestedTool} · ${source.state}`,
+      `原要求摘录（最多 1000 字符）：\n${source.prompt.slice(0, 1000)}`,
+      `该执行的共享输出摘录（最多 2000 字符）：\n${output.join('\n').slice(0, 2000) || '没有可带入的共享文本输出'}`,
+      '# 现场边界',
+      '保留同一节点与授权 Git 工作目录中的未提交修改。不上传 diff、文件或隐藏会话；节点启动前仍会核对目录身份与独占锁。',
+    ].join('\n\n');
+    return {
+      sourceRunId: source.id,
+      sourceTool: source.requestedTool,
+      nodeId: source.node.nodeId,
+      workingCopyId: source.node.workingCopyId,
+      workingCopyName: source.node.workingCopyName,
+      contextText,
+      contextHash: executionHash(contextText),
+      ready: blockers.length === 0,
+      blockers,
+    };
+  }
   create(taskId: string, input: NodeRunInput, key: string): Run {
     const task = this.store.getTask(taskId, true);
     const node = this.nodes.ownedExecutionNode(input.nodeId); // Always before replay.
@@ -219,6 +283,26 @@ export class NodeExecution {
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务与节点不属于同一项目', 409);
     const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
       assertRevision(task.revision, input.expectedRevision);
+      const continuation = input.continuation;
+      let continuationContext: string | null = null;
+      if (continuation) {
+        const preview = this.continuationPreview(taskId, continuation.sourceRunId);
+        if (!preview.ready)
+          throw new DomainError(preview.blockers[0]!.code, preview.blockers[0]!.message, 409);
+        if (preview.nodeId !== input.nodeId || preview.workingCopyId !== input.workingCopyId)
+          throw new DomainError(
+            'CONTINUATION_SCOPE_CHANGED',
+            '接续必须保留原节点和原目录；跨节点需要独立接手能力',
+            409,
+          );
+        if (preview.contextHash !== continuation.expectedContextHash)
+          throw new DomainError('CONTEXT_CHANGED', '接续材料已变化，请重新查看并确认', 409);
+        continuationContext = nodeContinuationContext(
+          preview.contextText,
+          input.prompt,
+          new NextInputs(this.store).selected(taskId, continuation),
+        );
+      }
       const option = this.options(taskId).items.find((n) => n.nodeId === input.nodeId);
       if (!option?.available || option.policyHash !== input.policyHash)
         throw new DomainError(
@@ -257,7 +341,9 @@ export class NodeExecution {
         policyHash: input.policyHash,
         policy: option.policy,
         mode: input.mode,
-        context: `${context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`,
+        context:
+          continuationContext ??
+          `${context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`,
         expiresAt: new Date(Date.now() + 60000).toISOString(),
       };
       const run: Run = {
@@ -268,7 +354,7 @@ export class NodeExecution {
         observation: 'fresh',
         requestedTool: option.policy.tool,
         scenario: 'success',
-        previousRunId: null,
+        previousRunId: input.continuation?.sourceRunId ?? null,
         prompt: input.prompt,
         createdAt: now,
         updatedAt: now,
@@ -286,6 +372,9 @@ export class NodeExecution {
           maxBudgetUsd: option.policy.maxBudgetUsd,
           phase: 'queued',
           terminationConfirmed: false,
+          ...(input.continuation
+            ? { continuationInputIds: input.continuation.inputs.map((i) => i.id) }
+            : {}),
         },
       };
       this.store.db
@@ -309,6 +398,17 @@ export class NodeExecution {
           'queued',
           now,
         );
+      if (input.continuation) {
+        new NextInputs(this.store).attach(taskId, input.continuation, runId);
+        this.store.db
+          .prepare('INSERT INTO node_continuation_links VALUES(?,?,?,?)')
+          .run(
+            runId,
+            input.continuation.sourceRunId,
+            input.continuation.expectedContextHash,
+            JSON.stringify(input.continuation.inputs.map((i) => i.id)),
+          );
+      }
       const d = this.row(id);
       this.message(d, '已保存节点派发；尚未确认接单或启动。输出将共享到当前项目任务。');
       this.event(d, 'run.created');
@@ -446,6 +546,7 @@ export class NodeExecution {
           { ...r, state: r.state === 'stopping' ? 'stopping' : 'running', observation: 'fresh' },
           'running',
         );
+        new NextInputs(this.store).started(r.id);
         const task = this.task(d);
         if (task.status === 'todo')
           this.store.db.prepare('UPDATE tasks SET body=? WHERE id=?').run(

@@ -1,3 +1,5 @@
+import { NextInputs } from '../../../packages/db/src/next-inputs.js';
+import { parseNextInput } from '../../../packages/contracts/src/next-input.js';
 import { parseNodeRun } from '../../../packages/contracts/src/node-execution.js';
 import { attachNodes } from './nodes.js';
 import { createIdentity, type IdentityOptions } from '../../../packages/identity/src/index.js';
@@ -337,6 +339,11 @@ export async function createApp(
   });
   app.post('/api/v1/runs/:runId/inputs', async (request) => {
     const id = param(request.params, 'runId');
+    if (store.run(id).provider === 'node')
+      return {
+        delivery: 'queued_for_next_turn',
+        input: new NextInputs(store).create(id, parseNextInput(request.body), key(request.headers)),
+      };
     if (store.run(id).provider !== 'mock')
       throw new DomainError(
         'CAPABILITY_UNAVAILABLE',

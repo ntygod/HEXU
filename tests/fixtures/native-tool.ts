@@ -18,22 +18,26 @@ function emit(value: unknown) {
 }
 emit({ type: 'system', subtype: 'init', session_id: 'fixture-session' });
 // Test-only bounded natural completion; never invokes a model.
-if (input.includes('FIXTURE_DELAY')) await new Promise((resolve) => setTimeout(resolve, 800));
-if (input.includes('FIXTURE_HANG')) {
+// Only current-round markers control this fixture; historical excerpts are data.
+const scenario = input.includes('# 本次要求\n') ? input.split('# 本次要求\n').at(-1)! : input;
+if (scenario.includes('FIXTURE_CAPTURE_INPUT'))
+  writeFileSync('received-context.txt', input, 'utf8');
+if (scenario.includes('FIXTURE_DELAY')) await new Promise((resolve) => setTimeout(resolve, 800));
+if (scenario.includes('FIXTURE_HANG')) {
   emit({ type: 'assistant', message: { content: [{ type: 'text', text: 'fixture waiting' }] } });
   setInterval(() => {}, 1000);
-} else if (input.includes('FIXTURE_INVALID')) console.log('not json');
-else if (input.includes('FIXTURE_NO_RESULT')) {
+} else if (scenario.includes('FIXTURE_INVALID')) console.log('not json');
+else if (scenario.includes('FIXTURE_NO_RESULT')) {
   emit({
     type: 'assistant',
     message: { content: [{ type: 'text', text: 'not a success signal' }] },
   });
-} else if (input.includes('FIXTURE_FAILURE')) {
+} else if (scenario.includes('FIXTURE_FAILURE')) {
   emit({ type: 'result', subtype: 'error_max_turns', is_error: true, result: 'fixture refused' });
   process.exitCode = 1;
 } else {
   const tools = args[args.indexOf('--tools') + 1] ?? '';
-  if (tools.includes('Write') && input.includes('FIXTURE_WRITE'))
+  if (tools.includes('Write') && scenario.includes('FIXTURE_WRITE'))
     writeFileSync('native-output.txt', 'fixture edit\n', 'utf8');
   emit({
     type: 'assistant',

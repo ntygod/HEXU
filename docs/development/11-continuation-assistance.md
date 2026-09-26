@@ -66,3 +66,7 @@ AI 协助默认文本材料、真正只读环境或隔离副本。不支持可�
 同机双向跨工具继续支持等待/停止、刷新、取消、启动前重查和事务关联。原进程未知不释放目录锁；重启将待接续操作转为需要处理，保留要求但不自动启动。任务修订或人工上下文变化采取保守阻止，标题变化也需要重新配置；这不是最终的细粒度影响判定。
 
 11-01/02/05 仍为部分实现：没有完整共享上下文选择、团队权限、同工具原生 resume 或协助面板。11-03/04/06 尚未实现，本轮接续取消不计作协助取消。真实模型生成仍未联调。工程结果见 [21](21-implementation-status.md)，逐项状态见 [19](19-work-items.md)。
+
+## E2b3 节点接续子集
+
+节点通过 GET /tasks/:id/node-continuation-preview 核对来源；POST /tasks/:id/runs 增加 continuation { sourceRunId, expectedContextHash, inputs:[{id,revision}] }，当前返回 201+Run。仅确认源执行结束后的本人同节点同目录新会话；没有节点自动等待 Operation、原生 resume 或协助。preview 的既有 202 Operation 不变。

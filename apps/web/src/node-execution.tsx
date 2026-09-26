@@ -1,3 +1,8 @@
+import {
+  nodeContinuationContext,
+  type NextInput,
+  type NodeContinuationPreview,
+} from '../../../packages/contracts/src/next-input.js';
 import { useEffect, useState } from 'react';
 import type { Run, Task } from '../../../packages/contracts/src/index.js';
 import type { NodeExecutionOption } from '../../../packages/contracts/src/node-execution.js';
@@ -5,7 +10,15 @@ import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon, RunBadge, ToolMark } from '../../../packages/ui/src/index.js';
 import { useApp } from './state.js';
 
-export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void }) {
+export function NodeRunPanel({
+  task,
+  onClose,
+  source,
+}: {
+  task: Task;
+  onClose(): void;
+  source?: Run;
+}) {
   const { refresh, notice } = useApp();
   const [options, setOptions] = useState<NodeExecutionOption[]>([]),
     [context, setContext] = useState(''),
@@ -16,7 +29,23 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
   const [prompt, setPrompt] = useState(''),
     [consent, setConsent] = useState(false),
     [busy, setBusy] = useState(false);
+  const [continuation, setContinuation] = useState<NodeContinuationPreview | null>(null);
+  const [notes, setNotes] = useState<NextInput[]>([]),
+    [chosen, setChosen] = useState<string[]>([]);
   const selected = options.find((n) => n.nodeId === nodeId);
+  const selectedNotes = chosen
+    .map((id) => notes.find((n) => n.id === id))
+    .filter((n): n is NextInput => !!n);
+  let materialError = '',
+    fullContext = context;
+  if (source && continuation) {
+    try {
+      fullContext = nodeContinuationContext(continuation.contextText, prompt, selectedNotes);
+    } catch (e) {
+      materialError = (e as Error).message;
+    }
+  }
+  const selectionVersion = selectedNotes.map((n) => `${n.id}:${n.revision}:${n.state}`).join(',');
   useEffect(() => {
     let disposed = false;
     const load = async () => {
@@ -24,14 +53,31 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
         const next = await request<{ items: NodeExecutionOption[]; contextText: string }>(
           `/tasks/${task.id}/node-options`,
         );
+        const preview = source
+          ? await request<NodeContinuationPreview>(
+              `/tasks/${task.id}/node-continuation-preview?sourceRunId=${source.id}`,
+            )
+          : null;
+        const queue = source
+          ? await request<{ items: NextInput[] }>(`/tasks/${task.id}/next-inputs`)
+          : { items: [] };
         if (!disposed) {
-          setOptions(next.items);
+          setContinuation(preview);
+          setNotes(queue.items);
+          if (preview) {
+            setNode(preview.nodeId);
+            setWorkspace(preview.workingCopyId);
+          }
+          setOptions(preview ? next.items.filter((n) => n.nodeId === preview.nodeId) : next.items);
           setContext(next.contextText);
           setError('');
         }
       } catch (e) {
         if (!disposed) {
           setOptions([]);
+          setContinuation(null);
+          setNotes([]);
+          setConsent(false);
           setError((e as Error).message);
         }
       }
@@ -42,12 +88,21 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
       disposed = true;
       clearInterval(timer);
     };
-  }, [task.id]);
+  }, [task.id, source?.id]);
   useEffect(() => {
     setConsent(false);
-  }, [selected?.policyHash, context, task.revision, mode, workspaceId, prompt]);
+  }, [
+    selected?.policyHash,
+    context,
+    task.revision,
+    mode,
+    workspaceId,
+    prompt,
+    continuation?.contextHash,
+    selectionVersion,
+  ]);
   return (
-    <Dialog title="在我的节点上执行" onClose={onClose} drawer>
+    <Dialog title={source ? '沿原目录继续' : '在我的节点上执行'} onClose={onClose} drawer>
       <form
         className="form-stack node-execution-form"
         onSubmit={async (e) => {
@@ -68,10 +123,23 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
                 expectedRevision: task.revision,
                 reopenTask: task.status === 'done',
                 confirmExecution: consent,
+                ...(source && continuation
+                  ? {
+                      continuation: {
+                        sourceRunId: source.id,
+                        expectedContextHash: continuation.contextHash,
+                        inputs: selectedNotes.map((n) => ({ id: n.id, revision: n.revision })),
+                      },
+                    }
+                  : {}),
               },
             });
             await refresh();
-            notice('节点派发已保存；接单和实际启动会分别显示');
+            notice(
+              source
+                ? '接续派发已保存；保留同一目录，新会话不会自动完成任务'
+                : '节点派发已保存；接单和实际启动会分别显示',
+            );
             onClose();
           } catch (e) {
             setError((e as Error).message);
@@ -87,6 +155,29 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
             只列出你拥有且已在本机明确启用执行的节点。代码留在授权目录，模型输出会共享到当前项目任务；在线不代表模型账户已验证。
           </p>
         </div>
+        {source && (
+          <div className="node-source-summary">
+            <strong>保留原任务和目录 · 新建工具会话</strong>
+            <p>
+              {source.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} →{' '}
+              {selected?.policy.tool === 'codex'
+                ? 'Codex'
+                : selected
+                  ? 'Claude Code'
+                  : '等待当前本机授权'}{' '}
+              · {source.node?.workingCopyName}
+            </p>
+            <small>
+              来源 {source.id}
+              。保留未提交修改；不恢复原生会话，不迁移到另一台电脑。工具来自节点当前明确授权，网页不能代为更换账户或工具路径。
+            </small>
+            {continuation?.blockers.map((b) => (
+              <p role="status" key={b.code} className="form-error">
+                {b.message}
+              </p>
+            ))}
+          </div>
+        )}
         {!task.projectId ? (
           <p>请先使用项目任务；本轮不把私有任务发送到项目节点。</p>
         ) : options.length === 0 && !error ? (
@@ -105,7 +196,7 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
             aria-label="执行节点"
             required
             value={nodeId}
-            disabled={busy}
+            disabled={busy || !!source}
             onChange={(e) => {
               setNode(e.target.value);
               setWorkspace('');
@@ -146,7 +237,7 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
                 aria-label="授权工作目录"
                 required
                 value={workspaceId}
-                disabled={busy}
+                disabled={busy || !!source}
                 onChange={(e) => setWorkspace(e.target.value)}
               >
                 <option value="">选择已授权目录</option>
@@ -173,6 +264,37 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
             </label>
           </>
         )}
+        {source && (
+          <fieldset className="node-input-selection">
+            <legend>选择本次带入的要求（不会自动全选）</legend>
+            {notes.filter((n) => n.state === 'queued' || chosen.includes(n.id)).length === 0 && (
+              <p className="muted">没有待选择要求，也可以直接填写本次要求。</p>
+            )}
+            {notes
+              .filter((n) => n.state === 'queued' || chosen.includes(n.id))
+              .map((n) => (
+                <label key={n.id} className="check-field">
+                  <input
+                    type="checkbox"
+                    aria-label={`带入：${n.body}`}
+                    disabled={busy || (n.state !== 'queued' && !chosen.includes(n.id))}
+                    checked={chosen.includes(n.id)}
+                    onChange={(e) => {
+                      setConsent(false);
+                      setChosen(
+                        e.target.checked ? [...chosen, n.id] : chosen.filter((id) => id !== n.id),
+                      );
+                    }}
+                  />
+                  <span>
+                    <strong>{n.authorName}</strong>
+                    <p>{n.body}</p>
+                    {n.state !== 'queued' && <small>此要求状态已变化，请取消选择</small>}
+                  </span>
+                </label>
+              ))}
+          </fieldset>
+        )}
         <label className="field">
           本次要求
           <textarea
@@ -188,9 +310,12 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
         </label>
         <details className="node-context-preview">
           <summary>查看本次发送的任务材料</summary>
-          <pre>{context}</pre>
+          <pre>{source ? fullContext : context}</pre>
           <p>
-            本次要求会一并发送。没有跨工具历史迁移；节点按授权读取目录。排队期间人工材料改变会取消启动，不自动采用新要求。
+            {source
+              ? '上方为完整发送文本。来源输出与人工讨论为有界摘录，仅供参考；没有隐藏会话或远程 diff 迁移。'
+              : '本次要求会一并发送。没有跨工具历史迁移；节点按授权读取目录。'}
+            排队期间人工讨论或任务说明变化会阻止启动，新保存的下一轮要求不会悄悄加入当前派发。
           </p>
         </details>
         <label className="check-field">
@@ -203,6 +328,11 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
           我确认本次目录与模式，允许把任务材料发送给所选工具，使用本机 API
           账户计费，并把输出共享到项目任务。
         </label>
+        {materialError && (
+          <p className="form-error" role="alert">
+            {materialError}
+          </p>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -216,9 +346,24 @@ export function NodeRunPanel({ task, onClose }: { task: Task; onClose(): void })
             variant="primary"
             type="submit"
             busy={busy}
-            disabled={!consent || !selected?.available || !workspaceId || !prompt.trim()}
+            disabled={
+              !consent ||
+              !!materialError ||
+              chosen.length > 6 ||
+              selectedNotes.some((n) => n.state !== 'queued') ||
+              !selected?.available ||
+              !workspaceId ||
+              !prompt.trim() ||
+              (!!source && !continuation?.ready)
+            }
           >
-            {task.status === 'done' ? '重新打开并派发' : '在节点上开始'}
+            {source
+              ? task.status === 'done'
+                ? '重开任务并接续'
+                : '确认同目录接续'
+              : task.status === 'done'
+                ? '重新打开并派发'
+                : '在节点上开始'}
           </Button>
         </div>
       </form>
@@ -231,6 +376,12 @@ export function NodeRunStatus({ run }: { run: Run }) {
   const reached = [true, !!n.acceptedAt, !!n.permittedAt, !!n.startedAt, n.terminationConfirmed];
   return (
     <section className="node-run-status" aria-label="独立节点执行进度">
+      {run.previousRunId && (
+        <p className="node-continuation-origin">
+          接续来源：{run.previousRunId} · 同目录新会话 · 带入 {n.continuationInputIds?.length ?? 0}{' '}
+          条要求
+        </p>
+      )}
       <div className="node-policy-summary">
         <ToolMark tool={run.requestedTool} />
         <div>
