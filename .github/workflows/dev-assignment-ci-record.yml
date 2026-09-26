@@ -1,0 +1,68 @@
+name: Development assignment CI record
+on:
+  push:
+    branches: [codex/task-assignment]
+    paths: [.github/workflows/dev-assignment-ci-record.yml]
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Create checksum-bound documentation commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD^)" = 9479546e81f00980196222167b0d39a4b19f817b
+          python3 - <<'PY'
+          import base64, json, os, pathlib, subprocess
+          def git(*args):
+              return subprocess.check_output(['git', *args]).decode().strip()
+          def api(path, body):
+              return json.loads(subprocess.check_output(['gh','api','repos/ntygod/HEXU/'+path,'--method','POST','--input','-'], input=json.dumps(body).encode()))
+          path = 'docs/development/21-implementation-status.md'
+          assert git('hash-object', path) == 'cb8008b8d7b604aaac1eb29547652f7fd6e66d0c'
+          s = pathlib.Path(path).read_text()
+          replacements = {
+              '新增 4 条浏览器流程，共 49 条；首轮已完整执行的 PR CI 结果及修正见下，修正后结果尚待确认，不提前计通过。': '新增 4 条浏览器流程，共 49 条，最终功能 CI 已全部通过（见下方记录）；此前失败与修正分别保留，不将失败轮次计为通过。',
+              '上述修正及最终全量结果待下一轮实际检查，未将 48/49 计为全部通过。': '第二轮的 48/49 不计为全部通过；修正后的最终全量结果见后续记录。',
+          }
+          for before, after in replacements.items():
+              assert s.count(before) == 1
+              s = s.replace(before, after)
+          anchor = '## 03-06 项目归档/恢复历史增量'
+          assert s.count(anchor) == 1
+          record = '''### 04-01 最终功能检查
+
+          [完整只读 PR CI 36254895334](https://github.com/ntygod/HEXU/actions/runs/36254895334) 已完成且全部通过，实际检查合并预览 `93761384ef10581952113a5f41decf0d004417da`，对应功能头 `9479546e81f00980196222167b0d39a4b19f817b`。已读取完整日志：锁文件安装、格式、双端类型与生产构建通过；**215/215 工程测试、49/49 Chromium 浏览器流程通过**，无失败、取消、跳过或重试。原 204 工程 / 45 浏览器全部保留，新增 11 / 4 条。
+
+          已下载产物 `10910456359` 并核对 SHA-256 `93304e1d334fb39a5eb9fbb7a1aa9738f57380bc312936c89e775316bf502598`。实际解析报告为 total 49 / expected 49 / unexpected 0 / flaky 0 / skipped 0；复查 44—47 深色、浅色、390px 手机和双页冲突截图。字段纵向布局、底部固定操作、失效成员不可选择、必须显式保存及撤权清理均包含在通过结果内。浏览器通过来自仓库 Linux CI，不将本地被策略阻断的尝试计为通过。
+
+          功能树 `69b006249de09f3f47c0d6719d1ba7a3ee350d25` 已与本地 216 个跟踪文件复算完全一致。此后的结果补录仅修改本页，不修改功能、测试、配置或依赖；最终合并提交和只读 CI 另见 PR #5 检查与合并记录。临时开发传输工作流从发布树删除，以 squash 合入，不带入临时工作流历史。任务参与者、共用筛选及真实模型联调仍未交付；原 102 项统计不变。
+
+          '''
+          pathlib.Path(path).write_text(s.replace(anchor,record+anchor))
+          blob = git('hash-object',path)
+          assert blob == '2e818162650c574eb939f9a1c45607e6bafa441e'
+          subprocess.check_call(['git','add',path])
+          workflow = '.github/workflows/dev-assignment-ci-record.yml'
+          subprocess.check_call(['git','rm',workflow])
+          subprocess.check_call(['git','diff','--cached','--check'])
+          tree = '8c0b9e2d38598b8958a5ffd520aaf1e6a067e3b3'
+          assert git('write-tree') == tree
+          created = api('git/blobs',{'encoding':'base64','content':base64.b64encode(pathlib.Path(path).read_bytes()).decode()})
+          assert created['sha'] == blob
+          published = api('git/trees',{'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[
+              {'path':path,'mode':'100644','type':'blob','sha':blob},
+              {'path':workflow,'mode':'100644','type':'blob','sha':None},
+          ]})
+          assert published['sha'] == tree
+          commit = api('git/commits',{'message':'docs: record complete task assignment checks and screenshot review','tree':tree,'parents':[os.environ['GITHUB_SHA']]})
+          print('DELIVERY_COMMIT='+commit['sha'])
+          print('DELIVERY_TREE='+tree)
+          PY
