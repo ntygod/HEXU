@@ -131,4 +131,18 @@ CREATE TABLE node_continuation_links (
 );
 `,
   },
+  {
+    version: 8,
+    sql: `
+CREATE TABLE node_continuation_operations (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ state TEXT NOT NULL CHECK(state IN ('waiting_for_stop','preparing','needs_attention','succeeded','cancelled','failed')),
+ body TEXT NOT NULL
+);
+CREATE INDEX node_continuation_task ON node_continuation_operations(task_id);
+CREATE UNIQUE INDEX node_continuation_pending_task ON node_continuation_operations(task_id) WHERE state IN ('waiting_for_stop','preparing');
+CREATE UNIQUE INDEX node_continuation_pending_node ON node_continuation_operations(node_id) WHERE state IN ('waiting_for_stop','preparing');
+`,
+  },
 ];

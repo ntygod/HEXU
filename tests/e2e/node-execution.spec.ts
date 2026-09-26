@@ -426,3 +426,154 @@ test('接续材料变化需重新确认，已完成任务接续明确重开而�
     await rm(f.dir, { recursive: true, force: true });
   }
 });
+
+async function arrangeUI(page: Page, mode: 'wait' | 'request_stop') {
+  await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
+  await page.getByLabel('原执行处理方式', { exact: true }).selectOption(mode);
+  await page.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
+  await page.getByLabel('本次要求', { exact: true }).fill('FIXTURE_WRITE');
+  await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
+  await page
+    .getByRole('button', { name: mode === 'wait' ? '保存等待接续' : '停止后接续', exact: true })
+    .click();
+}
+
+test('节点运行中直接安排停止后继续，202 状态保留且实际只启动两次', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_HANG');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('running');
+    await writeFile(join(f.root, 'keep-user-edit.txt'), 'Uncommitted original\n');
+    await arrangeUI(page, 'request_stop');
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('已创建新执行', { timeout: 20000 });
+    await expect
+      .poll(
+        async () => {
+          const runs = (await detail(page, f)).runs;
+          return runs.length === 2 && runs[1].state === 'succeeded';
+        },
+        { timeout: 25000 },
+      )
+      .toBe(true);
+    const data = await detail(page, f);
+    expect(data.runs[0].state).toBe('cancelled');
+    expect(data.runs[0].node.terminationConfirmed).toBe(true);
+    expect(data.runs[1].previousRunId).toBe(data.runs[0].id);
+    expect(data.task.status).toBe('in_progress');
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\none\n');
+    expect(await readFile(join(f.root, 'keep-user-edit.txt'), 'utf8')).toBe(
+      'Uncommitted original\n',
+    );
+    await page.reload();
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('已创建新执行');
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/29-node-operation-completed.png', fullPage: true });
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});
+
+test('节点等待接续刷新后可取消，手机深色显示安排与实际运行的区别', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_HANG');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('running');
+    await arrangeUI(page, 'wait');
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('等待原执行结束');
+    await page.reload();
+    await expect(page.getByRole('button', { name: '取消接续安排', exact: true })).toBeVisible();
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    expect((await detail(page, f)).runs[0].state).toBe('running');
+    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: 'artifacts/30-node-operation-waiting-mobile.png',
+      fullPage: true,
+    });
+    await page.getByRole('button', { name: '取消接续安排', exact: true }).click();
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('接续已取消');
+    await page.getByRole('button', { name: '停止节点执行', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs[0].state, { timeout: 20000 })
+      .toBe('cancelled');
+    await page.reload();
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('接续已取消');
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});
+
+test('等待接续期间修改人工材料会暂停，历史保留原要求而不是自动采用新内容', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_HANG');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('running');
+    await arrangeUI(page, 'wait');
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('等待原执行结束');
+    await post(
+      page,
+      `tasks/${f.task.id}/messages`,
+      { body: '新范围：暂不采用已有自动接续' },
+      f.space.id,
+    );
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('需要处理');
+    await page.reload();
+    await expect(page.getByRole('button', { name: '重新配置接续', exact: true })).toBeVisible();
+    await page.locator('.node-continuation-status > .continuation-records > summary').click();
+    await expect(page.locator('.node-continuation-status .continuation-prompt')).toHaveText(
+      'FIXTURE_WRITE',
+    );
+    await page.locator('.node-continuation-status .node-context-preview summary').click();
+    await expect(
+      page.locator('.node-continuation-status .node-context-preview pre'),
+    ).not.toContainText('新范围：暂不采用已有自动接续');
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    expect((await detail(page, f)).runs[0].state).toBe('running');
+    await page.screenshot({
+      path: 'artifacts/31-node-operation-needs-attention.png',
+      fullPage: true,
+    });
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});

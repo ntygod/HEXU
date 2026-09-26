@@ -257,3 +257,12 @@ interface RunHandle {
 GET /tasks/:taskId/next-inputs 返回任务可见范围内的待处理/历史要求；node 的 POST /runs/:runId/inputs 接受 {body} 返回 {delivery:queued_for_next_turn,input}。PATCH /next-inputs/:id 接受 {body,expectedRevision}；POST /next-inputs/:id/cancel 接受 {expectedRevision}；修改均需原作者及任务编辑权限，业务幂等键不变。
 
 GET /tasks/:id/node-continuation-preview?sourceRunId=... 仅供节点所有者，返回固定来源/节点/目录、材料与哈希、ready/blockers。POST /tasks/:id/runs 的 node 输入可增加 continuation {sourceRunId,expectedContextHash,inputs:[{id,revision}]}；未加则保留原执行创建语义。节点续接返回 201+Run，不冒充 preview 的 202 Operation。请求严格校验额外字段，材料和要求状态在同一事务再核对。
+
+
+## E2b4 实现：节点持久化接续
+
+`POST /tasks/:taskId/continuations` 在真实账号模式接受 provider=node 的现有 NodeRunInput、continuation 选材，以及必填 onActiveRun=wait/request_stop，返回 202+NodeContinuationOperation 和 Location。未知参数由严格 schema 拒绝。预览用 `GET /tasks/:id/node-continuation-preview?sourceRunId=...&waiting=true`；可预约配置用 `GET /tasks/:id/node-options?sourceRunId=...`，这不授予跳过来源检查的执行权。
+
+`GET /tasks/:id/continuations` 返回最近 20 个安排；`GET /operations/:id` 返回当前记录；`POST /operations/:id/cancel` 要求 expectedRevision/幂等键及任务编辑权限。Run 已创建返回 RUN_ALREADY_STARTED，应走 `/runs/:id/stop`。新增 SQLite 迁移 8，唯一活动 task/node 预约；普通 Run 创建也核对。
+
+状态 waiting_for_stop / preparing / needs_attention / succeeded / cancelled / failed 复用已有标签。succeeded 仅指派发事务创建了 Run。记录固定已授权全文和本机策略，不存模型 Key；服务恢复不重放付费执行。旧 preview Operation 读取/权限行为保留，两个数据模式不自动导入互换。

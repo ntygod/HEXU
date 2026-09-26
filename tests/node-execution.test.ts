@@ -664,3 +664,355 @@ test('下一轮要求沿用项目权限；撤权后的列表与幂等重放均�
     f.close();
   }
 });
+
+// E2b4 uses the same task/dispatch fixtures. No model or real account credentials.
+import { NodeContinuations } from '../packages/db/src/node-continuations.js';
+import { parseNodeContinuationOperation } from '../packages/contracts/src/node-continuation.js';
+function operationFixture(start = true) {
+  const f = fixture();
+  f.publish();
+  const source = start ? f.running() : { run: f.create(), c: f.command() };
+  const operations = new NodeContinuations(f.store, f.execution);
+  const body = (
+    onActiveRun: 'wait' | 'request_stop' = 'wait',
+    inputs: { id: string; revision: number }[] = [],
+  ) => ({
+    ...f.body(),
+    prompt: '冻结的下一次要求',
+    onActiveRun,
+    continuation: {
+      sourceRunId: source.run.id,
+      expectedContextHash: f.as(
+        () => f.execution.continuationPreview(f.task.id, source.run.id, true).contextHash,
+      ),
+      inputs,
+    },
+  });
+  const schedule = (
+    mode: 'wait' | 'request_stop' = 'wait',
+    inputs: { id: string; revision: number }[] = [],
+    id = key(),
+  ) =>
+    f.as(() =>
+      operations.create(f.task.id, parseNodeContinuationOperation(body(mode, inputs)), id),
+    );
+  const read = (id: string) => f.as(() => operations.get(id));
+  return { ...f, source, operations, body, schedule, read };
+}
+
+test('节点接续契约必须明确来源、停止策略与费用确认，拒绝执行参数扩权', () => {
+  const f = operationFixture();
+  try {
+    for (const patch of [
+      { onActiveRun: undefined },
+      { continuation: undefined },
+      { confirmExecution: false },
+      { executable: '/bin/sh' },
+      { contextText: 'injected' },
+    ])
+      assert.throws(() => parseNodeContinuationOperation({ ...f.body(), ...patch }), DomainError);
+  } finally {
+    f.close();
+  }
+});
+
+test('节点等待安排冻结材料；自然结束后原子创建 Run，不补入后来的模型输出或新要求', () => {
+  const f = operationFixture();
+  try {
+    f.send(f.source.c, 3, 'output', null, '授权时可见的来源文本');
+    const note = f.as(() =>
+      new NextInputs(f.store).create(f.source.run.id, '明确选择的要求', key()),
+    );
+    const input = parseNodeContinuationOperation(
+      f.body('wait', [{ id: note.id, revision: note.revision }]),
+    );
+    const idem = key(),
+      op = f.as(() => f.operations.create(f.task.id, input, idem));
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'waiting_for_stop');
+    assert.equal(f.as(() => f.store.run(f.source.run.id)).state, 'running');
+    f.as(() => new NextInputs(f.store).create(f.source.run.id, '后来新增不选的要求', key()));
+    f.send(f.source.c, 4, 'output', null, '后来的模型文本不自动采用');
+    f.send(f.source.c, 5, 'terminal', 'succeeded', '后来的最终结果也不自动采用');
+    f.operations.tick();
+    const done = f.read(op.id),
+      target = f.as(() => f.store.run(done.runId!));
+    assert.equal(done.state, 'succeeded', JSON.stringify(done.blockers));
+    assert.equal(target.state, 'queued');
+    assert.equal(target.previousRunId, f.source.run.id);
+    assert.equal(f.command().context, op.contextText);
+    assert.match(f.command().context, /授权时可见的来源文本/);
+    assert.match(f.command().context, /明确选择的要求/);
+    assert.doesNotMatch(f.command().context, /后来的模型文本|后来新增不选|后来的最终结果/);
+    const replay = f.as(() => f.operations.create(f.task.id, input, idem));
+    assert.equal(replay.runId, done.runId);
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 2);
+    assert.equal(
+      f.as(() => new NextInputs(f.store).list(f.task.id)).find((n) => n.id === note.id)?.state,
+      'attached',
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('停止后接续不把 stopping 当终态，取消安排不会撤销已发的停止请求', () => {
+  const f = operationFixture();
+  try {
+    const op = f.schedule('request_stop');
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.run(f.source.run.id)).state, 'stopping');
+    assert.equal(f.read(op.id).state, 'waiting_for_stop');
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    f.as(() => f.operations.cancel(op.id, op.revision, 'cancel-operation'));
+    const replay = f.as(() => f.operations.cancel(op.id, op.revision, 'cancel-operation'));
+    assert.equal(replay.state, 'cancelled');
+    f.send(f.source.c, 3, 'terminal', 'cancelled');
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+  } finally {
+    f.close();
+  }
+});
+
+test('节点预约拦截同任务重复安排、直接 Run 入口及另一任务抢占节点', () => {
+  const f = operationFixture();
+  try {
+    const op = f.schedule();
+    assert.throws(() => f.schedule(), code('CONTINUATION_PENDING'));
+    assert.throws(() => f.create(), code('CONTINUATION_PENDING'));
+    const other = f.as(() =>
+      f.store.createTask({ title: '其他任务', description: '', projectId: f.project.id }, key()),
+    );
+    assert.throws(
+      () =>
+        f.as(() =>
+          f.execution.create(
+            other.id,
+            { ...parseNodeContinuationOperation(f.body()).run, expectedRevision: other.revision },
+            key(),
+          ),
+        ),
+      code('CONTINUATION_PENDING'),
+    );
+    assert.equal(
+      f.as(() => f.execution.options(f.task.id).items[0]?.available),
+      false,
+    );
+    f.as(() => f.operations.cancel(op.id, op.revision, key()));
+    f.send(f.source.c, 3, 'terminal', 'succeeded');
+    assert.equal(f.create().state, 'queued');
+  } finally {
+    f.close();
+  }
+});
+
+test('保存于源执行开始前的安排接受唯一自动 todo→in_progress 修订，不误报人工变更', () => {
+  const f = operationFixture(false);
+  try {
+    const op = f.schedule();
+    f.send(f.source.c, 1, 'accepted');
+    assert.equal(
+      f.execution.permit(f.token, f.connection, f.source.c.id, f.source.c.generation).allowed,
+      true,
+    );
+    f.send(f.source.c, 2, 'running');
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'waiting_for_stop');
+    f.send(f.source.c, 3, 'terminal', 'succeeded');
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'succeeded', JSON.stringify(f.read(op.id).blockers));
+  } finally {
+    f.close();
+  }
+});
+
+test('所选要求被编辑或撤回、人工讨论/任务变化时暂停，保留授权时材料并不停止源进程', () => {
+  for (const kind of ['edit-note', 'retract-note', 'message', 'task', 'complete'] as const) {
+    const f = operationFixture();
+    try {
+      const notes = new NextInputs(f.store);
+      const note = f.as(() => notes.create(f.source.run.id, '原选择要求', key()));
+      const op = f.schedule('request_stop', [{ id: note.id, revision: note.revision }]);
+      f.as(() => {
+        if (kind === 'edit-note' || kind === 'retract-note')
+          notes.edit(note.id, note.revision, kind === 'edit-note' ? '新要求' : null, key());
+        else if (kind === 'message') f.store.addMessage(f.task.id, '新的人工讨论', null, key());
+        else if (kind === 'task')
+          f.store.patchTask(
+            f.task.id,
+            { expectedRevision: f.store.getTask(f.task.id).revision, description: '变更说明' },
+            key(),
+          );
+        else
+          f.store.changeTask(f.task.id, 'done', f.store.getTask(f.task.id).revision, 'keep', key());
+      });
+      f.operations.tick();
+      assert.equal(f.read(op.id).state, 'needs_attention', kind);
+      assert.match(f.read(op.id).contextText, /原选择要求/);
+      assert.equal(f.as(() => f.store.run(f.source.run.id)).state, 'running');
+      assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('节点撤权、本机策略变更与连接失效不会让待接续重新取得执行权', () => {
+  for (const kind of ['revoke', 'policy', 'offline'] as const) {
+    const f = operationFixture();
+    try {
+      const op = f.schedule();
+      if (kind === 'revoke')
+        f.as(() =>
+          f.nodes.revoke(
+            f.source.run.node!.nodeId,
+            f.nodes.get(f.source.run.node!.nodeId).revision,
+            key(),
+          ),
+        );
+      else if (kind === 'policy')
+        f.execution.publish(f.token, f.connection, { ...f.policy, grantId: key() });
+      else f.nodes.goodbye(f.token, f.connection);
+      f.operations.tick();
+      assert.equal(f.read(op.id).state, 'needs_attention', kind);
+      assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('重启与等待超时保留材料，释放接续预约但不释放未知源执行占用', () => {
+  for (const mode of ['restart', 'expired', 'unknown'] as const) {
+    const f = operationFixture();
+    try {
+      const op = f.schedule();
+      if (mode === 'restart') new NodeContinuations(f.store, f.execution);
+      else if (mode === 'expired') {
+        f.store.db
+          .prepare('UPDATE node_continuation_operations SET body=? WHERE id=?')
+          .run(JSON.stringify({ ...op, expiresAt: '2000-01-01T00:00:00.000Z' }), op.id);
+        f.operations.tick();
+      } else {
+        f.send(f.source.c, 3, 'unknown');
+        f.operations.tick();
+      }
+      assert.equal(f.read(op.id).state, 'needs_attention');
+      assert.equal(f.read(op.id).contextText, op.contextText);
+      assert.equal(
+        f.store.db
+          .prepare("SELECT COUNT(*) AS n FROM node_dispatches WHERE stage!='terminal'")
+          .get()!.n,
+        1,
+      );
+      assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('派发最后检查时取消仍生效；Operation→Run 关联故障与 Run/要求绑定共同回滚', () => {
+  for (const mode of ['cancel', 'rollback'] as const) {
+    const f = operationFixture();
+    try {
+      const note = f.as(() =>
+        new NextInputs(f.store).create(f.source.run.id, '事务绑定要求', key()),
+      );
+      const op = f.schedule('wait', [{ id: note.id, revision: note.revision }]);
+      f.send(f.source.c, 3, 'terminal', 'succeeded');
+      if (mode === 'cancel') {
+        const create = f.execution.create.bind(f.execution);
+        f.execution.create = (...args) => {
+          const current = f.read(op.id);
+          f.as(() => f.operations.cancel(op.id, current.revision, key()));
+          return create(...args);
+        };
+      } else
+        f.store.db.exec(
+          "CREATE TRIGGER fail_operation_link BEFORE UPDATE ON node_continuation_operations WHEN NEW.state='succeeded' BEGIN SELECT RAISE(ABORT, 'fixture operation failure'); END;",
+        );
+      f.operations.tick();
+      assert.equal(f.read(op.id).state, mode === 'cancel' ? 'cancelled' : 'failed');
+      assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+      assert.equal(f.as(() => new NextInputs(f.store).list(f.task.id))[0]?.state, 'queued');
+      assert.equal(
+        f.store.db.prepare('SELECT COUNT(*) AS n FROM node_continuation_links').get()!.n,
+        0,
+      );
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('接续新 Run 已创建后取消必须使用 Run 停止，不误报安排取消', () => {
+  const f = operationFixture();
+  try {
+    const op = f.schedule();
+    f.send(f.source.c, 3, 'terminal', 'succeeded');
+    f.operations.tick();
+    const done = f.read(op.id);
+    assert.throws(
+      () => f.as(() => f.operations.cancel(op.id, done.revision, key())),
+      code('RUN_ALREADY_STARTED'),
+    );
+    assert.equal(f.read(op.id).state, 'succeeded');
+  } finally {
+    f.close();
+  }
+});
+
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('SQLite 真实重开保留节点接续快照，重启恢复不新增派发或清除旧运行', () => {
+  const f = operationFixture(),
+    directory = mkdtempSync(join(tmpdir(), 'hexu-operation-reopen-'));
+  let reopened: Store | undefined;
+  try {
+    const op = f.schedule(),
+      path = join(directory, 'team.sqlite');
+    f.store.db.prepare('VACUUM INTO ?').run(path);
+    f.close();
+    reopened = new Store(path, undefined, { team: true });
+    const nodes = new NodeRegistry(reopened),
+      execution = new NodeExecution(reopened, nodes);
+    const operations = new NodeContinuations(reopened, execution);
+    const after = reopened.as({ user: f.alice, spaceId: f.space.id }, () => operations.get(op.id));
+    assert.equal(after.state, 'needs_attention');
+    assert.equal(after.blockers[0]?.code, 'SERVICE_RESTARTED');
+    assert.equal(after.contextText, op.contextText);
+    operations.tick();
+    assert.equal(reopened.db.prepare('SELECT COUNT(*) AS n FROM runs').get()!.n, 1);
+    assert.equal(
+      reopened.db.prepare("SELECT COUNT(*) AS n FROM node_dispatches WHERE stage='unknown'").get()!
+        .n,
+      1,
+    );
+  } finally {
+    f.close();
+    reopened?.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('大量来源模型输出不会把已有人工讨论挤出校验集合并误暂停接续', () => {
+  const f = operationFixture();
+  try {
+    f.as(() => f.store.addMessage(f.task.id, '需要保留的人工工作说明', null, key()));
+    const op = f.schedule();
+    for (let n = 3; n <= 104; n++) f.send(f.source.c, n, 'output', null, `来源增量 ${n}`);
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'waiting_for_stop');
+    f.send(f.source.c, 105, 'terminal', 'succeeded');
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'succeeded');
+    assert.match(f.command().context, /需要保留的人工工作说明/);
+  } finally {
+    f.close();
+  }
+});

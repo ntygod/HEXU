@@ -1,7 +1,7 @@
 # 19｜可领取工作项与团队分工
 
 > D1 · 17 个工作包 × 6 项 = 102 个工作项。  
-> **2026-09-26（UTC+8）逐项核对，E2b3。保留原 102 个编号与标题，新增实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**  
+> **2026-09-26（UTC+8）逐项核对，E2b4。保留原 102 个编号与标题，新增实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**  
 > [计划入口](README.md) · [先后依赖](00-delivery-map.md) · [接口总表](18-data-api-catalog.md)
 
 ## 1. 使用方式
@@ -16,9 +16,9 @@
 
 按原工作项完整定义记录：**已完成 2 项、部分实现 61 项、未实现 39 项，共 102 项**。这些工作项大小不同，不能将条目数换算为产品完成百分比。
 
-“已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3 是实际代码批次，二者不互相替代。
+“已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3/E2b4 是实际代码批次，二者不互相替代。
 
-本轮推进 **07-04、11-01/02/05** 的节点下一轮要求与同目录新会话接续，补及 06-06 的本机诊断。**不即时输入、不自动等待派发，不冒充原生 resume 或临时协助。** 下一步见 [22](22-next-delivery.md)。
+本轮推进 **11-01/02/05** 的独立节点持久化接续安排，联动 **07-02/04/06、01-04、10-03**。**支持明确授权的 wait/request_stop、固定材料、等待取消和恢复；不冒充原生 resume、即时输入或临时协助。** 下一步见 [22](22-next-delivery.md)。
 
 ## 2. 工作项索引
 
@@ -27,7 +27,7 @@
 | HX-DEV-01-01 | 技术建议落为实际工程基线与版本锁定 | TL | 部分实现 | React/Vite、Fastify、TypeScript 与锁文件已有；E2a 固定 Better Auth 1.7.6，经 IdentityPort 接入。正式存储适配、完整许可证与升级维护仍待收口。 | [工程](../../package.json) / [认证](../../packages/identity/src/index.ts) |
 | HX-DEV-01-02 | Monorepo 骨架与开发入口 | BE/RN | 已完成 | 应用与共享包、环境样例、统一启动/构建/类型检查入口已建立；本项仅工程骨架，不包含独立 Runner。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-01-03 | HTTP、事件、节点与适配器公共契约 | TL/BE/RN | 部分实现 | 已增加独立节点的有界执行策略/派发/事件契约与一次性启动许可；不是任意 RPC。远程 WSS、完整权限 schema 与类型生成仍缺。 | [执行契约](../../packages/contracts/src/node-execution.ts) |
-| HX-DEV-01-04 | 迁移、事务、outbox 与附件存储端口 | BE | 部分实现 | SQLite 迁移 6、Run/派发/输入/幂等/outbox 原子写入和节点事件持久 ACK 已有；PostgreSQL、附件存储与旧数据导入仍缺。 | [迁移](../../packages/db/src/schema.ts) / [派发](../../packages/db/src/node-execution.ts) |
+| HX-DEV-01-04 | 迁移、事务、outbox 与附件存储端口 | BE | 部分实现 | SQLite 迁移 8 增加节点接续 Operation 与任务/节点唯一预约；Run、派发、所选要求、Operation 关联和 outbox 原子提交。PostgreSQL、附件存储和旧数据导入仍未实现。 | [迁移](../../packages/db/src/schema.ts) / [派发](../../packages/db/src/node-execution.ts) |
 | HX-DEV-01-05 | 模拟适配器与统一演示数据 | RN/FE | 部分实现 | 虚构数据及成功/失败/输入/授权模拟流程已实现；节点失联、缺模型等完整场景集和生产隔离仍需完善。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-01-06 | 最小自托管开发组合与构建任务 | OPS/BE | 部分实现 | 本机构建、health/ready 与只读 CI 已有；正式数据库/文件服务的自托管组合与配置诊断未完整实现。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-02-01 | 设计变量、浅深色与状态 tokens | UX/FE | 部分实现 | 浅深色、颜色与状态变量已实现；字体、间距等仍有页面硬编码，完整语义 tokens 与使用说明未收口。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
@@ -61,11 +61,11 @@
 | HX-DEV-06-05 | 进程树、输入输出与取消 | RN | 部分实现 | 独立节点实际进程、结构化输出、原生停止与 POSIX 进程组确认已接入；原生输入、Windows 和完整跨平台管理未完成。 | [执行器](../../apps/runner/src/agent/executor.ts) / [进程](../../apps/runner/src/process-host.ts) |
 | HX-DEV-06-06 | 重启对账、能力发现与诊断 | RN | 部分实现 | 已有节点身份/摘要重启握手、独立执行日志恢复和本机 pending-executions 待处理列表；未知进程不推断已停止、不删锁或自动重跑。跨平台、自动对账与完整诊断仍缺。 | [诊断](../../apps/runner/src/agent/execution-journal.ts) / [CLI](../../apps/runner/src/cli.ts) |
 | HX-DEV-07-01 | Run、配置快照和状态 reducer | BE/RN | 部分实现 | 同一 Run 模型支持 node provider 和固定派发/本机策略快照；接单、许可、实际启动各有证据。协助/并行/模板完整模型与原生会话映射仍缺。 | [执行契约](../../packages/contracts/src/node-execution.ts) / [派发](../../packages/db/src/node-execution.ts) |
-| HX-DEV-07-02 | 持久化派发、ACK 与幂等 | BE/RN | 部分实现 | Run/派发/幂等事务、本机 accepted 日志、一次性启动许可及精确序号 ACK 已实现；未知窗口保守核对不重跑。跨电脑调度与正式存储未完成。 | [派发](../../packages/db/src/node-execution.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
+| HX-DEV-07-02 | 持久化派发、ACK 与幂等 | BE/RN | 部分实现 | 独立节点 Run/dispatch/幂等、接单和一次性许可已有；E2b4 对普通启动与接续统一核对预约并原子关联 Operation。远程 WSS、正式存储和完整调度未完成。 | [派发](../../packages/db/src/node-execution.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
 | HX-DEV-07-03 | 归一化事件、游标和权限 SSE | BE/FE | 部分实现 | 节点状态/有界输出/终态通过持久事件回到原任务和权限 SSE；撤权后丢弃内容只收结算证据。完整原生差异、用量、流式增量和远程通道仍缺。 | [事件](../../packages/db/src/node-execution.ts) / [节点](../../apps/runner/src/agent/executor.ts) |
-| HX-DEV-07-04 | 运行输入与下一轮队列 | BE/RN | 部分实现 | 独立节点已有持久化下一轮要求、本人编辑/撤回、显式选择、派发绑定与实际启动状态；不是即时输入，不自动安排下一轮。原生运行中输入/steer 和等待澄清仍未实现。 | [队列](../../packages/db/src/next-inputs.ts) / [界面](../../apps/web/src/next-inputs.tsx) |
+| HX-DEV-07-04 | 运行输入与下一轮队列 | BE/RN | 部分实现 | 节点下一轮要求、编辑/撤回与实际启动状态已有；等待接续固定选择的版本，变更暂停而非静默采用。原生即时输入、澄清和 provider receipt 未实现。 | [队列](../../packages/db/src/next-inputs.ts) / [界面](../../apps/web/src/next-inputs.tsx) |
 | HX-DEV-07-05 | 绑定式动作授权与真实拒绝 | BE/RN | 部分实现 | 模拟授权与原生额外请求默认拒绝已有；真实动作绑定授权问答尚未实现。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
-| HX-DEV-07-06 | 停止、取消、竞争与恢复 | RN/BE | 部分实现 | 节点队列取消、一次性许可竞争、实际停止、断线保守停止和重启保锁已有；未知现场仅本机明确确认后释放。跨节点迁移与完整平台恢复未完成。 | [派发](../../packages/db/src/node-execution.ts) / [恢复](../../apps/runner/src/agent/execution-commands.ts) |
+| HX-DEV-07-06 | 停止、取消、竞争与恢复 | RN/BE | 部分实现 | 本机/节点停止、队列取消、未知保锁已有；E2b4 增加等待取消、超时、重启暂停及停止后复核。完整跨平台/远程对账仍未完成。 | [派发](../../packages/db/src/node-execution.ts) / [恢复](../../apps/runner/src/agent/execution-commands.ts) |
 | HX-DEV-08-01 | Claude 路径、账号方式与能力声明 | RN | 部分实现 | CLI 路径、必要参数探测和独立 API 配置已有；其他账号方式与有效账户联调未完成。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
 | HX-DEV-08-02 | Claude 启动与结构化流 | RN | 部分实现 | preview 与独立节点均接受限 Claude CLI 结构化流；真实进程/Git 测试为显式协议替身。真实提供方模型生成仍未联调。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [独立节点](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-08-03 | Claude 原生会话与恢复映射 | RN | 部分实现 | 原生 session 引用已记录；同工具 resume/恢复映射未实现。 | [Claude](../../packages/adapters/claude-code/src/index.ts) / [宿主](../../apps/runner/src/runtime.ts) |
@@ -80,15 +80,15 @@
 | HX-DEV-09-06 | Codex 用量、配置与限制展示 | RN/FE | 部分实现 | 用量来源、隔离配置和限制文案已有；真实计费及完整账户可用性未验证。 | [Codex](../../packages/adapters/codex/src/index.ts) / [宿主](../../apps/runner/src/codex-host.ts) |
 | HX-DEV-10-01 | 任务页面与双状态头 | FE | 部分实现 | TaskDetail 双状态布局已接真实成员访问范围，只读成员禁用编辑；高级布局/共享范围功能仍待完善。 | [任务页面](../../apps/web/src/App.tsx) |
 | HX-DEV-10-02 | 协作消息、事件与草稿 | FE | 部分实现 | 协作消息、本机事件和错误提示已有；历史分页、草稿恢复与完整发送状态未完成。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
-| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | 双工具/模型、本机/独立本人节点执行和停止已有，节点支持同目录接续与下一轮要求。完整原生实时输入、委托他人节点与跨电脑执行未实现。 | [任务](../../apps/web/src/node-execution.tsx) / [队列](../../apps/web/src/next-inputs.tsx) |
+| HX-DEV-10-03 | 工具/模型/节点与运行控制 | FE/RN | 部分实现 | 任务内双工具、本机/本人节点执行与停止、下一轮要求及自动等待接续已有；节点工具由本机授权固定。原生实时输入和跨电脑执行未完成。 | [任务](../../apps/web/src/node-execution.tsx) / [队列](../../apps/web/src/next-inputs.tsx) |
 | HX-DEV-10-04 | 文件、diff 与外部 IDE | FE/RN | 部分实现 | 实际 Git 文件差异已有；完整文件树、不可变成果快照和外部 IDE 衔接未实现。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
 | HX-DEV-10-05 | 受控交互终端与输入权 | FE/RN | 未实现 | 带输入权的受控交互终端、重连和会话清理未实现。 | —（尚无可用实现） |
 | HX-DEV-10-06 | 上下文、协助、成果插槽整合 | FE | 部分实现 | 上下文与成果插槽、接续恢复卡已有；协助卡和完整多面板异常状态未完成。 | [任务页面](../../apps/web/src/App.tsx) / [原生面板](../../apps/web/src/native.tsx) |
-| HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 已有持久化 Operation；节点接续已有固定来源/目录预览、材料哈希、选择修订与事务校验。节点路径当前通过 runs 返回 201+Run，尚无自动等待接续 Operation、完整 ContextBundle 和跨节点接手。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
-| HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | 节点支持确认结束后同任务、同节点、同目录的新会话接续；保留未提交修改，关联来源和所选要求。工具切换须节点本机重新授权并发布。原生 resume、跨节点与有效账户生成联调仍缺。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
+| HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 与 node 均有 202 持久化 Operation、显式 wait/request_stop、查询/取消和幂等；节点固定本次材料与授权。完整 ContextBundle、跨节点和有限协助权限未实现。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
+| HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | E2b4 节点在真实终态后自动沿原目录创建新会话；保留脏文件、前驱、所选要求与恢复记录。原生 resume、跨成员/跨机器接手和真实模型联调未完成。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-11-03 | Assistance、所选快照与有限访问 | BE | 未实现 | Assistance、固定协助快照与有限 AccessGrant 未实现；依赖 03 的真实权限基础。 | —（尚无可用实现） |
 | HX-DEV-11-04 | 真人回应与 AI 协助 Run | BE/RN | 未实现 | 真人协助回复、AI assist Run 和独立只读/隔离协助流程未实现。 | —（尚无可用实现） |
-| HX-DEV-11-05 | 继续/协助抽屉与就地回复 | FE | 部分实现 | 节点继续面板可查看源/目标工具、锁定原目录、逐项选择要求及完整发送文本；preview 继续抽屉保留。协助抽屉和就地回应未实现。 | [接续界面](../../apps/web/src/node-execution.tsx) |
+| HX-DEV-11-05 | 继续/协助抽屉与就地回复 | FE | 部分实现 | 节点接续抽屉新增等待/停止选择、任务中的持久进度卡、取消、历史材料与重新配置入口；协助抽屉及就地回应尚未实现。 | [接续界面](../../apps/web/src/node-execution.tsx) |
 | HX-DEV-11-06 | 采纳、追问、取消与恢复 | FE/BE | 未实现 | 协助的采纳/追问/取消与旧快照提示未实现；本轮接续取消不冒充协助工作项完成。 | —（尚无可用实现） |
 | HX-DEV-12-01 | 多仓库提交/补丁检查点 | RN | 未实现 | 多仓库不可变检查点与补丁封装未实现；当前 Git 摘录不是可恢复检查点。 | —（尚无可用实现） |
 | HX-DEV-12-02 | 检查点传输与目标恢复 | RN/BE | 未实现 | 检查点传输和目标机器恢复未实现。 | —（尚无可用实现） |
@@ -148,7 +148,7 @@
 
 一个工作项可以拆成多个小 PR，也可以将强相关条目组合，但引用原 ID，不能把演示页面和真实执行混报为同一完成状态。基本运行说明和必要回归由开发负责，公司的评估方式不写进产品用户流程。
 
-详细依赖以 00 和各计划为准，不按编号机械串行。E0—E1c 的本机工具预览保留；E2a 新增独立的真实账号与协作数据模式。E2b2—E2b3 增加本人节点执行与手动同目录接续；下一组补节点等待接续 Operation、正式存储和跨电脑部署，不让团队账号继承宿主机权限。
+详细依赖以 00 和各计划为准，不按编号机械串行。E0—E1c 的本机工具预览保留；E2a 新增独立的真实账号与协作数据模式。E2b2—E2b4 增加本人节点执行、下一轮要求和持久化同目录接续；下一组补原生会话、正式存储和跨电脑部署，不让团队账号继承宿主机权限。
 
 ## 批次记录
 
@@ -161,3 +161,5 @@ E2b1 将 06-01/02 从未实现调整为部分实现；03-03/06 和 06-03/06 增�
 E2b2 新增独立节点本人授权执行、一次性启动许可、持久证据和保守恢复，推进的工作项原本均为部分实现。仍为 2 项完成、61 项部分实现、39 项未实现；不以新增测试数量将整包改为完成。
 
 E2b3：已有部分项内增加下一轮要求、选择性材料、新会话接续与本机待处理列表；仍为 2 已完成 / 61 部分实现 / 39 未实现。未因新增测试或按钮将整项标完成。
+
+E2b4：节点接续统一返回 202 Operation，固定授权材料、等待/停止策略和 task/node 预约；取消/变化/重启均保留材料，不自动重放付费执行。原 102 项仍为 2 已完成 / 61 部分实现 / 39 未实现。

@@ -1,3 +1,5 @@
+import { assertNoPendingNodeContinuation } from './node-continuations.js';
+import type { NodeContinuationCommit } from '../../contracts/src/node-continuation.js';
 import { NextInputs } from './next-inputs.js';
 import {
   nodeContinuationContext,
@@ -140,10 +142,12 @@ export class NodeExecution {
     // Keep attached notes for explicit review rather than silently queuing them again.
     this.message(d, body);
   }
-  private context(task: Task) {
+  humanContext(task: Task) {
     const messages = (
       this.store.db
-        .prepare('SELECT body FROM messages WHERE task_id=? ORDER BY rowid DESC LIMIT 100')
+        .prepare(
+          "SELECT body FROM messages WHERE task_id=? AND json_extract(body, '$.actorType')='human' ORDER BY rowid DESC LIMIT 6",
+        )
         .all(task.id) as { body: string }[]
     )
       .map((r) => JSON.parse(r.body) as Message)
@@ -183,11 +187,15 @@ export class NodeExecution {
       .prepare('SELECT * FROM node_execution_policies WHERE node_id=?')
       .get(id) as PolicyRow | undefined;
   }
-  options(taskId: string): { items: NodeExecutionOption[]; contextText: string } {
+  options(
+    taskId: string,
+    allowedSourceRunId?: string,
+    allowedOperationId?: string,
+  ): { items: NodeExecutionOption[]; contextText: string } {
     const task = this.store.getTask(taskId);
-    if (!task.projectId) return { items: [], contextText: this.context(task) };
+    if (!task.projectId) return { items: [], contextText: this.humanContext(task) };
     return {
-      contextText: this.context(task),
+      contextText: this.humanContext(task),
       items: this.nodes
         .list()
         .filter((n) => n.canRevoke && n.projectId === task.projectId && !n.revokedAt)
@@ -199,20 +207,33 @@ export class NodeExecution {
             .get(n.id) as { connection_id: string };
           const policy = JSON.parse(p.body) as ExecutionPolicy;
           const occupied = !!this.store.db
-            .prepare("SELECT 1 FROM node_dispatches WHERE node_id=? AND stage!='terminal'")
-            .get(n.id);
+            .prepare(
+              "SELECT 1 FROM node_dispatches WHERE node_id=? AND stage!='terminal' AND run_id!=?",
+            )
+            .get(n.id, allowedSourceRunId ?? '');
+          let reserved = false;
+          try {
+            assertNoPendingNodeContinuation(this.store, taskId, n.id, allowedOperationId);
+          } catch {
+            reserved = true;
+          }
           const available =
-            n.presence === 'online' && p.connection_id === raw.connection_id && !occupied;
+            n.presence === 'online' &&
+            p.connection_id === raw.connection_id &&
+            !occupied &&
+            !reserved;
           return [
             {
               nodeId: n.id,
               name: n.name,
               available,
-              reason: occupied
-                ? '节点仍有执行或待核对现场'
-                : available
-                  ? '仅节点所有者可发起；模型账户未据此验证'
-                  : '节点离线或尚未重新发布执行授权',
+              reason: reserved
+                ? '任务或节点已有待接续安排'
+                : occupied
+                  ? '节点仍有执行或待核对现场'
+                  : available
+                    ? '仅节点所有者可发起；模型账户未据此验证'
+                    : '节点离线或尚未重新发布执行授权',
               policyHash: p.policy_hash,
               policy,
               workspaces: n.workspaces.filter((w) => policy.workspaceIds.includes(w.id)),
@@ -221,7 +242,11 @@ export class NodeExecution {
         }),
     };
   }
-  continuationPreview(taskId: string, sourceRunId: string): NodeContinuationPreview {
+  continuationPreview(
+    taskId: string,
+    sourceRunId: string,
+    allowWaiting = false,
+  ): NodeContinuationPreview {
     const task = this.store.getTask(taskId, true);
     const source = this.store.run(sourceRunId);
     if (source.taskId !== taskId || source.provider !== 'node' || !source.node)
@@ -233,12 +258,19 @@ export class NodeExecution {
     if (this.store.runs(taskId).at(-1)?.id !== source.id)
       blockers.push({ code: 'SOURCE_CHANGED', message: '已有更新执行，请从最新执行继续' });
     const d = this.row(source.node.dispatchId);
-    if (isActiveRun(source.state) || !source.node.terminationConfirmed || d.stage !== 'terminal')
+    if (
+      !allowWaiting &&
+      (isActiveRun(source.state) || !source.node.terminationConfirmed || d.stage !== 'terminal')
+    )
       blockers.push({
         code: 'SOURCE_NOT_STOPPED',
         message: '原执行尚未确认结束。可先保存下一轮要求，确认结束后再继续',
       });
-    if (source.observation === 'unknown')
+    if (
+      source.observation === 'unknown' ||
+      d.stage === 'unknown' ||
+      (!isActiveRun(source.state) && (!source.node.terminationConfirmed || d.stage !== 'terminal'))
+    )
       blockers.push({ code: 'SOURCE_UNKNOWN', message: '原进程状态未知，请先在节点本机核对' });
     // Read only source-dispatch output before its first terminal event. Late drained
     // or revoked output is never adopted as newly shared continuation material.
@@ -255,8 +287,14 @@ export class NodeExecution {
       if (event.kind === 'output') output.push(event.text);
     }
     const contextText = [
+      ...(allowWaiting
+        ? [
+            '# 接续安排材料快照',
+            '仅采用本次确认时可见的材料；等待期间新增模型输出不自动补入。节点将继续使用原目录中的实际文件。',
+          ]
+        : []),
       '# 当前任务与近期人工讨论（最多 8000 字符）',
-      this.context(task).slice(0, 8000),
+      this.humanContext(task).slice(0, 8000),
       '# 来源执行（仅作参考，不是新授权）',
       `${source.id} · ${source.requestedTool} · ${source.state}`,
       `原要求摘录（最多 1000 字符）：\n${source.prompt.slice(0, 1000)}`,
@@ -276,16 +314,22 @@ export class NodeExecution {
       blockers,
     };
   }
-  create(taskId: string, input: NodeRunInput, key: string): Run {
+  create(
+    taskId: string,
+    input: NodeRunInput,
+    key: string,
+    operation?: NodeContinuationCommit,
+  ): Run {
     const task = this.store.getTask(taskId, true);
     const node = this.nodes.ownedExecutionNode(input.nodeId); // Always before replay.
     if (task.projectId !== node.project_id)
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务与节点不属于同一项目', 409);
     const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
+      assertNoPendingNodeContinuation(this.store, taskId, input.nodeId, operation?.operationId);
       assertRevision(task.revision, input.expectedRevision);
       const continuation = input.continuation;
-      let continuationContext: string | null = null;
-      if (continuation) {
+      let continuationContext: string | null = operation ? operation.context() : null;
+      if (continuation && !operation) {
         const preview = this.continuationPreview(taskId, continuation.sourceRunId);
         if (!preview.ready)
           throw new DomainError(preview.blockers[0]!.code, preview.blockers[0]!.message, 409);
@@ -303,7 +347,9 @@ export class NodeExecution {
           new NextInputs(this.store).selected(taskId, continuation),
         );
       }
-      const option = this.options(taskId).items.find((n) => n.nodeId === input.nodeId);
+      const option = this.options(taskId, undefined, operation?.operationId).items.find(
+        (n) => n.nodeId === input.nodeId,
+      );
       if (!option?.available || option.policyHash !== input.policyHash)
         throw new DomainError(
           'EXECUTION_UNAVAILABLE',
@@ -330,7 +376,7 @@ export class NodeExecution {
       const id = randomUUID(),
         runId = randomUUID(),
         now = stamp();
-      const context = this.context(task);
+      const context = this.humanContext(task);
       const command: DispatchCommand = {
         id,
         generation: randomUUID(),
@@ -412,6 +458,7 @@ export class NodeExecution {
       const d = this.row(id);
       this.message(d, '已保存节点派发；尚未确认接单或启动。输出将共享到当前项目任务。');
       this.event(d, 'run.created');
+      operation?.attach(run);
       return { id: runId };
     });
     return this.store.run(response.id);
@@ -495,7 +542,7 @@ export class NodeExecution {
         Date.parse(c.expiresAt) > Date.now() &&
         task.revision === d.task_revision &&
         !['done', 'cancelled'].includes(task.status) &&
-        executionHash(this.context(task)) === d.context_hash;
+        executionHash(this.humanContext(task)) === d.context_hash;
       if (!valid) {
         if (['queued', 'accepted'].includes(d.stage))
           this.finish(d, 'cancelled', '启动前授权、任务或上下文已变化，没有发出启动许可。');
