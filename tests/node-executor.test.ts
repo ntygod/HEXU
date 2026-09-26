@@ -1112,3 +1112,52 @@ test('Claude 未落盘有效原生历史不能宣称可恢复；停止中的历�
     await f.close();
   }
 });
+
+test('真实 HTTP 归档保留节点进程或请求实际停止，项目恢复不重跑旧派发', async () => {
+  for (const action of ['keep', 'stop'] as const) {
+    const f = await fixture();
+    try {
+      const { run, body, key } = await f.create('FIXTURE_HANG');
+      await f.until(
+        () => f.getRun(run.id),
+        (r) => r.state === 'running',
+      );
+      const saved = await f.call(`projects/${f.project.id}/lifecycle`, f.alice, {
+        action: 'archive',
+        expectedRevision: 1,
+        activeRunAction: action,
+      });
+      assert.equal(saved.statusCode, 200, saved.body);
+      const current = await f.getRun(run.id);
+      assert.equal(current.state, action === 'keep' ? 'running' : 'stopping');
+      assert.equal(current.node?.terminationConfirmed, false);
+      const duplicate = await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key);
+      assert.equal(duplicate.statusCode, 409);
+      assert.equal(duplicate.json().error.code, 'PROJECT_ARCHIVED');
+      if (action === 'keep') {
+        await f.connection.cycle();
+        await f.executor.tick();
+        await pause(60);
+        assert.equal((await f.getRun(run.id)).state, 'running');
+        assert.equal((await f.call(`runs/${run.id}/stop`, f.bob, {})).statusCode, 200);
+      }
+      const terminal = await f.until(
+        () => f.getRun(run.id),
+        (r) => r.node?.terminationConfirmed === true,
+      );
+      assert.equal(terminal.state, 'cancelled');
+      assert.equal((await f.call(`tasks/${f.task.id}`, f.alice)).json().task.status, 'in_progress');
+      const restored = await f.call(`projects/${f.project.id}/lifecycle`, f.alice, {
+        action: 'restore',
+        expectedRevision: saved.json().revision,
+      });
+      assert.equal(restored.statusCode, 200);
+      await f.connection.cycle();
+      await f.executor.tick();
+      assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+      assert.equal((await f.getRun(run.id)).state, 'cancelled');
+    } finally {
+      await f.close();
+    }
+  }
+});

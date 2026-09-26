@@ -140,7 +140,7 @@ Figma 参考只决定信息组织，不自动批准示例模型、隐藏会话�
 - `foundation.css`：浏览器基础、通用表单／布局；`shell`：全局工作台导航。
 - `task-workspace`、`discussion`、`prompt-bar`、`execution.css`：任务面板、草稿／讨论、输入与执行配置。
 - `identity`／`team`：账号、空间和项目成员；`settings`／`resources.css`：能力与节点。
-- `workbench`、`projects`、`results`、`work-cards`／`work-pages.css`：工作聚合、项目与成果；`project-settings.tsx/css`：基本信息、修订与冲突处理抽屉。
+- `workbench`、`projects`、`results`、`work-cards`／`work-pages.css`：工作聚合、项目与成果；`project-settings.tsx/css`：基本信息、修订与冲突处理抽屉；`project-lifecycle.tsx`：同一抽屉中的归档影响、运行选择与恢复。
 - `command-menu`：权限范围内的实际搜索与现有动作；`preview.css`：仅虚构订单示例。
 
 面板宽度使用原生滑杆提供拖动与键盘操作，布局按身份／空间保存；手机在讨论和代码／成果之间切换。输入草稿只在当前身份／空间的内存中保留，刷新会清空；不把账号凭证或任务文本写入外观偏好。

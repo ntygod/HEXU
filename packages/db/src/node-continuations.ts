@@ -108,10 +108,10 @@ export class NodeContinuations {
   }
   create(taskId: string, input: NodeContinuationInput, key: string) {
     if (this.closing) throw new DomainError('SERVICE_CLOSING', '服务正在关闭，未接收接续安排', 503);
-    this.store.getTask(taskId, true);
+    this.store.projectLifecycle.assertExecution(taskId);
     this.execution.nodes.ownedExecutionNode(input.run.nodeId); // Before idempotent replay.
     const result = this.store.mutate(`node.continuation.create:${taskId}`, key, input, () => {
-      const task = this.store.getTask(taskId, true),
+      const task = this.store.projectLifecycle.assertExecution(taskId),
         run = input.run;
       assertRevision(task.revision, run.expectedRevision);
       assertNoPendingNodeContinuation(this.store, taskId, run.nodeId);
@@ -213,7 +213,7 @@ export class NodeContinuations {
         '接续等待已超时；没有释放原进程占用或自动重试',
         409,
       );
-    const task = this.store.getTask(op.taskId, true);
+    const task = this.store.projectLifecycle.assertExecution(op.taskId);
     const preview = this.execution.continuationPreview(op.taskId, op.sourceRunId, !mustBeStopped);
     if (!preview.ready)
       throw new DomainError(preview.blockers[0]!.code, preview.blockers[0]!.message, 409);

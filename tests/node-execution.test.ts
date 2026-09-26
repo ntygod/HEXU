@@ -1016,3 +1016,153 @@ test('大量来源模型输出不会把已有人工讨论挤出校验集合并�
     f.close();
   }
 });
+
+test('项目归档取消未许可派发，保留已许可/未知执行或明确请求停止；快速恢复不能复活旧许可', () => {
+  for (const stage of ['queued', 'accepted', 'preparing', 'running', 'unknown'] as const) {
+    for (const action of ['keep', 'stop'] as const) {
+      const f = fixture();
+      try {
+        f.publish();
+        const run = f.create(),
+          c = f.command();
+        if (stage !== 'queued') f.send(c, 1, 'accepted');
+        if (['preparing', 'running', 'unknown'].includes(stage)) {
+          assert.equal(f.execution.permit(f.token, f.connection, c.id, c.generation).allowed, true);
+          if (stage !== 'preparing') f.send(c, 2, stage === 'running' ? 'running' : 'unknown');
+        }
+        const before = f.as(() => f.store.run(run.id));
+        const saved = f.as(() =>
+          f.store.projectLifecycle.change(
+            f.project.id,
+            { action: 'archive', expectedRevision: 1, activeRunAction: action },
+            key(),
+          ),
+        );
+        const after = f.as(() => f.store.run(run.id));
+        const neverPermitted = ['queued', 'accepted'].includes(stage);
+        assert.equal(
+          after.state,
+          neverPermitted ? 'cancelled' : action === 'stop' ? 'stopping' : before.state,
+          `${stage}/${action}`,
+        );
+        assert.equal(after.node?.terminationConfirmed, neverPermitted);
+        if (!neverPermitted) assert.equal(after.observation, before.observation);
+        assert.equal(f.execution.permit(f.token, f.connection, c.id, c.generation).allowed, false);
+        assert.throws(() => f.create(), code('PROJECT_ARCHIVED'));
+        const option = f.as(() => f.execution.options(f.task.id).items[0]!);
+        assert.equal(option.available, false);
+        assert.match(option.reason, /归档/);
+        f.as(() =>
+          f.store.projectLifecycle.change(
+            f.project.id,
+            { action: 'restore', expectedRevision: saved.project.revision },
+            key(),
+          ),
+        );
+        assert.equal(f.execution.permit(f.token, f.connection, c.id, c.generation).allowed, false);
+        assert.equal(
+          f.as(() => f.store.runs(f.task.id).length),
+          1,
+        );
+        if (!neverPermitted) assert.equal(f.command().id, c.id);
+      } finally {
+        f.close();
+      }
+    }
+  }
+});
+
+test('归档在同一事务暂停节点等待安排并保留固定材料；恢复和协调 tick 不自动创建 Run', () => {
+  const f = operationFixture();
+  try {
+    const op = f.schedule();
+    const frozen = f.read(op.id).contextText;
+    const saved = f.as(() =>
+      f.store.projectLifecycle.change(
+        f.project.id,
+        { action: 'archive', expectedRevision: 1, activeRunAction: 'keep' },
+        key(),
+      ),
+    );
+    assert.equal(f.read(op.id).state, 'needs_attention');
+    assert.equal(f.read(op.id).blockers[0]!.code, 'PROJECT_ARCHIVED');
+    assert.equal(f.read(op.id).contextText, frozen);
+    assert.throws(() => f.schedule(), code('PROJECT_ARCHIVED'));
+    f.as(() =>
+      f.store.projectLifecycle.change(
+        f.project.id,
+        { action: 'restore', expectedRevision: saved.project.revision },
+        key(),
+      ),
+    );
+    f.send(f.source.c, 3, 'terminal', 'succeeded');
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'needs_attention');
+    assert.equal(f.read(op.id).contextText, frozen);
+    assert.equal(
+      f.as(() => f.store.runs(f.task.id).length),
+      1,
+    );
+    assert.equal(
+      f.as(() => f.execution.options(f.task.id).items[0]!.available),
+      true,
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('归档事务的节点派发更新故障不留下半归档，恢复项目也不恢复已撤销凭证', () => {
+  const f = fixture();
+  try {
+    f.publish();
+    const run = f.create(),
+      c = f.command();
+    f.send(c, 1, 'accepted');
+    f.store.db.exec(
+      "CREATE TRIGGER fail_archived_dispatch BEFORE UPDATE ON node_dispatches BEGIN SELECT RAISE(ABORT,'fixture rollback'); END;",
+    );
+    assert.throws(
+      () =>
+        f.as(() =>
+          f.store.projectLifecycle.change(
+            f.project.id,
+            { action: 'archive', expectedRevision: 1, activeRunAction: 'keep' },
+            key(),
+          ),
+        ),
+      /fixture rollback/,
+    );
+    assert.equal(
+      f.as(() => f.store.project(f.project.id).revision),
+      1,
+    );
+    assert.equal(
+      f.as(() => f.store.run(run.id).node!.phase),
+      'accepted',
+    );
+    f.store.db.exec('DROP TRIGGER fail_archived_dispatch');
+    f.as(() =>
+      f.store.projectLifecycle.change(
+        f.project.id,
+        { action: 'archive', expectedRevision: 1, activeRunAction: 'keep' },
+        key(),
+      ),
+    );
+    f.as(() => f.nodes.revoke(f.n.nodeId, f.nodes.get(f.n.nodeId).revision, key()));
+    f.as(() =>
+      f.store.projectLifecycle.change(
+        f.project.id,
+        { action: 'restore', expectedRevision: 2 },
+        key(),
+      ),
+    );
+    assert.throws(() => f.nodes.hello(f.token, key()), DomainError);
+    assert.equal(
+      f.as(() => f.execution.options(f.task.id).items.length),
+      0,
+    );
+  } finally {
+    f.close();
+  }
+});

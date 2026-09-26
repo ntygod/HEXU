@@ -55,3 +55,38 @@
 .project-history .text-block {
   margin-top: var(--hx-space-2);
 }
+
+.project-lifecycle {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-3);
+  line-height: 1.6;
+}
+.project-lifecycle h3 {
+  margin: 0;
+  font-size: inherit;
+}
+.project-archive-options {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding-top: var(--hx-space-2);
+}
+.project-archive-run {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.project-archive-run a {
+  overflow-wrap: anywhere;
+}
+.project-archive-banner {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-raised);
+  color: var(--hx-text-secondary);
+  line-height: 1.6;
+}
+.project-archive-banner strong {
+  color: var(--hx-pending-text);
+}

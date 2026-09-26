@@ -11,9 +11,11 @@ import { time, useApp, useLoad } from './state.js';
 
 export function ContinuationStatus({
   taskId,
+  executionDisabled = false,
   onConfigure,
 }: {
   taskId: string;
+  executionDisabled?: boolean;
   onConfigure(): void;
 }) {
   const { value, error } = useLoad<{ items: ContinuationOperation[] }>(
@@ -99,7 +101,9 @@ export function ContinuationStatus({
           </Button>
         )}
         {!pending && op.state !== 'succeeded' && (
-          <Button onClick={onConfigure}>重新配置继续</Button>
+          <Button disabled={executionDisabled} onClick={onConfigure}>
+            重新配置继续
+          </Button>
         )}
       </div>
       <details className="continuation-records">

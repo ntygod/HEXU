@@ -760,3 +760,65 @@ for (const tool of ['codex', 'claude-code'] as const) {
     }
   });
 }
+
+test('项目归档从网页暂停节点接续并实际停止原进程，恢复不重启旧安排或丢失代码', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_HANG');
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
+      .toBe('running');
+    await writeFile(join(f.root, 'keep-user-edit.txt'), 'Uncommitted original\n');
+    await arrangeUI(page, 'wait');
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('等待原执行结束');
+    await page.goto(`${origin}/projects/${f.task.projectId}`);
+    await page.getByRole('button', { name: '项目设置', exact: true }).click();
+    await page.getByRole('button', { name: '查看归档影响', exact: true }).click();
+    await expect(page.getByRole('region', { name: '项目归档与恢复' })).toContainText(
+      '1 个待接续安排',
+    );
+    await page.getByLabel('已启动执行的处理', { exact: true }).selectOption('stop');
+    await page.getByRole('button', { name: '确认归档项目', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: '项目设置', exact: true })).toHaveCount(0);
+    await page.goto(`${origin}/tasks/${f.task.id}`);
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('需要处理');
+    await expect(page.getByRole('button', { name: '重新配置接续', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '沿原目录继续', exact: true })).toBeDisabled();
+    await expect
+      .poll(async () => (await detail(page, f)).runs.at(-1)?.node.terminationConfirmed, {
+        timeout: 20000,
+      })
+      .toBe(true);
+    expect((await detail(page, f)).runs[0].state).toBe('cancelled');
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({
+      path: 'artifacts/43-project-archived-node-continuation.png',
+      fullPage: true,
+    });
+    await page.goto(`${origin}/projects/${f.task.projectId}`);
+    await page.getByRole('button', { name: '项目设置', exact: true }).click();
+    await page.getByRole('button', { name: '恢复项目', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: '项目设置', exact: true })).toHaveCount(0);
+    await page.goto(`${origin}/tasks/${f.task.id}`);
+    await expect(page.getByRole('button', { name: '重新配置接续', exact: true })).toBeEnabled();
+    await expect(
+      page.locator('.node-continuation-status .continuation-status-title strong'),
+    ).toHaveText('需要处理');
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
+    expect(await readFile(join(f.root, 'keep-user-edit.txt'), 'utf8')).toBe(
+      'Uncommitted original\n',
+    );
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});

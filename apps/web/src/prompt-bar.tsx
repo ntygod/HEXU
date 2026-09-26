@@ -9,12 +9,14 @@ export function PromptBar({
   task,
   run,
   editable,
+  executionDisabled = false,
   onConfigure,
   onContinue,
 }: {
   task: Task;
   run?: Run;
   editable: boolean;
+  executionDisabled?: boolean;
   onConfigure(): void;
   onContinue(): void;
 }) {
@@ -35,7 +37,7 @@ export function PromptBar({
         <span className="spacer" />
         <button
           className="text-button"
-          disabled={!editable || task.status === 'cancelled'}
+          disabled={!editable || executionDisabled || task.status === 'cancelled'}
           onClick={onConfigure}
         >
           <Icon name="settings" size={14} /> 工具与模型
@@ -53,7 +55,10 @@ export function PromptBar({
       {node && (
         <div className="prompt-continue">
           <span>使用已保存的记录，明确选择下一轮材料。</span>
-          <Button disabled={!editable || task.status === 'cancelled'} onClick={onContinue}>
+          <Button
+            disabled={!editable || executionDisabled || task.status === 'cancelled'}
+            onClick={onContinue}
+          >
             沿原目录继续 <Icon name="arrow" size={14} />
           </Button>
         </div>

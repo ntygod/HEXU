@@ -20,7 +20,7 @@ export class ProjectSettingsStore {
     this.store.db
       .prepare(
         `INSERT INTO project_revisions
-      (project_id,revision,name,description,actor_id,actor_name,saved_at) VALUES(?,?,?,?,?,?,?)`,
+      (project_id,revision,name,description,actor_id,actor_name,saved_at,archived_at,archived_by) VALUES(?,?,?,?,?,?,?,?,?)`,
       )
       .run(
         project.id,
@@ -30,6 +30,8 @@ export class ProjectSettingsStore {
         actorId,
         actorName,
         savedAt,
+        project.archivedAt ?? null,
+        project.archivedBy ?? null,
       );
   }
 
@@ -69,7 +71,8 @@ export class ProjectSettingsStore {
     const rows = this.store.db
       .prepare(
         `SELECT project_id AS projectId,revision,name,description,
-      actor_id AS actorId,actor_name AS actorName,saved_at AS savedAt FROM project_revisions
+      actor_id AS actorId,actor_name AS actorName,saved_at AS savedAt,
+      archived_at AS archivedAt,archived_by AS archivedBy FROM project_revisions
       WHERE project_id=? AND (? IS NULL OR revision<?) ORDER BY revision DESC LIMIT ?`,
       )
       .all(id, query.before, query.before, query.limit + 1) as unknown as ProjectRevision[];

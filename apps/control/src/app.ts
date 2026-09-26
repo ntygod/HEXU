@@ -217,6 +217,23 @@ export async function createApp(
       key(request.headers),
     ),
   );
+  app.get('/api/v1/projects/:projectId/activity', async (request) =>
+    store.projectLifecycle.activity(param(request.params, 'projectId')),
+  );
+  app.post('/api/v1/projects/:projectId/lifecycle', async (request) => {
+    const result = store.projectLifecycle.change(
+      param(request.params, 'projectId'),
+      request.body,
+      key(request.headers),
+    );
+    for (const id of result.stopRunIds) {
+      const run = store.run(id);
+      if (run.provider === 'native') native.stop(id);
+      else if (run.provider === 'mock') mock.stop(id);
+    }
+    nodeExecution?.reconcile();
+    return result.project;
+  });
   app.get('/api/v1/projects/:projectId/revisions', async (request) => {
     const id = param(request.params, 'projectId');
     store.project(id);

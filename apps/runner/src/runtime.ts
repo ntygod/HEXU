@@ -402,7 +402,11 @@ export class NativeRuntime {
       const run = this.store.run(id),
         config = run.native!;
       const copy = await this.workspaces.get(config.workingCopyId);
-      if (this.closing || this.store.run(id).state === 'stopping') {
+      if (
+        this.closing ||
+        this.store.run(id).state === 'stopping' ||
+        this.store.projectLifecycle.isArchived(this.store.getTask(run.taskId).projectId)
+      ) {
         this.store.finishNativeRun(
           id,
           'cancelled',
@@ -418,6 +422,11 @@ export class NativeRuntime {
           root: copy.root,
           apiKey: this.options.codexApiKey!,
           config,
+          beforeSpawn: () => {
+            this.store.projectLifecycle.assertExecution(run.taskId);
+            if (this.closing || this.store.run(id).state === 'stopping')
+              throw new DomainError('RUN_CANCELLED', '执行在启动前已取消，没有模型调用', 409);
+          },
           onEvent: (kind, text) => this.store.appendNativeEvent(id, kind, this.clean(text)),
           onReferences: (refs) => this.store.recordNativeReferences(id, refs),
         });
@@ -521,7 +530,11 @@ export class NativeRuntime {
       try {
         this.store.finishNativeRun(
           id,
-          'failed',
+          !processStarted &&
+            err instanceof DomainError &&
+            ['RUN_CANCELLED', 'PROJECT_ARCHIVED'].includes(err.code)
+            ? 'cancelled'
+            : 'failed',
           this.clean(err instanceof Error ? err.message : '原生执行无法继续'),
           confirmed,
         );

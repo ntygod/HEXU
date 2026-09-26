@@ -12,10 +12,12 @@ import { time, useApp, useLoad } from './state.js';
 export function NodeContinuationStatus({
   taskId,
   editable,
+  executionDisabled = false,
   onConfigure,
 }: {
   taskId: string;
   editable: boolean;
+  executionDisabled?: boolean;
   onConfigure(): void;
 }) {
   const { value, error } = useLoad<{ items: NodeContinuationOperation[] }>(
@@ -104,7 +106,9 @@ export function NodeContinuationStatus({
           </Button>
         )}
         {!pending && op.state !== 'succeeded' && editable && (
-          <Button onClick={onConfigure}>重新配置接续</Button>
+          <Button disabled={executionDisabled} onClick={onConfigure}>
+            重新配置接续
+          </Button>
         )}
       </div>
       <details className="continuation-records">

@@ -22,6 +22,8 @@ export interface User {
   color: string;
 }
 export interface Project {
+  archivedAt?: string | null;
+  archivedBy?: string | null;
   memberIds?: string[];
   access?: import('./identity.js').ProjectRole;
   id: string;

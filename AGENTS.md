@@ -108,10 +108,19 @@ Keep Claude native transcript format opaque. Check the documented private transc
 
 Validate init ID/cwd/model/dontAsk/tools/empty MCP before accepting session output; resumed model is pinned to the saved resolved model. ID checks do not prove no model request occurred before init; do not claim zero charge after process launch. Failure/stop/unknown never silently starts a fresh paid turn or clears workspace claims. Optional check:claude-protocol uses no key and a nonexistent UUID, not a real successful session. The exact 2.1.283 hidden --max-turns help exception cannot waive restriction flags or become a blanket version claim.
 
-Project name/description editing (03-04) is now implemented; continue 03-06 archive/restore via the existing 22-next-delivery plan. Do not repeat W1 or block product development on unavailable live-provider credentials.
+Project name/description editing (03-04) and archive/restore with execution controls (03-06) are implemented as local slices; continue task ownership/participants via the existing 22-next-delivery plan. Do not repeat W1 or block product development on unavailable live-provider credentials.
 
 ## Project settings
 
 Project metadata edits require current project manage permission before replay and inside the transaction. Strictly accept name/description/expectedRevision; never persist request-scoped access or memberIds. The project update, immutable revision snapshot, project-scoped outbox event and idempotent receipt commit together. Old database migration records only the known snapshot with unknown author/time, not invented history. History and SSE use the parent's current access rules.
 
-Keep the edit baseline fixed while the drawer is open. SSE updates show a comparison without replacing the draft or silently rebasing. Uncertain replies reuse the exact original payload/key when the user confirms; never infer that closing a drawer cancels a sent request. Drafts are drawer-local memory, cleared on close/refresh/identity or space changes and revoked manage access. Project edits do not update tasks, nodes, frozen material or running models. Archive/restore is still the next slice.
+Keep the edit baseline fixed while the drawer is open. SSE updates show a comparison without replacing the draft or silently rebasing. Uncertain replies reuse the exact original payload/key when the user confirms; never infer that closing a drawer cancels a sent request. Drafts are drawer-local memory, cleared on close/refresh/identity or space changes and revoked manage access. Project edits do not update tasks, nodes, frozen material or running models. Archive/restore uses the separate lifecycle endpoint and the same project revision, never metadata PATCH.
+
+
+## Project archive and restore
+
+Archive is a barrier for new model work, not deletion or a blanket read-only state for human collaboration. Require current project manage permission before replay and inside the revision-checked transaction. Commit project state/history/outbox, cancellation of never-permitted node dispatches and suspension of every pending preview/node Operation together. Preserve fixed Operation material; immediate restore never revives old plans. Only unpermitted cancellation returns selected notes to queued.
+
+Explicit keep/stop applies to already-permitted/started runs. Stop only runs in tasks the caller can currently edit; activity summaries must not reveal private tasks. Unknown/permitted writers retain claims and require actual termination evidence. Preparing preview execution is invalidated durably; also check after async directory preparation and immediately before Codex spawn. Revalidate project state at direct Run creation, idempotent replay, node permit and final continuation commit. Restore must not replay work, reissue permits, revive revoked node credentials, or clear writer locks.
+
+Keep archive controls in the W1 project-settings drawer with explicit impact/stop choice and same-request receipt recovery. Archived tasks keep discussion/results/manual status and stop actions; disable and close execution/resume/reconfigure panels after the project-scoped SSE update. Project list filtering must not hide ongoing runs from task/workbench views. Do not reinterpret archive as OS process termination or as a new remote-deployment feature.

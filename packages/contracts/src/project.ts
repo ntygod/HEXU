@@ -13,6 +13,8 @@ export interface ProjectRevision {
   actorId: string | null;
   actorName: string | null;
   savedAt: string | null;
+  archivedAt: string | null;
+  archivedBy: string | null;
 }
 export interface ProjectRevisionPage {
   items: ProjectRevision[];
