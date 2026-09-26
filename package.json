@@ -14,7 +14,7 @@
     "packages/adapters/mock"
   ],
   "engines": {
-    "node": ">=22.16.0 <25"
+    "node": ">=24 <25"
   },
   "packageManager": "npm@10.9.2",
   "scripts": {

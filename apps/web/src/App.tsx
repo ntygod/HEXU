@@ -574,7 +574,7 @@ function ProjectPage({ id }: { id: string }) {
             <span>当前目标</span>
             <strong>{project.description || '从任务开始，持续推进项目。'}</strong>
             <span className="spacer" />
-            <small>本地开发预览</small>
+            <small>{data.mode === 'team-local' ? '按项目权限协作' : '本地开发预览'}</small>
           </div>
           <div className="board-toolbar">
             <div className="segmented">

@@ -57,5 +57,9 @@ const teamApp = await createApp({
   },
 });
 await teamApp.listen({ host: '127.0.0.1', port: 4311 });
+for (const signal of ['SIGINT', 'SIGTERM'])
+  process.once(signal, () => {
+    void teamApp.close();
+  });
 process.env.HEXU_MODE = 'preview';
 await import('../dist/apps/control/src/main.js');

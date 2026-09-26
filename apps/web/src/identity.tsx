@@ -280,6 +280,8 @@ function AccountEntry() {
                 密码
                 <input
                   name="password"
+                  aria-label="密码"
+                  aria-describedby="account-password-help"
                   type="password"
                   autoComplete={register ? 'new-password' : 'current-password'}
                   required
@@ -288,7 +290,7 @@ function AccountEntry() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <small>
+                <small id="account-password-help">
                   {register
                     ? '至少 12 个字符；密码由认证组件处理。'
                     : '输入账号密码，不是模型 API key。'}

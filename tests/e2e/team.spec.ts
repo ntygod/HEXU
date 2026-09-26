@@ -65,8 +65,8 @@ test('真实账号建立、邀请同事、项目只读转编辑与个人隔离�
     await page.goto(origin + '/settings');
     await page.getByLabel('团队空间名称', { exact: true }).fill('合序产品研发（测试）');
     await page.getByRole('button', { name: '创建空间', exact: true }).click();
-    const spaceId = await page.getByLabel('当前工作空间').inputValue();
     await expect(page.getByLabel('当前工作空间')).not.toHaveValue(/^personal-/);
+    const spaceId = await page.getByLabel('当前工作空间').inputValue();
     await page.goto(origin + '/settings');
     await page.getByLabel('受邀邮箱', { exact: true }).fill('member-browser@example.invalid');
     await page.getByRole('button', { name: '生成邀请链接', exact: true }).click();

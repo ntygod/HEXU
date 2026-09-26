@@ -4,15 +4,15 @@ Read `docs/product/03-functional-specification.md` and the relevant work package
 
 ## Current implementation
 
-E1c remains a **local single-user developer preview**, not a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex is an experimental App Server provider with isolated temporary HOME/CODEX_HOME, API-key authentication over stdin, and explicit restricted configuration. The official 0.157.0 binary has passed no-model initialization/configuration checks; live model generation is still untested. Both providers can continue in the same local working copy via a new Run.
+E2a has two loopback-only modes: **preview** preserves the fictional single-user native-tool workbench; **team-local** uses real accounts and project data permissions but forbids host execution. Neither is a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex is an experimental App Server provider with isolated temporary HOME/CODEX_HOME, API-key authentication over stdin, and explicit restricted configuration. The official 0.157.0 binary has passed no-model initialization/configuration checks; live model generation is still untested. Both providers can continue in the same local working copy via a new Run.
 
 ## Structure
 
 - `apps/web`: React/Vite UI; Task is the workspace entry point.
-- `apps/control`: Fastify local API. Binding is loopback-only until real identity is implemented.
+- `apps/control`: Fastify local API. Binding stays loopback-only even with real identities until independent nodes and remote deployment controls are implemented.
 - `packages/contracts`: dependency-free request validation and DTOs.
 - `packages/domain`: pure task/run rules. Must not import React, databases, or providers.
-- `packages/db`: local-preview SQLite repository, migrations, transactions and outbox.
+- `packages/db`: mode-separated SQLite repository, request-scoped permissions, migrations, transactions and outbox.
 - `packages/adapters/mock`: deterministic simulator. Never spawn shell commands or call a model here.
 - `packages/adapters/claude-code`: explicit JSONL parsing and restricted file-tool arguments; no bypass or hidden SDK/account fallback.
 - `packages/adapters/codex`: bounded JSONL RPC; kebab-case thread sandbox vs camelCase turn sandbox; no raw reasoning or credentials in UI events.
