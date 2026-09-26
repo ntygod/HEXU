@@ -1,5 +1,5 @@
 import { rmSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, fork } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 // Only this fixed, disposable fixture directory is cleared; never the user's preview data.
@@ -43,40 +43,53 @@ process.env.HEXU_NATIVE_ENABLED = '1';
 process.env.HEXU_NATIVE_ROOTS = JSON.stringify([repo]);
 process.env.HEXU_CLAUDE_BIN = executable;
 process.env.ANTHROPIC_API_KEY = 'sk-ant-browser-protocol-fixture-not-a-real-key';
-// Independent real-auth browser fixture, no model/provider settings inherited.
-const { createApp } = await import('../dist/apps/control/src/app.js');
-const teamApp = await createApp({
-  port: 4311,
-  databasePath: join(path, 'team-workspace.sqlite'),
-  identity: {
-    databasePath: join(path, 'team-identity.sqlite'),
-    secret: 'fictional-browser-auth-secret-not-real-0123456789',
-    setupCode: 'fictional-browser-setup-code-not-real-0123456789',
-    baseURL: 'http://127.0.0.1:4311',
-    trustedOrigins: ['http://127.0.0.1:4311'],
-  },
-});
-await teamApp.listen({ host: '127.0.0.1', port: 4311 });
-for (const signal of ['SIGINT', 'SIGTERM'])
-  process.once(signal, () => {
-    void teamApp.close();
-  });
-// Independent node-browser identities; never share setup state with team.spec.ts.
-const nodeApp = await createApp({
-  port: 4312,
-  databasePath: join(path, 'node-workspace.sqlite'),
-  identity: {
-    databasePath: join(path, 'node-identity.sqlite'),
-    secret: 'fictional-node-browser-auth-secret-0123456789',
-    setupCode: 'fictional-node-browser-setup-code-0123456789',
-    baseURL: 'http://127.0.0.1:4312',
-    trustedOrigins: ['http://127.0.0.1:4312'],
-  },
-});
-await nodeApp.listen({ host: '127.0.0.1', port: 4312 });
-for (const signal of ['SIGINT', 'SIGTERM'])
-  process.once(signal, () => {
-    void nodeApp.close();
-  });
+// Each independent control service needs its own process. The authentication library's
+// default in-memory rate limiter is process-wide; sharing it couples unrelated fixtures.
+// Keep the normal authentication limits, origins, databases and model restrictions.
+const children = [];
+let stopping = false;
+function stopChildren() {
+  if (stopping) return;
+  stopping = true;
+  for (const child of children) child.kill('SIGTERM');
+}
+for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, stopChildren);
+process.once('exit', stopChildren);
+try {
+  for (const fixture of ['team', 'node']) {
+    await new Promise((resolveReady, reject) => {
+      const child = fork(new URL('./start-e2e-identity.mjs', import.meta.url), [fixture], {
+        // No inherited provider keys, auth state or operator runtime configuration.
+        env: { PATH: process.env.PATH, NODE_ENV: 'test', HEXU_NATIVE_ENABLED: '0' },
+        stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+      });
+      children.push(child);
+      const timeout = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error(`Identity fixture ${fixture} did not become ready`));
+      }, 15000);
+      child.once('message', (message) => {
+        clearTimeout(timeout);
+        if (message?.ready !== fixture) reject(new Error('Unexpected fixture readiness'));
+        else resolveReady();
+      });
+      child.once('error', (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.once('exit', (code) => {
+        clearTimeout(timeout);
+        if (!stopping) {
+          console.error(`Identity fixture ${fixture} exited unexpectedly (${code})`);
+          stopChildren();
+          process.exit(1);
+        }
+      });
+    });
+  }
+} catch (error) {
+  stopChildren();
+  throw error;
+}
 process.env.HEXU_MODE = 'preview';
 await import('../dist/apps/control/src/main.js');

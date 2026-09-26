@@ -52,6 +52,7 @@ test('任务改派在原工作区保存与刷新，创建者不变，历史/浅�
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: '更改负责人', exact: true })).toBeVisible();
   await open(page);
   await page.getByLabel('新的负责人', { exact: true }).selectOption('user-demo-zhou');
   await page.screenshot({ path: 'artifacts/46-task-assignment-mobile.png', fullPage: true });

@@ -369,6 +369,11 @@ test('真实项目成员改派、撤权清理与退出显示，负责人不自�
       { headers: headers(space.id) },
     );
     expect(rejected.status()).toBe(404);
+    await post(page, `spaces/${space.id}/members/${bob.id}/remove`, {}, space.id);
+    await expect(page.getByLabel('任务负责人', { exact: true }).locator('.avatar')).toHaveText(
+      '改',
+    );
+    await expect(page.getByLabel('任务负责人', { exact: true })).toContainText(bob.name);
     await page.getByRole('button', { name: '更改负责人', exact: true }).click();
     await expect(
       page.getByLabel('新的负责人', { exact: true }).locator(`option[value="${bob.id}"]`),

@@ -35,10 +35,17 @@ function ProjectTaskOwner({ task }: { task: Task }) {
   // A permission downgrade destroys the editor and its local selection, even while saving.
   useEffect(() => setOpen(false), [editable]);
   const owner = value?.owner.id === task.ownerUserId ? value.owner : null;
+  const person = data.members.find((member) => member.id === task.ownerUserId);
   return (
     <>
       <span className="task-owner" aria-label="任务负责人">
-        <Avatar user={data.members.find((member) => member.id === task.ownerUserId)} size="small" />
+        {person ? (
+          <Avatar user={person} size="small" />
+        ) : (
+          <span className="avatar small" title={owner?.name ?? '姓名未记录'}>
+            {owner?.name ? Array.from(owner.name)[0] : '?'}
+          </span>
+        )}
         <span>
           负责人：{owner?.name ?? recordedPerson(task.ownerUserId, data.members)}
           {owner?.availability === 'removed'
