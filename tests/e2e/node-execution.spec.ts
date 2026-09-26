@@ -280,10 +280,10 @@ test('运行中记录下一轮要求，结束后沿原目录接续，选择与�
     await page.reload();
     await expect(page.locator('.next-input-item')).toContainText('保留订单数据');
     await page.getByRole('button', { name: '沿原目录继续', exact: true }).click();
-    await expect(
-      page.getByText('原执行尚未确认结束。可先保存下一轮要求，确认结束后再继续', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: '确认同目录接续', exact: true })).toBeDisabled();
+    await expect(page.getByLabel('原执行处理方式', { exact: true })).toHaveValue('wait');
+    await expect(page.getByRole('button', { name: '保存等待接续', exact: true })).toBeDisabled();
+    expect((await detail(page, f)).runs).toHaveLength(1);
+    expect((await detail(page, f)).runs[0].state).toBe('running');
     await page.getByRole('button', { name: '返回', exact: true }).click();
     await page.getByRole('button', { name: '停止节点执行', exact: true }).click();
     await expect
@@ -414,9 +414,16 @@ test('接续材料变化需重新确认，已完成任务接续明确重开而�
     await page.getByLabel('本次要求', { exact: true }).fill('重新打开后继续分析');
     await page.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
     await page.getByRole('button', { name: '重开任务并接续', exact: true }).click();
+    // 202 saves an Operation first; the old completed source is not the new result.
     await expect
-      .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
-      .toBe('succeeded');
+      .poll(
+        async () => {
+          const runs = (await detail(page, f)).runs;
+          return runs.length === 2 && runs[1].state === 'succeeded';
+        },
+        { timeout: 20000 },
+      )
+      .toBe(true);
     const next = await detail(page, f);
     expect(next.task.status).toBe('in_progress');
     expect(next.runs).toHaveLength(2);
@@ -540,6 +547,10 @@ test('等待接续期间修改人工材料会暂停，历史保留原要求而�
     agent = await authorize(f);
     await startUI(page, 'FIXTURE_HANG');
     await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await page.route(`**/api/v1/tasks/${f.task.id}`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await route.continue();
+    });
     await expect
       .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
       .toBe('running');

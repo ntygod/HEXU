@@ -27,8 +27,8 @@ export function NodeRunPanel({
     [workspaceId, setWorkspace] = useState(''),
     [mode, setMode] = useState<'read-only' | 'edit'>('read-only');
   const [prompt, setPrompt] = useState(''),
-    [consent, setConsent] = useState(false),
     [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState({ scope: '', approved: false });
   const [onActiveRun, setOnActiveRun] = useState<'wait' | 'request_stop'>('wait');
   const [continuation, setContinuation] = useState<NodeContinuationPreview | null>(null);
   const [notes, setNotes] = useState<NextInput[]>([]),
@@ -47,6 +47,32 @@ export function NodeRunPanel({
     }
   }
   const selectionVersion = selectedNotes.map((n) => `${n.id}:${n.revision}:${n.state}`).join(',');
+  // The preview and its task revision come from the same synchronous server read.
+  // A delayed parent snapshot cannot invalidate an already newer preview. A truly
+  // newer task still requires refreshing materials and explicit confirmation.
+  const previewTask = source ? continuation : null;
+  const expectedRevision = previewTask?.taskRevision ?? task.revision;
+  const taskStatus =
+    previewTask && previewTask.taskRevision >= task.revision ? previewTask.taskStatus : task.status;
+  const staleTask = !!previewTask && task.revision > previewTask.taskRevision;
+  const confirmationScope = JSON.stringify([
+    selected?.policyHash,
+    context,
+    Math.max(task.revision, expectedRevision),
+    taskStatus,
+    mode,
+    workspaceId,
+    prompt,
+    continuation?.contextHash,
+    selectionVersion,
+    onActiveRun,
+  ]);
+  // Invalidate during render, not a later effect that could clear a fresh click.
+  // Remembering the current scope also prevents A -> B -> A from restoring consent.
+  if (confirmation.scope !== confirmationScope)
+    setConfirmation({ scope: confirmationScope, approved: false });
+  const consent = confirmation.scope === confirmationScope && confirmation.approved;
+  const setConsent = (approved: boolean) => setConfirmation({ scope: confirmationScope, approved });
   useEffect(() => {
     let disposed = false;
     const load = async () => {
@@ -90,26 +116,13 @@ export function NodeRunPanel({
       clearInterval(timer);
     };
   }, [task.id, source?.id]);
-  useEffect(() => {
-    setConsent(false);
-  }, [
-    selected?.policyHash,
-    context,
-    task.revision,
-    mode,
-    workspaceId,
-    prompt,
-    continuation?.contextHash,
-    selectionVersion,
-    onActiveRun,
-  ]);
   return (
     <Dialog title={source ? '沿原目录继续' : '在我的节点上执行'} onClose={onClose} drawer>
       <form
         className="form-stack node-execution-form"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!selected || busy) return;
+          if (!selected || busy || !consent || staleTask) return;
           setBusy(true);
           setError('');
           try {
@@ -122,8 +135,8 @@ export function NodeRunPanel({
                 policyHash: selected.policyHash,
                 mode,
                 prompt,
-                expectedRevision: task.revision,
-                reopenTask: task.status === 'done',
+                expectedRevision,
+                reopenTask: taskStatus === 'done',
                 confirmExecution: consent,
                 ...(source && continuation
                   ? {
@@ -340,12 +353,19 @@ export function NodeRunPanel({
           <input
             type="checkbox"
             checked={consent}
-            disabled={busy}
+            disabled={
+              busy || !selected?.available || staleTask || (!!source && !continuation?.ready)
+            }
             onChange={(e) => setConsent(e.target.checked)}
           />
           我确认本次目录与模式，允许把任务材料发送给所选工具，使用本机 API
           账户计费，并把输出共享到项目任务。
         </label>
+        {staleTask && (
+          <p className="form-error" role="status">
+            任务版本已变化，正在重新整理材料；更新后请重新确认。
+          </p>
+        )}
         {materialError && (
           <p className="form-error" role="alert">
             {materialError}
@@ -366,6 +386,7 @@ export function NodeRunPanel({
             busy={busy}
             disabled={
               !consent ||
+              staleTask ||
               !!materialError ||
               chosen.length > 6 ||
               selectedNotes.some((n) => n.state !== 'queued') ||
@@ -376,7 +397,7 @@ export function NodeRunPanel({
             }
           >
             {source
-              ? task.status === 'done'
+              ? taskStatus === 'done'
                 ? '重开任务并接续'
                 : [
                       'queued',
@@ -390,7 +411,7 @@ export function NodeRunPanel({
                     ? '保存等待接续'
                     : '停止后接续'
                   : '确认同目录接续'
-              : task.status === 'done'
+              : taskStatus === 'done'
                 ? '重新打开并派发'
                 : '在节点上开始'}
           </Button>

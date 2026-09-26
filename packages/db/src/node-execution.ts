@@ -305,6 +305,8 @@ export class NodeExecution {
     return {
       sourceRunId: source.id,
       sourceTool: source.requestedTool,
+      taskRevision: task.revision,
+      taskStatus: task.status,
       nodeId: source.node.nodeId,
       workingCopyId: source.node.workingCopyId,
       workingCopyName: source.node.workingCopyName,

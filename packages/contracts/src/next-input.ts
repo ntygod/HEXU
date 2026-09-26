@@ -22,6 +22,8 @@ export interface NodeContinuationSelection {
 export interface NodeContinuationPreview {
   sourceRunId: string;
   sourceTool: Tool;
+  taskRevision: number;
+  taskStatus: import('./index.js').TaskStatus;
   nodeId: string;
   workingCopyId: string;
   workingCopyName: string;
