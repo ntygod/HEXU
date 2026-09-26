@@ -1,6 +1,6 @@
 # 24｜AI 接手开发指南
 
-更新：2026-09-26（UTC+8）。本页是接手入口，不另建功能清单或进度总账。
+更新：2026-09-27（UTC+8）。本页是接手入口，不另建功能清单或进度总账。
 
 ## 1. 从哪里开始
 
@@ -14,10 +14,11 @@
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-04-01：任务负责人/参与者**，先做项目可见任务的真人负责人修订式改派，联动 03-03/06、04-03/06 和任务工作区。项目基本设置、归档/恢复与执行联动已经接入，不重复实施；范围以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-04-01：参与者关系**，联动 03-03/06、04-03/06 和任务工作区。项目设置、归档/恢复、项目可见任务真人负责人改派与历史已经接入，不重复实施。先补任务参与者增删与当前权限/退出状态，再做负责人/参与者列表筛选；范围以 [22](22-next-delivery.md) 为准。
 
 | 工作 | 先查看 |
 | --- | --- |
+| 已交付的负责人改派 | [改派契约](../../packages/contracts/src/task-assignment.ts)、[原子事务](../../packages/db/src/task-assignment.ts)、[W1 抽屉](../../apps/web/src/task-assignment.tsx)、[使用说明](../engineering/task-assignment.md)；不转移代码/节点/个人账户 |
 | 任务归属、状态与界面 | [04 工作包](04-tasks-requirements.md)、[Task 契约](../../packages/contracts/src/index.ts)、[任务事务](../../packages/db/src/store.ts)、[任务工作区](../../apps/web/src/task-workspace.tsx) |
 | 已交付的项目基本设置 | [设置事务](../../packages/db/src/project-settings.ts)、[严格契约](../../packages/contracts/src/project.ts)、[W1 抽屉](../../apps/web/src/project-settings.tsx)、[回归](../../tests/project-settings.test.ts) |
 | 项目基础和成员管理 | [03 工作包](03-identity-projects.md)、[协作数据](../../packages/db/src/collaboration.ts)、[团队页面](../../apps/web/src/team.tsx)、[项目页面](../../apps/web/src/projects.tsx) |

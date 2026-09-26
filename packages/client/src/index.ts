@@ -1,3 +1,20 @@
+import type { Task } from '../../contracts/src/index.js';
+import type {
+  TaskAssignmentInput,
+  TaskAssignmentOptions,
+  TaskAssignmentHistory,
+} from '../../contracts/src/task-assignment.js';
+
+export const taskAssignment = (id: string, signal?: AbortSignal) =>
+  request<TaskAssignmentOptions>(`/tasks/${encodeURIComponent(id)}/assignment`, { signal });
+export const assignTaskOwner = (id: string, body: TaskAssignmentInput, key: string) =>
+  request<Task>(`/tasks/${encodeURIComponent(id)}/assignment`, { method: 'POST', body, key });
+export const taskAssignmentHistory = (id: string, before?: number, signal?: AbortSignal) =>
+  request<TaskAssignmentHistory>(
+    `/tasks/${encodeURIComponent(id)}/assignment-history${before ? `?before=${before}` : ''}`,
+    { signal },
+  );
+
 let activeSpace = '';
 export function setActiveSpace(id: string) {
   activeSpace = id;

@@ -166,4 +166,20 @@ ALTER TABLE project_revisions ADD COLUMN archived_at TEXT;
 ALTER TABLE project_revisions ADD COLUMN archived_by TEXT;
 `,
   },
+  {
+    version: 11,
+    sql: `
+CREATE TABLE task_assignment_events (
+ task_id TEXT NOT NULL REFERENCES tasks(id), revision INTEGER NOT NULL,
+ from_user_id TEXT NOT NULL, from_name TEXT, to_user_id TEXT NOT NULL, to_name TEXT NOT NULL,
+ actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, created_at TEXT NOT NULL,
+ PRIMARY KEY(task_id,revision)
+);
+-- Existing owners are not proof of who created a task or started its runs.
+UPDATE tasks SET body=json_set(body,'$.createdByUserId',NULL)
+ WHERE json_type(body,'$.createdByUserId') IS NULL;
+UPDATE runs SET body=json_set(body,'$.createdByUserId',NULL)
+ WHERE json_type(body,'$.createdByUserId') IS NULL;
+`,
+  },
 ];

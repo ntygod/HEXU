@@ -1,3 +1,4 @@
+import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import { parseNodeContinuationOperation } from '../../../packages/contracts/src/node-continuation.js';
 import { NextInputs } from '../../../packages/db/src/next-inputs.js';
@@ -278,6 +279,22 @@ export async function createApp(
   app.get('/api/v1/tasks/:taskId', async (request) =>
     store.detail(param(request.params, 'taskId')),
   );
+  app.get('/api/v1/tasks/:taskId/assignment', async (request) =>
+    store.taskAssignment.options(param(request.params, 'taskId')),
+  );
+  app.post('/api/v1/tasks/:taskId/assignment', async (request) =>
+    store.taskAssignment.assign(
+      param(request.params, 'taskId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.get('/api/v1/tasks/:taskId/assignment-history', async (request) =>
+    store.taskAssignment.history(
+      param(request.params, 'taskId'),
+      parseAssignmentHistoryQuery(request.query),
+    ),
+  );
   app.patch('/api/v1/tasks/:taskId', async (request) => {
     const body = record(request.body);
     const data: {
@@ -288,6 +305,15 @@ export async function createApp(
     } = { expectedRevision: revision(body.expectedRevision) };
     if (body.status !== undefined)
       throw new DomainError('INVALID_INPUT', '请使用明确的完成或重新打开操作');
+    if (
+      Object.keys(body).some(
+        (field) => !['expectedRevision', 'title', 'description', 'attention'].includes(field),
+      )
+    )
+      throw new DomainError(
+        'INVALID_INPUT',
+        '任务内容不能修改身份、负责人或访问范围；改派请使用独立操作',
+      );
     if (body.title !== undefined) data.title = text(body.title, '标题', 160);
     if (body.description !== undefined)
       data.description = text(body.description, '说明', 12000, true);

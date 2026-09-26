@@ -51,6 +51,7 @@ function task(
     title,
     description,
     ownerUserId,
+    createdByUserId: null,
     status,
     attention,
     revision: 1,
