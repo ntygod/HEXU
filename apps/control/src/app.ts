@@ -1,3 +1,4 @@
+import { attachNodes } from './nodes.js';
 import { createIdentity, type IdentityOptions } from '../../../packages/identity/src/index.js';
 import { attachIdentity, identityHeaders } from './identity.js';
 import { ContinuationCoordinator } from '../../runner/src/continuations.js';
@@ -45,6 +46,7 @@ export async function createApp(
             'req.body.newPassword',
             'req.body.code',
             'req.body.token',
+            'req.body.nodeToken',
           ],
         }
       : false,
@@ -94,13 +96,39 @@ export async function createApp(
     }
     if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostname))
       throw new DomainError('LOCAL_ONLY', '当前版本仅支持本机开发预览', 403);
-    if (identity && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !request.headers.origin)
+    const nodeProtocol = new URL(request.url, 'http://localhost').pathname.startsWith(
+      '/runner/v1/',
+    );
+    if (nodeProtocol) {
+      if (!store.teamMode)
+        throw new DomainError('TEAM_MODE_REQUIRED', '节点配对仅在真实账号模式启用', 404);
+      if (
+        request.method !== 'POST' ||
+        request.headers.origin ||
+        request.headers.cookie ||
+        request.headers['sec-fetch-site'] ||
+        request.headers['x-hexu-runner'] !== '1' ||
+        new URL(request.url, 'http://localhost').search
+      )
+        throw new DomainError(
+          'NODE_CHANNEL_REQUIRED',
+          '节点通道不接受浏览器会话、查询参数或非节点请求',
+          403,
+        );
+    }
+    if (
+      !nodeProtocol &&
+      identity &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+      !request.headers.origin
+    )
       throw new DomainError('ORIGIN_REQUIRED', '认证模式的写入请求必须提供来源', 403);
     if (request.headers.origin && !allowedOrigins.has(request.headers.origin))
       throw new DomainError('ORIGIN_REJECTED', '不允许跨站访问本地预览', 403);
     if (request.headers['sec-fetch-site'] === 'cross-site')
       throw new DomainError('ORIGIN_REJECTED', '不允许跨站访问本地预览', 403);
     if (
+      !nodeProtocol &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       request.headers['x-hexu-client'] !== 'web'
     )
@@ -109,9 +137,10 @@ export async function createApp(
       .header('X-Content-Type-Options', 'nosniff')
       .header('X-Frame-Options', 'DENY')
       .header('Referrer-Policy', 'no-referrer');
-    if (request.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
+    if (request.url.startsWith('/api/') || nodeProtocol) reply.header('Cache-Control', 'no-store');
   });
   attachIdentity(app, store, identity);
+  attachNodes(app, store);
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof DomainError;
     const statusCode =

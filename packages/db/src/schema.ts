@@ -54,4 +54,42 @@ CREATE INDEX collab_membership_user ON collab_memberships(user_id);
 CREATE INDEX collab_project_member_user ON collab_project_members(user_id);
 `,
   },
+  {
+    version: 5,
+    sql: `
+CREATE TABLE runner_pairings (
+ id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES collab_people(id),
+ space_id TEXT NOT NULL REFERENCES collab_spaces(id), project_id TEXT NOT NULL REFERENCES projects(id),
+ code_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, cancelled INTEGER NOT NULL DEFAULT 0,
+ node_id TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE runner_nodes (
+ id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES collab_people(id),
+ space_id TEXT NOT NULL REFERENCES collab_spaces(id), project_id TEXT NOT NULL REFERENCES projects(id),
+ token_hash TEXT NOT NULL UNIQUE, client_id TEXT NOT NULL UNIQUE, registration_hash TEXT NOT NULL,
+ name TEXT NOT NULL, platform TEXT NOT NULL, arch TEXT NOT NULL, grants TEXT NOT NULL,
+ created_at TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, revoked_at TEXT,
+ connection_id TEXT, server_epoch TEXT, lease_until INTEGER NOT NULL DEFAULT 0,
+ last_seen_at TEXT, disconnected INTEGER NOT NULL DEFAULT 0,
+ sequence INTEGER NOT NULL DEFAULT 0, event_hash TEXT, snapshot TEXT
+);
+CREATE INDEX runner_nodes_space ON runner_nodes(space_id,project_id);
+CREATE INDEX runner_pairings_owner ON runner_pairings(owner_id);
+CREATE TRIGGER runner_project_removed AFTER DELETE ON collab_project_members BEGIN
+ UPDATE runner_nodes SET revoked_at=COALESCE(revoked_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')),revision=revision+1
+ WHERE owner_id=OLD.user_id AND project_id=OLD.project_id AND revoked_at IS NULL;
+ UPDATE runner_pairings SET cancelled=1 WHERE owner_id=OLD.user_id AND project_id=OLD.project_id;
+END;
+CREATE TRIGGER runner_project_downgraded AFTER UPDATE OF role ON collab_project_members WHEN NEW.role='view' BEGIN
+ UPDATE runner_nodes SET revoked_at=COALESCE(revoked_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')),revision=revision+1
+ WHERE owner_id=NEW.user_id AND project_id=NEW.project_id AND revoked_at IS NULL;
+ UPDATE runner_pairings SET cancelled=1 WHERE owner_id=NEW.user_id AND project_id=NEW.project_id;
+END;
+CREATE TRIGGER runner_member_removed AFTER DELETE ON collab_memberships BEGIN
+ UPDATE runner_nodes SET revoked_at=COALESCE(revoked_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')),revision=revision+1
+ WHERE owner_id=OLD.user_id AND space_id=OLD.space_id AND revoked_at IS NULL;
+ UPDATE runner_pairings SET cancelled=1 WHERE owner_id=OLD.user_id AND space_id=OLD.space_id;
+END;
+`,
+  },
 ];

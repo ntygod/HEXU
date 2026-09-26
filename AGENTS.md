@@ -4,7 +4,7 @@ Read `docs/product/03-functional-specification.md` and the relevant work package
 
 ## Current implementation
 
-E2a has two loopback-only modes: **preview** preserves the fictional single-user native-tool workbench; **team-local** uses real accounts and project data permissions but forbids host execution. Neither is a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex is an experimental App Server provider with isolated temporary HOME/CODEX_HOME, API-key authentication over stdin, and explicit restricted configuration. The official 0.157.0 binary has passed no-model initialization/configuration checks; live model generation is still untested. Both providers can continue in the same local working copy via a new Run.
+E2b1 has two loopback-only modes: **preview** preserves the fictional single-user native-tool workbench; **team-local** uses real accounts and project data permissions but forbids host execution. Neither is a hosted team platform. `docs/development/21-implementation-status.md` distinguishes actual, simulated and pending behavior. `mock` never spawns commands or calls a model. The experimental native provider calls an explicitly configured Claude Code CLI using API-key-authenticated bare/restricted file tools. Real-provider integration has not been exercised; protocol fixtures are never production agents. Codex is an experimental App Server provider with isolated temporary HOME/CODEX_HOME, API-key authentication over stdin, and explicit restricted configuration. The official 0.157.0 binary has passed no-model initialization/configuration checks; live model generation is still untested. Both providers can continue in the same local working copy via a new Run.
 
 ## Structure
 
@@ -16,7 +16,7 @@ E2a has two loopback-only modes: **preview** preserves the fictional single-user
 - `packages/adapters/mock`: deterministic simulator. Never spawn shell commands or call a model here.
 - `packages/adapters/claude-code`: explicit JSONL parsing and restricted file-tool arguments; no bypass or hidden SDK/account fallback.
 - `packages/adapters/codex`: bounded JSONL RPC; kebab-case thread sandbox vs camelCase turn sandbox; no raw reasoning or credentials in UI events.
-- `apps/runner/src`: local hosted runtime, Git boundaries and POSIX process groups; not an independent daemon or remote node yet.
+- `apps/runner/src`: preview hosted native runtime plus the independent E2b1 metadata CLI in cli.ts/agent. No independent task dispatch or remote execution yet.
 - `packages/ui`: visual tokens and shared components.
 - `packages/client`: browser HTTP client.
 
@@ -47,3 +47,9 @@ ContinuationOperation is distinct from both Task and Run. Its succeeded state me
 The default preview remains single-user and fictional. Optional team-local uses Better Auth 1.7.6, real users and explicit project roles, but stays loopback-only. It never initializes host native resources or accepts mock/native execution dispatch. Independent node identity and grants must land before team execution. Preserve separate preview/business/auth databases; do not relabel or seed preview data as team data.
 
 Use request-scoped principals and PermissionService for direct objects, lists, search, SSE and idempotent replays. Space ownership is not access to another person's private task or every project. Check permissions before returning stored idempotent results. Revalidate session and membership during event delivery; clear old UI data on revocation or identity changes. Keep session tokens out of browser storage/JSON, secrets out of logs, and invitation tokens hash-only at rest. Do not expose the full authentication handler or unrestricted signup. Email verification, password recovery and production/remote security remain incomplete; see team-local.md.
+
+## E2b1 node metadata boundary
+
+Node pairing authorizes only a fixed project and locally confirmed Git summary directories, never task execution. Keep browser Cookie and node Bearer channels separate. Server stores code/token hashes only; client credentials are fsynced before pairing exchange into a private state directory outside repositories. Do not upload absolute paths, filenames, code, branch/remotes, environment or provider keys. Never turn the summary endpoint into arbitrary RPC/command dispatch.
+
+Preserve permanent node revocation on project/space removal; rejoining cannot revive credentials. Recheck project visibility for node metadata, even when the requester originally owned a revoked node. Connection presence is not Run state. A snapshot ACK means committed metadata, not accepted model work. Bounded local spool and exact sequence/hash replay must survive dropped replies; fail closed on divergence. Restart cannot spawn a model or signal a stale PID. Current protocol remains loopback HTTP and POSIX credentials; Windows, remote WSS/HTTPS and system credential storage are incomplete.

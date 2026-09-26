@@ -109,7 +109,7 @@ export function attachIdentity(
     )
       throw new DomainError(
         'RUNNER_REQUIRED',
-        '团队模式尚未接入独立执行器，不使用宿主机目录或模型账号',
+        '团队模式尚未接入节点任务派发，不使用宿主机目录或模型账号',
         422,
       );
   });

@@ -38,3 +38,7 @@ HEXU_NATIVE_ENABLED=0
 默认 preview 继续使用 `.hexu/preview.sqlite` 与示例身份；team-local 另用 workspace.sqlite，不清空旧数据。将预览业务库直接传给 team-local 会拒绝启动。旧数据导入、生产备份恢复、PostgreSQL 和跨节点迁移未完成。
 
 本机 HTTP Cookie 不以 Secure 标记冒充 HTTPS。回环访问、来源校验和认证组件不是操作系统隔离，也不能防止本机文件系统操作者读取数据库。不要用反向代理、隧道或 0.0.0.0 暴露此版本。正式 TLS、外部邮件、远程部署和独立节点授权必须另行交付。
+
+## E2b1 独立节点补充
+
+team-local 现在可配对独立摘要节点，仍不接受任务派发或宿主机资源访问。节点只上报本机明确授权的 Git 数量摘要；它可以是与控制服务独立的进程，但当前地址限制仍不支持两台电脑。账号退出不自动撤销设备凭证；停止共享需撤销节点。用法见 [runner-node](runner-node.md)。

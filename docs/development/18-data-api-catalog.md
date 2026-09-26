@@ -235,3 +235,11 @@ interface RunHandle {
 业务请求用 HttpOnly Cookie 认证及 `X-Hexu-Space` 选择当前已加入的空间；SSE 以 spaceId 参数选择但仍由 Cookie 校验成员关系。写入要求来源、客户端标识和现有业务幂等键。POST `/spaces` 建团队；GET/POST `/spaces/:spaceId/invitations`、POST `.../:invitationId/revoke`；GET `/spaces/:spaceId/members`、POST `.../:userId/remove`；GET `/projects/:projectId/members`、POST `.../:userId` 配置 view/edit/manage 或 null 移除。完整输入以 contracts/identity 和 control/identity 代码为准。
 
 直接 Task/Run/Result/Operation、列表、搜索与事件受同一权限约束。既有普通任务、讨论、文字成果和完成接口在团队空间可用。原生资源、上下文预览、全部 Run/接续派发在团队模式返回 RUNNER_REQUIRED，不以登录赋予本机文件或模型权限。正式节点、附件 AccessGrant 与跨空间发布仍未实现。
+
+## E2b1 实现子集：独立节点摘要
+
+浏览器使用真实会话的 `GET /nodes`（items/pairings）、`GET /nodes/:nodeId`、`POST /nodes/pairings`（projectId，幂等键）、`POST /nodes/pairings/:nodeId/cancel`、`POST /nodes/:nodeId/revoke`（expectedRevision，幂等键）。配对码仅第一次创建返回，记录和重放不返回明文。
+
+独立进程使用 `/runner/v1/` 的 POST pairing-preview、pair、hello、sync、goodbye、disconnect。配对接口消费短时随机码，其余接口验证专用节点 Bearer；请求不使用浏览器 Cookie/Origin，不能调用 /api/v1 的业务接口。hello 返回固定协议版本、项目、连接代次和 ACK 水位；sync 只接受固定目录 ID 的数量摘要。没有 execute/dispatch/stop 命令。
+
+输入类型以 `contracts/src/nodes.ts` 为准；未知字段、额外目录、序号冲突和跳号均拒绝。API 不接受本地路径、文件内容或模型密钥。此 ACK 不代表 Run 接单、进程启动或模型成功。

@@ -151,7 +151,7 @@ export function App() {
             <span className="preview-label">
               <span className={`connection-dot ${connected ? 'online' : ''}`} />
               {data.mode === 'team-local'
-                ? '本机团队模式 · 执行器未接入'
+                ? '本机团队模式 · 节点仅同步状态'
                 : '本地开发预览 · 执行模式明确标识'}
             </span>
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
@@ -197,7 +197,7 @@ export function App() {
         <footer className="app-footer">
           <span>HEXU · 让人和 AI，一起交付。</span>
           <span>
-            {data.mode === 'team-local' ? 'E2a · 真实账号 / 本机范围' : '开发预览 E2a · 示例数据'}
+            {data.mode === 'team-local' ? 'E2b1 · 真实账号 / 节点状态' : '开发预览 E2b1 · 示例数据'}
           </span>
         </footer>
       </div>
@@ -396,7 +396,9 @@ function Workbench() {
             </p>
             <p>
               <span className="color-dot teal" />
-              体验模拟执行的等待、回复和停止。
+              {data.mode === 'team-local'
+                ? '连接独立节点、分享授权目录状态。'
+                : '体验模拟执行的等待、回复和停止。'}
             </p>
             <Link to="/settings" className="text-link">
               查看能力边界 <Icon name="arrow" size={14} />
@@ -888,7 +890,7 @@ function TaskPage({ id }: { id: string }) {
           <ToolMark tool={lastRun?.requestedTool ?? 'claude-code'} />
           <strong>
             {team && !lastRun
-              ? '执行器未接入'
+              ? '节点执行尚未接入'
               : lastRun?.requestedTool === 'codex'
                 ? 'Codex'
                 : 'Claude Code'}
@@ -1244,7 +1246,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E2a · 本机预览</span>
+        <span className="badge neutral">E2b1 · 本机预览</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />

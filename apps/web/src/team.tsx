@@ -1,3 +1,4 @@
+import { NodeResources } from './nodes.js';
 import { useState } from 'react';
 import type { Project } from '../../../packages/contracts/src/index.js';
 import type { ProjectRole, SpaceMember } from '../../../packages/contracts/src/identity.js';
@@ -33,7 +34,7 @@ export function TeamSettings() {
           <h1>空间与账号</h1>
           <p>个人工作只对自己可见；团队项目按项目成员权限开放。</p>
         </div>
-        <span className="badge neutral">E2a · 本机团队模式</span>
+        <span className="badge neutral">E2b1 · 本机团队模式</span>
       </div>
       <div className="team-settings-grid">
         <section className="panel team-card">
@@ -162,6 +163,7 @@ export function TeamSettings() {
           </p>
         </div>
       </div>
+      <NodeResources key={space.id} />
       {remove && (
         <Dialog
           title={remove.id === data.user.id ? '退出团队空间' : '移除空间成员'}
