@@ -108,6 +108,7 @@ async function pairingUI(page: Page, projectId: string) {
 test('网页配对与真实独立 CLI：在线、Git 摘要、刷新重启及撤销，浅深色与窄屏', async ({ page }) => {
   test.setTimeout(90000);
   const f = await prepare(page);
+  await page.getByRole('button', { name: '切换浅色模式', exact: true }).click();
   let agent: ReturnType<typeof cli> | null = null;
   try {
     const code = await pairingUI(page, f.project.id);
@@ -133,6 +134,7 @@ test('网页配对与真实独立 CLI：在线、Git 摘要、刷新重启及撤
     agent = cli(['start', '--state', f.home]);
     await expect(card.locator('.badge')).toHaveText('在线');
     expect(await card.count()).toBe(1);
+    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
