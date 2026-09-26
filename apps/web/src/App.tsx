@@ -1,7 +1,8 @@
 import { NodeContinuationStatus } from './node-continuations.js';
 import { NextInputPanel } from './next-inputs.js';
 import { NodeRunPanel, NodeRunStatus } from './node-execution.js';
-import { SpaceSwitcher } from './identity.js';
+import { AppShell } from './shell.js';
+import { useAppearance } from './appearance.js';
 import { TeamSettings, ProjectAccess } from './team.js';
 import { ContinuationStatus } from './continuations.js';
 import { NativeResources, NativeCode, NativeEvents } from './native.js';
@@ -18,7 +19,6 @@ import { isActiveRun } from '../../../packages/domain/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import {
   Avatar,
-  Brand,
   Button,
   Dialog,
   Empty,
@@ -32,25 +32,12 @@ import { ContinuePanel, EditTask, NewProject, NewTask, ShareResult } from './for
 import { OrderPreview } from './preview.js';
 
 export function App() {
-  const { data, connected } = useApp();
   const path = usePath();
-  const [searchOpen, setSearchOpen] = useState(false),
-    [theme, setTheme] = useState(() => {
-      try {
-        return localStorage.getItem('hexu-theme') ?? 'light';
-      } catch {
-        return 'light';
-      }
-    });
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    try {
-      localStorage.setItem('hexu-theme', theme);
-    } catch {}
-  }, [theme]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !event.repeat) {
         event.preventDefault();
         setSearchOpen((value) => !value);
       }
@@ -60,154 +47,46 @@ export function App() {
   }, []);
   const segment = path.split('/').filter(Boolean);
   const active = segment[0] ?? 'workbench';
-  const task = active === 'tasks' ? data.tasks.find((task) => task.id === segment[1]) : undefined;
-  const project = data.projects.find((project) => project.id === (task?.projectId ?? segment[1]));
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Link to="/" className="brand-link">
-          <Brand />
-        </Link>
-        <SpaceSwitcher />
-        <nav aria-label="主导航">
-          {[
-            ['/', 'home', '工作台', 'workbench'],
-            ['/projects', 'folder', '项目', 'projects'],
-            ['/results', 'box', '成果', 'results'],
-          ].map(([to, icon, label, key]) => (
-            <Link
-              key={to}
-              to={to!}
-              className={`nav-item ${active === key || (key === 'projects' && active === 'tasks') ? 'active' : ''}`}
-              title={label}
-            >
-              <Icon name={icon!} />
-              <span>{label}</span>
-              {active === key && <i />}
-            </Link>
-          ))}
-        </nav>
-        <div className="favorite-projects">
-          <div className="nav-heading">常用项目</div>
-          {data.projects.slice(0, 4).map((project) => (
-            <Link key={project.id} to={`/projects/${project.id}`} className="favorite">
-              <span className={`color-dot ${project.color}`} />
-              <span>{project.name}</span>
-            </Link>
-          ))}
-        </div>
-        <div className="sidebar-bottom">
-          <Link
-            to="/settings"
-            className={`nav-item ${active === 'settings' ? 'active' : ''}`}
-            title="资源与设置"
-          >
-            <Icon name="settings" />
-            <span>资源与设置</span>
-          </Link>
-          <div className="profile">
-            <Avatar user={data.user} />
-            <div>
-              <strong>{data.user.name}</strong>
-              <small>
-                {data.mode === 'team-local'
-                  ? '真实账号 · ' + (data.space?.kind === 'personal' ? '个人空间' : '团队空间')
-                  : '示例身份 · 本地工作空间'}
-              </small>
-            </div>
-            <button
-              className="icon-button theme-toggle"
-              aria-label={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            >
-              <Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} />
-            </button>
-          </div>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumbs">
-            <Link to={active === 'results' ? '/results' : '/'}>
-              {active === 'results'
-                ? '成果'
-                : active === 'projects' || active === 'tasks'
-                  ? '项目'
-                  : active === 'settings'
-                    ? '资源与设置'
-                    : '工作台'}
-            </Link>
-            {project && (
-              <>
-                <span>/</span>
-                <Link to={`/projects/${project.id}`}>{project.name}</Link>
-              </>
-            )}
-            {task && (
-              <>
-                <span>/</span>
-                <span>{task.shortId}</span>
-              </>
-            )}
-          </div>
-          <div className="topbar-right">
-            <span className="preview-label">
-              <span className={`connection-dot ${connected ? 'online' : ''}`} />
-              {data.mode === 'team-local'
-                ? '本机团队模式 · 本人授权节点执行'
-                : '本地开发预览 · 执行模式明确标识'}
-            </span>
-            <button className="search-trigger" onClick={() => setSearchOpen(true)}>
-              <Icon name="search" size={16} />
-              <span>搜索任务、项目…</span>
-              <kbd>⌘ K</kbd>
-            </button>
-            <button className="icon-button" aria-label="查看待回复事项" onClick={() => go('/')}>
-              <Icon name="bell" />
-            </button>
-          </div>
-        </header>
-        <main id="main-content">
-          {active === 'workbench' ? (
-            <Workbench />
-          ) : active === 'projects' ? (
-            segment[1] ? (
-              <ProjectPage id={segment[1]} key={segment[1]} />
-            ) : (
-              <Projects />
-            )
-          ) : active === 'tasks' && segment[1] ? (
-            <TaskPage id={segment[1]} key={segment[1]} />
-          ) : active === 'results' ? (
-            segment[1] ? (
-              <ResultPage id={segment[1]} key={segment[1]} />
-            ) : (
-              <Results />
-            )
-          ) : active === 'settings' ? (
-            <Settings
-              theme={theme}
-              onTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            />
+    <>
+      <AppShell onSearch={() => setSearchOpen(true)}>
+        {active === 'workbench' ? (
+          <Workbench />
+        ) : active === 'projects' ? (
+          segment[1] ? (
+            <ProjectPage id={segment[1]} key={segment[1]} />
           ) : (
-            <Empty title="没有找到这个页面">
-              <Link to="/" className="button primary">
-                返回工作台
-              </Link>
-            </Empty>
-          )}
-        </main>
-        <footer className="app-footer">
-          <span>HEXU · 让人和 AI，一起交付。</span>
-          <span>
-            {data.mode === 'team-local'
-              ? 'E2c1 · 真实账号 / 本人节点执行'
-              : '开发预览 E2c1 · 示例数据'}
-          </span>
-        </footer>
-      </div>
-      {searchOpen && <Search onClose={() => setSearchOpen(false)} />}
-    </div>
+            <Projects />
+          )
+        ) : active === 'tasks' && segment[1] ? (
+          <TaskPage id={segment[1]} key={segment[1]} />
+        ) : active === 'results' ? (
+          segment[1] ? (
+            <ResultPage id={segment[1]} key={segment[1]} />
+          ) : (
+            <Results />
+          )
+        ) : active === 'settings' ? (
+          <Settings />
+        ) : (
+          <Empty title="没有找到这个页面">
+            <Link to="/" className="button primary">
+              返回工作台
+            </Link>
+          </Empty>
+        )}
+      </AppShell>
+      {searchOpen && (
+        <Search
+          onClose={() => setSearchOpen(false)}
+          onNewTask={() => {
+            setSearchOpen(false);
+            setNewTaskOpen(true);
+          }}
+        />
+      )}
+      {newTaskOpen && <NewTask onClose={() => setNewTaskOpen(false)} />}
+    </>
   );
 }
 function PreviewThumb() {
@@ -1314,7 +1193,8 @@ function ResultPage({ id }: { id: string }) {
     </div>
   );
 }
-function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
+function Settings() {
+  const { theme, density, toggleTheme, toggleDensity } = useAppearance();
   const { data, connected } = useApp();
   if (data.mode === 'team-local') return <TeamSettings />;
   return (
@@ -1369,9 +1249,16 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
         </div>
         <div>
           <span>外观</span>
-          <Button onClick={onTheme}>
+          <Button onClick={toggleTheme}>
             <Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} />
-            {theme === 'light' ? '切换深色模式' : '切换浅色模式'}
+            {theme === 'light' ? '使用深色主题' : '使用浅色主题'}
+          </Button>
+        </div>
+        <div>
+          <span>信息密度</span>
+          <Button onClick={toggleDensity}>
+            <Icon name="density" size={16} />
+            {density === 'compact' ? '使用舒适密度' : '使用紧凑密度'}
           </Button>
         </div>
       </div>
@@ -1387,7 +1274,43 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
     </div>
   );
 }
-function Search({ onClose }: { onClose: () => void }) {
+function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
+  const { data } = useApp();
+  const commands = [
+    { name: '新建任务', icon: 'plus', action: onNewTask },
+    {
+      name: '打开工作台',
+      icon: 'home',
+      action: () => {
+        go('/');
+        onClose();
+      },
+    },
+    {
+      name: '查看项目',
+      icon: 'folder',
+      action: () => {
+        go('/projects');
+        onClose();
+      },
+    },
+    {
+      name: '查看成果',
+      icon: 'box',
+      action: () => {
+        go('/results');
+        onClose();
+      },
+    },
+    {
+      name: data.mode === 'team-local' ? '空间与账号' : '资源与设置',
+      icon: 'settings',
+      action: () => {
+        go('/settings');
+        onClose();
+      },
+    },
+  ];
   const [q, setQ] = useState(''),
     [items, setItems] = useState<Task[]>([]),
     [busy, setBusy] = useState(false),
@@ -1396,9 +1319,12 @@ function Search({ onClose }: { onClose: () => void }) {
     const controller = new AbortController();
     if (!q.trim()) {
       setItems([]);
+      setBusy(false);
+      setError('');
       return () => controller.abort();
     }
     setBusy(true);
+    setError('');
     const timer = setTimeout(
       () =>
         request<{ items: Task[] }>(`/search?q=${encodeURIComponent(q.trim())}`, {
@@ -1422,7 +1348,7 @@ function Search({ onClose }: { onClose: () => void }) {
     };
   }, [q]);
   return (
-    <Dialog title="找到需要继续的工作" onClose={onClose} wide>
+    <Dialog title="搜索与快捷操作" onClose={onClose} wide>
       <div className="dialog-body">
         <label className="search-field">
           <Icon name="search" />
@@ -1430,14 +1356,29 @@ function Search({ onClose }: { onClose: () => void }) {
             autoFocus
             aria-label="全局搜索"
             maxLength={160}
-            placeholder="任务标题、编号或说明…"
+            placeholder="任务标题、编号，或新建、项目、设置…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <kbd>ESC</kbd>
         </label>
         {error && <p role="alert">{error}</p>}
+        {commands.some((command) => command.name.includes(q.trim())) && (
+          <div className="command-actions" aria-label="快捷操作">
+            <span className="command-section-label">快捷操作</span>
+            {commands
+              .filter((command) => command.name.includes(q.trim()))
+              .map((command) => (
+                <button key={command.name} onClick={command.action}>
+                  <Icon name={command.icon} size={17} />
+                  <span>{command.name}</span>
+                  <Icon name="arrow" size={14} />
+                </button>
+              ))}
+          </div>
+        )}
         <div className="search-results">
+          {items.length > 0 && <span className="command-section-label">当前可见任务</span>}
           {items.map((task) => (
             <button
               key={task.id}

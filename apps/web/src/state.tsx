@@ -35,6 +35,7 @@ export function Link({
   children: ReactNode;
   className?: string;
   title?: string;
+  'aria-current'?: 'page';
 }) {
   return (
     <a

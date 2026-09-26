@@ -82,6 +82,13 @@ export function Icon({
       </>
     ),
     list: <path d="M8 5h13M8 12h13M8 19h13M3 5h.1M3 12h.1M3 19h.1" />,
+    panel: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M9 4v16" />
+      </>
+    ),
+    density: <path d="M4 5h16M4 12h16M4 19h16M8 8v1m0 6v1" />,
     external: (
       <>
         <path d="M13 3h8v8m0-8L10 14M9 4H4v16h16v-5" />
@@ -140,8 +147,8 @@ export function Brand() {
   return (
     <div className="brand">
       <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
-        <path fill="#4F46E5" d="M3 4h7v13l12-7V4h7v24h-7V17l-12 7v4H3z" />
-        <path fill="#AAA4FF" d="m10 9 12-5v6L10 17z" />
+        <path fill="var(--hx-brand)" d="M3 4h7v13l12-7V4h7v24h-7V17l-12 7v4H3z" />
+        <path fill="var(--hx-brand)" opacity="0.5" d="m10 9 12-5v6L10 17z" />
       </svg>
       <strong>HEXU</strong>
       <span>合序</span>
@@ -163,6 +170,7 @@ export function Button({
       {...props}
       className={`button ${variant} ${props.className ?? ''}`}
       disabled={props.disabled || busy}
+      aria-busy={busy || undefined}
     >
       {busy ? <span className="spinner" aria-hidden="true" /> : null}
       {children}
@@ -232,6 +240,11 @@ export function Dialog({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.showModal();
+    ref.current
+      ?.querySelector<HTMLElement>(
+        'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)',
+      )
+      ?.focus();
     return () => {
       ref.current?.close();
       previous?.focus();

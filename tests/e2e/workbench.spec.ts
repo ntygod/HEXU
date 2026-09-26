@@ -5,6 +5,13 @@ test('工作台真实打开，并保留桌面截图', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '我的工作', exact: true })).toBeVisible();
   await expect(page.getByText('本地开发预览 · 执行模式明确标识')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
+  await page.getByRole('button', { name: '收起项目导航', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '展开项目导航', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '展开项目导航', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: '项目导引栏' })).toBeVisible();
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/01-workbench.png', fullPage: true });
 });
@@ -78,9 +85,10 @@ test('示例预览筛选与 CSV 导出可操作', async ({ page }) => {
   expect(download.suggestedFilename()).toBe('orders-2026-09-demo.csv');
   await page.screenshot({ path: 'artifacts/03-results.png', fullPage: true });
 });
-test('搜索与深色模式正常工作', async ({ page }) => {
+test('命令搜索、主题和密度偏好在刷新后保留', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: '搜索任务、项目… ⌘ K' }).click();
+  await page.getByRole('button', { name: '搜索与快捷操作', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '全局搜索' })).toBeFocused();
   await page.getByRole('textbox', { name: '全局搜索' }).fill('浏览器中创建');
   await page
     .getByRole('dialog')
@@ -89,9 +97,23 @@ test('搜索与深色模式正常工作', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: '浏览器中创建的真实任务', exact: true }),
   ).toBeVisible();
+  await page.getByRole('button', { name: '切换浅色模式' }).click();
+  await page.getByRole('button', { name: '切换舒适密度' }).click();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-density', 'comfortable');
   await page.getByRole('button', { name: '切换深色模式' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.screenshot({ path: 'artifacts/04-dark-workspace.png', fullPage: true });
+  await page.keyboard.press('ControlOrMeta+k');
+  await expect(page.getByRole('dialog', { name: '搜索与快捷操作' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: '新建任务', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '开始一项工作' })).toBeVisible();
+  await page.getByLabel('要做什么').fill('通过命令面板创建的任务');
+  await page.getByRole('button', { name: '创建任务', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: '通过命令面板创建的任务', exact: true }),
+  ).toBeVisible();
 });
 test('窄屏没有整个页面的横向溢出', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -103,6 +125,10 @@ test('窄屏没有整个页面的横向溢出', async ({ page }) => {
   ]) {
     await page.goto(path);
     await expect(page.locator('.app-shell')).toBeVisible();
+    await page.getByRole('button', { name: '展开项目导航', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: '项目导引栏' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: '展开项目导航', exact: true })).toBeFocused();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);

@@ -24,7 +24,7 @@
 
 ## 3. 组件与视觉实现
 
-视觉以 W1 的暗色优先、青色强调、完整浅色主题、紧凑／舒适密度为准。数值见 [设计 tokens](../design/tokens.css)，新组件逐步迁移到 `packages/ui` 的共享实现，不在业务页复制另一套配色。参考 tokens 尚未被应用导入，旧 `packages/ui/src/tokens.css` 的靛蓝色不再代表新的设计选择。
+视觉以 W1 的暗色优先、青色强调、完整浅色主题、紧凑／舒适密度为准。数值由 [运行 tokens](../../packages/ui/src/tokens.css) 统一维护，[设计 tokens](../design/tokens.css) 仅转引同一来源。W1-01 已迁移共享控件，W1-02 已替换壳层；旧页面变量映射仍保留必要消费者，不在业务页复制另一套配色。剩余页面重建和硬编码清理按后续切片完成。
 
 建立 `AppShell`、`ProjectHeader`、`TaskRow`、`TaskStatusBadge`、`RunStatusBadge`、`CodeStatus`、`PromptBar`、`Participant`、`ContextReference`、`ExecutionEvent`、`ResultCard`、`FeedbackThread`、`CapabilitySelect`、`ActionDrawer` 和 `EmptyState`。TaskStatus、RunStatus 与代码事实分别表达，不能用一个 status pill 隐藏区别。桌面和 Web 共用这些组件与业务契约，见 [ADR-0008](../engineering/adr-0008-client-surfaces.md)。
 

@@ -94,7 +94,7 @@ test('等待安排刷新后仍可取消，浅深色和窄屏不溢出', async ({
     await expect(page.getByRole('button', { name: '停止原生执行', exact: true })).toBeVisible();
     await mkdir('artifacts', { recursive: true });
     await page.screenshot({ path: 'artifacts/13-continuation-waiting.png', fullPage: true });
-    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,

@@ -20,9 +20,9 @@
 
 本轮推进 **09-02/05/06** 的 Codex 节点私有会话与显式恢复，联动 **06-06、10-03、11-02**。**仅本人、同范围、最新成功会话；真实提供方恢复未验证，Claude resume 和自动等待恢复未实现。** 下一步见 [22](22-next-delivery.md)。
 
-设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)，归档 tokens 与交互参考，覆盖 01-01、02-01/02/05/06、10-01/03/06 的设计依据。应用尚未迁移，桌面尚未交付；**2 完成 / 61 部分实现 / 39 未实现的统计不变**。
+设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1-01/02 已接入真实应用的共享视觉、外观与导航壳层，具体页面仍待后续切片；桌面尚未交付。原工作项完整范围未全部收口，**2 完成 / 61 部分实现 / 39 未实现的统计不变**。
 
-执行拆分见 [23｜W1 前端重建](23-workbench-rebuild.md)：W1-01—09 映射到原 02／03／04／07／09／10／11／14／15 项，均为未开始的 UI 增量。旧 UI 的已完成历史保留，接管后清理呈现代码；已有接口、权限、执行器和原生能力不归零。原表是唯一总账，W1 标签不另计为新增全局工作项。
+执行拆分见 [23｜W1 前端重建](23-workbench-rebuild.md)：W1-01—09 映射到原 02／03／04／07／09／10／11／14／15 项，状态按各子任务实际交付记录。旧 UI 的已完成历史保留，接管后清理呈现代码；已有接口、权限、执行器和原生能力不归零。原表是唯一总账，W1 标签不另计为新增全局工作项。
 
 ## 2. 工作项索引
 
@@ -34,9 +34,9 @@
 | HX-DEV-01-04 | 迁移、事务、outbox 与附件存储端口 | BE | 部分实现 | SQLite 迁移 8 增加节点接续 Operation 与任务/节点唯一预约；Run、派发、所选要求、Operation 关联和 outbox 原子提交。PostgreSQL、附件存储和旧数据导入仍未实现。 | [迁移](../../packages/db/src/schema.ts) / [派发](../../packages/db/src/node-execution.ts) |
 | HX-DEV-01-05 | 模拟适配器与统一演示数据 | RN/FE | 部分实现 | 虚构数据及成功/失败/输入/授权模拟流程已实现；节点失联、缺模型等完整场景集和生产隔离仍需完善。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
 | HX-DEV-01-06 | 最小自托管开发组合与构建任务 | OPS/BE | 部分实现 | 本机构建、health/ready 与只读 CI 已有；正式数据库/文件服务的自托管组合与配置诊断未完整实现。 | [工程](../../package.json) / [迁移](../../packages/db/src/schema.ts) |
-| HX-DEV-02-01 | 设计变量、浅深色与状态 tokens | UX/FE | 部分实现 | 既有浅深色样式保留；W1 暗色青色语义 tokens、字体、密度与说明已定稿。参考 tokens 尚未导入应用，共享组件迁移与硬编码清理未完成。 | [W1](../design/README.md) / [参考变量](../design/tokens.css) / [现有变量](../../packages/ui/src/tokens.css) |
-| HX-DEV-02-02 | 应用外壳、导航与空间切换 | FE | 部分实现 | 既有导航和真实空间切换已实现；W1 导航轨／导引栏和桌面／Web 共享壳层方向已确认。新壳层、布局偏好和正式个人客户端入口尚未交付。 | [客户端决定](../engineering/adr-0008-client-surfaces.md) / [外壳](../../apps/web/src/App.tsx) |
-| HX-DEV-02-03 | 任务、执行、人物、工具、成果组件 | FE | 部分实现 | 任务、执行、人物/工具、成果组件已有；完整上下文引用与全部状态示例未完成。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
+| HX-DEV-02-01 | 设计变量、浅深色与状态 tokens | UX/FE | 部分实现 | W1 tokens 已成为 UI 包的运行源，设计入口转引同一文件；新增默认深色、保留已有主题、紧凑／舒适密度，登录前后统一。旧页面仍消费过渡别名，完整页面硬编码清理未完成。 | [运行变量](../../packages/ui/src/tokens.css) / [外观](../../apps/web/src/appearance.tsx) |
+| HX-DEV-02-02 | 应用外壳、导航与空间切换 | FE | 部分实现 | W1 顶栏、导航轨、项目导引栏、面包屑和命令入口已替换旧壳层；原路由和空间切换保留，导引栏偏好按身份／空间隔离。完整工作区布局偏好与正式个人客户端仍未交付。 | [新外壳](../../apps/web/src/shell.tsx) / [客户端决定](../engineering/adr-0008-client-surfaces.md) |
+| HX-DEV-02-03 | 任务、执行、人物、工具、成果组件 | FE | 部分实现 | 共享按钮／输入／状态／Dialog／Drawer／Empty 已采用 W1，busy、禁用、焦点与 provider 文案保留；页面组件、完整上下文引用和全部状态示例尚未完成。 | [共享组件](../../packages/ui/src/index.tsx) / [共享样式](../../packages/ui/src/components.css) |
 | HX-DEV-02-04 | 四类核心页面的模拟交互 | UX/FE | 已完成 | 工作台、项目、任务和成果四类页面骨架已接统一示例数据并可交互；此完成状态仅指页面骨架。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
 | HX-DEV-02-05 | 继续、协助、并行与反馈面板 | UX/FE | 部分实现 | 继续、反馈、接续状态界面已有；W1 归档交互参考并选用 Figma 求助材料／交接信息结构。真实协助、并行与接手仍未实现，参考按钮不计作功能交付。 | [设计参考](../design/workbench-reference.html) / [界面](../../apps/web/src/App.tsx) |
 | HX-DEV-02-06 | 响应式、键盘、文案与异常状态 | FE | 部分实现 | 窄屏、浅深色、搜索/弹层键盘路径及部分异常状态已有；布局偏好、历史阅读保护与完整文案字典未完成。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |

@@ -119,7 +119,7 @@ test('真实账号建立、邀请同事、项目只读转编辑与个人隔离�
     await page.goto(origin + '/settings');
     await expect(page.getByRole('heading', { name: '空间与账号', exact: true })).toBeVisible();
     await page.screenshot({ path: 'artifacts/18-team-members.png', fullPage: true });
-    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,

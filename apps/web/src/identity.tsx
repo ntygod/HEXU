@@ -362,8 +362,8 @@ export function SpaceSwitcher() {
     return (
       <div className="space-switch">
         <span className="space-grid">▦</span>
-        <strong>合序团队</strong>
-        <span className="space-demo">本地</span>
+        <strong>本地预览</strong>
+        <span className="space-demo">示例</span>
       </div>
     );
   return (

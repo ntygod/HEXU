@@ -212,7 +212,7 @@ test('节点运行中停止确认，手机深色页面不把关闭或离线当�
       .poll(async () => (await detail(page, f)).runs.at(-1)?.state, { timeout: 20000 })
       .toBe('running');
     await expect(page.locator('.node-run-steps .reached')).toHaveCount(4);
-    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,
@@ -360,7 +360,7 @@ test('下一轮要求可编辑撤回并持久保存，手机深色不溢出，�
     await page.getByLabel('下一轮要求', { exact: true }).fill('补充月份筛选，保留未提交修改');
     await page.getByRole('button', { name: '保存修改', exact: true }).click();
     await expect(page.locator('.next-input-item')).toContainText('补充月份筛选');
-    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,
@@ -512,7 +512,7 @@ test('节点等待接续刷新后可取消，手机深色显示安排与实际�
     await expect(page.getByRole('button', { name: '取消接续安排', exact: true })).toBeVisible();
     expect((await detail(page, f)).runs).toHaveLength(1);
     expect((await detail(page, f)).runs[0].state).toBe('running');
-    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,
@@ -635,7 +635,7 @@ test('Codex 原生会话：重启独立节点后明确恢复，使用同一私�
     await page.reload();
     await expect(page.locator('.native-session-record')).toContainText('Codex 原生恢复完成');
     await page.screenshot({ path: 'artifacts/33-codex-native-resumed.png', fullPage: true });
-    await page.getByRole('button', { name: '切换深色模式', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,
