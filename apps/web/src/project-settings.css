@@ -8,6 +8,11 @@
   flex-wrap: wrap;
   gap: var(--hx-space-2);
 }
+@media (max-width: 650px) {
+  .project-settings-actions {
+    flex-basis: 100%;
+  }
+}
 .project-conflict {
   padding: var(--hx-space-3);
   border: 1px solid var(--hx-border-subtle);
