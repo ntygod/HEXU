@@ -19,3 +19,7 @@ E2b1 使用独立 CLI 和回环 HTTP 的固定端点，不新增依赖或开放�
 不为了展示执行按钮而远程调用控制服务的原生 runtime；它仍仅用于 preview。E2b2 必须增加独立执行授权、dispatch/outbox、工作区写入约束、真实进程状态和幂等恢复，再接入既有工具适配器。远程 WSS/HTTPS、PostgreSQL、系统凭证存储和跨平台安装仍单列未完成。
 
 Git porcelain 稳定格式、未跟踪目录与 submodule 的范围参见 [git-status 官方文档](https://git-scm.com/docs/git-status)，helper 配置参见 [git-config 官方文档](https://git-scm.com/docs/git-config)。Node SQLite / Fetch 接口按所用 Node 24 程序、锁定类型与实际测试核对，不能以文档代替运行结果。
+
+## Git 配置隔离补充
+
+Git 状态采集使用临时隔离的 Git 元数据目录和只读复制的有界索引，不加载原仓库的可执行配置；仅通过允许的核心布尔/换行设置读取现有对象。配置中的 clean/smudge/process 过滤器会使摘要显示“不可用”，不会执行过滤器来换取精确数字。配置在预检后变化也不会进入状态进程；采集后再次核对。稀疏工作区、分割索引等尚未覆盖的形式可能显示不可用；临时元数据随后清理，不改写原索引。这仍不是操作系统沙箱。

@@ -36,6 +36,8 @@ async function prepare(page: Page) {
   await page.goto(origin + '/settings');
   await page.getByLabel('当前工作空间', { exact: true }).selectOption(space.id);
   await expect(page.getByLabel('当前工作空间', { exact: true })).toHaveValue(space.id);
+  // Space switching intentionally returns to the workbench. Re-enter settings.
+  await page.getByRole('link', { name: '资源与设置', exact: true }).click();
   await expect(page.getByRole('button', { name: '连接我的节点', exact: true })).toBeEnabled();
   const dir = await mkdtemp(join(tmpdir(), 'hexu-browser-node-')),
     root = join(dir, 'repo'),
@@ -185,6 +187,8 @@ test('项目只读成员可看授权摘要但不能控制节点，撤权后打�
     agent = cli(['start', '--state', f.home]);
     await member.goto(origin + '/settings');
     await member.getByLabel('当前工作空间', { exact: true }).selectOption(f.space.id);
+    await expect(member.getByLabel('当前工作空间', { exact: true })).toHaveValue(f.space.id);
+    await member.getByRole('link', { name: '资源与设置', exact: true }).click();
     const card = member.locator('.node-card').filter({ hasText: '我的开发节点' });
     await expect(card.locator('.badge')).toHaveText('在线');
     await expect(card.getByRole('button', { name: '撤销节点' })).toHaveCount(0);

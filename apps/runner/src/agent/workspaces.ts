@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { realpath, stat } from 'node:fs/promises';
-import { relative, isAbsolute, sep, resolve } from 'node:path';
+import { realpath, stat, open, mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { relative, isAbsolute, sep, resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import {
@@ -29,8 +31,9 @@ const inside = (a: string, b: string) => {
 };
 
 async function git(root: string, args: string[]) {
-  // Inherit no user-supplied GIT_* switches. Disable repository-configured helpers
-  // that status could otherwise execute. Never invoke a shell, hooks or providers.
+  // Inherit no user-supplied GIT_* switches. Discovery/config reads never refresh
+  // the index. Status MUST use the isolated metadata directory below: disabling
+  // fsmonitor/hooks alone does not prevent clean/process filter execution.
   const env: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
@@ -40,12 +43,15 @@ async function git(root: string, args: string[]) {
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_OPTIONAL_LOCKS: '0',
     GIT_TERMINAL_PROMPT: '0',
+    GIT_NO_LAZY_FETCH: '1',
+    GIT_NO_REPLACE_OBJECTS: '1',
   };
   return (
     await exec(
       'git',
       [
         '--no-optional-locks',
+        '--no-pager',
         '-C',
         root,
         '-c',
@@ -56,12 +62,129 @@ async function git(root: string, args: string[]) {
         'core.untrackedCache=false',
         '-c',
         'status.renames=false',
+        '-c',
+        'protocol.allow=never',
         ...args,
       ],
       { env, timeout: 4000, maxBuffer: 1024 * 1024, encoding: 'utf8' },
     )
   ).stdout;
 }
+// Read a bounded, regular metadata file; never follow a pipe or symlink into an
+// unbounded source. The original index is not refreshed or written by the agent.
+async function metadataFile(path: string, limit: number): Promise<Buffer | null> {
+  let handle;
+  try {
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > limit) throw new Error('Unsupported metadata');
+    const buffer = Buffer.alloc(info.size + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+      if (!bytesRead) break;
+      length += bytesRead;
+    }
+    if (length !== info.size) throw new Error('Metadata changed during capture');
+    return buffer.subarray(0, length);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  } finally {
+    await handle?.close();
+  }
+}
+
+async function isolatedStatus(w: LocalDirectory): Promise<string> {
+  // Original repository configuration is read ONLY as data. Never pass includes,
+  // filters, aliases, hooks, remotes or helper commands to the status process.
+  const settings = new Map<string, string>();
+  const raw = await git(w.root, ['config', '--null', '--list']);
+  for (const entry of raw.split('\0')) {
+    if (!entry) continue;
+    const newline = entry.indexOf('\n');
+    if (newline < 0) throw new Error('Unsupported config');
+    settings.set(entry.slice(0, newline).toLowerCase(), entry.slice(newline + 1));
+  }
+  // Filters can make raw working-tree bytes incomparable to indexed content.
+  // Report unavailable, not a misleading clean count. Isolation below also
+  // protects against configuration changing after this check.
+  for (const [name, value] of settings) {
+    if (/^filter\..*\.(clean|smudge|process)$/.test(name) && value)
+      throw new Error('Filtered status requires an explicitly trusted native tool');
+  }
+  if (settings.get('core.sparsecheckout') === 'true')
+    throw new Error('Sparse checkout summary is not implemented');
+  const objectFormat = (await git(w.root, ['rev-parse', '--show-object-format'])).trim();
+  if (!['sha1', 'sha256'].includes(objectFormat)) throw new Error('Unsupported object format');
+  const common = await realpath(
+    (await git(w.root, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim(),
+  );
+  const objects = await realpath(join(common, 'objects'));
+  const index = await metadataFile(join(w.gitDir, 'index'), 32 * 1024 * 1024);
+  let head: string;
+  try {
+    head = (await git(w.root, ['rev-parse', '--verify', 'HEAD'])).trim();
+    if (!new RegExp(`^[0-9a-f]{${objectFormat === 'sha256' ? 64 : 40}}$`).test(head))
+      throw new Error('Invalid HEAD');
+  } catch {
+    // An unborn branch is valid; all other missing/corrupt HEAD states are not.
+    const ref = (await git(w.root, ['symbolic-ref', '--quiet', 'HEAD'])).trim();
+    if (!ref.startsWith('refs/heads/')) throw new Error('Invalid unborn HEAD');
+    head = 'ref: refs/heads/hexu-summary-unborn';
+  }
+  const shadow = await mkdtemp(join(tmpdir(), 'hexu-git-summary-'));
+  try {
+    if (inside(w.root, shadow)) throw new Error('Temporary metadata must be outside workspace');
+    await mkdir(join(shadow, 'refs'));
+    await mkdir(join(shadow, 'info'));
+    await symlink(objects, join(shadow, 'objects'), 'dir');
+    await writeFile(join(shadow, 'HEAD'), head + '\n', { mode: 0o600 });
+    if (index) await writeFile(join(shadow, 'index'), index, { mode: 0o600 });
+    const exclude = await metadataFile(join(common, 'info', 'exclude'), 1024 * 1024);
+    if (exclude) await writeFile(join(shadow, 'info', 'exclude'), exclude, { mode: 0o600 });
+    // No original configuration is loaded, even if it changes concurrently.
+    // Disable filters at the highest attribute precedence as defense in depth.
+    await writeFile(join(shadow, 'info', 'attributes'), '* -filter\n', { mode: 0o600 });
+    const options = [
+      `--git-dir=${shadow}`,
+      `--work-tree=${w.root}`,
+      '-c',
+      'core.bare=false',
+      '-c',
+      'core.attributesFile=/dev/null',
+    ];
+    if (objectFormat === 'sha256')
+      options.push('-c', 'core.repositoryformatversion=1', '-c', 'extensions.objectformat=sha256');
+    for (const name of [
+      'core.filemode',
+      'core.ignorecase',
+      'core.symlinks',
+      'core.autocrlf',
+      'core.eol',
+    ]) {
+      const value = settings.get(name);
+      if (value === undefined) continue;
+      if (!['true', 'false', 'input', 'lf', 'crlf', 'native'].includes(value))
+        throw new Error('Unsupported core configuration');
+      options.push('-c', `${name}=${value}`);
+    }
+    const result = await git(w.root, [
+      ...options,
+      'status',
+      '--porcelain=v1',
+      '-z',
+      '--untracked-files=normal',
+      '--ignore-submodules=all',
+    ]);
+    if ((await git(w.root, ['config', '--null', '--list'])) !== raw)
+      throw new Error('Configuration changed during capture');
+    return result;
+  } finally {
+    await rm(shadow, { recursive: true, force: true });
+  }
+}
+
 export async function authorizeDirectories(
   input: { name: string; path: string }[],
   stateDirectory?: string,
@@ -152,13 +275,7 @@ export async function captureDirectory(w: LocalDirectory): Promise<GitSummary> {
     ) {
       return { ...summary, state: 'authorization_changed' };
     }
-    const output = await git(w.root, [
-      'status',
-      '--porcelain=v1',
-      '-z',
-      '--untracked-files=normal',
-      '--ignore-submodules=all',
-    ]);
+    const output = await isolatedStatus(w);
     // Recheck after capture; no summary is sent for a replaced authorization target.
     if ((await identity(w.root)) !== w.rootIdentity || (await identity(w.gitDir)) !== w.gitIdentity)
       return { ...summary, state: 'authorization_changed' };

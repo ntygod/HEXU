@@ -10,6 +10,7 @@ import {
   rm,
   stat,
   symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -366,4 +367,88 @@ test('CLI 不接受参数中的配对凭证，缺少本机确认时不注册节�
   assert.equal(response.code, 1);
   assert.ok(!response.out.includes(token));
   assert.ok(response.out.includes('不支持此参数'));
+});
+
+test('Git clean/process/smudge 与 include 配置不能执行，过滤型仓库不伪造干净状态', async () => {
+  for (const driver of ['clean', 'process', 'smudge', 'included']) {
+    const f = await repo();
+    try {
+      const marker = join(f.dir, 'filter-invoked');
+      await writeFile(join(f.root, '.gitattributes'), 'README.md filter=probe\n');
+      execFileSync('git', ['-C', f.root, 'add', '.gitattributes']);
+      const command = `touch '${marker}'; cat`;
+      if (driver === 'included') {
+        const config = join(f.dir, 'extra.config');
+        await writeFile(config, `[filter "probe"]\nclean = "${command}"\n`);
+        execFileSync('git', ['-C', f.root, 'config', 'include.path', config]);
+      } else execFileSync('git', ['-C', f.root, 'config', `filter.probe.${driver}`, command]);
+      await utimes(join(f.root, 'README.md'), 1000000000, 1000000000);
+      const index = await readFile(join(f.root, '.git', 'index'));
+      const [w] = await authorizeDirectories([{ name: '安全目录', path: f.root }], f.home);
+      const result = await captureDirectory(w!);
+      assert.equal(result.state, 'unavailable');
+      assert.equal(existsSync(marker), false);
+      assert.deepEqual(await readFile(join(f.root, '.git', 'index')), index);
+    } finally {
+      await f.close();
+    }
+  }
+});
+
+test('配置预检后新增过滤器仍不会被状态采集进程执行', async () => {
+  const f = await repo(),
+    previous = process.env.PATH;
+  try {
+    const marker = join(f.dir, 'race-filter-invoked');
+    const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+    await writeFile(join(f.root, '.gitattributes'), 'README.md filter=late\n');
+    await utimes(join(f.root, 'README.md'), 1000000000, 1000000000);
+    const [w] = await authorizeDirectories([{ name: '工作副本', path: f.root }], f.home);
+    const bin = join(f.dir, 'bin');
+    await mkdir(bin);
+    // Test-only interception at the exact isolation boundary, not a production hook.
+    const wrapper = join(bin, 'git');
+    await writeFile(
+      wrapper,
+      `#!${process.execPath}\nconst {spawnSync}=require('node:child_process');\nconst args=process.argv.slice(2);\nif(args.some(a=>a.startsWith('--git-dir='))) spawnSync(${JSON.stringify(git)},['-C',${JSON.stringify(f.root)},'config','filter.late.clean',${JSON.stringify(`touch '${marker}'; cat`)}]);\nconst result=spawnSync(${JSON.stringify(git)},args,{stdio:'inherit'});process.exit(result.status??1);\n`,
+    );
+    await chmod(wrapper, 0o700);
+    process.env.PATH = bin + ':' + previous;
+    assert.equal((await captureDirectory(w!)).state, 'unavailable');
+    assert.equal(existsSync(marker), false);
+  } finally {
+    process.env.PATH = previous;
+    await f.close();
+  }
+});
+
+test('隔离 Git 摘要支持未提交首版与 linked worktree，且不写入原始索引', async () => {
+  const f = await repo();
+  try {
+    const linked = join(f.dir, 'linked');
+    execFileSync('git', ['-C', f.root, 'worktree', 'add', '-q', '-b', 'summary-test', linked]);
+    await writeFile(join(linked, 'README.md'), 'changed in linked workspace\n');
+    const empty = join(f.dir, 'empty');
+    await mkdir(empty);
+    execFileSync('git', ['init', '-q', empty]);
+    await writeFile(join(empty, 'new.txt'), 'not yet committed\n');
+    execFileSync('git', ['-C', empty, 'add', 'new.txt']);
+    const dirs = await authorizeDirectories(
+      [
+        { name: 'linked', path: linked },
+        { name: 'unborn', path: empty },
+      ],
+      f.home,
+    );
+    const indexes = await Promise.all(dirs.map((w) => readFile(join(w.gitDir, 'index'))));
+    const summary = await captureSnapshot(dirs);
+    assert.equal(summary.workspaces[0]?.state, 'available');
+    assert.equal(summary.workspaces[0]?.modified, 1);
+    assert.equal(summary.workspaces[1]?.state, 'available');
+    assert.equal(summary.workspaces[1]?.staged, 1);
+    for (let i = 0; i < dirs.length; i++)
+      assert.deepEqual(await readFile(join(dirs[i]!.gitDir, 'index')), indexes[i]);
+  } finally {
+    await f.close();
+  }
 });
