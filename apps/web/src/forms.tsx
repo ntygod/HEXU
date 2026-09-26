@@ -19,7 +19,7 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
           setBusy(true);
           setError('');
           try {
-            const task = await request<Task>('/spaces/space-demo/tasks', {
+            const task = await request<Task>(`/spaces/${data.space?.id ?? 'space-demo'}/tasks`, {
               method: 'POST',
               body: { title, description, projectId: project || null },
             });
@@ -52,11 +52,13 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
             放在哪里
             <select value={project} onChange={(e) => setProject(e.target.value)}>
               <option value="">我的个人工作</option>
-              {data.projects.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
+              {data.projects
+                .filter((item) => item.access !== 'view')
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
             </select>
           </label>
           <label className="field">
@@ -93,7 +95,7 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
   );
 }
 export function NewProject({ onClose }: { onClose: () => void }) {
-  const { refresh, notice } = useApp();
+  const { data, refresh, notice } = useApp();
   const [name, setName] = useState(''),
     [description, setDescription] = useState(''),
     [busy, setBusy] = useState(false),
@@ -105,10 +107,13 @@ export function NewProject({ onClose }: { onClose: () => void }) {
           event.preventDefault();
           setBusy(true);
           try {
-            const project = await request<{ id: string }>('/spaces/space-demo/projects', {
-              method: 'POST',
-              body: { name, description },
-            });
+            const project = await request<{ id: string }>(
+              `/spaces/${data.space?.id ?? 'space-demo'}/projects`,
+              {
+                method: 'POST',
+                body: { name, description },
+              },
+            );
             await refresh();
             onClose();
             go(`/projects/${project.id}`);
@@ -167,7 +172,7 @@ export function ContinuePanel({
   lastRun?: Run;
   onClose: () => void;
 }) {
-  const { refresh, notice } = useApp();
+  const { data, refresh, notice } = useApp();
   const [nativeMode, setNativeMode] = useState(lastRun?.provider === 'native');
   const [tool, setTool] = useState<Tool>(
       lastRun?.requestedTool === 'claude-code' ? 'codex' : 'claude-code',
@@ -296,7 +301,7 @@ export function ContinuePanel({
   );
 }
 export function ShareResult({ task, onClose }: { task: Task; onClose: () => void }) {
-  const { refresh, notice } = useApp();
+  const { data, refresh, notice } = useApp();
   const [title, setTitle] = useState(task.title),
     [body, setBody] = useState(''),
     [busy, setBusy] = useState(false),
@@ -368,7 +373,7 @@ export function ShareResult({ task, onClose }: { task: Task; onClose: () => void
   );
 }
 export function EditTask({ task, onClose }: { task: Task; onClose: () => void }) {
-  const { refresh, notice } = useApp();
+  const { data, refresh, notice } = useApp();
   const [title, setTitle] = useState(task.title),
     [description, setDescription] = useState(task.description),
     [attention, setAttention] = useState(task.attention ?? ''),

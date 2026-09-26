@@ -8,9 +8,19 @@ import {
   type MouseEvent,
 } from 'react';
 import type { Task, TaskStatus, Workbench } from '../../../packages/contracts/src/index.js';
-import { request } from '../../../packages/client/src/index.js';
+import { request, getActiveSpace } from '../../../packages/client/src/index.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
 import { Button, Dialog, Icon } from '../../../packages/ui/src/index.js';
+export function canEditTask(data: Workbench, task: Task) {
+  return (
+    data.mode === 'local-preview' ||
+    (task.visibility === 'private'
+      ? task.ownerUserId === data.user.id
+      : ['edit', 'manage'].includes(
+          data.projects.find((p) => p.id === task.projectId)?.access ?? '',
+        ))
+  );
+}
 export const go = (path: string) => {
   history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
@@ -78,7 +88,7 @@ export function Provider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const next = await request<Workbench>('/workbench');
     if (
-      next.mode !== 'local-preview' ||
+      !['local-preview', 'team-local'].includes(next.mode) ||
       !Array.isArray(next.tasks) ||
       !Array.isArray(next.projects)
     )
@@ -90,11 +100,21 @@ export function Provider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh().catch((error) => setFatal(error.message));
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const events = new EventSource('/api/v1/events');
+    const events = new EventSource(
+      '/api/v1/events' +
+        (getActiveSpace() ? '?spaceId=' + encodeURIComponent(getActiveSpace()) : ''),
+    );
     events.addEventListener('ready', () => setConnected(true));
     events.addEventListener('changed', () => {
       clearTimeout(timer);
       timer = setTimeout(() => refresh().catch(() => setConnected(false)), 120);
+    });
+    events.addEventListener('access-ended', (event) => {
+      events.close();
+      const reason = JSON.parse((event as MessageEvent).data).reason;
+      window.dispatchEvent(
+        new Event(reason === 'session' ? 'hexu-auth-required' : 'hexu-space-revoked'),
+      );
     });
     events.onerror = () => setConnected(false);
     return () => {
@@ -128,6 +148,10 @@ export function Provider({ children }: { children: ReactNode }) {
     notice(status === 'done' ? '已标记完成，随时可以重新打开' : '任务状态已更新');
   };
   const changeStatus = async (task: Task, status: TaskStatus) => {
+    if (data && !canEditTask(data, task)) {
+      notice('只读项目不能修改任务状态', true);
+      return;
+    }
     if (
       status === 'done' &&
       data?.runs.some((run) => run.taskId === task.id && isActiveRun(run.state))
@@ -232,7 +256,10 @@ export function useLoad<T>(path: string) {
     request<T>(path, { signal: controller.signal })
       .then(setValue)
       .catch((error) => {
-        if (error.name !== 'AbortError') setError(error.message);
+        if (error.name !== 'AbortError') {
+          setValue(null);
+          setError(error.message);
+        }
       });
     return () => controller.abort();
   }, [path, version]);

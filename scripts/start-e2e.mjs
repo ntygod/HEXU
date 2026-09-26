@@ -43,4 +43,19 @@ process.env.HEXU_NATIVE_ENABLED = '1';
 process.env.HEXU_NATIVE_ROOTS = JSON.stringify([repo]);
 process.env.HEXU_CLAUDE_BIN = executable;
 process.env.ANTHROPIC_API_KEY = 'sk-ant-browser-protocol-fixture-not-a-real-key';
+// Independent real-auth browser fixture, no model/provider settings inherited.
+const { createApp } = await import('../dist/apps/control/src/app.js');
+const teamApp = await createApp({
+  port: 4311,
+  databasePath: join(path, 'team-workspace.sqlite'),
+  identity: {
+    databasePath: join(path, 'team-identity.sqlite'),
+    secret: 'fictional-browser-auth-secret-not-real-0123456789',
+    setupCode: 'fictional-browser-setup-code-not-real-0123456789',
+    baseURL: 'http://127.0.0.1:4311',
+    trustedOrigins: ['http://127.0.0.1:4311'],
+  },
+});
+await teamApp.listen({ host: '127.0.0.1', port: 4311 });
+process.env.HEXU_MODE = 'preview';
 await import('../dist/apps/control/src/main.js');
