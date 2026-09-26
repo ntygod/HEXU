@@ -22,6 +22,7 @@ export async function openCodex(options: {
   config?: NativeRunConfig;
   retained?: { home: string; threadId?: string; resolvedModel?: string };
   onSpawn?(): void;
+  beforeSpawn?(): void;
   onEvent(kind: NativeEvent['kind'], body: string): void;
   onReferences(refs: { sessionId?: string; turnId?: string; resolvedModel?: string }): void;
 }): Promise<CodexHandle> {
@@ -48,6 +49,7 @@ export async function openCodex(options: {
   );
   let handle: ProcessHandle;
   try {
+    options.beforeSpawn?.();
     handle = runProcess({
       executable: options.executable,
       args: codexArguments(options.root),

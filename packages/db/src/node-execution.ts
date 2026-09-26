@@ -1,3 +1,4 @@
+import { PROJECT_ARCHIVED } from './project-lifecycle.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import type { NodeContinuationCommit } from '../../contracts/src/node-continuation.js';
 import { NextInputs } from './next-inputs.js';
@@ -217,7 +218,9 @@ export class NodeExecution {
           } catch {
             reserved = true;
           }
+          const archived = this.store.projectLifecycle.isArchived(task.projectId);
           const available =
+            !archived &&
             n.presence === 'online' &&
             p.connection_id === raw.connection_id &&
             !occupied &&
@@ -227,13 +230,15 @@ export class NodeExecution {
               nodeId: n.id,
               name: n.name,
               available,
-              reason: reserved
-                ? '任务或节点已有待接续安排'
-                : occupied
-                  ? '节点仍有执行或待核对现场'
-                  : available
-                    ? '仅节点所有者可发起；模型账户未据此验证'
-                    : '节点离线或尚未重新发布执行授权',
+              reason: archived
+                ? PROJECT_ARCHIVED.message
+                : reserved
+                  ? '任务或节点已有待接续安排'
+                  : occupied
+                    ? '节点仍有执行或待核对现场'
+                    : available
+                      ? '仅节点所有者可发起；模型账户未据此验证'
+                      : '节点离线或尚未重新发布执行授权',
               policyHash: p.policy_hash,
               policy,
               workspaces: n.workspaces.filter((w) => policy.workspaceIds.includes(w.id)),
@@ -255,6 +260,7 @@ export class NodeExecution {
     if (owner.project_id !== task.projectId)
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '来源项目范围已变化', 409);
     const blockers: NodeContinuationPreview['blockers'] = [];
+    if (this.store.projectLifecycle.isArchived(task.projectId)) blockers.push(PROJECT_ARCHIVED);
     if (this.store.runs(taskId).at(-1)?.id !== source.id)
       blockers.push({ code: 'SOURCE_CHANGED', message: '已有更新执行，请从最新执行继续' });
     const d = this.row(source.node.dispatchId);
@@ -371,11 +377,12 @@ export class NodeExecution {
     key: string,
     operation?: NodeContinuationCommit,
   ): Run {
-    const task = this.store.getTask(taskId, true);
+    const task = this.store.projectLifecycle.assertExecution(taskId);
     const node = this.nodes.ownedExecutionNode(input.nodeId); // Always before replay.
     if (task.projectId !== node.project_id)
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务与节点不属于同一项目', 409);
     const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
+      this.store.projectLifecycle.assertExecution(taskId);
       assertNoPendingNodeContinuation(this.store, taskId, input.nodeId, operation?.operationId);
       assertRevision(task.revision, input.expectedRevision);
       if (input.sessionMode && operation)
@@ -545,6 +552,8 @@ export class NodeExecution {
           c = JSON.parse(d.command) as DispatchCommand;
         if (
           n.revoked_at ||
+          (['queued', 'accepted'].includes(d.stage) &&
+            this.store.projectLifecycle.isArchived(this.task(d).projectId)) ||
           r.state === 'stopping' ||
           (['queued', 'accepted'].includes(d.stage) && Date.parse(c.expiresAt) <= Date.now())
         )
@@ -593,6 +602,7 @@ export class NodeExecution {
         r = this.run(d);
       const valid =
         d.stage === 'accepted' &&
+        !this.store.projectLifecycle.isArchived(task.projectId) &&
         r.state !== 'stopping' &&
         p?.connection_id === connectionId &&
         p.policy_hash === c.policyHash &&

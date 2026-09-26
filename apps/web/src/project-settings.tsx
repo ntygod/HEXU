@@ -8,6 +8,7 @@ import type {
 import { ApiError, request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon } from '../../../packages/ui/src/index.js';
 import { useApp } from './state.js';
+import { ProjectLifecycle } from './project-lifecycle.js';
 import './project-settings.css';
 
 type SaveAttempt = { body: ProjectPatch; key: string };
@@ -19,6 +20,8 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description);
   const [busy, setBusy] = useState(false);
+  const [lifecyclePending, setLifecyclePending] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [error, setError] = useState('');
   const [uncertain, setUncertain] = useState<SaveAttempt | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -64,12 +67,13 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
   };
 
   return (
-    <Dialog title="项目设置" drawer onClose={() => !busy && onClose()}>
+    <Dialog title="项目设置" drawer onClose={() => !busy && !lifecycleBusy && onClose()}>
       <form
         className="drawer-form project-settings"
         onSubmit={(event) => {
           event.preventDefault();
-          if (busy || uncertain || changedElsewhere || !dirty || !name.trim()) return;
+          if (busy || lifecyclePending || uncertain || changedElsewhere || !dirty || !name.trim())
+            return;
           void save({
             body: { expectedRevision: base.revision, name, description },
             key: crypto.randomUUID(),
@@ -87,7 +91,7 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
               required
               maxLength={100}
               value={name}
-              disabled={busy || !!uncertain}
+              disabled={busy || !!uncertain || lifecyclePending}
               onChange={(event) => setName(event.target.value)}
             />
           </label>
@@ -97,7 +101,7 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
               rows={6}
               maxLength={2000}
               value={description}
-              disabled={busy || !!uncertain}
+              disabled={busy || !!uncertain || lifecyclePending}
               placeholder="希望解决什么问题，这个项目的目标是什么…"
               onChange={(event) => setDescription(event.target.value)}
             />
@@ -110,6 +114,8 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
               </h3>
               <p role="status">你的草稿仍然保留。请比较最新内容，再选择如何继续；不会自动覆盖。</p>
               <dl>
+                <dt>最新状态</dt>
+                <dd>{project.archivedAt ? '已归档' : '未归档'}</dd>
                 <dt>最新名称</dt>
                 <dd>{project.name}</dd>
                 <dt>最新说明</dt>
@@ -118,7 +124,7 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
               <div className="project-settings-actions">
                 <Button
                   type="button"
-                  disabled={busy || !!uncertain}
+                  disabled={busy || !!uncertain || lifecyclePending}
                   onClick={() => {
                     setBase(project);
                     setName(project.name);
@@ -130,7 +136,7 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
                 </Button>
                 <Button
                   type="button"
-                  disabled={busy || !!uncertain}
+                  disabled={busy || !!uncertain || lifecyclePending}
                   onClick={() => {
                     setBase(project);
                     setError('');
@@ -171,17 +177,24 @@ export function ProjectSettings({ project, onClose }: { project: Project; onClos
             </Button>
             {historyOpen && <ProjectHistory id={project.id} revision={project.revision} />}
           </section>
-          <p className="hint">当前支持基本信息与修订查看。仓库引用、项目归档和恢复尚未接入。</p>
+          <ProjectLifecycle
+            project={project}
+            disabled={busy || dirty || changedElsewhere || !!uncertain}
+            onPending={setLifecyclePending}
+            onBusy={setLifecycleBusy}
+            onClose={onClose}
+          />
+          <p className="hint">仓库引用尚未接入。</p>
         </div>
         <div className="dialog-footer">
-          <Button type="button" disabled={busy} onClick={onClose}>
+          <Button type="button" disabled={busy || lifecycleBusy} onClick={onClose}>
             取消
           </Button>
           <Button
             type="submit"
             variant="primary"
             busy={busy}
-            disabled={!dirty || !name.trim() || changedElsewhere || !!uncertain}
+            disabled={!dirty || !name.trim() || changedElsewhere || !!uncertain || lifecyclePending}
           >
             保存项目设置
           </Button>
@@ -250,6 +263,7 @@ function ProjectHistory({ id, revision }: { id: string; revision: number }) {
               ? `${item.actorName} · ${new Date(item.savedAt).toLocaleString()}`
               : '已有项目快照；历史作者和保存时间未记录'}
           </p>
+          <p className="hint">项目状态：{item.archivedAt ? '已归档' : '未归档'}</p>
           <p className="text-block">{item.description || '未填写说明'}</p>
         </details>
       ))}

@@ -100,7 +100,7 @@ export class ContinuationStore {
     return op;
   }
   assertSource(taskId: string, input: NativeRunInput) {
-    const task = this.store.getTask(taskId);
+    const task = this.store.projectLifecycle.assertExecution(taskId);
     assertRevision(task.revision, input.expectedRevision);
     if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
       throw new DomainError('TASK_REOPEN_REQUIRED', '请重新打开任务后继续', 409);
@@ -123,7 +123,7 @@ export class ContinuationStore {
     return source;
   }
   create(taskId: string, input: ContinuationInput, key: string): ContinuationOperation {
-    this.store.getTask(taskId);
+    this.store.projectLifecycle.assertExecution(taskId);
     const result = this.store.mutate(`continuation.create:${taskId}`, key, input, () => {
       this.assertSource(taskId, input.run);
       assertNoPendingContinuation(this.store, taskId, input.run.workingCopyId);

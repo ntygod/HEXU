@@ -159,4 +159,11 @@ INSERT INTO project_revisions(project_id,revision,name,description)
 ALTER TABLE outbox ADD COLUMN project_id TEXT REFERENCES projects(id);
 `,
   },
+  {
+    version: 10,
+    sql: `
+ALTER TABLE project_revisions ADD COLUMN archived_at TEXT;
+ALTER TABLE project_revisions ADD COLUMN archived_by TEXT;
+`,
+  },
 ];

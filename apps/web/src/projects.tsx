@@ -11,6 +11,8 @@ import './work-pages.css';
 export function Projects() {
   const { data } = useApp();
   const [creating, setCreating] = useState(false);
+  const [archived, setArchived] = useState(false);
+  const projects = data.projects.filter((project) => !!project.archivedAt === archived);
   return (
     <div className="work-page">
       <header className="work-page-heading">
@@ -24,8 +26,16 @@ export function Projects() {
           新建项目
         </Button>
       </header>
+      <div className="work-tabs" aria-label="项目状态筛选">
+        <button aria-pressed={!archived} onClick={() => setArchived(false)}>
+          当前项目
+        </button>
+        <button aria-pressed={archived} onClick={() => setArchived(true)}>
+          已归档
+        </button>
+      </div>
       <div className="work-project-grid">
-        {data.projects.map((project) => {
+        {projects.map((project) => {
           const tasks = data.tasks.filter((task) => task.projectId === project.id);
           return (
             <Link to={`/projects/${project.id}`} className="work-project-card" key={project.id}>
@@ -42,6 +52,7 @@ export function Projects() {
                 <Icon name="arrow" />
               </div>
               <h2>{project.name}</h2>
+              {project.archivedAt && <span className="hint">已归档 · 仍可查看任务与成果</span>}
               <p>{project.description || '从一项任务开始，逐步补充项目目标。'}</p>
               <div className="work-card-footer">
                 <span>{tasks.filter((task) => task.status === 'in_progress').length} 项进行中</span>
@@ -51,8 +62,11 @@ export function Projects() {
           );
         })}
       </div>
-      {!data.projects.length && (
-        <Empty title="还没有项目" description="创建项目后即可整理任务，不必先连接代码目录。" />
+      {!projects.length && (
+        <Empty
+          title={archived ? '没有已归档项目' : '还没有当前项目'}
+          description="可切换项目状态查看历史，或新建项目开始工作。"
+        />
       )}
       {creating && <NewProject onClose={() => setCreating(false)} />}
     </div>
@@ -118,6 +132,12 @@ export function ProjectPage({ id }: { id: string }) {
       </header>
       {settingsOpen && manageable && (
         <ProjectSettings project={project} onClose={() => setSettingsOpen(false)} />
+      )}
+      {project.archivedAt && (
+        <div className="project-archive-banner" role="status">
+          <strong>项目已归档。</strong>{' '}
+          历史与讨论保留，新执行已暂停。已有运行仍需实际结束；恢复项目不会自动重启旧安排。
+        </div>
       )}
       {data.mode === 'team-local' && <ProjectAccess project={project} />}
       <div className="work-tabs">

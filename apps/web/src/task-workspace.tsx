@@ -73,6 +73,14 @@ export function TaskPage({ id }: { id: string }) {
     if (following.current) scroll.current.scrollTop = scroll.current.scrollHeight;
     else setUnread(true);
   }, [value?.messages.length]);
+  const archived = !!data.projects.find((project) => project.id === value?.task.projectId)
+    ?.archivedAt;
+  useEffect(() => {
+    if (archived)
+      setModal((current) =>
+        current === 'continue' || current === 'node-continue' ? null : current,
+      );
+  }, [archived]);
   if (error)
     return (
       <Empty title="暂时无法打开任务" description={error}>
@@ -144,7 +152,7 @@ export function TaskPage({ id }: { id: string }) {
             <Button
               variant="primary"
               onClick={() => setModal('continue')}
-              disabled={!editable || task.status === 'cancelled'}
+              disabled={!editable || archived || task.status === 'cancelled'}
               title={team ? '选择本人在本机明确授权的独立节点' : undefined}
             >
               <Icon name="play" />
@@ -155,7 +163,7 @@ export function TaskPage({ id }: { id: string }) {
           {active?.provider === 'native' && (
             <Button
               onClick={() => setModal('continue')}
-              disabled={!editable || task.status === 'cancelled'}
+              disabled={!editable || archived || task.status === 'cancelled'}
               title={team ? '选择本人在本机明确授权的独立节点' : undefined}
             >
               <Icon name="arrow" />
@@ -196,6 +204,12 @@ export function TaskPage({ id }: { id: string }) {
           </button>
         </div>
       </div>
+      {archived && (
+        <div className="project-archive-banner" role="status">
+          <strong>所属项目已归档。</strong>{' '}
+          可以查看、讨论和停止已有执行；新执行与接续需先在项目设置中恢复项目。
+        </div>
+      )}
       <div className="w1-run-bar" aria-label="当前执行">
         {lastRun ? (
           <>
@@ -297,15 +311,23 @@ export function TaskPage({ id }: { id: string }) {
                   key={id}
                   taskId={id}
                   editable={editable}
+                  executionDisabled={archived}
                   onConfigure={() => {
-                    if (lastRun?.provider === 'node') {
+                    if (!archived && lastRun?.provider === 'node') {
                       setContinuationSource(lastRun.id);
                       setModal('node-continue');
                     }
                   }}
                 />
               ) : (
-                <ContinuationStatus key={id} taskId={id} onConfigure={() => setModal('continue')} />
+                <ContinuationStatus
+                  key={id}
+                  taskId={id}
+                  executionDisabled={archived}
+                  onConfigure={() => {
+                    if (!archived) setModal('continue');
+                  }}
+                />
               )}
               {lastRun?.provider === 'node' && <NodeRunStatus run={lastRun} />}
               <MessageList messages={messages} />
@@ -380,9 +402,12 @@ export function TaskPage({ id }: { id: string }) {
                 task={task}
                 run={lastRun}
                 editable={editable}
-                onConfigure={() => setModal('continue')}
+                executionDisabled={archived}
+                onConfigure={() => {
+                  if (!archived) setModal('continue');
+                }}
                 onContinue={() => {
-                  if (lastRun?.provider === 'node') {
+                  if (!archived && lastRun?.provider === 'node') {
                     setContinuationSource(lastRun.id);
                     setModal('node-continue');
                   }
@@ -523,13 +548,15 @@ export function TaskPage({ id }: { id: string }) {
           </div>
         </Dialog>
       )}
-      {modal === 'continue' &&
+      {!archived &&
+        modal === 'continue' &&
         (team ? (
           <NodeRunPanel task={task} onClose={() => setModal(null)} />
         ) : (
           <ContinuePanel task={task} lastRun={lastRun} onClose={() => setModal(null)} />
         ))}{' '}
-      {modal === 'node-continue' &&
+      {!archived &&
+        modal === 'node-continue' &&
         continuationSource &&
         runs.some((r) => r.id === continuationSource && r.provider === 'node') && (
           <NodeRunPanel

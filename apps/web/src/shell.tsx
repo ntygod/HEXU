@@ -185,10 +185,13 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
                   key={item.id}
                   to={`/projects/${item.id}`}
                   className={`context-link ${project?.id === item.id ? 'selected' : ''}`}
-                  title={item.name}
+                  title={item.name + (item.archivedAt ? ' · 已归档' : '')}
                 >
                   <Icon name="folder" size={15} />
-                  <span>{item.name}</span>
+                  <span>
+                    {item.name}
+                    {item.archivedAt ? ' · 已归档' : ''}
+                  </span>
                 </Link>
               ))}
               {!data.projects.length && <p className="context-empty">还没有可访问的项目</p>}

@@ -1,3 +1,4 @@
+import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -50,6 +51,7 @@ export class Store {
   readonly permissions: PermissionService;
   readonly collaboration: CollaborationStore;
   readonly projectSettings: ProjectSettingsStore;
+  readonly projectLifecycle: ProjectLifecycleStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -83,6 +85,7 @@ export class Store {
     this.permissions = new PermissionService(this.db, () => this.principal());
     this.collaboration = new CollaborationStore(this);
     this.projectSettings = new ProjectSettingsStore(this);
+    this.projectLifecycle = new ProjectLifecycleStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
@@ -459,7 +462,9 @@ export class Store {
   ) {
     if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
     this.getTask(taskId, true);
+    this.projectLifecycle.assertExecution(taskId);
     return this.mutate(`run.create:${taskId}`, key, input, () => {
+      this.projectLifecycle.assertExecution(taskId);
       assertNoPendingNodeContinuation(this, taskId);
       assertNoPendingContinuation(this, taskId);
       const task = this.getTask(taskId, true);
@@ -603,7 +608,7 @@ export class Store {
     return row?.run_id ?? null;
   }
   replayNativeRun(taskId: string, input: NativeRunInput, key: string): Run | null {
-    this.getTask(taskId);
+    this.projectLifecycle.assertExecution(taskId);
     const row = this.db
       .prepare('SELECT fingerprint,result FROM idempotency_records WHERE scope=? AND key=?')
       .get(`${this.actorId}:native.create:${taskId}`, key) as
@@ -638,7 +643,9 @@ export class Store {
   ): Run {
     if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
     this.getTask(taskId, true);
+    this.projectLifecycle.assertExecution(taskId);
     return this.mutate(`native.create:${taskId}`, key, input, () => {
+      this.projectLifecycle.assertExecution(taskId);
       assertNoPendingNodeContinuation(this, taskId);
       assertNoPendingContinuation(this, taskId, input.workingCopyId, operationId);
       if (operationId) new ContinuationStore(this).assertStart(operationId, taskId, input);
