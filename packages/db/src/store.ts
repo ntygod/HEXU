@@ -1,3 +1,4 @@
+import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IdentityUser, Principal } from '../../contracts/src/identity.js';
 import { PermissionService } from './permissions.js';
@@ -447,6 +448,7 @@ export class Store {
     if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
     this.getTask(taskId, true);
     return this.mutate(`run.create:${taskId}`, key, input, () => {
+      assertNoPendingNodeContinuation(this, taskId);
       assertNoPendingContinuation(this, taskId);
       const task = this.getTask(taskId, true);
       assertRevision(task.revision, input.expectedRevision);
@@ -625,6 +627,7 @@ export class Store {
     if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
     this.getTask(taskId, true);
     return this.mutate(`native.create:${taskId}`, key, input, () => {
+      assertNoPendingNodeContinuation(this, taskId);
       assertNoPendingContinuation(this, taskId, input.workingCopyId, operationId);
       if (operationId) new ContinuationStore(this).assertStart(operationId, taskId, input);
       const task = this.getTask(taskId, true);

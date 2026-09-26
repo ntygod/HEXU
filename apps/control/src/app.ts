@@ -1,3 +1,4 @@
+import { parseNodeContinuationOperation } from '../../../packages/contracts/src/node-continuation.js';
 import { NextInputs } from '../../../packages/db/src/next-inputs.js';
 import { parseNextInput } from '../../../packages/contracts/src/next-input.js';
 import { parseNodeRun } from '../../../packages/contracts/src/node-execution.js';
@@ -144,6 +145,12 @@ export async function createApp(
   });
   attachIdentity(app, store, identity);
   const nodeExecution = attachNodes(app, store);
+  const operationRecords = (id: string) =>
+    nodeExecution &&
+    store.db.prepare('SELECT id FROM node_continuation_operations WHERE id=?').get(id)
+      ? nodeExecution.continuations
+      : continuations.records;
+
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof DomainError;
     const statusCode =
@@ -378,21 +385,31 @@ export async function createApp(
     return run;
   });
   app.post('/api/v1/tasks/:taskId/continuations', async (request, reply) => {
-    const operation = continuations.create(
-      param(request.params, 'taskId'),
-      parseContinuation(request.body),
-      key(request.headers),
-    );
+    const operation = nodeExecution
+      ? nodeExecution.continuations.create(
+          param(request.params, 'taskId'),
+          parseNodeContinuationOperation(request.body),
+          key(request.headers),
+        )
+      : continuations.create(
+          param(request.params, 'taskId'),
+          parseContinuation(request.body),
+          key(request.headers),
+        );
     return reply.code(202).header('Location', `/api/v1/operations/${operation.id}`).send(operation);
   });
   app.get('/api/v1/tasks/:taskId/continuations', async (request) => ({
-    items: continuations.records.list(param(request.params, 'taskId')),
+    items: (nodeExecution?.continuations ?? continuations.records).list(
+      param(request.params, 'taskId'),
+    ),
   }));
   app.get('/api/v1/operations/:operationId', async (request) =>
-    continuations.records.get(param(request.params, 'operationId')),
+    operationRecords(param(request.params, 'operationId')).get(
+      param(request.params, 'operationId'),
+    ),
   );
   app.post('/api/v1/operations/:operationId/cancel', async (request) =>
-    continuations.records.cancel(
+    operationRecords(param(request.params, 'operationId')).cancel(
       param(request.params, 'operationId'),
       revision(record(request.body).expectedRevision),
       key(request.headers),

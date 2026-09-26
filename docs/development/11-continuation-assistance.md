@@ -70,3 +70,10 @@ AI 协助默认文本材料、真正只读环境或隔离副本。不支持可�
 ## E2b3 节点接续子集
 
 节点通过 GET /tasks/:id/node-continuation-preview 核对来源；POST /tasks/:id/runs 增加 continuation { sourceRunId, expectedContextHash, inputs:[{id,revision}] }，当前返回 201+Run。仅确认源执行结束后的本人同节点同目录新会话；没有节点自动等待 Operation、原生 resume 或协助。preview 的既有 202 Operation 不变。
+
+
+## E2b4 节点安排子集
+
+node 的主接续 UI 已迁移至 `POST /tasks/:id/continuations` 返回 202+持久化 Operation。显式 wait/request_stop、固定材料/选中版本、任务与节点预约、取消、终态后复核和原子 Run 关联已落地；查询与取消沿用 `/operations/:id`。
+
+为兼容保留直接 `/runs` 的 201 节点新会话接口，但不能绕过待安排预约。本轮停止后不重新吸收后续模型输出，只派发已确认文本；严格的人工/任务修订变化仍需重新配置。原生 resume、完整 ContextBundle 与协助部分未实现，因此 11-01/02/05 仍是部分实现。

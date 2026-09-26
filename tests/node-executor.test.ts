@@ -532,3 +532,137 @@ test('本机待处理摘要不包含任务文本/密钥，不改变未知状态�
     await f.close();
   }
 });
+
+import type { NodeContinuationOperation } from '../packages/contracts/src/node-continuation.js';
+async function scheduleOperation(
+  f: Awaited<ReturnType<typeof fixture>>,
+  source: Run,
+  onActiveRun: 'wait' | 'request_stop',
+) {
+  const previewResponse = await f.call(
+    `tasks/${f.task.id}/node-continuation-preview?sourceRunId=${source.id}&waiting=true`,
+    f.alice,
+  );
+  assert.equal(previewResponse.statusCode, 200, previewResponse.body);
+  const preview = previewResponse.json();
+  const response = await f.call(`tasks/${f.task.id}/continuations`, f.alice, {
+    provider: 'node',
+    nodeId: f.pair.nodeId,
+    workingCopyId: f.directories[0]!.id,
+    policyHash: f.option.policyHash,
+    mode: 'edit',
+    prompt: 'FIXTURE_WRITE',
+    expectedRevision: (await f.call(`tasks/${f.task.id}`, f.alice)).json().task.revision,
+    confirmExecution: true,
+    onActiveRun,
+    continuation: { sourceRunId: source.id, expectedContextHash: preview.contextHash, inputs: [] },
+  });
+  assert.equal(response.statusCode, 202, response.body);
+  assert.equal(response.headers.location, `/api/v1/operations/${response.json().id}`);
+  return response.json() as NodeContinuationOperation;
+}
+
+test('节点 202 Operation 经真实 HTTP 自动停止源进程后接续，只创建一次并保持脏文件', async () => {
+  const f = await fixture();
+  try {
+    const { run } = await f.create('FIXTURE_HANG');
+    const source = await f.until(
+      () => f.getRun(run.id),
+      (r) => r.state === 'running',
+    );
+    await writeFile(join(f.root, 'retained.txt'), 'original user edit\n');
+    const op = await scheduleOperation(f, source, 'request_stop');
+    let operation = op;
+    for (
+      let i = 0;
+      i < 160 &&
+      !operation.runId &&
+      !['needs_attention', 'failed', 'cancelled'].includes(operation.state);
+      i++
+    ) {
+      await f.connection.cycle();
+      await f.executor.tick();
+      await pause();
+      operation = (await f.call(`operations/${op.id}`, f.alice)).json();
+    }
+    assert.equal(operation.state, 'succeeded', JSON.stringify(operation.blockers));
+    const target = await f.until(
+      () => f.getRun(operation.runId!),
+      (r) => r.state === 'succeeded',
+    );
+    const stopped = await f.getRun(source.id);
+    assert.equal(stopped.state, 'cancelled');
+    assert.equal(stopped.node?.terminationConfirmed, true);
+    assert.ok(target.createdAt >= stopped.updatedAt);
+    assert.equal(target.previousRunId, source.id);
+    assert.equal(await readFile(join(f.root, 'retained.txt'), 'utf8'), 'original user edit\n');
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\none\n');
+    await f.restart();
+    assert.equal((await f.call(`operations/${op.id}`, f.alice)).json().runId, target.id);
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\none\n');
+  } finally {
+    await f.close();
+  }
+});
+
+test('节点安排刷新可读，取消受真实项目权限控制；撤权后旧操作 ID 不泄露材料', async () => {
+  const f = await fixture();
+  try {
+    const { run } = await f.create('FIXTURE_HANG');
+    const source = await f.until(
+      () => f.getRun(run.id),
+      (r) => r.state === 'running',
+    );
+    const op = await scheduleOperation(f, source, 'wait');
+    await pause(300);
+    assert.equal((await f.call(`operations/${op.id}`, f.alice)).json().state, 'waiting_for_stop');
+    assert.equal(
+      (await f.call(`tasks/${f.task.id}/continuations`, f.alice)).json().items[0].id,
+      op.id,
+    );
+    await f.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, { role: 'view' });
+    assert.equal((await f.call(`operations/${op.id}`, f.bob)).statusCode, 200);
+    assert.equal(
+      (await f.call(`operations/${op.id}/cancel`, f.bob, { expectedRevision: op.revision }))
+        .statusCode,
+      403,
+    );
+    assert.equal(
+      (
+        await f.call(`operations/${op.id}/cancel`, f.alice, { expectedRevision: op.revision })
+      ).json().state,
+      'cancelled',
+    );
+    assert.equal((await f.getRun(source.id)).state, 'running');
+    await f.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, { role: null });
+    assert.equal((await f.call(`operations/${op.id}`, f.bob)).statusCode, 404);
+    assert.equal((await f.call(`tasks/${f.task.id}/continuations`, f.bob)).statusCode, 404);
+  } finally {
+    await f.close();
+  }
+});
+
+test('节点等待期间要求编辑在实际 API 中暂停安排，不发送修改后的要求', async () => {
+  const f = await fixture();
+  try {
+    const { run } = await f.create('FIXTURE_HANG');
+    const source = await f.until(
+      () => f.getRun(run.id),
+      (r) => r.state === 'running',
+    );
+    const op = await scheduleOperation(f, source, 'wait');
+    await f.call(`tasks/${f.task.id}/messages`, f.alice, { body: '等待时改变人工工作范围' });
+    let current = op;
+    for (let i = 0; i < 50 && current.state === 'waiting_for_stop'; i++) {
+      await pause();
+      current = (await f.call(`operations/${op.id}`, f.alice)).json();
+    }
+    assert.equal(current.state, 'needs_attention');
+    assert.equal(current.blockers[0]?.code, 'CONTEXT_CHANGED');
+    assert.doesNotMatch(current.contextText, /等待时改变人工工作范围/);
+    assert.equal((await f.getRun(source.id)).state, 'running');
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+  } finally {
+    await f.close();
+  }
+});

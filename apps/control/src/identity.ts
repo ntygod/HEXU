@@ -97,7 +97,17 @@ export function attachIdentity(
       );
     if (p.operationId)
       store.getTask(
-        new ContinuationStore(store).get(text(p.operationId, '操作', 150)).taskId,
+        store.teamMode
+          ? (() => {
+              const row = store.db
+                .prepare('SELECT task_id FROM node_continuation_operations WHERE id=?')
+                .get(text(p.operationId, '操作', 150)) as { task_id: string } | undefined;
+              return (
+                row?.task_id ??
+                new ContinuationStore(store).get(text(p.operationId, '操作', 150)).taskId
+              );
+            })()
+          : new ContinuationStore(store).get(text(p.operationId, '操作', 150)).taskId,
         !['GET', 'HEAD'].includes(request.method),
       );
     // Only explicit node dispatch, stop and next-round notes are allowed; no host execution.
@@ -107,7 +117,10 @@ export function attachIdentity(
       /\/(continuation-preview|native-context)(\/|$)/.test(path) ||
       (/\/(runs|continuations)(\/|$)/.test(path) &&
         request.method !== 'GET' &&
-        !(/\/tasks\/[^/]+\/runs$/.test(path) && record(request.body).provider === 'node') &&
+        !(
+          /\/tasks\/[^/]+\/(runs|continuations)$/.test(path) &&
+          record(request.body).provider === 'node'
+        ) &&
         !(
           /\/runs\/[^/]+\/(stop|inputs)$/.test(path) &&
           store.run(text(p.runId, '执行', 150)).provider === 'node'

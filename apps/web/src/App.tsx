@@ -1,3 +1,4 @@
+import { NodeContinuationStatus } from './node-continuations.js';
 import { NextInputPanel } from './next-inputs.js';
 import { NodeRunPanel, NodeRunStatus } from './node-execution.js';
 import { SpaceSwitcher } from './identity.js';
@@ -200,8 +201,8 @@ export function App() {
           <span>HEXU · 让人和 AI，一起交付。</span>
           <span>
             {data.mode === 'team-local'
-              ? 'E2b3 · 真实账号 / 本人节点执行'
-              : '开发预览 E2b3 · 示例数据'}
+              ? 'E2b4 · 真实账号 / 本人节点执行'
+              : '开发预览 E2b4 · 示例数据'}
           </span>
         </footer>
       </div>
@@ -940,7 +941,21 @@ function TaskPage({ id }: { id: string }) {
           </span>
         </div>
       </div>
-      <ContinuationStatus key={id} taskId={id} onConfigure={() => setModal('continue')} />
+      {team ? (
+        <NodeContinuationStatus
+          key={id}
+          taskId={id}
+          editable={editable}
+          onConfigure={() => {
+            if (lastRun?.provider === 'node') {
+              setContinuationSource(lastRun.id);
+              setModal('node-continue');
+            }
+          }}
+        />
+      ) : (
+        <ContinuationStatus key={id} taskId={id} onConfigure={() => setModal('continue')} />
+      )}
       {lastRun?.provider === 'node' && (
         <>
           <NodeRunStatus run={lastRun} />
@@ -1309,7 +1324,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E2b3 · 本机预览</span>
+        <span className="badge neutral">E2b4 · 本机预览</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />
