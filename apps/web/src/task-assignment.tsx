@@ -198,6 +198,7 @@ function AssignmentDrawer({
               </p>
               <div className="assignment-actions">
                 <Button
+                  type="button"
                   disabled={busy || options.revision !== task.revision}
                   onClick={() => {
                     setBase(task);
@@ -208,6 +209,7 @@ function AssignmentDrawer({
                   载入最新负责人
                 </Button>
                 <Button
+                  type="button"
                   disabled={busy || options.revision !== task.revision}
                   onClick={() => {
                     setBase(task);
@@ -227,7 +229,7 @@ function AssignmentDrawer({
           {uncertain && (
             <div className="notice-box">
               <p>保存回执未确认；不要创建另一条改派请求。关闭不会撤回已经发出的操作。</p>
-              <Button busy={busy} onClick={() => void save(uncertain)}>
+              <Button type="button" busy={busy} onClick={() => void save(uncertain)}>
                 确认上次改派结果
               </Button>
             </div>
@@ -245,7 +247,7 @@ function AssignmentDrawer({
           </section>
         </div>
         <div className="dialog-actions">
-          <Button disabled={busy} onClick={onClose}>
+          <Button type="button" disabled={busy} onClick={onClose}>
             关闭
           </Button>
           {editable && (
@@ -310,7 +312,11 @@ function AssignmentHistory({ taskId }: { taskId: string }) {
       {error && <p role="alert">{error}</p>}
       {busy && <p role="status">正在读取改派记录…</p>}
       {(error || page?.nextCursor) && (
-        <Button disabled={busy} onClick={() => void load(page?.nextCursor ?? undefined)}>
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={() => void load(page?.nextCursor ?? undefined)}
+        >
           {error ? '重试改派记录' : '更多改派记录'}
         </Button>
       )}
