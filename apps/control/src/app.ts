@@ -1,3 +1,5 @@
+import { createIdentity, type IdentityOptions } from '../../../packages/identity/src/index.js';
+import { attachIdentity, identityHeaders } from './identity.js';
 import { ContinuationCoordinator } from '../../runner/src/continuations.js';
 import { parseContinuation } from '../../../packages/contracts/src/continuation.js';
 import { NativeRuntime, type NativeOptions } from '../../runner/src/runtime.js';
@@ -16,7 +18,6 @@ import {
   text,
 } from '../../../packages/contracts/src/index.js';
 import { Store } from '../../../packages/db/src/store.js';
-import { SPACE_ID } from '../../../packages/db/src/seed.js';
 import { MockAdapter } from '../../../packages/adapters/mock/src/index.js';
 
 export async function createApp(
@@ -28,16 +29,47 @@ export async function createApp(
     webRoot?: string;
     logger?: boolean;
     native?: NativeOptions;
+    identity?: IdentityOptions;
   } = {},
 ) {
-  const app = Fastify({ logger: options.logger ?? false, bodyLimit: 32768 });
-  const store = options.store ?? new Store(options.databasePath);
+  if (options.identity && options.native?.enabled)
+    throw new Error('团队模式不能启用宿主机原生执行；请等待独立节点授权。');
+  const app = Fastify({
+    logger: options.logger
+      ? {
+          redact: [
+            'req.headers.cookie',
+            'req.headers.authorization',
+            'req.body.password',
+            'req.body.currentPassword',
+            'req.body.newPassword',
+            'req.body.code',
+            'req.body.token',
+          ],
+        }
+      : false,
+    bodyLimit: 32768,
+  });
+  const store =
+    options.store ?? new Store(options.databasePath, undefined, { team: !!options.identity });
+  if (store.teamMode !== !!options.identity) throw new Error('数据模式与认证配置不一致');
+  let identity;
+  try {
+    identity = options.identity ? await createIdentity(options.identity) : null;
+  } catch (error) {
+    store.close();
+    throw error;
+  }
   store.recoverMockRuns();
   const mock = new MockAdapter(store, options.stepMs);
-  const native = new NativeRuntime(store, options.native);
+  const native = new NativeRuntime(
+    store,
+    store.teamMode ? { enabled: false, roots: [] } : options.native,
+  );
   try {
-    await native.initialize();
+    if (!store.teamMode) await native.initialize();
   } catch (error) {
+    identity?.close();
     store.close();
     throw error;
   }
@@ -62,6 +94,8 @@ export async function createApp(
     }
     if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostname))
       throw new DomainError('LOCAL_ONLY', '当前版本仅支持本机开发预览', 403);
+    if (identity && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !request.headers.origin)
+      throw new DomainError('ORIGIN_REQUIRED', '认证模式的写入请求必须提供来源', 403);
     if (request.headers.origin && !allowedOrigins.has(request.headers.origin))
       throw new DomainError('ORIGIN_REJECTED', '不允许跨站访问本地预览', 403);
     if (request.headers['sec-fetch-site'] === 'cross-site')
@@ -77,6 +111,7 @@ export async function createApp(
       .header('Referrer-Policy', 'no-referrer');
     if (request.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
   });
+  attachIdentity(app, store, identity);
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof DomainError;
     const statusCode =
@@ -100,20 +135,26 @@ export async function createApp(
       requestId: request.id,
     });
   });
-  app.get('/health', async () => ({ status: 'ok', mode: 'local-preview' }));
+  app.get('/health', async () => ({
+    status: 'ok',
+    mode: store.teamMode ? 'team-local' : 'local-preview',
+  }));
   app.get('/ready', async () => {
     store.db.prepare('SELECT 1').get();
     return { status: 'ready' };
   });
-  app.get('/api/v1/me', async () => ({ ...store.workbench().user, mode: 'local-preview' }));
+  app.get('/api/v1/me', async () => ({
+    ...store.workbench().user,
+    mode: store.teamMode ? 'team-local' : 'local-preview',
+  }));
   app.get('/api/v1/workbench', async () => store.workbench());
   app.get('/api/v1/spaces/:spaceId/projects', async (request) => {
-    if (param(request.params, 'spaceId') !== SPACE_ID)
+    if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     return { items: store.projects() };
   });
   app.post('/api/v1/spaces/:spaceId/projects', async (request, reply) => {
-    if (param(request.params, 'spaceId') !== SPACE_ID)
+    if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     const body = record(request.body);
     return reply.code(201).send(
@@ -130,7 +171,7 @@ export async function createApp(
     store.project(param(request.params, 'projectId')),
   );
   app.get('/api/v1/spaces/:spaceId/tasks', async (request) => {
-    if (param(request.params, 'spaceId') !== SPACE_ID)
+    if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     const query = record(request.query);
     const limit = query.limit === undefined ? 50 : Number(query.limit);
@@ -159,7 +200,7 @@ export async function createApp(
     };
   });
   app.post('/api/v1/spaces/:spaceId/tasks', async (request, reply) => {
-    if (param(request.params, 'spaceId') !== SPACE_ID)
+    if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     return reply
       .code(201)
@@ -390,17 +431,33 @@ export async function createApp(
       });
       streams.add(reply.raw);
       reply.raw.write('event: ready\ndata: {}\n\n');
-      const poll = () => {
-        if (reply.raw.destroyed) return;
-        const batch = store.events(after, taskId);
-        after = batch.cursor;
-        for (const event of batch.events)
-          reply.raw.write(
-            `id: ${event.sequence}\nevent: changed\ndata: ${JSON.stringify(event)}\n\n`,
-          );
+      let polling = false;
+      const poll = async () => {
+        if (reply.raw.destroyed || polling) return;
+        polling = true;
+        try {
+          if (identity && !(await identity.current(identityHeaders(request), false))) {
+            reply.raw.write('event: access-ended\ndata: {"reason":"session"}\n\n');
+            reply.raw.end();
+            return;
+          }
+          const batch = store.events(after, taskId);
+          after = batch.cursor;
+          for (const event of batch.events)
+            reply.raw.write(
+              `id: ${event.sequence}\nevent: changed\ndata: ${JSON.stringify(event)}\n\n`,
+            );
+        } catch {
+          reply.raw.write('event: access-ended\ndata: {"reason":"permission"}\n\n');
+          reply.raw.end();
+        } finally {
+          polling = false;
+        }
       };
-      poll();
-      const timer = setInterval(poll, 750);
+      void poll();
+      const timer = setInterval(() => {
+        void poll();
+      }, 750);
       timer.unref();
       const ping = setInterval(() => reply.raw.write(': heartbeat\n\n'), 15000);
       ping.unref();
@@ -452,6 +509,7 @@ export async function createApp(
     await continuations.close();
     await native.close();
     mock.close();
+    identity?.close();
     store.close();
   });
   return app;

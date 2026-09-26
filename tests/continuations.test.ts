@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { migrations } from '../packages/db/src/schema.js';
 import { Store } from '../packages/db/src/store.js';
 import { ContinuationStore } from '../packages/db/src/continuations.js';
 import {
@@ -250,7 +251,10 @@ test('重启保留接续要求，但不自动重试待启动的付费执行', as
     assert.equal(reopened.get(op.id).input.run.prompt, 'retained follow-up');
     assert.equal(reopened.pending().length, 0);
     assert.equal(store.runs(f.task.id).length, 1);
-    assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get()?.n, 3);
+    assert.equal(
+      store.db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get()?.n,
+      migrations.length,
+    );
   } finally {
     store.close();
     await rm(dir, { recursive: true, force: true });

@@ -1,3 +1,5 @@
+import { SpaceSwitcher } from './identity.js';
+import { TeamSettings, ProjectAccess } from './team.js';
 import { ContinuationStatus } from './continuations.js';
 import { NativeResources, NativeCode, NativeEvents } from './native.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -22,7 +24,7 @@ import {
   StatusBadge,
   ToolMark,
 } from '../../../packages/ui/src/index.js';
-import { Link, go, time, useApp, useLoad, usePath } from './state.js';
+import { Link, go, time, useApp, useLoad, usePath, canEditTask } from './state.js';
 import { ContinuePanel, EditTask, NewProject, NewTask, ShareResult } from './forms.js';
 import { OrderPreview } from './preview.js';
 
@@ -63,11 +65,7 @@ export function App() {
         <Link to="/" className="brand-link">
           <Brand />
         </Link>
-        <div className="space-switch">
-          <span className="space-grid">▦</span>
-          <strong>合序团队</strong>
-          <span className="space-demo">本地</span>
-        </div>
+        <SpaceSwitcher />
         <nav aria-label="主导航">
           {[
             ['/', 'home', '工作台', 'workbench'],
@@ -108,7 +106,11 @@ export function App() {
             <Avatar user={data.user} />
             <div>
               <strong>{data.user.name}</strong>
-              <small>示例身份 · 本地工作空间</small>
+              <small>
+                {data.mode === 'team-local'
+                  ? '真实账号 · ' + (data.space?.kind === 'personal' ? '个人空间' : '团队空间')
+                  : '示例身份 · 本地工作空间'}
+              </small>
             </div>
             <button
               className="icon-button theme-toggle"
@@ -148,7 +150,9 @@ export function App() {
           <div className="topbar-right">
             <span className="preview-label">
               <span className={`connection-dot ${connected ? 'online' : ''}`} />
-              本地开发预览 · 执行模式明确标识
+              {data.mode === 'team-local'
+                ? '本机团队模式 · 执行器未接入'
+                : '本地开发预览 · 执行模式明确标识'}
             </span>
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
               <Icon name="search" size={16} />
@@ -192,7 +196,9 @@ export function App() {
         </main>
         <footer className="app-footer">
           <span>HEXU · 让人和 AI，一起交付。</span>
-          <span>开发预览 E1b · 非正式团队服务</span>
+          <span>
+            {data.mode === 'team-local' ? 'E2a · 真实账号 / 本机范围' : '开发预览 E2a · 示例数据'}
+          </span>
         </footer>
       </div>
       {searchOpen && <Search onClose={() => setSearchOpen(false)} />}
@@ -472,6 +478,10 @@ function ProjectPage({ id }: { id: string }) {
         <Link to="/projects">返回项目</Link>
       </Empty>
     );
+  const members =
+    data.mode === 'team-local'
+      ? data.members.filter((m) => project.memberIds?.includes(m.id))
+      : data.members;
   const tasks = data.tasks.filter(
     (task) =>
       task.projectId === id &&
@@ -495,16 +505,21 @@ function ProjectPage({ id }: { id: string }) {
         </div>
         <div className="flex-line">
           <div className="avatar-stack">
-            {data.members.map((member) => (
+            {members.map((member) => (
               <Avatar key={member.id} user={member} />
             ))}
           </div>
-          <Button variant="primary" onClick={() => setOpen(true)}>
+          <Button
+            variant="primary"
+            disabled={project.access === 'view'}
+            onClick={() => setOpen(true)}
+          >
             <Icon name="plus" />
             新建任务
           </Button>
         </div>
       </div>
+      {data.mode === 'team-local' && <ProjectAccess project={project} />}
       <div className="tabs page-tabs">
         {[
           ['overview', '总览'],
@@ -541,8 +556,8 @@ function ProjectPage({ id }: { id: string }) {
             </div>
           </section>
           <section className="panel">
-            <h3>项目成员 · 示例资料</h3>
-            {data.members.map((member) => (
+            <h3>项目成员{data.mode === 'local-preview' ? ' · 示例资料' : ''}</h3>
+            {members.map((member) => (
               <div className="member-line" key={member.id}>
                 <Avatar user={member} />
                 <strong>{member.name}</strong>
@@ -559,7 +574,7 @@ function ProjectPage({ id }: { id: string }) {
             <span>当前目标</span>
             <strong>{project.description || '从任务开始，持续推进项目。'}</strong>
             <span className="spacer" />
-            <small>本地开发预览</small>
+            <small>{data.mode === 'team-local' ? '按项目权限协作' : '本地开发预览'}</small>
           </div>
           <div className="board-toolbar">
             <div className="segmented">
@@ -670,7 +685,7 @@ function MessageComposer({
   resultId?: string;
   run?: Run;
 }) {
-  const { refresh, notice } = useApp();
+  const { data, refresh, notice } = useApp();
   const [body, setBody] = useState(''),
     [busy, setBusy] = useState(false);
   async function send(event: FormEvent) {
@@ -690,6 +705,9 @@ function MessageComposer({
       setBusy(false);
     }
   }
+  const task = data.tasks.find((t) => t.id === taskId);
+  if (task && !canEditTask(data, task))
+    return <p className="team-readonly">你可以查看此项目，修改和回复需要编辑权限。</p>;
   return (
     <form className="composer" onSubmit={send}>
       <textarea
@@ -783,6 +801,8 @@ function TaskPage({ id }: { id: string }) {
       </div>
     );
   const { task, messages, runs, results } = value;
+  const editable = canEditTask(data, task);
+  const team = data.mode === 'team-local';
   const lastRun = runs.at(-1),
     active = runs.find((run) => isActiveRun(run.state));
   const preview = results.find((result) => result.kind === 'demo-preview');
@@ -806,6 +826,7 @@ function TaskPage({ id }: { id: string }) {
           <button
             className="icon-button"
             aria-label="编辑工作说明"
+            disabled={!editable}
             onClick={() => setModal('edit')}
           >
             <Icon name="file" size={16} />
@@ -832,7 +853,8 @@ function TaskPage({ id }: { id: string }) {
             <Button
               variant="primary"
               onClick={() => setModal('continue')}
-              disabled={task.status === 'cancelled'}
+              disabled={team || !editable || task.status === 'cancelled'}
+              title={team ? '独立执行器尚未接入，当前仅进行任务协作' : undefined}
             >
               <Icon name="play" />
               {task.status === 'done' ? '重新打开并继续' : '继续'}
@@ -840,7 +862,11 @@ function TaskPage({ id }: { id: string }) {
             </Button>
           )}
           {active?.provider === 'native' && (
-            <Button onClick={() => setModal('continue')} disabled={task.status === 'cancelled'}>
+            <Button
+              onClick={() => setModal('continue')}
+              disabled={team || !editable || task.status === 'cancelled'}
+              title={team ? '独立执行器尚未接入，当前仅进行任务协作' : undefined}
+            >
               <Icon name="arrow-right" />
               准备接续
             </Button>
@@ -853,18 +879,26 @@ function TaskPage({ id }: { id: string }) {
             <Icon name="branch" />
             并行探索
           </Button>
-          <Button onClick={() => setModal('share')}>
+          <Button disabled={!editable} onClick={() => setModal('share')}>
             <Icon name="upload" />
             分享成果
           </Button>
         </div>
         <div className="task-subtitle">
           <ToolMark tool={lastRun?.requestedTool ?? 'claude-code'} />
-          <strong>{lastRun?.requestedTool === 'codex' ? 'Codex' : 'Claude Code'}</strong>
+          <strong>
+            {team && !lastRun
+              ? '执行器未接入'
+              : lastRun?.requestedTool === 'codex'
+                ? 'Codex'
+                : 'Claude Code'}
+          </strong>
           <span>
             {lastRun?.provider === 'native'
               ? '原生 · ' + (lastRun.native?.mode === 'edit' ? '文件编辑' : '只读分析')
-              : '模拟适配器'}
+              : team
+                ? '任务协作可用'
+                : '模拟适配器'}
           </span>
           <Icon name="monitor" size={14} />
           <span>{lastRun?.provider === 'native' ? '本机授权目录' : '无真实执行节点'}</span>
@@ -963,7 +997,9 @@ function TaskPage({ id }: { id: string }) {
               <span className="eyebrow">本次工作说明</span>
               <h3>{task.title}</h3>
               <p className="text-block">{task.description || '暂无补充说明，可以直接编辑。'}</p>
-              <Button onClick={() => setModal('edit')}>编辑说明</Button>
+              <Button disabled={!editable} onClick={() => setModal('edit')}>
+                编辑说明
+              </Button>
               <hr />
               <h3>当前可用上下文</h3>
               <p>任务说明、已保存的讨论，以及文字成果。</p>
@@ -994,7 +1030,14 @@ function TaskPage({ id }: { id: string }) {
                 </div>
               ))}
               {!runs.length && (
-                <Empty title="还没有执行记录" description="可以用模拟适配器体验执行过程。" />
+                <Empty
+                  title="还没有执行记录"
+                  description={
+                    team
+                      ? '独立执行器接入后可以在这里查看执行记录。'
+                      : '可以用模拟适配器体验执行过程。'
+                  }
+                />
               )}
             </div>
           )}
@@ -1023,7 +1066,9 @@ function TaskPage({ id }: { id: string }) {
                 title="成果会出现在这里"
                 description="当前任务没有示例预览。可以先分享一份文字成果。"
               >
-                <Button onClick={() => setModal('share')}>分享成果</Button>
+                <Button disabled={!editable} onClick={() => setModal('share')}>
+                  分享成果
+                </Button>
               </Empty>
             )
           ) : rightTab === 'code' ? (
@@ -1035,7 +1080,9 @@ function TaskPage({ id }: { id: string }) {
               ))}
               {!results.length && (
                 <Empty title="还没有分享成果">
-                  <Button onClick={() => setModal('share')}>写一份成果说明</Button>
+                  <Button disabled={!editable} onClick={() => setModal('share')}>
+                    写一份成果说明
+                  </Button>
                 </Empty>
               )}
             </div>
@@ -1189,6 +1236,7 @@ function ResultPage({ id }: { id: string }) {
 }
 function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
   const { data, connected } = useApp();
+  if (data.mode === 'team-local') return <TeamSettings />;
   return (
     <div className="page settings-page">
       <div className="page-heading">
@@ -1196,13 +1244,16 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E1b · 本地原生执行</span>
+        <span className="badge neutral">E2a · 本机预览</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />
         <div>
           <strong>当前使用示例身份，数据仅保存在本机。</strong>
-          <p>尚未实现多人登录和远程节点。本版本拒绝对公网监听，不应通过代理开放给团队或互联网。</p>
+          <p>
+            真实账号在独立的 team-local
+            模式中启用。当前仍未接入远程节点；两种模式都不能通过代理开放到公网。
+          </p>
         </div>
       </div>
       <NativeResources />

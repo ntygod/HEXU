@@ -41,4 +41,17 @@ CREATE UNIQUE INDEX continuation_active_task ON continuation_operations(task_id)
 CREATE UNIQUE INDEX continuation_active_copy ON continuation_operations(working_copy_id) WHERE state IN ('waiting_for_stop','preparing');
 `,
   },
+  {
+    version: 4,
+    sql: `
+CREATE TABLE collab_people (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE);
+CREATE TABLE collab_spaces (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('personal','team')), created_at TEXT NOT NULL);
+CREATE TABLE collab_memberships (space_id TEXT NOT NULL REFERENCES collab_spaces(id), user_id TEXT NOT NULL REFERENCES collab_people(id), role TEXT NOT NULL CHECK(role IN ('owner','admin','member')), PRIMARY KEY(space_id,user_id));
+CREATE TABLE collab_project_members (project_id TEXT NOT NULL REFERENCES projects(id), user_id TEXT NOT NULL REFERENCES collab_people(id), role TEXT NOT NULL CHECK(role IN ('view','edit','manage')), PRIMARY KEY(project_id,user_id));
+CREATE TABLE collab_invitations (id TEXT PRIMARY KEY, space_id TEXT NOT NULL REFERENCES collab_spaces(id), email TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_by TEXT NOT NULL REFERENCES collab_people(id), expires_at TEXT NOT NULL, accepted_by TEXT REFERENCES collab_people(id), revoked INTEGER NOT NULL DEFAULT 0);
+ALTER TABLE outbox ADD COLUMN space_id TEXT;
+CREATE INDEX collab_membership_user ON collab_memberships(user_id);
+CREATE INDEX collab_project_member_user ON collab_project_members(user_id);
+`,
+  },
 ];

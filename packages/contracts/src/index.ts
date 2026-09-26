@@ -22,6 +22,8 @@ export interface User {
   color: string;
 }
 export interface Project {
+  memberIds?: string[];
+  access?: import('./identity.js').ProjectRole;
   id: string;
   spaceId: string;
   name: string;
@@ -79,7 +81,9 @@ export interface Result {
   updatedAt: string;
 }
 export interface Workbench {
-  mode: 'local-preview';
+  mode: 'local-preview' | 'team-local';
+  space?: import('./identity.js').Space;
+  spaces?: import('./identity.js').Space[];
   user: User;
   members: User[];
   projects: Project[];

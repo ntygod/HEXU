@@ -1,3 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { IdentityUser, Principal } from '../../contracts/src/identity.js';
+import { PermissionService } from './permissions.js';
+import { CollaborationStore } from './collaboration.js';
 import { ContinuationStore, assertNoPendingContinuation } from './continuations.js';
 import type {
   WorkingCopy,
@@ -40,12 +44,59 @@ const now = () => new Date().toISOString();
 export class Store {
   readonly db: DatabaseSync;
   private closed = false;
-  constructor(
-    path = ':memory:',
-    readonly actorId = demoUser.id,
-  ) {
+  readonly context = new AsyncLocalStorage<Principal>();
+  readonly permissions: PermissionService;
+  readonly collaboration: CollaborationStore;
+  readonly teamMode: boolean;
+  private readonly previewActorId: string;
+  principal(): Principal {
+    const principal = this.context.getStore();
+    if (!principal) throw new DomainError('AUTH_REQUIRED', '请先登录', 401);
+    return principal;
+  }
+  get actorId() {
+    return this.teamMode ? this.principal().user.id : this.previewActorId;
+  }
+  get spaceId() {
+    return this.teamMode ? this.principal().spaceId : SPACE_ID;
+  }
+  as<T>(principal: Principal, action: () => T): T {
+    return this.context.run(principal, action);
+  }
+  atomic<T>(action: () => T): T {
+    return this.transaction(action);
+  }
+  actorName() {
+    return this.teamMode
+      ? this.principal().user.name
+      : (demoMembers.find((m) => m.id === this.actorId)?.name ?? '本地用户');
+  }
+
+  constructor(path = ':memory:', actorId = demoUser.id, options: { team?: boolean } = {}) {
+    this.teamMode = options.team === true;
+    this.previewActorId = actorId;
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(path);
+    this.permissions = new PermissionService(this.db, () => this.principal());
+    this.collaboration = new CollaborationStore(this);
+    // Do not relabel or adopt the old demo database as real team data.
+    if (
+      this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
+    ) {
+      const mode = this.db.prepare("SELECT value FROM metadata WHERE key='data_mode'").get() as
+        | { value: string }
+        | undefined;
+      const seeded = this.db.prepare("SELECT value FROM metadata WHERE key='seeded'").get();
+      if (
+        (this.teamMode && (mode?.value === 'preview' || (!mode && seeded))) ||
+        (!this.teamMode && mode?.value === 'team')
+      ) {
+        this.db.close();
+        throw new Error(
+          '数据模式不一致。请保留原数据库并使用独立数据目录，不自动把演示数据共享给团队。',
+        );
+      }
+    }
     this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
     this.db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY);');
     for (const migration of migrations) {
@@ -60,7 +111,12 @@ export class Store {
         });
       }
     }
-    if (!this.db.prepare("SELECT value FROM metadata WHERE key='seeded'").get()) this.seed();
+    this.db
+      .prepare('INSERT OR IGNORE INTO metadata VALUES(?,?)')
+      .run('data_mode', this.teamMode ? 'team' : 'preview');
+    if (this.teamMode)
+      this.db.prepare('INSERT OR IGNORE INTO metadata VALUES(?,?)').run('task_counter', '0');
+    else if (!this.db.prepare("SELECT value FROM metadata WHERE key='seeded'").get()) this.seed();
   }
   close() {
     if (!this.closed) {
@@ -82,7 +138,8 @@ export class Store {
   mutate<T>(scope: string, key: string, payload: unknown, action: () => T): T {
     if (!key || key.length > 128 || !/^[\w.:-]+$/.test(key))
       throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', '操作需要有效的 Idempotency-Key');
-    const fullScope = `${this.actorId}:${scope}`;
+    if (this.teamMode) this.permissions.space();
+    const fullScope = `${this.actorId}:${this.teamMode ? this.spaceId + ':' : ''}${scope}`;
     const fingerprint = createHash('sha256').update(canonicalJson(payload)).digest('hex');
     return this.transaction(() => {
       const previous = this.db
@@ -102,17 +159,19 @@ export class Store {
   }
   private event(taskId: string | null, kind: string) {
     this.db
-      .prepare('INSERT INTO outbox(task_id,kind,created_at) VALUES(?,?,?)')
-      .run(taskId, kind, now());
+      .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
+      .run(taskId, kind, now(), this.spaceId);
   }
   events(after: number, taskId?: string) {
+    if (this.teamMode) this.permissions.space();
     if (taskId) this.getTask(taskId);
     const rows = this.db
       .prepare(
-        'SELECT sequence,task_id AS taskId,kind,created_at AS createdAt FROM outbox WHERE sequence>? ORDER BY sequence LIMIT 100',
+        'SELECT sequence,task_id AS taskId,kind,created_at AS createdAt,space_id AS spaceId FROM outbox WHERE sequence>? ORDER BY sequence LIMIT 100',
       )
       .all(after) as unknown as {
       sequence: number;
+      spaceId: string | null;
       taskId: string | null;
       kind: string;
       createdAt: string;
@@ -121,7 +180,7 @@ export class Store {
     const cursor = rows.at(-1)?.sequence ?? after;
     const visible = rows.filter((row) => {
       if (taskId && row.taskId !== taskId) return false;
-      if (!row.taskId) return !taskId;
+      if (!row.taskId) return !taskId && (!this.teamMode || row.spaceId === this.spaceId);
       try {
         this.getTask(row.taskId);
         return true;
@@ -134,28 +193,56 @@ export class Store {
   projects(): Project[] {
     return this.db
       .prepare('SELECT body FROM projects WHERE space_id=? ORDER BY rowid')
-      .all(SPACE_ID)
-      .map((row) => decode<Project>(row)!);
+      .all(this.spaceId)
+      .map((row) => decode<Project>(row)!)
+      .filter((project) => !this.teamMode || this.permissions.projectRole(project.id) !== null)
+      .map((project) =>
+        this.teamMode
+          ? {
+              ...project,
+              access: this.permissions.projectRole(project.id)!,
+              memberIds: this.projectMemberIds(project.id),
+            }
+          : project,
+      );
+  }
+  private projectMemberIds(id: string): string[] {
+    return (
+      this.db
+        .prepare('SELECT user_id AS id FROM collab_project_members WHERE project_id=?')
+        .all(id) as { id: string }[]
+    ).map((row) => row.id);
   }
   project(id: string): Project {
+    if (this.teamMode) this.permissions.project(id);
     const result = decode<Project>(
-      this.db.prepare('SELECT body FROM projects WHERE id=? AND space_id=?').get(id, SPACE_ID),
+      this.db.prepare('SELECT body FROM projects WHERE id=? AND space_id=?').get(id, this.spaceId),
     );
     if (!result) throw new DomainError('NOT_FOUND', '项目不存在或不可访问', 404);
-    return result;
+    return this.teamMode
+      ? {
+          ...result,
+          access: this.permissions.projectRole(id)!,
+          memberIds: this.projectMemberIds(id),
+        }
+      : result;
   }
   createProject(data: { name: string; description: string }, key: string) {
     return this.mutate('project.create', key, data, () => {
       const item: Project = {
         id: randomUUID(),
-        spaceId: SPACE_ID,
+        spaceId: this.spaceId,
         ...data,
         color: 'violet',
         revision: 1,
       };
       this.db
         .prepare('INSERT INTO projects VALUES(?,?,?)')
-        .run(item.id, SPACE_ID, JSON.stringify(item));
+        .run(item.id, this.spaceId, JSON.stringify(item));
+      if (this.teamMode)
+        this.db
+          .prepare('INSERT INTO collab_project_members VALUES(?,?,?)')
+          .run(item.id, this.actorId, 'manage');
       this.event(null, 'project.created');
       return item;
     });
@@ -163,25 +250,37 @@ export class Store {
   tasks(): Task[] {
     return this.db
       .prepare('SELECT body FROM tasks WHERE space_id=? ORDER BY rowid DESC')
-      .all(SPACE_ID)
+      .all(this.spaceId)
       .map((row) => decode<Task>(row)!)
-      .filter((task) => canReadTask(task, this.actorId, SPACE_ID));
+      .filter((task) =>
+        this.teamMode
+          ? this.permissions.canTask(task)
+          : canReadTask(task, this.actorId, this.spaceId),
+      );
   }
-  getTask(id: string): Task {
+  getTask(id: string, write = false): Task {
     const task = decode<Task>(this.db.prepare('SELECT body FROM tasks WHERE id=?').get(id));
-    if (!task || !canReadTask(task, this.actorId, SPACE_ID))
+    if (
+      !task ||
+      !(this.teamMode
+        ? this.permissions.canTask(task)
+        : canReadTask(task, this.actorId, this.spaceId))
+    )
       throw new DomainError('NOT_FOUND', '任务不存在或不可访问', 404);
+    if (this.teamMode) this.permissions.task(task, write);
     return task;
   }
   private saveTask(task: Task) {
     this.db
       .prepare('UPDATE tasks SET body=?,project_id=? WHERE id=? AND space_id=?')
-      .run(JSON.stringify(task), task.projectId, task.id, SPACE_ID);
+      .run(JSON.stringify(task), task.projectId, task.id, this.spaceId);
     this.event(task.id, 'task.updated');
     return task;
   }
   createTask(data: { title: string; description: string; projectId: string | null }, key: string) {
+    if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
     return this.mutate('task.create', key, data, () => {
+      if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
       if (data.projectId) this.project(data.projectId);
       const counter = this.db
         .prepare("SELECT value FROM metadata WHERE key='task_counter'")
@@ -192,7 +291,7 @@ export class Store {
       const task: Task = {
         id: randomUUID(),
         shortId: `HX-${String(next).padStart(3, '0')}`,
-        spaceId: SPACE_ID,
+        spaceId: this.spaceId,
         ...data,
         visibility: data.projectId ? 'project' : 'private',
         ownerUserId: this.actorId,
@@ -204,7 +303,7 @@ export class Store {
       };
       this.db
         .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
-        .run(task.id, SPACE_ID, task.projectId, JSON.stringify(task));
+        .run(task.id, this.spaceId, task.projectId, JSON.stringify(task));
       this.event(task.id, 'task.created');
       return task;
     });
@@ -219,9 +318,9 @@ export class Store {
     },
     key: string,
   ) {
-    this.getTask(id);
+    this.getTask(id, true);
     return this.mutate(`task.patch:${id}`, key, data, () => {
-      const task = this.getTask(id);
+      const task = this.getTask(id, true);
       assertRevision(task.revision, data.expectedRevision);
       const { expectedRevision: _, ...changes } = data;
       return this.saveTask({ ...task, ...changes, revision: task.revision + 1, updatedAt: now() });
@@ -239,13 +338,13 @@ export class Store {
     activeRunAction: 'stop' | 'keep',
     key: string,
   ) {
-    this.getTask(id);
+    this.getTask(id, true);
     return this.mutate(
       `task.status:${id}`,
       key,
       { status, expectedRevision, activeRunAction },
       () => {
-        const task = this.getTask(id);
+        const task = this.getTask(id, true);
         assertRevision(task.revision, expectedRevision);
         assertTaskChange(task, status);
         const next = this.saveTask({
@@ -308,17 +407,11 @@ export class Store {
     return item;
   }
   addMessage(taskId: string, body: string, resultId: string | null, key: string) {
-    this.getTask(taskId);
+    this.getTask(taskId, true);
     if (resultId && this.result(resultId).taskId !== taskId)
       throw new DomainError('INVALID_INPUT', '成果不属于当前任务');
     return this.mutate(`message.create:${taskId}`, key, { body, resultId }, () =>
-      this.insertMessage(
-        taskId,
-        body,
-        'human',
-        demoMembers.find((member) => member.id === this.actorId)?.name ?? '本地用户',
-        resultId,
-      ),
+      this.insertMessage(taskId, body, 'human', this.actorName(), resultId),
     );
   }
   runs(taskId: string): Run[] {
@@ -351,10 +444,11 @@ export class Store {
     },
     key: string,
   ) {
-    this.getTask(taskId);
+    if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
+    this.getTask(taskId, true);
     return this.mutate(`run.create:${taskId}`, key, input, () => {
       assertNoPendingContinuation(this, taskId);
-      const task = this.getTask(taskId);
+      const task = this.getTask(taskId, true);
       assertRevision(task.revision, input.expectedRevision);
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
         throw new DomainError('TASK_REOPEN_REQUIRED', '请先重新打开任务', 409);
@@ -528,11 +622,12 @@ export class Store {
     key: string,
     operationId?: string,
   ): Run {
-    this.getTask(taskId);
+    if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
+    this.getTask(taskId, true);
     return this.mutate(`native.create:${taskId}`, key, input, () => {
       assertNoPendingContinuation(this, taskId, input.workingCopyId, operationId);
       if (operationId) new ContinuationStore(this).assertStart(operationId, taskId, input);
-      const task = this.getTask(taskId);
+      const task = this.getTask(taskId, true);
       assertRevision(task.revision, input.expectedRevision);
       if (input.sourceRunId) {
         const source = this.run(input.sourceRunId);
@@ -720,7 +815,7 @@ export class Store {
     return item;
   }
   createResult(taskId: string, title: string, body: string, key: string) {
-    this.getTask(taskId);
+    this.getTask(taskId, true);
     return this.mutate(`result.create:${taskId}`, key, { title, body }, () => {
       const at = now();
       const result: Result = {
@@ -750,14 +845,24 @@ export class Store {
   }
   workbench(): Workbench {
     return {
-      mode: 'local-preview',
-      user: demoMembers.find((user) => user.id === this.actorId) ?? demoUser,
-      members: demoMembers,
+      mode: this.teamMode ? 'team-local' : 'local-preview',
+      ...(this.teamMode
+        ? { space: this.permissions.space(), spaces: this.collaboration.spaces(this.actorId) }
+        : {}),
+      user: this.teamMode
+        ? this.profile(this.principal().user)
+        : (demoMembers.find((user) => user.id === this.actorId) ?? demoUser),
+      members: this.teamMode
+        ? this.collaboration.members().map((user) => this.profile(user))
+        : demoMembers,
       projects: this.projects(),
       tasks: this.tasks(),
       results: this.results(),
       runs: this.tasks().flatMap((task) => this.runs(task.id)),
     };
+  }
+  private profile(user: IdentityUser) {
+    return { id: user.id, name: user.name, initial: user.name.slice(0, 1), color: 'violet' };
   }
   private seed() {
     this.transaction(() => {
