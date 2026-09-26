@@ -302,7 +302,26 @@ export class NodeExecution {
       '# 现场边界',
       '保留同一节点与授权 Git 工作目录中的未提交修改。不上传 diff、文件或隐藏会话；节点启动前仍会核对目录身份与独占锁。',
     ].join('\n\n');
+    const retained = source.node.nativeSession;
+    const p = this.policy(source.node.nodeId);
+    const resumeAvailable = !!(
+      retained &&
+      source.state === 'succeeded' &&
+      source.node.terminationConfirmed &&
+      d.stage === 'terminal' &&
+      this.store.runs(taskId).at(-1)?.id === source.id &&
+      p?.policy_hash === source.node.policyHash &&
+      JSON.parse(p.body).retainSessions === true &&
+      Date.parse(retained.expiresAt) > Date.now()
+    );
     return {
+      nativeSession: {
+        available: resumeAvailable,
+        expiresAt: retained?.expiresAt ?? null,
+        reason: resumeAvailable
+          ? '节点曾报告保留了 Codex 原生会话，启动前仍核对账户、文件与范围；真实模型联调未完成'
+          : '没有当前可恢复的成功 Codex 会话，或授权/期限已变化；仍可明确新建会话',
+      },
       sourceRunId: source.id,
       sourceTool: source.requestedTool,
       taskRevision: task.revision,
@@ -315,6 +334,35 @@ export class NodeExecution {
       ready: blockers.length === 0,
       blockers,
     };
+  }
+  private resumeSource(taskId: string, input: NodeRunInput) {
+    const source = input.continuation ? this.store.run(input.continuation.sourceRunId) : null;
+    const p = this.policy(input.nodeId);
+    if (
+      !source ||
+      source.taskId !== taskId ||
+      source.provider !== 'node' ||
+      source.requestedTool !== 'codex' ||
+      source.state !== 'succeeded' ||
+      !source.node?.terminationConfirmed ||
+      source.observation === 'unknown' ||
+      this.row(source.node.dispatchId).stage !== 'terminal' ||
+      this.store.runs(taskId).at(-1)?.id !== source.id ||
+      !source.node.nativeSession ||
+      source.node.nodeId !== input.nodeId ||
+      source.node.workingCopyId !== input.workingCopyId ||
+      source.node.mode !== input.mode ||
+      source.node.policyHash !== input.policyHash ||
+      p?.policy_hash !== input.policyHash ||
+      JSON.parse(p.body).retainSessions !== true ||
+      Date.parse(source.node.nativeSession.expiresAt) <= Date.now()
+    )
+      throw new DomainError(
+        'SESSION_NOT_RECOVERABLE',
+        '来源会话未成功保留，或目录、模式、工具授权与期限已变化；没有自动新建',
+        409,
+      );
+    return { ref: source.node.nativeSession.ref, sourceDispatchId: source.node.dispatchId };
   }
   create(
     taskId: string,
@@ -329,6 +377,9 @@ export class NodeExecution {
     const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
       assertNoPendingNodeContinuation(this.store, taskId, input.nodeId, operation?.operationId);
       assertRevision(task.revision, input.expectedRevision);
+      if (input.sessionMode && operation)
+        throw new DomainError('SESSION_RESUME_MANUAL', '原生恢复暂不接受自动等待安排', 409);
+      const session = input.sessionMode === 'resume' ? this.resumeSource(taskId, input) : undefined;
       const continuation = input.continuation;
       let continuationContext: string | null = operation ? operation.context() : null;
       if (continuation && !operation) {
@@ -347,6 +398,7 @@ export class NodeExecution {
           preview.contextText,
           input.prompt,
           new NextInputs(this.store).selected(taskId, continuation),
+          input.sessionMode,
         );
       }
       const option = this.options(taskId, undefined, operation?.operationId).items.find(
@@ -380,6 +432,7 @@ export class NodeExecution {
         now = stamp();
       const context = this.humanContext(task);
       const command: DispatchCommand = {
+        ...(session ? { session } : {}),
         id,
         generation: randomUUID(),
         runId,
@@ -420,6 +473,7 @@ export class NodeExecution {
           maxBudgetUsd: option.policy.maxBudgetUsd,
           phase: 'queued',
           terminationConfirmed: false,
+          ...(input.sessionMode ? { sessionMode: input.sessionMode } : {}),
           ...(input.continuation
             ? { continuationInputIds: input.continuation.inputs.map((i) => i.id) }
             : {}),
@@ -613,15 +667,36 @@ export class NodeExecution {
       } else if (input.kind === 'terminal') {
         if (input.result === 'succeeded' && !['running', 'unknown'].includes(d.stage))
           throw new DomainError('INVALID_TRANSITION', '未确认运行的执行不能报告成功', 409);
+        if (input.nativeSession && !node.settlementOnly) {
+          const command = JSON.parse(d.command) as DispatchCommand;
+          const info = input.nativeSession;
+          if (
+            input.result !== 'succeeded' ||
+            command.policy.tool !== 'codex' ||
+            !command.policy.retainSessions ||
+            info.ref !== (command.session?.ref ?? command.id) ||
+            info.action !== (command.session ? 'resumed' : 'created') ||
+            Date.parse(info.expiresAt) > Date.now() + 7 * 86400_000 + 60000
+          )
+            throw new DomainError('SESSION_EVIDENCE_MISMATCH', '会话声明与当前派发不一致', 409);
+          this.save(d, { ...r, node: { ...r.node!, nativeSession: info } });
+        }
         this.finish(d, input.result!, body || '节点已确认进程结束；任务是否完成由成员决定。');
       } else {
         if (!['preparing', 'running', 'unknown'].includes(d.stage))
           throw new DomainError('INVALID_TRANSITION', '当前阶段不接受输出', 409);
         this.message(d, body, 'agent');
       }
-      this.store.db
-        .prepare('INSERT INTO node_run_events VALUES(?,?,?,?)')
-        .run(d.id, input.sequence, hash, JSON.stringify({ ...input, text: body }));
+      this.store.db.prepare('INSERT INTO node_run_events VALUES(?,?,?,?)').run(
+        d.id,
+        input.sequence,
+        hash,
+        JSON.stringify({
+          ...input,
+          text: body,
+          ...(node.settlementOnly ? { nativeSession: undefined } : {}),
+        }),
+      );
       this.store.db
         .prepare('UPDATE node_dispatches SET last_sequence=?,last_hash=? WHERE id=?')
         .run(input.sequence, hash, d.id);

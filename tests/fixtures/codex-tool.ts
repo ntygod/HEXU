@@ -1,4 +1,5 @@
 /** Test-only App Server protocol fixture. Never connects to any model or provider. */
+import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,8 +19,12 @@ let initialized = false,
   prompt = '',
   key = '';
 let hang: ReturnType<typeof setInterval> | undefined;
-const threadId = 'fixture-thread',
+let threadId = 'fixture-thread',
   turnId = 'fixture-turn';
+let retained = false;
+const stateFile = join(process.env.CODEX_HOME ?? '', 'fixture-provider-state.json');
+let memory = '';
+const saveState = () => writeFileSync(stateFile, JSON.stringify({ threadId, root, memory }));
 const send = (v: unknown) => process.stdout.write(JSON.stringify(v) + '\n');
 const note = (method: string, params: unknown) => send({ method, params });
 function completed(status = 'completed') {
@@ -39,7 +44,13 @@ rl.on('line', (line) => {
   if (method === 'initialize') {
     if (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY)
       throw new Error('Fixture forbids inherited provider credentials');
-    if (!process.env.HOME?.includes('hexu-codex-') || process.env.CODEX_HOME !== process.env.HOME)
+    if (
+      !process.env.HOME?.includes('hexu-codex-') ||
+      !(
+        process.env.CODEX_HOME === process.env.HOME ||
+        process.env.CODEX_HOME?.includes('/codex-sessions/')
+      )
+    )
       throw new Error('Codex must use an isolated home');
     initialized = true;
     result({ userAgent: 'fixture' });
@@ -50,7 +61,13 @@ rl.on('line', (line) => {
   } else if (method === 'config/read')
     result({
       config: {
-        features: { shell_tool: false, unified_exec: false },
+        features: {
+          shell_tool: false,
+          unified_exec: false,
+          goals: false,
+          memories: false,
+          proactivity: false,
+        },
         approval_policy: 'never',
         web_search: 'disabled',
         cli_auth_credentials_store: 'ephemeral',
@@ -77,9 +94,53 @@ rl.on('line', (line) => {
     });
   else if (method === 'thread/start') {
     root = p.cwd;
-    result({ thread: { id: threadId }, model: p.model ?? 'fixture-model' });
+    retained = p.ephemeral === false;
+    if (retained) {
+      threadId = randomUUID();
+      memory = randomUUID();
+      saveState();
+    }
+    result({
+      thread: { id: threadId, ephemeral: !retained },
+      model: p.model ?? 'fixture-model',
+      cwd: root,
+      approvalPolicy: 'never',
+      sandbox: { type: 'readOnly' },
+    });
+  } else if (method === 'thread/read' || method === 'thread/resume') {
+    if (!existsSync(stateFile)) {
+      send({ id, error: { code: -32000, message: 'fixture retained thread missing' } });
+      return;
+    }
+    const saved = JSON.parse(readFileSync(stateFile, 'utf8'));
+    if (saved.threadId !== p.threadId || saved.failResume) {
+      send({ id, error: { code: -32000, message: 'fixture thread unavailable' } });
+      return;
+    }
+    threadId = saved.threadId;
+    root = saved.root;
+    memory = saved.memory;
+    retained = true;
+    appendFileSync(join(process.env.CODEX_HOME!, 'fixture-resume-methods.txt'), method + '\n');
+    result({
+      thread: {
+        id: saved.wrongId ? 'wrong-session' : threadId,
+        cwd: root,
+        ephemeral: false,
+        status: { type: 'notLoaded' },
+        turns: [{ hidden: 'private-history-must-not-show' }],
+      },
+      model: p.model ?? 'fixture-model',
+      cwd: root,
+      approvalPolicy: 'never',
+      sandbox: { type: 'readOnly' },
+    });
   } else if (method === 'turn/start') {
     prompt = p.input[0].text;
+    if (retained) {
+      turnId = randomUUID();
+      saveState();
+    }
     if (prompt.includes('CODEX_BAD_JSON')) {
       console.log('bad json');
       return;
@@ -121,7 +182,11 @@ rl.on('line', (line) => {
     note('item/completed', {
       threadId,
       turnId,
-      item: { id: 'answer', type: 'agentMessage', text: `Codex fixture result ${key}` },
+      item: {
+        id: 'answer',
+        type: 'agentMessage',
+        text: `Codex fixture result ${key}${retained && prompt.split('# 本次要求').at(-1)?.includes('SESSION_RECALL') ? ' restored=' + memory : ''}`,
+      },
     });
     note('item/completed', {
       threadId,

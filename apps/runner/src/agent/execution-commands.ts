@@ -1,3 +1,4 @@
+import { CodexSessions } from './codex-sessions.js';
 import { createInterface } from 'node:readline/promises';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import type { DispatchCommand } from '../../../../packages/contracts/src/node-execution.js';
@@ -45,6 +46,10 @@ export async function executionCommand(
         ? 'Codex 不支持美元硬预算。'
         : `Claude 每次预算参数：USD ${local.policy.maxBudgetUsd}（不等于已验证账单）。`,
     );
+    if (local.policy.retainSessions)
+      console.log(
+        '另外保留 Codex 原生历史到节点私有目录（可能含代码及敏感材料），恢复有效期 7 天；到期不自动删除，请用 forget-native-session 清理。不会上传原生历史到控制服务。',
+      );
     await confirm('确认以上范围，输入 EXECUTE：', 'EXECUTE');
     writeExecutionPolicy(storage.home, local);
     console.log('本机执行授权已保存；下次 start 将核对工具版本并发布。');
@@ -76,4 +81,13 @@ export async function executionCommand(
     new WorkspaceLease(directory.root, dispatchId, true).release();
     console.log('停止证据已保存；下次 start 上报，不会恢复或重跑旧执行。');
   }
+}
+
+export async function forgetNativeSession(storage: AgentStorage, ref: string) {
+  await confirm(
+    `仅清理此节点保留的原生历史，不删除代码或 HEXU 任务。输入 FORGET ${ref}：`,
+    `FORGET ${ref}`,
+  );
+  new CodexSessions(storage).forget(ref);
+  console.log('本机原生历史已清理；旧会话引用不能恢复，任务公开历史不受影响。');
 }

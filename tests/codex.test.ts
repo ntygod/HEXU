@@ -370,3 +370,122 @@ test('Codex 配置兼容空 Hooks，但拒绝活动 Hooks、Shell 或错误的�
     }
   }
 });
+
+test('恢复引导中取消：不发送 thread/resume 或 turn/start，也不回退新会话', async () => {
+  for (const phase of ['thread/read', 'thread/resume']) {
+    let stopped = false;
+    const calls: string[] = [];
+    let session: CodexSession;
+    session = new CodexSession(
+      (line) => {
+        const q = JSON.parse(line);
+        calls.push(q.method);
+        if (q.method === phase) stopped = true;
+        const reply =
+          q.method === 'thread/read'
+            ? {
+                thread: {
+                  id: 'stored-thread',
+                  cwd: '/fixture',
+                  ephemeral: false,
+                  status: { type: 'notLoaded' },
+                },
+              }
+            : {
+                thread: { id: 'stored-thread', ephemeral: false },
+                cwd: '/fixture',
+                approvalPolicy: 'never',
+                sandbox: { type: 'readOnly' },
+                model: 'fixture-model',
+              };
+        queueMicrotask(() => session.line(JSON.stringify({ id: q.id, result: reply })));
+      },
+      () => {},
+      () => {},
+      () => {},
+    );
+    try {
+      await assert.rejects(
+        session.start(
+          '/fixture',
+          'edit',
+          'new material',
+          'fixture-model',
+          { threadId: 'stored-thread', resolvedModel: 'fixture-model' },
+          () => stopped,
+        ),
+        /启动已取消/,
+      );
+      assert.ok(!calls.includes('turn/start') && !calls.includes('thread/start'));
+      assert.deepEqual(
+        calls,
+        phase === 'thread/read' ? ['thread/read'] : ['thread/read', 'thread/resume'],
+      );
+    } finally {
+      session.dispose();
+    }
+  }
+});
+
+test('持久会话拒绝缺失自动行为配置和恢复后的模型或权限漂移', async () => {
+  for (const fault of ['config', 'model', 'sandbox'] as const) {
+    const calls: string[] = [];
+    let session: CodexSession;
+    session = new CodexSession(
+      (line) => {
+        const q = JSON.parse(line);
+        calls.push(q.method);
+        let result: unknown;
+        if (q.method === 'config/read')
+          result = {
+            config: {
+              features: { shell_tool: false, unified_exec: false },
+              web_search: 'disabled',
+              approval_policy: 'never',
+              cli_auth_credentials_store: 'ephemeral',
+              projects: { '/fixture': { trust_level: 'untrusted' } },
+              hooks: {},
+              plugins: {},
+              mcp_servers: {},
+            },
+          };
+        else if (q.method === 'thread/read')
+          result = {
+            thread: {
+              id: 'stored-thread',
+              cwd: '/fixture',
+              ephemeral: false,
+              status: { type: 'notLoaded' },
+            },
+          };
+        else
+          result = {
+            thread: { id: 'stored-thread', ephemeral: false },
+            cwd: '/fixture',
+            approvalPolicy: 'never',
+            sandbox: { type: fault === 'sandbox' ? 'dangerFullAccess' : 'readOnly' },
+            model: fault === 'model' ? 'different-model' : 'fixture-model',
+          };
+        queueMicrotask(() => session.line(JSON.stringify({ id: q.id, result })));
+      },
+      () => {},
+      () => {},
+      () => {},
+    );
+    try {
+      if (fault === 'config')
+        await assert.rejects(session.checkConfiguration('/fixture', true), /自动行为/);
+      else
+        await assert.rejects(
+          session.start('/fixture', 'edit', 'new material', null, {
+            threadId: 'stored-thread',
+            resolvedModel: 'fixture-model',
+          }),
+          /不会回退新会话/,
+        );
+      assert.ok(!calls.includes('turn/start') && !calls.includes('thread/start'));
+    } finally {
+      session.dispose();
+    }
+  }
+});

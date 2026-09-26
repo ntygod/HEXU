@@ -47,7 +47,13 @@ export function parseNodeContinuationOperation(value: unknown): NodeContinuation
     'confirmExecution',
     'continuation',
     'onActiveRun',
+    'sessionMode',
   ]);
+  if (b.sessionMode !== undefined)
+    throw new DomainError(
+      'SESSION_RESUME_MANUAL',
+      '原生恢复需在来源成功结束后明确启动，不接受自动等待安排',
+    );
   const { onActiveRun, ...runBody } = b;
   const run = parseNodeRun(runBody);
   if (!run.continuation)
