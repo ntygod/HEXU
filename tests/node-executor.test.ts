@@ -380,3 +380,19 @@ test('未确认执行和未送达的终态证据阻止删除凭证重新配对',
     await f.close();
   }
 });
+
+test('授权根不能包含执行锁目录，正常的个人仓库仍可占用', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'hexu-private-lease-home-'));
+  const previous = process.env.HOME;
+  try {
+    process.env.HOME = home;
+    assert.throws(() => new WorkspaceLease(home, randomUUID()), /不能包含受管工作区锁目录/);
+    const repository = join(home, 'repo');
+    await mkdir(repository);
+    new WorkspaceLease(repository, randomUUID()).release();
+  } finally {
+    if (previous === undefined) delete process.env.HOME;
+    else process.env.HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  }
+});

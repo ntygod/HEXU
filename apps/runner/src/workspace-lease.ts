@@ -24,6 +24,11 @@ export class WorkspaceLease {
       return r === '' || (!isAbsolute(r) && r !== '..' && !r.startsWith('..' + sep));
     };
     const home = ensurePrivateHome(join(homedir(), '.hexu', 'workspace-leases'));
+    if (within(canonical, home))
+      throw new DomainError(
+        'LEASE_INSIDE_WORKSPACE',
+        '授权目录不能包含受管工作区锁目录；请使用更小的独立 Git 目录',
+      );
     const path = join(home, 'registry.sqlite');
     if (!existsSync(path)) {
       try {
