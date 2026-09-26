@@ -61,3 +61,7 @@ Run 的 observation 不等于其所属节点是否在线：节点在线但原生
 ## E2b2 实现子集
 
 沿用 Run 增加 node provider。事务创建 dispatch/input/幂等/outbox；节点 accepted 落盘后确认，preparing 在一次性许可请求前落盘，running 仅实际 spawn 后上报。单个 dispatch 的 generation/序号/hash 保护 ACK 重放；重复 permit 不重新发启动许可。重启不重复 spawn，未知状态仅在确认后终结。未实现完整原生会话引用、运行中输入、完整用量、WSS 和远程调度。
+
+## E2b3 输入子集
+
+node 的 POST /runs/:id/inputs 返回 queued_for_next_turn + 持久化条目。只保存下一轮材料，尚不支持即时输入或澄清。选中要求与后续 Run 原子绑定，实际 spawn 后标随执行启动；不是 delivered 的提供方确认。未发许可取消才自动退回待选，启动歧义不重排。

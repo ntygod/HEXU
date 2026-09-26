@@ -1,5 +1,7 @@
+import { NextInputs } from '../../../packages/db/src/next-inputs.js';
+import { parseNextInputEdit } from '../../../packages/contracts/src/next-input.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { DomainError, text } from '../../../packages/contracts/src/index.js';
+import { DomainError, text, revision } from '../../../packages/contracts/src/index.js';
 import { exact, nodeId, nodeSecret } from '../../../packages/contracts/src/nodes.js';
 import {
   parseExecutionEvent,
@@ -20,6 +22,34 @@ export function attachNodeExecution(app: FastifyInstance, store: Store, nodes: N
   app.get('/api/v1/tasks/:taskId/node-options', async (r) =>
     execution.options(nodeId((r.params as { taskId: string }).taskId)),
   );
+  app.get('/api/v1/tasks/:taskId/next-inputs', async (r) => ({
+    items: new NextInputs(store).list(nodeId((r.params as { taskId: string }).taskId)),
+  }));
+  app.get('/api/v1/tasks/:taskId/node-continuation-preview', async (r) => {
+    const q = exact(r.query, ['sourceRunId']);
+    return execution.continuationPreview(
+      nodeId((r.params as { taskId: string }).taskId),
+      nodeId(q.sourceRunId),
+    );
+  });
+  app.patch('/api/v1/next-inputs/:inputId', async (r) => {
+    const body = parseNextInputEdit(r.body);
+    return new NextInputs(store).edit(
+      nodeId((r.params as { inputId: string }).inputId),
+      body.expectedRevision,
+      body.body,
+      text(r.headers['idempotency-key'], '操作标识', 128),
+    );
+  });
+  app.post('/api/v1/next-inputs/:inputId/cancel', async (r) => {
+    const body = exact(r.body, ['expectedRevision']);
+    return new NextInputs(store).edit(
+      nodeId((r.params as { inputId: string }).inputId),
+      revision(body.expectedRevision),
+      null,
+      text(r.headers['idempotency-key'], '操作标识', 128),
+    );
+  });
   app.post('/runner/v1/execution-policy', async (r) => {
     const b = exact(r.body, ['connectionId', 'policy']);
     return execution.publish(

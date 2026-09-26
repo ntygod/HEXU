@@ -396,3 +396,139 @@ test('授权根不能包含执行锁目录，正常的个人仓库仍可占用',
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test('真实 HTTP 下一轮队列与同目录新会话接续：明确选择、实际启动、脏文件保留及重放去重', async () => {
+  const f = await fixture();
+  try {
+    const first = await f.create('FIXTURE_WRITE');
+    const done = await f.until(
+      () => f.getRun(first.run.id),
+      (r) => r.state === 'succeeded',
+    );
+    await writeFile(join(f.root, 'keep-dirty.txt'), 'Uncommitted user edits stay here\n');
+    const saved = await f.call(`runs/${done.id}/inputs`, f.bob, { body: '选择此条：处理空数据' });
+    assert.equal(saved.statusCode, 200, saved.body);
+    assert.equal(saved.json().delivery, 'queued_for_next_turn');
+    const note = saved.json().input;
+    const omitted = await f.call(`runs/${done.id}/inputs`, f.alice, {
+      body: '此条不选择，不能偷偷带入',
+    });
+    assert.equal(omitted.statusCode, 200);
+    const preview = (
+      await f.call(`tasks/${f.task.id}/node-continuation-preview?sourceRunId=${done.id}`, f.alice)
+    ).json();
+    assert.equal(preview.ready, true);
+    assert.equal(
+      (await f.call(`tasks/${f.task.id}/node-continuation-preview?sourceRunId=${done.id}`, f.bob))
+        .statusCode,
+      403,
+    );
+    const body = {
+      ...first.body,
+      prompt: 'FIXTURE_CAPTURE_INPUT',
+      expectedRevision: (await f.call(`tasks/${f.task.id}`, f.alice)).json().task.revision,
+      continuation: {
+        sourceRunId: done.id,
+        expectedContextHash: preview.contextHash,
+        inputs: [{ id: note.id, revision: note.revision }],
+      },
+    };
+    const idempotency = randomUUID();
+    const created = await f.call(`tasks/${f.task.id}/runs`, f.alice, body, idempotency);
+    assert.equal(created.statusCode, 201, created.body);
+    const second = await f.until(
+      () => f.getRun(created.json().id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(second.state, 'succeeded');
+    assert.equal(second.previousRunId, done.id);
+    assert.equal(second.node?.workingCopyId, done.node?.workingCopyId);
+    const context = await readFile(join(f.root, 'received-context.txt'), 'utf8');
+    assert.match(context, /选择此条：处理空数据/);
+    assert.ok(!context.includes('此条不选择'));
+    assert.match(context, /fixture response \[REDACTED\]/);
+    assert.equal(
+      await readFile(join(f.root, 'keep-dirty.txt'), 'utf8'),
+      'Uncommitted user edits stay here\n',
+    );
+    assert.equal(
+      (await f.call(`tasks/${f.task.id}/runs`, f.alice, body, idempotency)).json().id,
+      second.id,
+    );
+    await f.restart();
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\none\n');
+    const queue = (await f.call(`tasks/${f.task.id}/next-inputs`, f.alice)).json().items;
+    assert.equal(queue.find((i: { id: string }) => i.id === note.id).state, 'started');
+    assert.equal(
+      queue.find((i: { id: string }) => i.id === omitted.json().input.id).state,
+      'queued',
+    );
+  } finally {
+    await f.close();
+  }
+});
+test('下一轮要求的 HTTP 编辑/撤回与只读访问边界，不取消当前已排队执行', async () => {
+  const f = await fixture();
+  try {
+    const { run } = await f.create('FIXTURE_WRITE');
+    const note = (await f.call(`runs/${run.id}/inputs`, f.bob, { body: '可编辑草稿' })).json()
+      .input;
+    const edited = await f.call(
+      `next-inputs/${note.id}`,
+      f.bob,
+      { body: '新草稿', expectedRevision: 1 },
+      randomUUID(),
+      'PATCH',
+    );
+    assert.equal(edited.statusCode, 200, edited.body);
+    const no = await f.call(`next-inputs/${note.id}/cancel`, f.alice, { expectedRevision: 2 });
+    assert.equal(no.statusCode, 403);
+    const cancel = await f.call(`next-inputs/${note.id}/cancel`, f.bob, { expectedRevision: 2 });
+    assert.equal(cancel.json().state, 'cancelled');
+    await f.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, { role: 'view' });
+    assert.equal((await f.call(`tasks/${f.task.id}/next-inputs`, f.bob)).statusCode, 200);
+    assert.equal(
+      (await f.call(`runs/${run.id}/inputs`, f.bob, { body: '只读不能添加' })).statusCode,
+      403,
+    );
+    assert.equal(
+      (
+        await f.until(
+          () => f.getRun(run.id),
+          (r) => r.state === 'succeeded',
+        )
+      ).state,
+      'succeeded',
+    );
+  } finally {
+    await f.close();
+  }
+});
+test('本机待处理摘要不包含任务文本/密钥，不改变未知状态或释放目录', async () => {
+  const f = await fixture();
+  try {
+    const { run } = await f.create('sensitive fixture prompt');
+    const c = (
+      await nodeRequest<{ command: any }>(
+        f.origin,
+        'execution-poll',
+        { connectionId: f.connection.connectionId },
+        f.token,
+      )
+    ).command;
+    f.executor.journal.accept(c);
+    const list = f.executor.journal.pendingSummaries();
+    assert.equal(list.length, 1);
+    assert.equal(list[0]!.runId, run.id);
+    assert.equal(list[0]!.requiresLocalReview, true);
+    assert.ok(!JSON.stringify(list).includes('sensitive fixture prompt'));
+    assert.ok(!JSON.stringify(list).includes(f.token));
+    assert.equal(f.executor.journal.get(c.id)!.phase, 'accepted');
+    // Fixture cleanup explicitly settles a never-started command, not product recovery.
+    f.executor.journal.settle(c.id, 'cancelled', 'fixture no spawn');
+    await f.executor.flush();
+    assert.equal(f.executor.journal.pendingSummaries().length, 0);
+  } finally {
+    await f.close();
+  }
+});

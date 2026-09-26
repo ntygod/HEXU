@@ -100,7 +100,7 @@ export function attachIdentity(
         new ContinuationStore(store).get(text(p.operationId, '操作', 150)).taskId,
         !['GET', 'HEAD'].includes(request.method),
       );
-    // Until node identities and dispatch grants exist, no account inherits host execution.
+    // Only explicit node dispatch, stop and next-round notes are allowed; no host execution.
     const path = new URL(request.url, 'http://localhost').pathname;
     if (
       path.startsWith('/api/v1/native') ||
@@ -109,13 +109,13 @@ export function attachIdentity(
         request.method !== 'GET' &&
         !(/\/tasks\/[^/]+\/runs$/.test(path) && record(request.body).provider === 'node') &&
         !(
-          /\/runs\/[^/]+\/stop$/.test(path) &&
+          /\/runs\/[^/]+\/(stop|inputs)$/.test(path) &&
           store.run(text(p.runId, '执行', 150)).provider === 'node'
         ))
     )
       throw new DomainError(
         'RUNNER_REQUIRED',
-        '团队模式尚未接入节点任务派发，不使用宿主机目录或模型账号',
+        '此入口不支持团队宿主机执行；请使用本人明确授权的独立节点',
         422,
       );
   });

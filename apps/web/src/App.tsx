@@ -1,3 +1,4 @@
+import { NextInputPanel } from './next-inputs.js';
 import { NodeRunPanel, NodeRunStatus } from './node-execution.js';
 import { SpaceSwitcher } from './identity.js';
 import { TeamSettings, ProjectAccess } from './team.js';
@@ -199,8 +200,8 @@ export function App() {
           <span>HEXU · 让人和 AI，一起交付。</span>
           <span>
             {data.mode === 'team-local'
-              ? 'E2b2 · 真实账号 / 本人节点执行'
-              : '开发预览 E2b2 · 示例数据'}
+              ? 'E2b3 · 真实账号 / 本人节点执行'
+              : '开发预览 E2b3 · 示例数据'}
           </span>
         </footer>
       </div>
@@ -789,10 +790,11 @@ function MessageList({ messages }: { messages: Message[] }) {
 function TaskPage({ id }: { id: string }) {
   const { value, error } = useLoad<TaskDetail>(`/tasks/${id}`);
   const { data, refresh, notice, changeStatus } = useApp();
-  const [modal, setModal] = useState<'continue' | 'share' | 'edit' | null>(null),
+  const [modal, setModal] = useState<'continue' | 'node-continue' | 'share' | 'edit' | null>(null),
     [leftTab, setLeftTab] = useState('discussion'),
     [rightTab, setRightTab] = useState('preview'),
     [busy, setBusy] = useState(false);
+  const [continuationSource, setContinuationSource] = useState<string | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
@@ -939,7 +941,20 @@ function TaskPage({ id }: { id: string }) {
         </div>
       </div>
       <ContinuationStatus key={id} taskId={id} onConfigure={() => setModal('continue')} />
-      {lastRun?.provider === 'node' && <NodeRunStatus run={lastRun} />}
+      {lastRun?.provider === 'node' && (
+        <>
+          <NodeRunStatus run={lastRun} />
+          <NextInputPanel
+            key={id}
+            run={lastRun}
+            editable={editable}
+            onContinue={() => {
+              setContinuationSource(lastRun.id);
+              setModal('node-continue');
+            }}
+          />
+        </>
+      )}
       <div className="task-grid">
         <section className="panel collaboration-panel">
           <div className="tabs panel-tabs">
@@ -1153,6 +1168,16 @@ function TaskPage({ id }: { id: string }) {
         ) : (
           <ContinuePanel task={task} lastRun={lastRun} onClose={() => setModal(null)} />
         ))}{' '}
+      {modal === 'node-continue' &&
+        continuationSource &&
+        runs.some((r) => r.id === continuationSource && r.provider === 'node') && (
+          <NodeRunPanel
+            key={continuationSource}
+            task={task}
+            source={runs.find((r) => r.id === continuationSource)!}
+            onClose={() => setModal(null)}
+          />
+        )}
       {modal === 'share' && <ShareResult task={task} onClose={() => setModal(null)} />}{' '}
       {modal === 'edit' && <EditTask task={task} onClose={() => setModal(null)} />}
     </div>
@@ -1284,7 +1309,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E2b2 · 本机预览</span>
+        <span className="badge neutral">E2b3 · 本机预览</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />
