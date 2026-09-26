@@ -143,6 +143,7 @@ export function ProjectLifecycle({
               <label className="field">
                 已启动执行的处理
                 <select
+                  aria-label="已启动执行的处理"
                   value={choice}
                   disabled={busy || !!uncertain}
                   onChange={(event) => setChoice(event.target.value as typeof choice)}
