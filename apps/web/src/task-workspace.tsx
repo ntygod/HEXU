@@ -1,9 +1,9 @@
+import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { TaskDetail } from '../../../packages/contracts/src/index.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import {
-  Avatar,
   Button,
   Dialog,
   Empty,
@@ -189,15 +189,7 @@ export function TaskPage({ id }: { id: string }) {
         <div className="w1-task-scope">
           <span>{task.shortId}</span>
           <span>{task.visibility === 'private' ? '仅自己可见' : '项目成员可见'}</span>
-          <Avatar
-            user={data.members.find((member) => member.id === task.ownerUserId)}
-            size="small"
-          />
-          <span>
-            负责人：
-            {data.members.find((member) => member.id === task.ownerUserId)?.name ??
-              (task.ownerUserId === data.user.id ? data.user.name : '未提供')}
-          </span>
+          <TaskOwner task={task} />
           <span className="spacer" />
           <button className="text-button" onClick={() => setDrawer('context')}>
             工作说明
@@ -226,6 +218,7 @@ export function TaskPage({ id }: { id: string }) {
               <span>配置模型：{lastRun.node?.model ?? lastRun.native?.model}</span>
             )}
             <RunBadge run={lastRun} />
+            <span>发起者：{recordedPerson(lastRun.createdByUserId, data.members)}</span>
             <span className="w1-code-location">
               <Icon name="folder" size={14} />
               {lastRun.node
@@ -495,6 +488,7 @@ export function TaskPage({ id }: { id: string }) {
           <div className="context-view">
             <span className="eyebrow">本次工作说明</span>
             <h3>{task.title}</h3>
+            <p>创建者：{recordedPerson(task.createdByUserId, data.members)}</p>
             <p className="text-block">{task.description || '暂无补充说明，可以直接编辑。'}</p>
             <Button disabled={!editable} onClick={() => setModal('edit')}>
               编辑说明
@@ -529,6 +523,7 @@ export function TaskPage({ id }: { id: string }) {
                   <span className="spacer" />
                   <RunBadge run={run} />
                 </div>
+                <p>发起者：{recordedPerson(run.createdByUserId, data.members)}</p>
                 <p>{run.prompt || '未补充要求'}</p>
                 <small>
                   {time(run.createdAt)} · {run.previousRunId ? '关联此前执行' : '首次执行'}

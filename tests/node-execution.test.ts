@@ -1166,3 +1166,130 @@ test('归档事务的节点派发更新故障不留下半归档，恢复项目�
     f.close();
   }
 });
+
+test('改派保留节点所有者、运行发起者和活动派发，接任者不能借负责人身份启动他人节点', () => {
+  const f = fixture();
+  try {
+    const { run, c } = f.running();
+    const before = f.as(() => f.store.run(run.id));
+    const dispatch = f.store.db.prepare('SELECT * FROM node_dispatches WHERE id=?').get(c.id);
+    const beforeNode = f.as(() => f.nodes.get(f.n.nodeId));
+    assert.equal(before.createdByUserId, f.alice.id);
+    const next = f.as(
+      () =>
+        f.store.taskAssignment.assign(
+          f.task.id,
+          { expectedRevision: f.store.getTask(f.task.id).revision, ownerUserId: f.bob.id },
+          key(),
+        ),
+      f.bob,
+    );
+    assert.equal(next.createdByUserId, f.alice.id);
+    assert.equal(next.ownerUserId, f.bob.id);
+    assert.deepEqual(
+      f.as(() => f.store.run(run.id)),
+      before,
+    );
+    assert.deepEqual(
+      f.store.db.prepare('SELECT * FROM node_dispatches WHERE id=?').get(c.id),
+      dispatch,
+    );
+    assert.deepEqual(
+      f.as(() => f.nodes.get(f.n.nodeId)),
+      beforeNode,
+    );
+    assert.throws(
+      () => f.as(() => f.execution.create(f.task.id, parseNodeRun(f.body()), key()), f.bob),
+      code('NODE_OWNER_REQUIRED'),
+    );
+    f.send(c, 3, 'terminal', 'succeeded');
+    assert.throws(
+      () => f.as(() => f.execution.create(f.task.id, parseNodeRun(f.body()), key()), f.bob),
+      code('NODE_OWNER_REQUIRED'),
+    );
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+  } finally {
+    f.close();
+  }
+});
+
+test('改派不更新旧派发材料，未发启动许可时修订检查拒绝旧请求而不改变发起者', () => {
+  const f = fixture();
+  try {
+    f.publish();
+    const run = f.create(),
+      c = f.command();
+    f.send(c, 1, 'accepted');
+    const before = f.store.db
+      .prepare('SELECT command,owner_id,task_revision FROM node_dispatches WHERE id=?')
+      .get(c.id);
+    f.as(() =>
+      f.store.taskAssignment.assign(
+        f.task.id,
+        { expectedRevision: f.store.getTask(f.task.id).revision, ownerUserId: f.bob.id },
+        key(),
+      ),
+    );
+    assert.deepEqual(
+      f.store.db
+        .prepare('SELECT command,owner_id,task_revision FROM node_dispatches WHERE id=?')
+        .get(c.id),
+      before,
+    );
+    assert.equal(f.execution.permit(f.token, f.connection, c.id, c.generation).allowed, false);
+    assert.equal(f.as(() => f.store.run(run.id)).createdByUserId, f.alice.id);
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+  } finally {
+    f.close();
+  }
+});
+
+test('改派原子暂停节点等待接续，回滚不改变原责任和材料，往返改派不自动重跑', () => {
+  const f = operationFixture();
+  try {
+    const note = f.as(() =>
+      new NextInputs(f.store).create(f.source.run.id, '保持原先选择的要求', key()),
+    );
+    const op = f.schedule('wait', [{ id: note.id, revision: note.revision }]);
+    const before = f.as(() => f.store.getTask(f.task.id));
+    const dispatch = f.store.db.prepare('SELECT * FROM node_dispatches').all();
+    f.store.db.exec(
+      "CREATE TRIGGER assignment_failure BEFORE UPDATE ON node_continuation_operations BEGIN SELECT RAISE(ABORT,'node assignment rollback'); END",
+    );
+    const body = { expectedRevision: before.revision, ownerUserId: f.bob.id };
+    assert.throws(
+      () => f.as(() => f.store.taskAssignment.assign(f.task.id, body, 'assignment')),
+      /node assignment rollback/,
+    );
+    assert.deepEqual(
+      f.as(() => f.store.getTask(f.task.id)),
+      before,
+    );
+    assert.deepEqual(f.read(op.id), op);
+    f.store.db.exec('DROP TRIGGER assignment_failure');
+    const changed = f.as(() => f.store.taskAssignment.assign(f.task.id, body, 'assignment'));
+    const paused = f.read(op.id);
+    assert.equal(paused.state, 'needs_attention');
+    assert.equal(paused.blockers[0]!.code, 'TASK_ASSIGNMENT_CHANGED');
+    assert.equal(paused.contextText, op.contextText);
+    assert.deepEqual(paused.input, op.input);
+    assert.equal(paused.ownerId, f.alice.id);
+    assert.deepEqual(f.store.db.prepare('SELECT * FROM node_dispatches').all(), dispatch);
+    f.as(() =>
+      f.store.taskAssignment.assign(
+        f.task.id,
+        { expectedRevision: changed.revision, ownerUserId: f.alice.id },
+        key(),
+      ),
+    );
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.run(f.source.run.id)).state, 'running');
+    f.send(f.source.c, 3, 'terminal', 'succeeded');
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'needs_attention');
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    assert.equal(f.as(() => new NextInputs(f.store).list(f.task.id))[0]!.state, 'queued');
+  } finally {
+    f.close();
+  }
+});

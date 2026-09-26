@@ -1,0 +1,45 @@
+.task-owner {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-assignment h3 {
+  margin: 0;
+  font-size: inherit;
+}
+.task-assignment p {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.task-assignment small {
+  color: var(--hx-text-secondary);
+}
+.assignment-conflict {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-raised);
+}
+.assignment-conflict h3 {
+  color: var(--hx-pending-text);
+}
+.assignment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.assignment-history {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-3);
+}
+.assignment-history article {
+  border-bottom: 1px solid var(--hx-border-subtle);
+  padding: var(--hx-space-3) 0;
+}
+.assignment-history article p {
+  margin-bottom: 0;
+  color: var(--hx-text-secondary);
+}

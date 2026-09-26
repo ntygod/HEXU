@@ -138,7 +138,7 @@ Figma 参考只决定信息组织，不自动批准示例模型、隐藏会话�
 
 - `packages/ui`：唯一语义 tokens、共享控件和状态，不在页面中另建配色。
 - `foundation.css`：浏览器基础、通用表单／布局；`shell`：全局工作台导航。
-- `task-workspace`、`discussion`、`prompt-bar`、`execution.css`：任务面板、草稿／讨论、输入与执行配置。
+- `task-workspace`、`discussion`、`prompt-bar`、`execution.css`：任务面板、草稿／讨论、输入与执行配置；`task-assignment.tsx/css`：任务头部负责人、改派/历史抽屉与冲突处理。
 - `identity`／`team`：账号、空间和项目成员；`settings`／`resources.css`：能力与节点。
 - `workbench`、`projects`、`results`、`work-cards`／`work-pages.css`：工作聚合、项目与成果；`project-settings.tsx/css`：基本信息、修订与冲突处理抽屉；`project-lifecycle.tsx`：同一抽屉中的归档影响、运行选择与恢复。
 - `command-menu`：权限范围内的实际搜索与现有动作；`preview.css`：仅虚构订单示例。

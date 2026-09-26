@@ -298,3 +298,90 @@ test('项目设置仅管理者可写；撤权清除打开的草稿，重新授�
     await context.close();
   }
 });
+
+test('真实项目成员改派、撤权清理与退出显示，负责人不自动获得额外访问权', async ({
+  page,
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    member = await context.newPage();
+  try {
+    const alice = await loginOwner(page);
+    const space = await post(page, 'spaces', { name: '任务改派测试团队' });
+    const invitation = await post(
+      page,
+      `spaces/${space.id}/invitations`,
+      { email: `assignment-${randomUUID()}@example.invalid` },
+      space.id,
+    );
+    await post(member, 'identity/join', {
+      token: invitation.token,
+      name: '改派成员（测试）',
+      password,
+    });
+    const bob = (await (await member.request.get(`${origin}/api/v1/identity`)).json()).user;
+    const project = await post(
+      page,
+      `spaces/${space.id}/projects`,
+      { name: '共同维护客户入口' },
+      space.id,
+    );
+    await post(page, `projects/${project.id}/members/${bob.id}`, { role: 'edit' }, space.id);
+    const task = await post(
+      page,
+      `spaces/${space.id}/tasks`,
+      { title: '真实成员改派任务', projectId: project.id },
+      space.id,
+    );
+    await page.goto(origin);
+    await select(page, space.id);
+    await page.goto(`${origin}/tasks/${task.id}`);
+    await member.goto(origin);
+    await select(member, space.id);
+    await member.goto(`${origin}/tasks/${task.id}`);
+    await member.getByRole('button', { name: '更改负责人', exact: true }).click();
+    await expect(member.getByLabel('新的负责人', { exact: true }).locator('option')).toHaveCount(2);
+    await member.getByLabel('新的负责人', { exact: true }).selectOption(bob.id);
+    await member.getByRole('button', { name: '保存负责人', exact: true }).click();
+    await expect(member.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByLabel('任务负责人', { exact: true })).toContainText(bob.name);
+    await member.getByRole('button', { name: '更改负责人', exact: true }).click();
+    await member.getByLabel('新的负责人', { exact: true }).selectOption(alice.id);
+    await post(page, `projects/${project.id}/members/${bob.id}`, { role: 'view' }, space.id);
+    await expect(member.getByRole('dialog')).toHaveCount(0);
+    await expect(member.getByLabel('任务负责人', { exact: true })).toContainText('当前只读');
+    await expect(member.getByRole('button', { name: '更改负责人', exact: true })).toHaveCount(0);
+    await member.getByRole('button', { name: '改派记录', exact: true }).click();
+    await expect(member.getByLabel('负责人变更历史', { exact: true })).toContainText(
+      '林舟（测试） → 改派成员（测试）',
+    );
+    await expect(member.getByLabel('新的负责人', { exact: true })).toHaveCount(0);
+    await member.keyboard.press('Escape');
+    await post(page, `projects/${project.id}/members/${bob.id}`, { role: 'edit' }, space.id);
+    await member.getByRole('button', { name: '更改负责人', exact: true }).click();
+    await expect(member.getByLabel('新的负责人', { exact: true })).toHaveValue(bob.id); // Discarded choice did not return.
+    await post(page, `projects/${project.id}/members/${bob.id}`, { role: null }, space.id);
+    await expect(member.getByRole('dialog')).toHaveCount(0);
+    await expect(member.getByRole('heading', { name: task.title, exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('任务负责人', { exact: true })).toContainText('已不在项目');
+    const rejected = await member.request.get(
+      `${origin}/api/v1/tasks/${task.id}/assignment-history`,
+      { headers: headers(space.id) },
+    );
+    expect(rejected.status()).toBe(404);
+    await page.getByRole('button', { name: '更改负责人', exact: true }).click();
+    await expect(
+      page.getByLabel('新的负责人', { exact: true }).locator(`option[value="${bob.id}"]`),
+    ).toBeDisabled();
+    await page.getByLabel('新的负责人', { exact: true }).selectOption(alice.id);
+    await page.getByRole('button', { name: '保存负责人', exact: true }).click();
+    await expect(page.getByLabel('任务负责人', { exact: true })).toContainText(alice.name);
+    const detail = await (
+      await page.request.get(`${origin}/api/v1/tasks/${task.id}`, { headers: headers(space.id) })
+    ).json();
+    expect(detail.task.createdByUserId).toBe(alice.id);
+    expect(detail.runs).toHaveLength(0);
+  } finally {
+    await context.close();
+  }
+});

@@ -53,3 +53,9 @@
 任务改派不修改旧 Run 的执行配置，不转移目录或账号。暂缓任务也不是原生进程暂停。UI 根据字段展示事实，不要求研发团队为了保持首页整洁填百分比。
 
 交付时给后续模块稳定的 TaskSummary、TaskDetail、TaskCommandResult 与事件；不让每个页面自己推断任务是否“质量通过”。
+
+## 7. 已交付的 04-01 负责人切片
+
+项目可见任务已接入 `GET/POST /tasks/:id/assignment` 与分页 `assignment-history`。有任务编辑权的人可选择当前空间/项目中有 edit/manage 权限的真人；负责人不是访问授权，私有任务和跨空间转移不在本次范围。Task.ownerUserId 与新 Task/Run 的 createdByUserId 分开，迁移 11 不根据旧负责人补造创建者。
+
+改派、改派历史、等待 Operation 暂停、outbox 和幂等回执同事务提交；保留 Run、节点授权和冻结材料，不发停止或新执行。已获许可执行不因改派被撤回；尚未许可的派发仍受任务修订检查，拒绝旧材料后不自动重试。W1 入口含明确冲突处理、原请求回执确认和权限变化清理。参与者、完整筛选与正式存储仍未交付，工作项保持部分实现。使用与验证见 [任务改派](../engineering/task-assignment.md) 和 [21](21-implementation-status.md)。

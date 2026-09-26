@@ -34,6 +34,8 @@ export interface Project {
   revision: number;
 }
 export interface Task {
+  /** Unknown for legacy records; never inferred from the current owner. */
+  createdByUserId?: string | null;
   id: string;
   shortId: string;
   spaceId: string;
@@ -58,6 +60,8 @@ export interface Message {
   resultId: string | null;
 }
 export interface Run {
+  /** Original requester, independent of later task reassignment. */
+  createdByUserId?: string | null;
   id: string;
   taskId: string;
   state: RunState;
@@ -144,6 +148,8 @@ export function enumValue<T extends string>(
 }
 export function parseTaskCreate(value: unknown) {
   const body = record(value);
+  if (Object.keys(body).some((key) => !['title', 'description', 'projectId'].includes(key)))
+    throw new DomainError('INVALID_INPUT', '新建任务只接受标题、说明和项目');
   return {
     title: text(body.title, '任务标题', 160),
     description: text(body.description, '说明', 12000, true),

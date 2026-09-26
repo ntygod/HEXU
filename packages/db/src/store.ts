@@ -1,3 +1,4 @@
+import { TaskAssignmentStore } from './task-assignment.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
@@ -52,6 +53,7 @@ export class Store {
   readonly collaboration: CollaborationStore;
   readonly projectSettings: ProjectSettingsStore;
   readonly projectLifecycle: ProjectLifecycleStore;
+  readonly taskAssignment: TaskAssignmentStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -86,6 +88,7 @@ export class Store {
     this.collaboration = new CollaborationStore(this);
     this.projectSettings = new ProjectSettingsStore(this);
     this.projectLifecycle = new ProjectLifecycleStore(this);
+    this.taskAssignment = new TaskAssignmentStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
@@ -311,6 +314,7 @@ export class Store {
         ...data,
         visibility: data.projectId ? 'project' : 'private',
         ownerUserId: this.actorId,
+        createdByUserId: this.actorId,
         status: 'todo',
         attention: null,
         revision: 1,
@@ -485,6 +489,7 @@ export class Store {
       const at = now();
       const previous = this.runs(taskId).at(-1);
       const run: Run = {
+        createdByUserId: this.actorId,
         id: randomUUID(),
         taskId,
         state: 'queued',
@@ -699,6 +704,7 @@ export class Store {
       }
       const at = now();
       const run: Run = {
+        createdByUserId: this.actorId,
         id: randomUUID(),
         taskId,
         provider: 'native',

@@ -456,6 +456,7 @@ export class NodeExecution {
         expiresAt: new Date(Date.now() + 60000).toISOString(),
       };
       const run: Run = {
+        createdByUserId: this.store.actorId,
         id: runId,
         taskId,
         provider: 'node',
