@@ -163,6 +163,8 @@ tests                    单元、存储、API 与浏览器测试
 
 ## 产品与开发文档
 
+已确认的产品形态是**桌面优先、个人无需团队服务器、团队共享服务可选，并保留 Web 协作入口**。界面采用 **Workbench W1：暗色优先、青色强调、任务一体化工作台**。这两项是后续开发基线；当前可运行范围仍以上述实现说明为准，桌面安装包和 W1 全量迁移尚未交付。
+
 | 入口 | 用途 |
 | --- | --- |
 | [产品概要](docs/product/00-executive-brief.md) | 面向管理层的定位与完整目标 |
@@ -170,6 +172,8 @@ tests                    单元、存储、API 与浏览器测试
 | [人的工作旅程](docs/product/02-people-and-workflows.md) | 角色、继续、协助和接手 |
 | [功能规格](docs/product/03-functional-specification.md) | v1.1 功能要求 |
 | [UI/UX](docs/product/04-ux-and-design.md) | 工作台、任务与成果的页面规则 |
+| [设计语言 W1](docs/design/README.md) | 已确认的视觉、交互、tokens、Figma 采用范围和可交互参考 |
+| [客户端形态 ADR-0008](docs/engineering/adr-0008-client-surfaces.md) | 桌面／Web／团队服务／Runner 的职责和未决选型 |
 | [领域状态](docs/product/05-domain-and-state.md) | Task、Run、成果与真实状态的区别 |
 | [技术架构](docs/product/06-technical-architecture.md) | 最终执行与协作架构 |
 | [建设路线](docs/product/07-roadmap.md) | 完整目标的实施顺序 |

@@ -1,0 +1,102 @@
+/* Workbench W1 design reference. Not imported by the application yet. */
+.hexu-workbench {
+  color-scheme: dark;
+  --hx-bg-app: #0d1117;
+  --hx-surface-panel: #161b22;
+  --hx-surface-raised: #1c222c;
+  --hx-surface-hover: #232b36;
+  --hx-border-subtle: #30363d;
+  --hx-border-muted: #232a34;
+  --hx-text-primary: #e6edf3;
+  --hx-text-secondary: #9ba8b9;
+  --hx-text-muted: #778498;
+  --hx-brand: #00f0ff;
+  --hx-brand-foreground: #062126;
+  --hx-brand-soft: #102a31;
+  --hx-ai-marker: #a855f7;
+  --hx-ai-text: #bc8cff;
+  --hx-ai-soft: #281e3b;
+  --hx-running-marker: #10b981;
+  --hx-running-text: #3dd6a0;
+  --hx-running-soft: #102d25;
+  --hx-pending-marker: #f59e0b;
+  --hx-pending-text: #f4bd62;
+  --hx-pending-soft: #342817;
+  --hx-danger-marker: #ef4444;
+  --hx-danger-text: #ff8590;
+  --hx-danger-soft: #341e27;
+  --hx-code-text: #c9d6e5;
+  --hx-shadow: #00000066;
+  --hx-font-ui: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --hx-font-code: 'JetBrains Mono', 'Fira Code', Consolas, ui-monospace, monospace;
+  --hx-font-body: 13px;
+  --hx-font-secondary: 12px;
+  --hx-font-metadata: 11px;
+  --hx-font-code-size: 12px;
+  --hx-font-task-title: 20px;
+  --hx-font-page-title: 24px;
+  --hx-line-height-body: 1.6;
+  --hx-space-1: 4px;
+  --hx-space-2: 8px;
+  --hx-space-3: 12px;
+  --hx-space-4: 16px;
+  --hx-space-5: 24px;
+  --hx-space-6: 32px;
+  --hx-density-unit: 8px;
+  --hx-panel-padding: 16px;
+  --hx-control-height: 32px;
+  --hx-touch-target: 44px;
+  --hx-radius-control: 6px;
+  --hx-radius-panel: 8px;
+  --hx-radius-dialog: 12px;
+  --hx-navigation-width: 48px;
+  --hx-guide-width: 200px;
+  --hx-drawer-width: 350px;
+  --hx-motion-fast: 120ms;
+  --hx-motion-normal: 180ms;
+}
+
+.hexu-workbench[data-theme='light'] {
+  color-scheme: light;
+  --hx-bg-app: #f8fafc;
+  --hx-surface-panel: #ffffff;
+  --hx-surface-raised: #f0f4f8;
+  --hx-surface-hover: #e8eef4;
+  --hx-border-subtle: #dce3eb;
+  --hx-border-muted: #e9edf3;
+  --hx-text-primary: #182536;
+  --hx-text-secondary: #52637a;
+  --hx-text-muted: #64748b;
+  --hx-brand: #0369a1;
+  --hx-brand-foreground: #ffffff;
+  --hx-brand-soft: #e0f3fc;
+  --hx-ai-marker: #9333ea;
+  --hx-ai-text: #9333ea;
+  --hx-ai-soft: #f2e8fc;
+  --hx-running-marker: #0c805b;
+  --hx-running-text: #0c805b;
+  --hx-running-soft: #e4f5ec;
+  --hx-pending-marker: #925d00;
+  --hx-pending-text: #925d00;
+  --hx-pending-soft: #fff4db;
+  --hx-danger-marker: #c63242;
+  --hx-danger-text: #c63242;
+  --hx-danger-soft: #fff0f2;
+  --hx-code-text: #293b50;
+  --hx-shadow: #23354a24;
+}
+
+.hexu-workbench[data-density='comfortable'] {
+  --hx-font-body: 14px;
+  --hx-font-code-size: 13px;
+  --hx-density-unit: 12px;
+  --hx-panel-padding: 24px;
+  --hx-control-height: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hexu-workbench {
+    --hx-motion-fast: 0ms;
+    --hx-motion-normal: 0ms;
+  }
+}

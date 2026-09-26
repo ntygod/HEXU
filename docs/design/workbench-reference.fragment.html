@@ -1,0 +1,3705 @@
+<style>
+  #hexu-workbench {
+    --w-bg: #0d1117;
+    --w-panel: #161b22;
+    --w-raised: #1c222c;
+    --w-hover: #232b36;
+    --w-border: #30363d;
+    --w-softline: #232a34;
+    --w-text: #e6edf3;
+    --w-muted: #9ba8b9;
+    --w-dim: #778498;
+    --w-cyan: #00f0ff;
+    --w-cyan-bg: #102a31;
+    --w-on-cyan: #062126;
+    --w-violet: #bc8cff;
+    --w-violet-bg: #281e3b;
+    --w-green: #3dd6a0;
+    --w-green-bg: #102d25;
+    --w-amber: #f4bd62;
+    --w-amber-bg: #342817;
+    --w-red: #ff8590;
+    --w-red-bg: #341e27;
+    --w-code: #c9d6e5;
+    --w-shadow: #00000066;
+    --w-space: 16px;
+    --w-guide: 182px;
+    --w-trace: 49%;
+    color-scheme: dark;
+    color: var(--w-text);
+    background: var(--w-bg);
+    font:
+      13px/1.65 Inter,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Microsoft YaHei',
+      sans-serif;
+    height: 848px;
+    min-height: 848px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border: 1px solid var(--w-border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  #hexu-workbench[data-theme='light'] {
+    --w-bg: #f8fafc;
+    --w-panel: #fff;
+    --w-raised: #f0f4f8;
+    --w-hover: #e8eef4;
+    --w-border: #dce3eb;
+    --w-softline: #e9edf3;
+    --w-text: #182536;
+    --w-muted: #52637a;
+    --w-dim: #64748b;
+    --w-cyan: #0369a1;
+    --w-cyan-bg: #e0f3fc;
+    --w-on-cyan: #fff;
+    --w-violet: #9333ea;
+    --w-violet-bg: #f2e8fc;
+    --w-green: #0c805b;
+    --w-green-bg: #e4f5ec;
+    --w-amber: #925d00;
+    --w-amber-bg: #fff4db;
+    --w-red: #c63242;
+    --w-red-bg: #fff0f2;
+    --w-code: #293b50;
+    --w-shadow: #23354a24;
+    color-scheme: light;
+  }
+  #hexu-workbench[data-density='comfortable'] {
+    --w-space: 22px;
+    font-size: 14px;
+  }
+  #hexu-workbench *,
+  #hexu-workbench *::before,
+  #hexu-workbench *::after {
+    box-sizing: border-box;
+  }
+  #hexu-workbench [hidden] {
+    display: none !important;
+  }
+  #hexu-workbench h1,
+  #hexu-workbench h2,
+  #hexu-workbench h3,
+  #hexu-workbench p {
+    margin: 0;
+  }
+  #hexu-workbench h1 {
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: -0.3px;
+  }
+  #hexu-workbench h2 {
+    font-size: 17px;
+    font-weight: 500;
+  }
+  #hexu-workbench h3 {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  #hexu-workbench strong {
+    font-weight: 500;
+  }
+  #hexu-workbench button,
+  #hexu-workbench input,
+  #hexu-workbench select,
+  #hexu-workbench textarea {
+    font: inherit;
+    color: inherit;
+  }
+  #hexu-workbench button {
+    border: 0;
+  }
+  #hexu-workbench svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+  #hexu-workbench small,
+  #hexu-workbench .wb-small {
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-muted {
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-dim {
+    color: var(--w-dim);
+  }
+  #hexu-workbench .wb-cyan {
+    color: var(--w-cyan);
+  }
+  #hexu-workbench .wb-green {
+    color: var(--w-green);
+  }
+  #hexu-workbench .wb-amber {
+    color: var(--w-amber);
+  }
+  #hexu-workbench .wb-violet {
+    color: var(--w-violet);
+  }
+  #hexu-workbench .wb-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  #hexu-workbench .wb-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  #hexu-workbench .wb-wrap {
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-between {
+    justify-content: space-between;
+  }
+  #hexu-workbench .wb-grow {
+    flex: 1;
+    min-width: 0;
+  }
+  #hexu-workbench .wb-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--w-muted);
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  #hexu-workbench .wb-icon:hover,
+  #hexu-workbench .wb-icon[aria-pressed='true'] {
+    background: var(--w-hover);
+    color: var(--w-text);
+  }
+  #hexu-workbench .wb-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 1px solid var(--w-border);
+    background: var(--w-raised);
+    color: var(--w-text);
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  #hexu-workbench .wb-button:hover {
+    background: var(--w-hover);
+    border-color: var(--w-muted);
+  }
+  #hexu-workbench .wb-primary {
+    background: var(--w-cyan);
+    border-color: var(--w-cyan);
+    color: var(--w-on-cyan);
+    font-weight: 500;
+  }
+  #hexu-workbench .wb-primary:hover {
+    background: var(--w-cyan);
+    border-color: var(--w-cyan);
+    filter: brightness(0.92);
+  }
+  #hexu-workbench .wb-subtle {
+    background: transparent;
+    border-color: transparent;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-danger {
+    color: var(--w-red);
+    background: var(--w-red-bg);
+  }
+  #hexu-workbench button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  #hexu-workbench .wb-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--w-muted);
+    background: var(--w-raised);
+    white-space: nowrap;
+  }
+  #hexu-workbench .wb-tag.cyan {
+    color: var(--w-cyan);
+    background: var(--w-cyan-bg);
+  }
+  #hexu-workbench .wb-tag.violet {
+    color: var(--w-violet);
+    background: var(--w-violet-bg);
+  }
+  #hexu-workbench .wb-tag.green {
+    color: var(--w-green);
+    background: var(--w-green-bg);
+  }
+  #hexu-workbench .wb-tag.amber {
+    color: var(--w-amber);
+    background: var(--w-amber-bg);
+  }
+  #hexu-workbench .wb-dot {
+    height: 6px;
+    width: 6px;
+    background: var(--w-green);
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  #hexu-workbench .wb-dot.active {
+    box-shadow: 0 0 0 3px #10b98118;
+    animation: wb-breathe 2.5s ease-in-out infinite;
+  }
+  #hexu-workbench .wb-top {
+    min-height: 51px;
+    padding: 0 13px;
+    gap: 15px;
+    border-bottom: 1px solid var(--w-border);
+    background: var(--w-panel);
+    z-index: 4;
+  }
+  #hexu-workbench .wb-logo {
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    border-radius: 7px;
+    background: var(--w-cyan);
+    color: var(--w-on-cyan);
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: -2px;
+    padding-right: 2px;
+  }
+  #hexu-workbench .wb-wordmark {
+    font-weight: 500;
+    letter-spacing: 1.3px;
+  }
+  #hexu-workbench .wb-top-separator {
+    height: 20px;
+    width: 1px;
+    background: var(--w-border);
+  }
+  #hexu-workbench .wb-space-picker {
+    border: 0;
+    background: transparent;
+    max-width: 176px;
+    padding: 4px 0;
+  }
+  #hexu-workbench .wb-search {
+    background: var(--w-bg);
+    border: 1px solid var(--w-border);
+    color: var(--w-dim);
+    border-radius: 6px;
+    padding: 4px 10px;
+    width: 240px;
+    min-width: 120px;
+    justify-content: space-between;
+    margin-left: auto;
+  }
+  #hexu-workbench kbd {
+    font:
+      11px/1.6 Consolas,
+      monospace;
+    border: 1px solid var(--w-border);
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--w-raised);
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-avatar {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: var(--w-raised);
+    color: var(--w-text);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    border: 1px solid var(--w-border);
+    flex-shrink: 0;
+  }
+  #hexu-workbench .wb-avatar.agent {
+    border-radius: 7px;
+    background: var(--w-violet-bg);
+    color: var(--w-violet);
+    border-color: transparent;
+    font-size: 13px;
+  }
+  #hexu-workbench .wb-shell {
+    display: grid;
+    grid-template-columns: 46px var(--w-guide) minmax(0, 1fr) 37px;
+    flex: 1;
+    min-height: 0;
+  }
+  #hexu-workbench[data-guide='closed'] .wb-shell {
+    grid-template-columns: 46px 0 minmax(0, 1fr) 37px;
+  }
+  #hexu-workbench .wb-rail {
+    padding: 12px 6px;
+    border-right: 1px solid var(--w-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: var(--w-bg);
+  }
+  #hexu-workbench .wb-rail .wb-icon {
+    width: 34px;
+    height: 35px;
+    position: relative;
+  }
+  #hexu-workbench .wb-rail .wb-icon[aria-current='page'] {
+    background: var(--w-cyan-bg);
+    color: var(--w-cyan);
+  }
+  #hexu-workbench .wb-rail .wb-icon[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 9px;
+    bottom: 9px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--w-cyan);
+  }
+  #hexu-workbench .wb-rail-bottom {
+    margin-top: auto;
+  }
+  #hexu-workbench .wb-guide {
+    min-width: 0;
+    overflow: hidden;
+    background: var(--w-panel);
+    border-right: 1px solid var(--w-border);
+    display: flex;
+    flex-direction: column;
+  }
+  #hexu-workbench[data-guide='closed'] .wb-guide {
+    visibility: hidden;
+  }
+  #hexu-workbench .wb-guide-head {
+    padding: 16px 13px 14px;
+    white-space: nowrap;
+  }
+  #hexu-workbench .wb-guide-caption {
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    color: var(--w-dim);
+    padding: 18px 14px 9px;
+    white-space: nowrap;
+  }
+  #hexu-workbench .wb-guide-link {
+    padding: 8px 11px;
+    margin: 1px 7px;
+    border-radius: 5px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: transparent;
+    color: var(--w-muted);
+    width: calc(100% - 14px);
+    text-align: left;
+    white-space: nowrap;
+  }
+  #hexu-workbench .wb-guide-link.current {
+    background: var(--w-cyan-bg);
+    color: var(--w-text);
+  }
+  #hexu-workbench .wb-count {
+    margin-left: auto;
+    color: var(--w-dim);
+    font-size: 11px;
+  }
+  #hexu-workbench .wb-task-item {
+    margin: 2px 7px;
+    padding: 9px 11px;
+    border-radius: 6px;
+    color: var(--w-text);
+    border: 1px solid var(--w-border);
+    background: var(--w-raised);
+  }
+  #hexu-workbench .wb-task-item p {
+    font-size: 12px;
+    line-height: 1.65;
+    margin-top: 4px;
+  }
+  #hexu-workbench .wb-task-item small {
+    font-size: 11px;
+    color: var(--w-dim);
+  }
+  #hexu-workbench .wb-guide-bottom {
+    margin-top: auto;
+    padding: 15px 12px;
+    border-top: 1px solid var(--w-border);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+  #hexu-workbench .wb-main {
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  #hexu-workbench .wb-view {
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  #hexu-workbench .wb-task-head {
+    padding: 16px 18px 0;
+    background: var(--w-bg);
+  }
+  #hexu-workbench .wb-crumb {
+    font-size: 11px;
+    color: var(--w-dim);
+    letter-spacing: 0.5px;
+  }
+  #hexu-workbench .wb-task-title {
+    margin: 8px 0 13px;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  #hexu-workbench .wb-task-title h1 {
+    font-size: 18px;
+    flex: 1;
+  }
+  #hexu-workbench .wb-statusband {
+    gap: 0;
+    padding: 10px 0;
+    border-top: 1px solid var(--w-softline);
+    font-size: 11px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  #hexu-workbench .wb-statusgroup {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 12px;
+    border-right: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-statusgroup:first-child {
+    padding-left: 0;
+  }
+  #hexu-workbench .wb-statusgroup:last-of-type {
+    border-right: 0;
+  }
+  #hexu-workbench .wb-split {
+    display: grid;
+    grid-template-columns: minmax(0, var(--w-trace)) 7px minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+    border-top: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-trace,
+  #hexu-workbench .wb-inspector {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--w-bg);
+  }
+  #hexu-workbench .wb-pane-head {
+    min-height: 40px;
+    padding: 0 13px;
+    border-bottom: 1px solid var(--w-border);
+    background: var(--w-panel);
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-tabs {
+    display: flex;
+    height: 40px;
+    align-items: stretch;
+    gap: 15px;
+  }
+  #hexu-workbench .wb-tab {
+    background: transparent;
+    color: var(--w-muted);
+    padding: 0 1px;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-tab[aria-selected='true'] {
+    color: var(--w-text);
+    border-bottom-color: var(--w-cyan);
+  }
+  #hexu-workbench .wb-splitter {
+    padding: 0;
+    background: var(--w-panel);
+    border-left: 1px solid var(--w-border);
+    border-right: 1px solid var(--w-border);
+    cursor: col-resize;
+    touch-action: none;
+  }
+  #hexu-workbench .wb-splitter:hover {
+    background: var(--w-cyan-bg);
+  }
+  #hexu-workbench .wb-feed {
+    padding: var(--w-space);
+    flex: 1;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--w-border) transparent;
+  }
+  #hexu-workbench .wb-entry {
+    position: relative;
+    padding-left: 34px;
+    margin-bottom: 21px;
+  }
+  #hexu-workbench .wb-entry > .wb-avatar {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  #hexu-workbench .wb-entry-header {
+    margin-bottom: 7px;
+    font-size: 12px;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-entry-time {
+    margin-left: auto;
+    color: var(--w-dim);
+    font:
+      11px Consolas,
+      monospace;
+  }
+  #hexu-workbench .wb-entry p {
+    font-size: 12px;
+    line-height: 1.85;
+    color: var(--w-text);
+  }
+  #hexu-workbench .wb-plan {
+    margin-top: 12px;
+    border: 1px solid var(--w-border);
+    border-radius: 7px;
+    background: var(--w-panel);
+    overflow: hidden;
+  }
+  #hexu-workbench .wb-plan-head {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--w-softline);
+    font-size: 11px;
+  }
+  #hexu-workbench .wb-plan ol {
+    margin: 0;
+    padding: 9px 10px;
+    list-style: none;
+    display: grid;
+    gap: 9px;
+  }
+  #hexu-workbench .wb-plan li {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-plan li svg {
+    height: 14px;
+    width: 14px;
+    margin-top: 3px;
+  }
+  #hexu-workbench .wb-plan .done {
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-plan .later {
+    color: var(--w-dim);
+  }
+  #hexu-workbench .wb-tool-event {
+    margin: 0 0 19px 34px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font:
+      11px/1.7 Consolas,
+      monospace;
+    color: var(--w-muted);
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-tool-event span {
+    background: var(--w-raised);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  #hexu-workbench .wb-note {
+    border-left: 2px solid var(--w-violet);
+    padding: 8px 10px;
+    background: var(--w-violet-bg);
+    font-size: 12px;
+    margin-top: 10px;
+    border-radius: 0 5px 5px 0;
+  }
+  #hexu-workbench .wb-filebar {
+    background: var(--w-panel);
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--w-softline);
+    gap: 6px;
+  }
+  #hexu-workbench .wb-file-select {
+    background: transparent;
+    border: 0;
+    color: var(--w-muted);
+    font:
+      11px Consolas,
+      monospace;
+    padding: 2px 0;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1;
+  }
+  #hexu-workbench .wb-diff {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 10px 0;
+    scrollbar-width: thin;
+  }
+  #hexu-workbench .wb-code-row {
+    display: grid;
+    grid-template-columns: 28px 14px minmax(0, 1fr);
+    padding: 1px 10px 1px 5px;
+    font:
+      11px/2.05 'JetBrains Mono',
+      Consolas,
+      monospace;
+    min-height: 24px;
+  }
+  #hexu-workbench .wb-code-row.add {
+    background: var(--w-green-bg);
+  }
+  #hexu-workbench .wb-code-row.del {
+    background: var(--w-red-bg);
+  }
+  #hexu-workbench .wb-line-number {
+    color: var(--w-dim);
+    text-align: right;
+    padding-right: 8px;
+    user-select: none;
+  }
+  #hexu-workbench .wb-line-sign {
+    color: var(--w-muted);
+  }
+  #hexu-workbench .add .wb-line-sign {
+    color: var(--w-green);
+  }
+  #hexu-workbench .del .wb-line-sign {
+    color: var(--w-red);
+  }
+  #hexu-workbench .wb-code-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--w-code);
+  }
+  #hexu-workbench .wb-kw {
+    color: var(--w-violet);
+  }
+  #hexu-workbench .wb-fn {
+    color: var(--w-cyan);
+  }
+  #hexu-workbench .wb-str {
+    color: var(--w-green);
+  }
+  #hexu-workbench .wb-num {
+    color: var(--w-amber);
+  }
+  #hexu-workbench .wb-diff-footer {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--w-dim);
+    border-top: 1px solid var(--w-softline);
+    background: var(--w-panel);
+  }
+  #hexu-workbench .wb-terminal-mini {
+    border-top: 1px solid var(--w-border);
+    padding: 9px 13px;
+    min-height: 116px;
+    background: var(--w-bg);
+  }
+  #hexu-workbench .wb-terminal-title {
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  #hexu-workbench .wb-terminal-mini p {
+    font:
+      11px/1.9 Consolas,
+      monospace;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-terminal-pane {
+    flex: 1;
+    padding: 17px;
+    overflow: auto;
+    font:
+      12px/2 Consolas,
+      monospace;
+  }
+  #hexu-workbench .wb-terminal-pane p {
+    margin: 0 0 7px;
+    overflow-wrap: anywhere;
+  }
+  #hexu-workbench .wb-terminal-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    align-items: center;
+  }
+  #hexu-workbench .wb-terminal-input input {
+    background: transparent;
+    border: 0;
+    width: 100%;
+    min-width: 0;
+    font:
+      12px Consolas,
+      monospace;
+  }
+  #hexu-workbench .wb-inspector-panel {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+  }
+  #hexu-workbench .wb-preview-wrap {
+    padding: 16px;
+    overflow: auto;
+    flex: 1;
+  }
+  #hexu-workbench .wb-preview-app {
+    border: 1px solid var(--w-border);
+    border-radius: 8px;
+    background: var(--w-panel);
+    overflow: hidden;
+  }
+  #hexu-workbench .wb-preview-url {
+    padding: 8px 10px;
+    background: var(--w-raised);
+    border-bottom: 1px solid var(--w-border);
+    font:
+      11px Consolas,
+      monospace;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-preview-content {
+    padding: 20px 16px;
+  }
+  #hexu-workbench .wb-preview-content h3 {
+    font-size: 17px;
+    margin: 6px 0;
+  }
+  #hexu-workbench .wb-preview-step {
+    margin-top: 13px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12px;
+    border-top: 1px solid var(--w-softline);
+    padding-top: 13px;
+  }
+  #hexu-workbench .wb-composer {
+    padding: 12px 17px 11px;
+    border-top: 1px solid var(--w-border);
+    background: var(--w-panel);
+  }
+  #hexu-workbench .wb-config {
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 9px;
+    font-size: 11px;
+  }
+  #hexu-workbench .wb-config label {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    color: var(--w-dim);
+  }
+  #hexu-workbench select {
+    border-radius: 4px;
+  }
+  #hexu-workbench option {
+    background: var(--w-panel);
+    color: var(--w-text);
+  }
+  #hexu-workbench .wb-config select {
+    font-size: 12px;
+    max-width: 150px;
+    padding: 1px 0;
+    border: 0;
+    background: transparent;
+    color: var(--w-text);
+  }
+  #hexu-workbench .wb-prompt-box {
+    border: 1px solid var(--w-border);
+    border-radius: 7px;
+    background: var(--w-bg);
+    padding: 10px 12px;
+  }
+  #hexu-workbench .wb-prompt-box:focus-within {
+    border-color: var(--w-cyan);
+  }
+  #hexu-workbench .wb-prompt-box textarea {
+    display: block;
+    width: 100%;
+    resize: none;
+    height: 47px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  #hexu-workbench .wb-prompt-box textarea::placeholder {
+    color: var(--w-dim);
+  }
+  #hexu-workbench .wb-prompt-bottom {
+    justify-content: space-between;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-dispatch-picker {
+    font-size: 11px;
+    padding: 5px;
+    background: var(--w-raised);
+    color: var(--w-muted);
+    border: 1px solid var(--w-border);
+    max-width: 150px;
+  }
+  #hexu-workbench .wb-prompt-foot {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--w-dim);
+    gap: 6px;
+  }
+  #hexu-workbench .wb-queue-chip {
+    color: var(--w-amber);
+    border: 0;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+  }
+  #hexu-workbench .wb-side-rail {
+    background: var(--w-panel);
+    border-left: 1px solid var(--w-border);
+    padding: 8px 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  #hexu-workbench .wb-side-rail .wb-icon {
+    width: 30px;
+    height: 32px;
+  }
+  #hexu-workbench .wb-side-rail .wb-icon[aria-pressed='true'] {
+    background: var(--w-violet-bg);
+    color: var(--w-violet);
+  }
+  #hexu-workbench .wb-footer {
+    height: 27px;
+    flex-shrink: 0;
+    background: var(--w-panel);
+    border-top: 1px solid var(--w-border);
+    font-size: 11px;
+    padding: 0 11px;
+    color: var(--w-muted);
+    gap: 14px;
+  }
+  #hexu-workbench .wb-footer svg {
+    width: 12px;
+    height: 12px;
+  }
+  #hexu-workbench .wb-drawer {
+    position: absolute;
+    z-index: 5;
+    right: 37px;
+    top: 51px;
+    bottom: 27px;
+    width: min(350px, calc(100% - 50px));
+    background: var(--w-panel);
+    border-left: 1px solid var(--w-border);
+    box-shadow: -15px 0 35px var(--w-shadow);
+    display: flex;
+    flex-direction: column;
+  }
+  #hexu-workbench .wb-drawer-head {
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-drawer-body {
+    padding: 17px;
+    overflow: auto;
+    flex: 1;
+  }
+  #hexu-workbench .wb-field {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 17px;
+    font-size: 12px;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-field input,
+  #hexu-workbench .wb-field select,
+  #hexu-workbench .wb-field textarea {
+    background: var(--w-bg);
+    border: 1px solid var(--w-border);
+    border-radius: 6px;
+    padding: 9px 10px;
+    width: 100%;
+    font-size: 13px;
+    color: var(--w-text);
+    min-width: 0;
+  }
+  #hexu-workbench .wb-field textarea {
+    min-height: 92px;
+    resize: vertical;
+  }
+  #hexu-workbench .wb-drawer-section {
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-context-card {
+    padding: 12px;
+    border: 1px solid var(--w-border);
+    border-radius: 7px;
+    margin-bottom: 11px;
+    background: var(--w-bg);
+  }
+  #hexu-workbench .wb-context-card p {
+    font-size: 12px;
+    margin-top: 6px;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-checkline {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    font-size: 12px;
+  }
+  #hexu-workbench input[type='checkbox'],
+  #hexu-workbench input[type='radio'] {
+    accent-color: var(--w-cyan);
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  #hexu-workbench .wb-assist-answer {
+    border: 1px solid var(--w-border);
+    border-radius: 8px;
+    background: var(--w-bg);
+    padding: 14px;
+    margin-top: 18px;
+  }
+  #hexu-workbench .wb-assist-answer p {
+    font-size: 12px;
+    margin-top: 10px;
+  }
+  #hexu-workbench .wb-snippet {
+    background: var(--w-raised);
+    padding: 10px;
+    border-radius: 5px;
+    font:
+      11px/1.8 Consolas,
+      monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    margin: 12px 0;
+    color: var(--w-code);
+  }
+  #hexu-workbench .wb-history-item {
+    padding: 12px 0 14px 17px;
+    border-left: 1px solid var(--w-border);
+    position: relative;
+    margin-left: 4px;
+  }
+  #hexu-workbench .wb-history-item::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--w-dim);
+    position: absolute;
+    left: -4px;
+    top: 18px;
+  }
+  #hexu-workbench .wb-history-item:first-child::before {
+    background: var(--w-green);
+  }
+  #hexu-workbench .wb-history-item p {
+    font-size: 12px;
+    color: var(--w-muted);
+    margin-top: 5px;
+  }
+  #hexu-workbench .wb-content-view {
+    padding: 23px;
+    overflow: auto;
+    gap: 23px;
+  }
+  #hexu-workbench .wb-page-title {
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-page-title p {
+    color: var(--w-muted);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  #hexu-workbench .wb-variants,
+  #hexu-workbench .wb-nodes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 17px;
+  }
+  #hexu-workbench .wb-variant {
+    border: 1px solid var(--w-border);
+    background: var(--w-panel);
+    border-radius: 9px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  #hexu-workbench .wb-variant-head {
+    padding: 17px;
+    border-bottom: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-variant-head h2 {
+    font-size: 16px;
+    margin: 10px 0 7px;
+  }
+  #hexu-workbench .wb-variant-body {
+    padding: 17px;
+  }
+  #hexu-workbench .wb-variant-body dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 0 0 20px;
+  }
+  #hexu-workbench .wb-variant-body dt {
+    font-size: 11px;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-variant-body dd {
+    margin: 4px 0 0;
+    font-size: 14px;
+    font-family: Consolas, monospace;
+  }
+  #hexu-workbench .wb-variant-footer {
+    padding: 13px 17px;
+    display: flex;
+    gap: 8px;
+    border-top: 1px solid var(--w-border);
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-section-banner {
+    padding: 14px 17px;
+    background: var(--w-panel);
+    border: 1px solid var(--w-border);
+    border-radius: 7px;
+    color: var(--w-muted);
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-convention {
+    border: 1px solid var(--w-border);
+    border-radius: 8px;
+    background: var(--w-panel);
+    overflow: hidden;
+  }
+  #hexu-workbench .wb-convention-row {
+    display: grid;
+    grid-template-columns: 82px minmax(0, 1fr) 98px 76px 28px;
+    gap: 12px;
+    padding: 16px;
+    align-items: start;
+    border-bottom: 1px solid var(--w-border);
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-convention-row:last-child {
+    border-bottom: 0;
+  }
+  #hexu-workbench .wb-convention-row.heading {
+    background: var(--w-raised);
+    color: var(--w-muted);
+    font-size: 11px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  #hexu-workbench .wb-convention-row p {
+    color: var(--w-muted);
+    margin-top: 5px;
+  }
+  #hexu-workbench .wb-node {
+    padding: 20px;
+    background: var(--w-panel);
+    border: 1px solid var(--w-border);
+    border-radius: 9px;
+  }
+  #hexu-workbench .wb-node-icon {
+    height: 38px;
+    width: 38px;
+    border-radius: 9px;
+    border: 1px solid var(--w-border);
+    display: grid;
+    place-items: center;
+    margin-bottom: 15px;
+    color: var(--w-cyan);
+  }
+  #hexu-workbench .wb-node h2 {
+    font-size: 15px;
+  }
+  #hexu-workbench .wb-node p {
+    margin: 7px 0 15px;
+    font-size: 12px;
+    color: var(--w-muted);
+  }
+  #hexu-workbench .wb-resource-row {
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-meter {
+    height: 5px;
+    border-radius: 3px;
+    background: var(--w-raised);
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  #hexu-workbench .wb-meter-fill {
+    height: 100%;
+    width: 47%;
+    background: var(--w-cyan);
+  }
+  #hexu-workbench .wb-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
+    background: #03070bcc;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 68px 20px 20px;
+    backdrop-filter: blur(3px);
+    overflow: auto;
+  }
+  #hexu-workbench .wb-dialog {
+    width: 535px;
+    max-width: 100%;
+    border: 1px solid var(--w-border);
+    border-radius: 12px;
+    background: var(--w-panel);
+    box-shadow: 0 24px 80px var(--w-shadow);
+    overflow: hidden;
+  }
+  #hexu-workbench .wb-dialog-head {
+    padding: 18px 21px 14px;
+    border-bottom: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-dialog-content {
+    padding: 20px 22px;
+  }
+  #hexu-workbench .wb-dialog-actions {
+    padding: 14px 21px;
+    border-top: 1px solid var(--w-border);
+    background: var(--w-bg);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #hexu-workbench .wb-handoff-engines {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 19px;
+  }
+  #hexu-workbench .wb-engine {
+    background: var(--w-bg);
+    border: 1px solid var(--w-border);
+    padding: 11px 13px;
+    flex: 1;
+    border-radius: 7px;
+  }
+  #hexu-workbench .wb-engine p {
+    font-size: 11px;
+    color: var(--w-muted);
+    margin-top: 3px;
+  }
+  #hexu-workbench .wb-material {
+    display: flex;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--w-softline);
+  }
+  #hexu-workbench .wb-material p {
+    font-size: 12px;
+    color: var(--w-muted);
+    margin-top: 4px;
+  }
+  #hexu-workbench .wb-dialog-hint {
+    font-size: 12px;
+    color: var(--w-amber);
+    background: var(--w-amber-bg);
+    padding: 11px;
+    border-radius: 6px;
+    margin-top: 17px;
+  }
+  #hexu-workbench .wb-palette-search {
+    padding: 15px 18px;
+    border-bottom: 1px solid var(--w-border);
+  }
+  #hexu-workbench .wb-palette-search input {
+    background: transparent;
+    border: 0;
+    min-width: 0;
+    flex: 1;
+    font-size: 14px;
+  }
+  #hexu-workbench .wb-palette-list {
+    padding: 8px;
+    display: grid;
+    gap: 2px;
+  }
+  #hexu-workbench .wb-command {
+    background: transparent;
+    border-radius: 6px;
+    padding: 11px 12px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  #hexu-workbench .wb-command:hover,
+  #hexu-workbench .wb-command:focus-visible {
+    background: var(--w-raised);
+  }
+  #hexu-workbench .wb-command small {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--w-dim);
+  }
+  #hexu-workbench .wb-toast {
+    position: absolute;
+    z-index: 15;
+    bottom: 39px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 40px);
+    padding: 10px 15px;
+    border-radius: 8px;
+    background: var(--w-raised);
+    border: 1px solid var(--w-border);
+    box-shadow: 0 8px 28px var(--w-shadow);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #hexu-workbench .wb-queued-item {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--w-border);
+    font-size: 12px;
+  }
+  #hexu-workbench .wb-queued-item p {
+    margin-top: 7px;
+  }
+  #hexu-workbench .wb-inspector-hidden .wb-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #hexu-workbench .wb-inspector-hidden .wb-inspector,
+  #hexu-workbench .wb-inspector-hidden .wb-splitter {
+    display: none;
+  }
+  @keyframes wb-breathe {
+    50% {
+      box-shadow: 0 0 0 5px #10b98108;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #hexu-workbench .wb-dot.active {
+      animation: none;
+    }
+  }
+  @media (max-width: 1100px) {
+    #hexu-workbench {
+      --w-guide: 155px;
+    }
+    #hexu-workbench .wb-top {
+      gap: 10px;
+    }
+    #hexu-workbench .wb-wordmark {
+      display: none;
+    }
+    #hexu-workbench .wb-search {
+      width: 190px;
+    }
+    #hexu-workbench .wb-config {
+      gap: 9px;
+    }
+    #hexu-workbench .wb-preset {
+      display: none;
+    }
+    #hexu-workbench .wb-task-title {
+      flex-wrap: wrap;
+    }
+    #hexu-workbench .wb-task-title h1 {
+      min-width: 100%;
+    }
+    #hexu-workbench .wb-statusgroup {
+      padding: 0 8px;
+    }
+    #hexu-workbench .wb-task-head {
+      padding: 13px 15px 0;
+    }
+    #hexu-workbench .wb-tabs {
+      gap: 11px;
+    }
+    #hexu-workbench .wb-convention-row {
+      grid-template-columns: 70px minmax(0, 1fr) 85px 28px;
+    }
+    #hexu-workbench .wb-convention-scope {
+      display: none;
+    }
+  }
+  @media (max-width: 860px) {
+    #hexu-workbench {
+      --w-guide: 0px;
+    }
+    #hexu-workbench .wb-guide {
+      visibility: hidden;
+    }
+    #hexu-workbench .wb-top-runner {
+      display: none;
+    }
+    #hexu-workbench .wb-top {
+      gap: 8px;
+    }
+    #hexu-workbench .wb-search {
+      width: auto;
+      flex: 1;
+    }
+    #hexu-workbench .wb-footer .wb-extra {
+      display: none;
+    }
+    #hexu-workbench .wb-task-title h1 {
+      font-size: 17px;
+    }
+    #hexu-workbench .wb-node {
+      padding: 16px;
+    }
+    #hexu-workbench .wb-content-view {
+      padding: 18px;
+    }
+  }
+  @media (max-width: 620px) {
+    #hexu-workbench {
+      height: auto;
+      min-height: 1260px;
+    }
+    #hexu-workbench .wb-shell,
+    #hexu-workbench[data-guide='closed'] .wb-shell {
+      grid-template-columns: 38px minmax(0, 1fr) 32px;
+    }
+    #hexu-workbench .wb-guide {
+      display: none;
+    }
+    #hexu-workbench .wb-rail {
+      padding: 10px 3px;
+    }
+    #hexu-workbench .wb-rail .wb-icon {
+      width: 30px;
+    }
+    #hexu-workbench .wb-side-rail {
+      padding: 8px 1px;
+    }
+    #hexu-workbench .wb-main {
+      min-height: 1180px;
+    }
+    #hexu-workbench .wb-top {
+      padding: 9px 10px;
+      flex-wrap: wrap;
+    }
+    #hexu-workbench .wb-space-picker {
+      max-width: 165px;
+    }
+    #hexu-workbench .wb-search {
+      order: 2;
+      flex-basis: 100%;
+      margin-left: 0;
+    }
+    #hexu-workbench .wb-top-separator,
+    #hexu-workbench .wb-density-button,
+    #hexu-workbench .wb-demo-tag {
+      display: none;
+    }
+    #hexu-workbench .wb-view {
+      height: auto;
+      flex: 1;
+    }
+    #hexu-workbench .wb-task-head {
+      padding: 13px 12px 0;
+    }
+    #hexu-workbench .wb-statusband {
+      row-gap: 8px;
+      column-gap: 5px;
+    }
+    #hexu-workbench .wb-statusgroup {
+      border: 0;
+      padding: 0;
+    }
+    #hexu-workbench .wb-split {
+      display: flex;
+      flex-direction: column;
+      min-height: 760px;
+    }
+    #hexu-workbench .wb-splitter {
+      display: none;
+    }
+    #hexu-workbench .wb-trace {
+      min-height: 390px;
+      max-height: 440px;
+    }
+    #hexu-workbench .wb-inspector {
+      min-height: 400px;
+      height: 400px;
+      border-top: 1px solid var(--w-border);
+    }
+    #hexu-workbench .wb-task-title h1 {
+      font-size: 16px;
+    }
+    #hexu-workbench .wb-feed {
+      padding: 12px;
+    }
+    #hexu-workbench .wb-entry {
+      padding-left: 30px;
+    }
+    #hexu-workbench .wb-pane-head {
+      padding: 0 10px;
+    }
+    #hexu-workbench .wb-composer {
+      padding: 11px;
+    }
+    #hexu-workbench .wb-prompt-box textarea {
+      font-size: 16px;
+      height: 76px;
+    }
+    #hexu-workbench .wb-config {
+      gap: 7px;
+    }
+    #hexu-workbench .wb-config select {
+      max-width: 132px;
+    }
+    #hexu-workbench .wb-prompt-bottom {
+      justify-content: flex-end;
+    }
+    #hexu-workbench .wb-variants,
+    #hexu-workbench .wb-nodes {
+      grid-template-columns: 1fr;
+    }
+    #hexu-workbench .wb-content-view {
+      padding: 14px;
+    }
+    #hexu-workbench .wb-convention-row {
+      grid-template-columns: 1fr 28px;
+      gap: 7px;
+    }
+    #hexu-workbench .wb-convention-row.heading {
+      display: none;
+    }
+    #hexu-workbench .wb-convention-category,
+    #hexu-workbench .wb-convention-copy,
+    #hexu-workbench .wb-convention-sync {
+      grid-column: 1;
+    }
+    #hexu-workbench .wb-convention-edit {
+      grid-column: 2;
+      grid-row: 1/3;
+    }
+    #hexu-workbench .wb-drawer {
+      top: 92px;
+      right: 32px;
+      bottom: 27px;
+      width: calc(100% - 70px);
+    }
+    #hexu-workbench .wb-overlay {
+      padding: 85px 10px 15px;
+    }
+    #hexu-workbench .wb-dialog-content {
+      padding: 16px;
+    }
+    #hexu-workbench .wb-footer {
+      gap: 9px;
+    }
+    #hexu-workbench .wb-footer .wb-cost {
+      display: none;
+    }
+  }
+</style>
+<div
+  id="hexu-workbench"
+  data-theme="dark"
+  data-density="compact"
+  data-guide="open"
+  aria-label="HEXU 沉浸式工作台交互演示"
+>
+  <header class="wb-top wb-row">
+    <span class="wb-logo">H</span><span class="wb-wordmark">HEXU</span
+    ><span class="wb-top-separator"></span>
+    <select class="wb-space-picker" id="wb-space" aria-label="工作空间">
+      <option value="team">合序核心研发</option>
+      <option value="personal">我的个人空间</option></select
+    ><span class="wb-tag cyan wb-demo-tag">DESIGN DEMO</span>
+    <button class="wb-search wb-row cursor-interaction" data-action="command">
+      <span class="wb-row"><i data-lucide="search" aria-hidden="true"></i>搜索与快捷操作</span
+      ><kbd>⌘ K</kbd>
+    </button>
+    <span class="wb-row wb-small wb-top-runner"
+      ><span class="wb-dot"></span><span class="wb-muted">本机节点</span></span
+    >
+    <button
+      class="wb-icon wb-density-button cursor-interaction"
+      data-action="density"
+      aria-label="切换信息密度"
+      data-tooltip="紧凑 / 舒适"
+    >
+      <i data-lucide="rows-3" aria-hidden="true"></i></button
+    ><button
+      class="wb-icon cursor-interaction"
+      data-action="theme"
+      aria-label="切换浅色或深色"
+      data-tooltip="切换外观"
+    >
+      <i data-lucide="sun-moon" aria-hidden="true"></i></button
+    ><span class="wb-avatar" aria-label="Alex">AL</span>
+  </header>
+  <div class="wb-shell">
+    <nav class="wb-rail" aria-label="全局导航">
+      <button
+        class="wb-icon cursor-interaction"
+        data-page="task"
+        aria-label="任务工作区"
+        aria-current="page"
+        data-tooltip="任务工作区"
+        data-tooltip-placement="right"
+      >
+        <i data-lucide="panels-top-left" aria-hidden="true"></i>
+      </button>
+      <button
+        class="wb-icon cursor-interaction"
+        data-page="variants"
+        aria-label="并行方案"
+        data-tooltip="并行方案"
+        data-tooltip-placement="right"
+      >
+        <i data-lucide="git-branch" aria-hidden="true"></i>
+      </button>
+      <button
+        class="wb-icon cursor-interaction"
+        data-page="conventions"
+        aria-label="团队约定"
+        data-tooltip="团队约定"
+        data-tooltip-placement="right"
+      >
+        <i data-lucide="book-open" aria-hidden="true"></i>
+      </button>
+      <button
+        class="wb-icon cursor-interaction"
+        data-page="resources"
+        aria-label="节点与用量"
+        data-tooltip="节点与用量"
+        data-tooltip-placement="right"
+      >
+        <i data-lucide="server" aria-hidden="true"></i>
+      </button>
+      <button
+        class="wb-icon wb-rail-bottom cursor-interaction"
+        data-action="command"
+        aria-label="命令面板"
+        data-tooltip="命令面板"
+        data-tooltip-placement="right"
+      >
+        <i data-lucide="command" aria-hidden="true"></i>
+      </button>
+    </nav>
+    <aside class="wb-guide">
+      <div class="wb-guide-head wb-row wb-between">
+        <strong>项目与任务</strong
+        ><button class="wb-icon cursor-interaction" data-action="new-task" aria-label="新建任务">
+          <i data-lucide="plus" aria-hidden="true"></i>
+        </button>
+      </div>
+      <button class="wb-guide-link cursor-interaction" data-action="personal">
+        <i data-lucide="flask-conical" aria-hidden="true"></i>个人探索</button
+      ><button class="wb-guide-link current cursor-interaction" data-page="task">
+        <i data-lucide="folder-open" aria-hidden="true"></i>Payments Core
+      </button>
+      <div class="wb-guide-caption">当前工作</div>
+      <div class="wb-task-item">
+        <div class="wb-row wb-between">
+          <small class="wb-mono">HX-104</small><span class="wb-dot active"></span>
+        </div>
+        <p>支付网关的幂等重试</p>
+        <small>Alex · Claude Code</small>
+      </div>
+      <button class="wb-guide-link cursor-interaction" data-page="variants">
+        <i data-lucide="git-fork" aria-hidden="true"></i>方案分支<span class="wb-count">2</span>
+      </button>
+      <div class="wb-guide-caption">项目知识</div>
+      <button class="wb-guide-link cursor-interaction" data-page="conventions">
+        <i data-lucide="book-text" aria-hidden="true"></i>团队约定<span class="wb-count"
+          >3</span
+        ></button
+      ><button class="wb-guide-link cursor-interaction" data-drawer="context">
+        <i data-lucide="files" aria-hidden="true"></i>任务上下文<span class="wb-count"
+          >4</span
+        ></button
+      ><button class="wb-guide-link cursor-interaction" data-drawer="results">
+        <i data-lucide="package" aria-hidden="true"></i>阶段成果<span
+          class="wb-count"
+          id="wb-result-count"
+          >1</span
+        >
+      </button>
+      <div class="wb-guide-caption">团队协作</div>
+      <button class="wb-guide-link cursor-interaction" data-drawer="assist">
+        <i data-lucide="messages-square" aria-hidden="true"></i>请人或 AI 协助</button
+      ><button class="wb-guide-link cursor-interaction" data-drawer="history">
+        <i data-lucide="history" aria-hidden="true"></i>执行历史
+      </button>
+      <div class="wb-guide-bottom">
+        <div class="wb-row">
+          <i data-lucide="folder-git-2" aria-hidden="true"></i><strong>payments-core</strong>
+        </div>
+        <div class="wb-row wb-muted" style="margin-top: 7px">
+          <i data-lucide="git-branch" aria-hidden="true"></i
+          ><span id="wb-directory-branch">feat/retry-gateway</span>
+        </div>
+        <div class="wb-muted" style="margin-top: 10px">交互演示 · 全部为示例数据</div>
+      </div>
+    </aside>
+    <main class="wb-main">
+      <section class="wb-view" data-view="task" aria-label="任务工作区">
+        <div class="wb-task-head">
+          <div class="wb-row wb-between">
+            <span class="wb-row wb-crumb"
+              ><button
+                class="wb-icon cursor-interaction"
+                data-action="guide"
+                aria-label="收起或展开项目导航"
+              >
+                <i data-lucide="panel-left" aria-hidden="true"></i></button
+              >PAYMENTS CORE <span>／</span> HX-104</span
+            ><span class="wb-row"
+              ><span class="wb-avatar">AL</span><small class="wb-muted">Alex</small
+              ><button
+                class="wb-icon cursor-interaction"
+                data-action="inspector"
+                aria-label="显示或隐藏代码面板"
+              >
+                <i data-lucide="panel-right" aria-hidden="true"></i></button
+            ></span>
+          </div>
+          <div class="wb-row wb-task-title">
+            <h1 id="wb-task-title">重构支付网关的幂等重试机制</h1>
+            <div class="wb-row">
+              <button class="wb-button cursor-interaction" data-page="variants">
+                <i data-lucide="git-branch" aria-hidden="true"></i
+                ><span id="wb-branch-label">主方案</span></button
+              ><button class="wb-button cursor-interaction" data-action="publish">
+                <i data-lucide="package-plus" aria-hidden="true"></i>发布成果
+              </button>
+            </div>
+          </div>
+          <div class="wb-row wb-statusband">
+            <span class="wb-statusgroup"
+              ><span class="wb-dim">任务</span
+              ><span class="wb-tag cyan" id="wb-task-status">进行中</span></span
+            ><span class="wb-statusgroup"
+              ><span class="wb-dim">执行</span><span class="wb-dot active" id="wb-run-dot"></span
+              ><span id="wb-run-state">Claude Code 运行中</span></span
+            ><span class="wb-statusgroup"
+              ><span class="wb-dim">代码</span><span>3 文件变更</span
+              ><span class="wb-green wb-mono">+124</span
+              ><span class="wb-muted wb-mono">−42</span></span
+            ><span class="wb-grow"></span
+            ><button
+              class="wb-button wb-subtle cursor-interaction"
+              data-action="complete"
+              id="wb-complete-button"
+            >
+              <i data-lucide="circle-check" aria-hidden="true"></i><span>完成任务</span>
+            </button>
+          </div>
+        </div>
+        <div class="wb-split" id="wb-split">
+          <section class="wb-trace" aria-label="过程与讨论">
+            <div class="wb-pane-head wb-row wb-between">
+              <div class="wb-tabs" role="tablist" aria-label="工作记录">
+                <button
+                  id="wb-trace-tab"
+                  class="wb-tab cursor-interaction"
+                  role="tab"
+                  aria-controls="wb-trace-feed"
+                  aria-selected="true"
+                  data-trace="all"
+                >
+                  执行轨迹</button
+                ><button
+                  id="wb-discuss-tab"
+                  class="wb-tab cursor-interaction"
+                  role="tab"
+                  aria-controls="wb-trace-feed"
+                  aria-selected="false"
+                  data-trace="human"
+                >
+                  团队讨论
+                </button>
+              </div>
+              <button
+                class="wb-icon cursor-interaction"
+                data-drawer="history"
+                aria-label="查看执行历史"
+              >
+                <i data-lucide="clock-3" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="wb-feed" id="wb-trace-feed" role="tabpanel" aria-labelledby="wb-trace-tab">
+              <article class="wb-entry">
+                <span class="wb-avatar">AL</span>
+                <div class="wb-row wb-entry-header">
+                  <strong>Alex</strong><span class="wb-tag">需求</span
+                  ><time class="wb-entry-time">20:14</time>
+                </div>
+                <p>
+                  为支付客户端的超时请求增加指数退避，最多重试 3
+                  次。重试时保留同一个幂等键，避免重复扣款。
+                </p>
+              </article>
+              <article class="wb-entry" data-agent-entry>
+                <span class="wb-avatar agent">✳</span>
+                <div class="wb-row wb-entry-header">
+                  <strong>Claude Code</strong><span class="wb-tag violet">Sonnet</span
+                  ><time class="wb-entry-time">20:15</time>
+                </div>
+                <p>先把重试策略独立出来，再接入支付流程，保留现有错误处理和幂等边界。</p>
+                <div class="wb-plan">
+                  <div class="wb-plan-head wb-row wb-between">
+                    <span class="wb-row"
+                      ><i data-lucide="list-checks" aria-hidden="true"></i>本轮计划</span
+                    ><span class="wb-muted">2 / 4 完成</span>
+                  </div>
+                  <ol>
+                    <li class="done">
+                      <i data-lucide="circle-check" aria-hidden="true"></i>分析现有异常与幂等处理
+                    </li>
+                    <li class="done">
+                      <i data-lucide="circle-check" aria-hidden="true"></i>提取 backoff 辅助函数
+                    </li>
+                    <li>
+                      <i data-lucide="circle-dot" aria-hidden="true" class="wb-green"></i
+                      ><span>接入 payment.ts 主流程 <span class="wb-tag green">执行中</span></span>
+                    </li>
+                    <li class="later">
+                      <i data-lucide="circle" aria-hidden="true"></i>补充重试边界检查
+                    </li>
+                  </ol>
+                </div>
+              </article>
+              <div class="wb-tool-event" data-agent-entry>
+                <i data-lucide="file-pen-line" aria-hidden="true"></i
+                ><span>Edit</span>src/gateway/payment.ts <span class="wb-green">+18 −6</span>
+              </div>
+              <article class="wb-entry" data-agent-entry>
+                <span class="wb-avatar agent">✳</span>
+                <div class="wb-row wb-entry-header">
+                  <strong>Claude Code</strong><time class="wb-entry-time">20:16</time>
+                </div>
+                <p>重试入口已接入。请求超时会沿用原幂等键；业务拒绝不会触发重试。</p>
+              </article>
+              <article class="wb-entry" data-team-entry>
+                <span class="wb-avatar">DV</span>
+                <div class="wb-row wb-entry-header">
+                  <strong>David</strong><span class="wb-tag">协作者</span
+                  ><time class="wb-entry-time">20:17</time>
+                </div>
+                <p>建议给退避增加随机抖动，避免大量请求在同一时刻重试。</p>
+                <div class="wb-note">建议先让另一模型检查 jitter 的边界。</div>
+              </article>
+              <div id="wb-added-messages"></div>
+            </div>
+          </section>
+          <button
+            class="wb-splitter"
+            id="wb-splitter"
+            aria-label="拖动调整面板比例，方向键微调"
+          ></button>
+          <section class="wb-inspector" aria-label="代码与运行现场">
+            <div class="wb-pane-head wb-row wb-between">
+              <div class="wb-tabs" role="tablist" aria-label="代码与运行现场">
+                <button
+                  id="wb-diff-tab"
+                  class="wb-tab cursor-interaction"
+                  role="tab"
+                  aria-controls="wb-diff-panel"
+                  aria-selected="true"
+                  data-inspect="diff"
+                >
+                  代码变更</button
+                ><button
+                  id="wb-terminal-tab"
+                  class="wb-tab cursor-interaction"
+                  role="tab"
+                  aria-controls="wb-terminal-panel"
+                  aria-selected="false"
+                  data-inspect="terminal"
+                >
+                  终端</button
+                ><button
+                  id="wb-preview-tab"
+                  class="wb-tab cursor-interaction"
+                  role="tab"
+                  aria-controls="wb-preview-panel"
+                  aria-selected="false"
+                  data-inspect="preview"
+                >
+                  预览
+                </button>
+              </div>
+              <span class="wb-tag">3</span>
+            </div>
+            <div
+              class="wb-inspector-panel"
+              id="wb-diff-panel"
+              role="tabpanel"
+              aria-labelledby="wb-diff-tab"
+              data-inspector-panel="diff"
+            >
+              <div class="wb-filebar wb-row">
+                <i data-lucide="file-code-2" aria-hidden="true" class="wb-violet"></i
+                ><select id="wb-file" class="wb-file-select" aria-label="查看变更文件">
+                  <option value="payment">src/gateway/payment.ts</option>
+                  <option value="backoff">src/gateway/backoff.ts</option>
+                  <option value="test">tests/gateway.test.ts</option></select
+                ><button
+                  class="wb-icon cursor-interaction"
+                  data-drawer="assist"
+                  aria-label="请人或 AI 查看当前文件"
+                  data-tooltip="针对当前文件求助"
+                >
+                  <i data-lucide="message-square-plus" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div id="wb-code" class="wb-diff" aria-label="代码差异"></div>
+              <div class="wb-diff-footer wb-row wb-between">
+                <span>工作区变更 · 未提交</span
+                ><span class="wb-row"
+                  ><i data-lucide="git-compare-arrows" aria-hidden="true"></i>统一差异</span
+                >
+              </div>
+              <div class="wb-terminal-mini">
+                <div class="wb-row wb-between wb-terminal-title">
+                  <span class="wb-row"
+                    ><i data-lucide="terminal" aria-hidden="true"></i>开发输出</span
+                  ><span class="wb-dim">示例日志</span>
+                </div>
+                <p><span class="wb-cyan">❯</span> npm run test:gateway</p>
+                <p><span class="wb-green">✓</span> preserves idempotency key across retries</p>
+                <p><span class="wb-amber">○</span> jitter boundaries — 待补充</p>
+              </div>
+            </div>
+            <div
+              class="wb-inspector-panel"
+              id="wb-terminal-panel"
+              role="tabpanel"
+              aria-labelledby="wb-terminal-tab"
+              data-inspector-panel="terminal"
+              hidden
+            >
+              <div class="wb-filebar wb-row wb-between">
+                <small class="wb-muted">本地节点 · payments-core</small
+                ><button class="wb-button cursor-interaction" data-action="test">
+                  演示运行检查
+                </button>
+              </div>
+              <div class="wb-terminal-pane">
+                <p class="wb-dim">HEXU TERMINAL · 模拟输出，不执行系统命令</p>
+                <p><span class="wb-cyan">❯</span> npm run test:gateway</p>
+                <p class="wb-muted">gateway.test.ts</p>
+                <p class="wb-green">
+                  ✓ keeps the original idempotency key<br />✓ retries transient errors only<br />✓
+                  stops after the maximum attempts
+                </p>
+                <p class="wb-amber">○ jitter boundary cases: pending</p>
+                <div id="wb-terminal-log"></div>
+                <label class="wb-terminal-input"
+                  ><span class="wb-cyan">❯</span
+                  ><input
+                    id="wb-terminal-command"
+                    aria-label="演示终端命令"
+                    placeholder="输入命令体验终端反馈…"
+                    autocomplete="off"
+                /></label>
+              </div>
+            </div>
+            <div
+              class="wb-inspector-panel"
+              id="wb-preview-panel"
+              role="tabpanel"
+              aria-labelledby="wb-preview-tab"
+              data-inspector-panel="preview"
+              hidden
+            >
+              <div class="wb-filebar wb-row wb-between">
+                <small class="wb-muted">重试行为预览</small
+                ><span class="wb-tag amber">交互示意</span>
+              </div>
+              <div class="wb-preview-wrap">
+                <div class="wb-preview-app">
+                  <div class="wb-preview-url wb-row">
+                    <i data-lucide="globe" aria-hidden="true"></i>payments.local / retry-playground
+                  </div>
+                  <div class="wb-preview-content">
+                    <span class="wb-tag cyan">GATEWAY</span>
+                    <h3>请求重试调试台</h3>
+                    <p class="wb-muted wb-small">观察一次超时请求如何恢复。</p>
+                    <div class="wb-context-card" style="margin-top: 20px">
+                      <small class="wb-muted">请求幂等键</small>
+                      <p class="wb-mono">req_demo_104</p>
+                    </div>
+                    <button
+                      class="wb-button wb-primary cursor-interaction"
+                      data-action="preview-request"
+                    >
+                      <i data-lucide="play" aria-hidden="true"></i>模拟超时请求
+                    </button>
+                    <div id="wb-preview-steps">
+                      <div class="wb-preview-step wb-muted">
+                        <i data-lucide="circle" aria-hidden="true"></i>等待发起请求
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="wb-composer">
+          <div class="wb-config wb-row">
+            <label
+              ><i data-lucide="bot" aria-hidden="true" class="wb-violet"></i>工具<select
+                id="wb-tool"
+                aria-label="下一轮执行工具"
+              >
+                <option value="claude">Claude Code</option>
+                <option value="codex">Codex</option>
+              </select></label
+            ><label
+              >模型<select id="wb-model" aria-label="下一轮模型">
+                <option>Sonnet</option>
+                <option>Opus</option>
+              </select></label
+            ><label
+              ><i data-lucide="monitor" aria-hidden="true"></i
+              ><select id="wb-node" aria-label="运行环境">
+                <option>MacBook Pro · 本机</option>
+                <option>Dev Linux · 隔离目录</option>
+              </select></label
+            ><button class="wb-button wb-subtle wb-preset cursor-interaction" data-action="preset">
+              <i data-lucide="sliders-horizontal" aria-hidden="true"></i>支付组配置</button
+            ><span class="wb-grow"></span
+            ><button
+              class="wb-icon cursor-interaction"
+              data-action="stop"
+              aria-label="请求停止当前执行"
+              data-tooltip="请求停止当前执行"
+            >
+              <i data-lucide="square" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="wb-prompt-box">
+            <textarea
+              id="wb-prompt"
+              aria-label="给 AI 的下一步要求"
+              placeholder="补充要求、追问，或选择另一个工具继续…"
+            >
+增加 Full Jitter，避免并发请求集中重试。</textarea
+            >
+            <div class="wb-row wb-prompt-bottom">
+              <span class="wb-row"
+                ><button
+                  class="wb-icon cursor-interaction"
+                  data-drawer="context"
+                  aria-label="选择上下文材料"
+                >
+                  <i data-lucide="paperclip" aria-hidden="true"></i></button
+                ><button
+                  class="wb-icon cursor-interaction"
+                  data-drawer="assist"
+                  aria-label="请同事或 AI 协助"
+                >
+                  <i data-lucide="at-sign" aria-hidden="true"></i></button
+                ><button class="wb-queue-chip cursor-interaction" data-drawer="queue">
+                  <i data-lucide="list-plus" aria-hidden="true"></i
+                  ><span id="wb-queue-count">下一轮 0</span>
+                </button></span
+              ><span class="wb-row"
+                ><select class="wb-dispatch-picker" id="wb-dispatch-mode" aria-label="输入送达方式">
+                  <option value="queue">排队到下一轮</option>
+                  <option value="continue">停止后继续</option></select
+                ><button class="wb-button wb-primary cursor-interaction" data-action="send">
+                  <span id="wb-send-label">保存要求</span
+                  ><i data-lucide="arrow-up" aria-hidden="true"></i></button
+              ></span>
+            </div>
+          </div>
+          <div class="wb-row wb-prompt-foot">
+            <span class="wb-dot" style="background: var(--w-amber)"></span
+            ><span id="wb-input-hint">执行中 · 新要求将保存到下一轮</span
+            ><span class="wb-grow"></span><span>Ctrl ↵ 发送</span>
+          </div>
+        </div>
+      </section>
+      <section
+        class="wb-view wb-content-view"
+        data-view="variants"
+        aria-label="并行方案对比"
+        hidden
+      >
+        <div class="wb-row wb-between wb-page-title">
+          <div>
+            <span class="wb-crumb">HX-104 / PARALLEL EXPLORATION</span>
+            <h1 style="margin-top: 7px">两种实现，保留各自现场</h1>
+            <p>相同目标与起点，独立目录；选择后继续推进。</p>
+          </div>
+          <button class="wb-button cursor-interaction" data-page="task">
+            <i data-lucide="arrow-left" aria-hidden="true"></i>返回任务
+          </button>
+        </div>
+        <div class="wb-variants">
+          <article class="wb-variant">
+            <header class="wb-variant-head">
+              <div class="wb-row wb-between">
+                <span class="wb-tag violet">方案 A</span
+                ><span class="wb-tag green">本轮已结束</span>
+              </div>
+              <h2>独立重试策略</h2>
+              <div class="wb-row wb-small wb-muted">
+                <span class="wb-avatar agent">✳</span>Claude Code · Sonnet
+              </div>
+            </header>
+            <div class="wb-variant-body">
+              <dl>
+                <div>
+                  <dt>文件变更</dt>
+                  <dd>2 <small class="wb-muted">个文件</small></dd>
+                </div>
+                <div>
+                  <dt>代码增减</dt>
+                  <dd><span class="wb-green">+86</span> <span class="wb-muted">−12</span></dd>
+                </div>
+                <div>
+                  <dt>检查记录</dt>
+                  <dd>4 <small class="wb-muted">项通过 · 示例</small></dd>
+                </div>
+                <div>
+                  <dt>工具费用估算</dt>
+                  <dd>$0.27</dd>
+                </div>
+              </dl>
+              <p class="wb-small wb-muted">
+                将退避策略封装为独立函数，调用方保留错误分类和幂等键。
+              </p>
+              <pre class="wb-snippet">
+await withRetry(() =&gt;&#10;  client.charge(payload, {&#10;    idempotencyKey&#10;  }), retryPolicy&#10;);</pre
+              >
+              <small class="wb-dim wb-mono">worktree / variant-a</small>
+            </div>
+            <footer class="wb-variant-footer">
+              <button class="wb-button wb-primary cursor-interaction" data-variant="A">
+                选择此方案继续</button
+              ><button class="wb-button cursor-interaction" data-action="integrate">
+                选择文件整合
+              </button>
+            </footer>
+          </article>
+          <article class="wb-variant">
+            <header class="wb-variant-head">
+              <div class="wb-row wb-between">
+                <span class="wb-tag cyan">方案 B</span
+                ><span class="wb-tag amber" id="wb-variant-b-state">执行中</span>
+              </div>
+              <h2>请求中间件</h2>
+              <div class="wb-row wb-small wb-muted">
+                <span class="wb-avatar agent">◈</span>Codex · 默认模型
+              </div>
+            </header>
+            <div class="wb-variant-body">
+              <dl>
+                <div>
+                  <dt>文件变更</dt>
+                  <dd>4 <small class="wb-muted">个文件</small></dd>
+                </div>
+                <div>
+                  <dt>代码增减</dt>
+                  <dd><span class="wb-green">+142</span> <span class="wb-muted">−50</span></dd>
+                </div>
+                <div>
+                  <dt>检查记录</dt>
+                  <dd><small class="wb-muted">尚未完成</small></dd>
+                </div>
+                <div>
+                  <dt>工具费用估算</dt>
+                  <dd>$0.45</dd>
+                </div>
+              </dl>
+              <p class="wb-small wb-muted">
+                在请求边界统一重试。正在核对业务拒绝与网络超时的分流。
+              </p>
+              <pre class="wb-snippet">
+gateway.use(retryMiddleware({&#10;  attempts: 3,&#10;  strategy: 'full-jitter',&#10;  preserveIdempotencyKey: true&#10;}));</pre
+              >
+              <small class="wb-dim wb-mono">worktree / variant-b</small>
+            </div>
+            <footer class="wb-variant-footer">
+              <button
+                class="wb-button cursor-interaction"
+                data-action="stop-variant"
+                id="wb-stop-variant"
+              >
+                停止此方案</button
+              ><button class="wb-button cursor-interaction" data-variant="B">选择此方案继续</button>
+            </footer>
+          </article>
+        </div>
+        <div class="wb-section-banner wb-row">
+          <i data-lucide="git-compare-arrows" aria-hidden="true"></i
+          ><span
+            >选择方案会保留其他方案的历史；代码整合和停止执行分别操作。费用与检查均为演示数据。</span
+          >
+        </div>
+      </section>
+      <section
+        class="wb-view wb-content-view"
+        data-view="conventions"
+        aria-label="团队约定中心"
+        hidden
+      >
+        <div class="wb-row wb-between wb-page-title">
+          <div>
+            <span class="wb-crumb">PAYMENTS CORE / CONTEXT</span>
+            <h1 style="margin-top: 7px">让约定跟随每一轮工作</h1>
+            <p>保留来源、版本和适用范围，明确何时进入 AI 上下文。</p>
+          </div>
+          <button class="wb-button wb-primary cursor-interaction" data-action="new-convention">
+            <i data-lucide="plus" aria-hidden="true"></i>新增约定
+          </button>
+        </div>
+        <div class="wb-convention">
+          <div class="wb-convention-row heading">
+            <span>分类</span><span>约定内容</span><span class="wb-convention-scope">适用范围</span
+            ><span>使用状态</span><span></span>
+          </div>
+          <div id="wb-convention-list"></div>
+        </div>
+        <div class="wb-section-banner">
+          <div class="wb-row">
+            <i data-lucide="sparkles" aria-hidden="true" class="wb-violet"></i
+            ><strong class="wb-violet">来自 HX-104 的可复用经验</strong>
+          </div>
+          <p style="margin: 10px 0 14px">
+            重试网络超时请求时，沿用原始幂等键；业务拒绝直接返回，不进入重试。
+          </p>
+          <button class="wb-button cursor-interaction" data-action="extract-convention">
+            编辑并保存为约定
+          </button>
+        </div>
+      </section>
+      <section class="wb-view wb-content-view" data-view="resources" aria-label="节点与用量" hidden>
+        <div class="wb-row wb-between wb-page-title">
+          <div>
+            <span class="wb-crumb">WORKSPACE / RESOURCES</span>
+            <h1 style="margin-top: 7px">运行环境与用量</h1>
+            <p>工具在获授权的环境中工作，账号和目录范围分别管理。</p>
+          </div>
+          <button class="wb-button cursor-interaction" data-action="connect-node">
+            <i data-lucide="plus" aria-hidden="true"></i>连接节点
+          </button>
+        </div>
+        <div class="wb-nodes">
+          <article class="wb-node">
+            <div class="wb-row wb-between">
+              <div class="wb-node-icon"><i data-lucide="laptop" aria-hidden="true"></i></div>
+              <span class="wb-tag green">在线 · 示例</span>
+            </div>
+            <h2>MacBook Pro</h2>
+            <p>Alex 的本机环境</p>
+            <div class="wb-resource-row">
+              <span class="wb-muted">授权目录</span><span class="wb-mono">payments-core</span>
+            </div>
+            <div class="wb-resource-row">
+              <span class="wb-muted">可用工具</span><span>Claude Code · Codex</span>
+            </div>
+            <div class="wb-resource-row">
+              <span class="wb-muted">本轮范围</span><span>文件编辑</span>
+            </div>
+            <button
+              class="wb-button cursor-interaction"
+              data-action="policy"
+              style="margin-top: 18px"
+            >
+              查看授权范围
+            </button>
+          </article>
+          <article class="wb-node">
+            <div class="wb-row wb-between">
+              <div class="wb-node-icon"><i data-lucide="server" aria-hidden="true"></i></div>
+              <span class="wb-tag amber">1 个执行 · 示例</span>
+            </div>
+            <h2>Dev Linux</h2>
+            <p>独立的方案验证环境</p>
+            <div class="wb-resource-row">
+              <span class="wb-muted">授权目录</span><span class="wb-mono">variant-b</span>
+            </div>
+            <div class="wb-resource-row">
+              <span class="wb-muted">可用工具</span><span>Codex</span>
+            </div>
+            <div class="wb-resource-row">
+              <span class="wb-muted">使用范围</span><span>本人授权</span>
+            </div>
+            <button
+              class="wb-button cursor-interaction"
+              data-page="variants"
+              style="margin-top: 18px"
+            >
+              查看当前方案
+            </button>
+          </article>
+        </div>
+        <div class="wb-node">
+          <div class="wb-row wb-between">
+            <h2>本月费用</h2>
+            <span class="wb-tag">示例估算 · 非实际账单</span>
+          </div>
+          <div class="wb-row wb-between" style="margin-top: 17px">
+            <span class="wb-mono" style="font-size: 23px">$142.50</span
+            ><span class="wb-muted">预算 $300.00</span>
+          </div>
+          <div class="wb-meter"><div class="wb-meter-fill"></div></div>
+          <div class="wb-resource-row">
+            <span>Claude Code</span><span class="wb-mono">$86.20</span>
+          </div>
+          <div class="wb-resource-row"><span>Codex</span><span class="wb-mono">$56.30</span></div>
+        </div>
+      </section>
+    </main>
+    <nav class="wb-side-rail" aria-label="任务协作面板">
+      <button
+        class="wb-icon cursor-interaction"
+        data-drawer="assist"
+        aria-pressed="false"
+        aria-label="旁路协助"
+        data-tooltip="旁路协助"
+        data-tooltip-placement="left"
+      >
+        <i data-lucide="messages-square" aria-hidden="true"></i></button
+      ><button
+        class="wb-icon cursor-interaction"
+        data-drawer="context"
+        aria-pressed="false"
+        aria-label="当前上下文"
+        data-tooltip="当前上下文"
+        data-tooltip-placement="left"
+      >
+        <i data-lucide="book-open-text" aria-hidden="true"></i></button
+      ><button
+        class="wb-icon cursor-interaction"
+        data-drawer="results"
+        aria-pressed="false"
+        aria-label="阶段成果"
+        data-tooltip="阶段成果"
+        data-tooltip-placement="left"
+      >
+        <i data-lucide="package" aria-hidden="true"></i></button
+      ><button
+        class="wb-icon cursor-interaction"
+        data-drawer="history"
+        aria-pressed="false"
+        aria-label="执行历史"
+        data-tooltip="执行历史"
+        data-tooltip-placement="left"
+      >
+        <i data-lucide="history" aria-hidden="true"></i>
+      </button>
+    </nav>
+  </div>
+  <footer class="wb-footer wb-row">
+    <span class="wb-row wb-mono"
+      ><i data-lucide="git-branch" aria-hidden="true"></i
+      ><span id="wb-footer-branch">feat/retry-gateway*</span></span
+    ><span class="wb-row wb-cost"
+      ><i data-lucide="coins" aria-hidden="true"></i>12.4k · $0.18 估算</span
+    ><span class="wb-grow"></span
+    ><span class="wb-extra" id="wb-footer-engine">Claude Code / Sonnet</span
+    ><span class="wb-row wb-cyan"><span class="wb-dot"></span>交互演示</span>
+  </footer>
+  <aside class="wb-drawer" id="wb-drawer" aria-label="任务协作抽屉" hidden>
+    <div class="wb-drawer-head wb-row wb-between">
+      <strong id="wb-drawer-title">旁路协助</strong
+      ><button
+        class="wb-icon cursor-interaction"
+        data-action="close-drawer"
+        aria-label="关闭协作抽屉"
+      >
+        <i data-lucide="x" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="wb-drawer-body" id="wb-drawer-body"></div>
+  </aside>
+  <div class="wb-overlay" id="wb-modal" hidden>
+    <section class="wb-dialog" role="dialog" aria-modal="true" aria-labelledby="wb-modal-title">
+      <div class="wb-dialog-head wb-row wb-between">
+        <h2 id="wb-modal-title">跨工具继续</h2>
+        <button
+          class="wb-icon cursor-interaction"
+          data-action="close-modal"
+          aria-label="关闭对话框"
+        >
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="wb-dialog-content" id="wb-modal-body"></div>
+      <div class="wb-dialog-actions">
+        <button class="wb-button cursor-interaction" data-action="close-modal">取消</button
+        ><button class="wb-button wb-primary cursor-interaction" id="wb-modal-confirm">确认</button>
+      </div>
+    </section>
+  </div>
+  <div class="wb-overlay" id="wb-command-overlay" hidden>
+    <section class="wb-dialog" role="dialog" aria-modal="true" aria-label="全局命令">
+      <div class="wb-palette-search wb-row">
+        <i data-lucide="search" aria-hidden="true" class="wb-cyan"></i
+        ><input
+          id="wb-command-input"
+          aria-label="搜索任务或操作"
+          placeholder="搜索任务，或输入操作名称…"
+          autocomplete="off"
+        /><button
+          class="wb-icon cursor-interaction"
+          data-action="close-command"
+          aria-label="关闭命令面板"
+        >
+          <kbd>Esc</kbd>
+        </button>
+      </div>
+      <div id="wb-command-list" class="wb-palette-list"></div>
+      <div class="wb-dialog-actions wb-muted wb-small" style="justify-content: space-between">
+        <span>↑ ↓ 选择 &nbsp; ↵ 打开</span><span>HEXU COMMAND</span>
+      </div>
+    </section>
+  </div>
+  <div class="wb-toast" id="wb-toast" role="status" aria-live="polite" hidden>
+    <i data-lucide="circle-check" aria-hidden="true" class="wb-cyan"></i><span></span>
+  </div>
+</div>
+<template id="wb-assist-template"
+  ><span class="wb-tag violet">只读协助 · 示例</span>
+  <div class="wb-context-card" style="margin-top: 13px">
+    <small class="wb-muted">所选材料</small>
+    <p class="wb-mono" id="wb-assist-source">src/gateway/backoff.ts:18–26</p>
+    <p>仅分享该段代码与当前问题。</p>
+  </div>
+  <label class="wb-field"
+    >协助对象<select id="wb-assist-person">
+      <option>Codex · 默认模型</option>
+      <option>David · 项目成员</option>
+    </select></label
+  ><label class="wb-field"
+    >需要帮助的问题<textarea id="wb-assist-question">
+请检查 Full Jitter 的边界，是否会造成集中重试？</textarea
+    ></label
+  ><button class="wb-button wb-primary cursor-interaction" id="wb-assist-ask">
+    <i data-lucide="sparkles" aria-hidden="true"></i>请求协助 · 演示
+  </button>
+  <div id="wb-assist-response" hidden class="wb-assist-answer">
+    <div class="wb-row"><span class="wb-avatar agent">◈</span><strong>协助回复</strong></div>
+    <p>
+      使用 Full Jitter，让等待时间分布在 0
+      到本轮退避上限之间，并限制最大等待时间。重试时继续保留同一个幂等键。
+    </p>
+    <pre class="wb-snippet">const delay = random() *&#10;  Math.min(cap, base * 2 ** attempt);</pre>
+    <button class="wb-button cursor-interaction" id="wb-assist-adopt">加入下一轮要求</button>
+  </div></template
+>
+<template id="wb-context-template"
+  ><div class="wb-drawer-section">
+    <small class="wb-muted">当前任务使用的材料</small>
+    <div class="wb-context-card" style="margin-top: 12px">
+      <label class="wb-checkline"
+        ><input type="checkbox" checked /><span
+          ><strong>任务目标与要求</strong>
+          <p>最多重试 3 次，保留幂等键。</p></span
+        ></label
+      >
+    </div>
+    <div class="wb-context-card">
+      <label class="wb-checkline"
+        ><input type="checkbox" checked /><span
+          ><strong>项目约定 · v3</strong>
+          <p>金额使用 Decimal；仅重试网络异常。</p></span
+        ></label
+      >
+    </div>
+    <div class="wb-context-card">
+      <label class="wb-checkline"
+        ><input type="checkbox" checked /><span
+          ><strong>近期讨论与决定</strong>
+          <p>采用独立策略，补充 Full Jitter。</p></span
+        ></label
+      >
+    </div>
+    <div class="wb-context-card">
+      <label class="wb-checkline"
+        ><input type="checkbox" /><span
+          ><strong>完整终端日志</strong>
+          <p>默认只带关键错误摘要。</p></span
+        ></label
+      >
+    </div>
+    <button class="wb-button cursor-interaction" id="wb-context-save">保存下一轮材料选择</button>
+  </div>
+  <span class="wb-tag amber">材料变化将在下一轮使用</span>
+  <p class="wb-small wb-muted" style="margin-top: 10px">
+    当前执行已经收到的材料保持不变。
+  </p></template
+>
+<template id="wb-switch-template"
+  ><div class="wb-handoff-engines">
+    <div class="wb-engine">
+      <strong id="wb-source-engine">Claude Code</strong>
+      <p>当前执行</p>
+    </div>
+    <i data-lucide="arrow-right" aria-hidden="true" class="wb-cyan"></i>
+    <div class="wb-engine">
+      <strong id="wb-target-engine">Codex</strong>
+      <p>新原生会话</p>
+    </div>
+  </div>
+  <p class="wb-small wb-muted">选择带入下一轮的材料：</p>
+  <label class="wb-material"
+    ><input type="checkbox" checked /><span
+      ><strong>核心目标</strong>
+      <p>指数退避，最多重试 3 次，保留原幂等键。</p></span
+    ></label
+  ><label class="wb-material"
+    ><input type="checkbox" checked /><span
+      ><strong>已达成的决定</strong>
+      <p>重试策略独立，业务拒绝直接返回。</p></span
+    ></label
+  >
+  <div class="wb-material">
+    <i data-lucide="folder-check" aria-hidden="true" class="wb-green" style="margin-top: 3px"></i
+    ><span
+      ><strong>沿用当前工作目录</strong>
+      <p>保留 3 个文件的未提交修改，无需搬运代码。</p></span
+    >
+  </div>
+  <label class="wb-material"
+    ><input type="checkbox" /><span
+      ><strong>完整终端日志</strong>
+      <p>默认排除重复输出。</p></span
+    ></label
+  >
+  <div class="wb-dialog-hint" id="wb-switch-hint">
+    当前执行仍在运行。确认后请求停止，收到结束确认后再开始新一轮。
+  </div>
+  <label class="wb-field" style="margin-top: 16px; margin-bottom: 0"
+    >本次要求<textarea id="wb-switch-prompt"></textarea></label
+></template>
+<template id="wb-complete-template"
+  ><p>将这项工作标记为完成。代码发布和执行状态会分别保留。</p>
+  <label class="wb-checkline" style="margin-top: 18px"
+    ><input type="checkbox" id="wb-stop-on-complete" checked /><span
+      >同时请求停止当前执行</span
+    ></label
+  >
+  <p class="wb-small wb-muted" style="margin-top: 12px">
+    无需提交检查报告。停止期间仍显示执行状态。
+  </p></template
+>
+<template id="wb-convention-template"
+  ><label class="wb-field"
+    >约定标题<input id="wb-convention-title" placeholder="例如：重试时保留幂等键" /></label
+  ><label class="wb-field"
+    >约定内容<textarea
+      id="wb-convention-body"
+      placeholder="写清适用范围与具体约定"
+    ></textarea></label
+  ><span class="wb-tag amber">保存后供下一轮执行使用</span></template
+>
+<template id="wb-integrate-template"
+  ><p class="wb-muted wb-small">选择要形成整合草案的文件，不自动合并主分支。</p>
+  <label class="wb-material"
+    ><input type="checkbox" checked /><span
+      ><strong class="wb-mono">src/gateway/backoff.ts</strong>
+      <p>独立退避策略</p></span
+    ></label
+  ><label class="wb-material"
+    ><input type="checkbox" /><span
+      ><strong class="wb-mono">src/gateway/payment.ts</strong>
+      <p>支付调用接入</p></span
+    ></label
+  ><label class="wb-material"
+    ><input type="checkbox" checked /><span
+      ><strong class="wb-mono">tests/gateway.test.ts</strong>
+      <p>异常与边界检查</p></span
+    ></label
+  ></template
+>
+<script>
+  (() => {
+    const root = document.getElementById('hexu-workbench');
+    const q = (selector) => root.querySelector(selector);
+    const qa = (selector) => [...root.querySelectorAll(selector)];
+    const el = (tag, cls, text) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined) n.textContent = text;
+      return n;
+    };
+    const icon = (name) => {
+      const n = el('i');
+      n.setAttribute('data-lucide', name);
+      n.setAttribute('aria-hidden', 'true');
+      return n;
+    };
+    const icons = () => {
+      if (globalThis.lucide) lucide.createIcons({ attrs: { width: 16, height: 16 } });
+    };
+    const button = (text, action, primary = false) => {
+      const n = el('button', 'wb-button cursor-interaction' + (primary ? ' wb-primary' : ''), text);
+      n.type = 'button';
+      n.addEventListener('click', action);
+      return n;
+    };
+    const state = {
+      page: 'task',
+      theme: 'dark',
+      density: 'compact',
+      guide: true,
+      inspector: true,
+      split: 49,
+      space: 'team',
+      inspect: 'diff',
+      trace: 'all',
+      file: 'payment',
+      tool: 'claude',
+      model: 'Sonnet',
+      engine: 'claude',
+      run: 'running',
+      done: false,
+      branch: 'Main',
+      bStopped: false,
+      prompt: '增加 Full Jitter，避免并发请求集中重试。',
+      dispatch: 'queue',
+      notes: [],
+      messages: [],
+      resultCount: 1,
+      materials: [true, true, true, false],
+      initialStopped: false,
+    };
+    let drawer = '',
+      modalConfirm = null,
+      modalCancel = null,
+      opener = null,
+      toastTimer,
+      generation = 0,
+      testBusy = false,
+      previewBusy = false;
+    const names = { claude: 'Claude Code', codex: 'Codex' };
+    const conventions = [
+      {
+        category: '架构',
+        title: '重试策略与业务逻辑分离',
+        body: '退避计算独立为辅助函数，支付调用负责异常分类。',
+        scope: 'src/gateway/*',
+        revision: 3,
+        updated: false,
+      },
+      {
+        category: '数据',
+        title: '金额统一使用 Decimal',
+        body: '跨服务传输使用字符串，避免浮点误差。',
+        scope: '**/payment*',
+        revision: 2,
+        updated: false,
+      },
+      {
+        category: '接口',
+        title: '重试沿用原始幂等键',
+        body: '网络超时可重试，业务拒绝直接返回。',
+        scope: 'gateway/*',
+        revision: 1,
+        updated: true,
+      },
+    ];
+    const files = {
+      payment: {
+        start: 37,
+        lines: [
+          ['', 'export async function charge(payload) {'],
+          ['', '  const idempotencyKey = payload.requestId;'],
+          ['', ''],
+          ['-', '  return client.charge(payload);'],
+          ['+', '  return withRetry('],
+          ['+', '    () => client.charge(payload, {'],
+          ['+', '      idempotencyKey'],
+          ['+', '    }),'],
+          ['+', '    {'],
+          ['+', '      attempts: 3,'],
+          ['+', '      baseDelay: 1000,'],
+          ['+', '      maxDelay: 10000,'],
+          ['+', '      strategy: fullJitter,'],
+          ['+', '      shouldRetry: isTransientError'],
+          ['+', '    }'],
+          ['+', '  );'],
+          ['', '}'],
+        ],
+      },
+      backoff: {
+        start: 15,
+        lines: [
+          ['', 'export function fullJitter(attempt, options) {'],
+          ['+', '  const { baseDelay, maxDelay } = options;'],
+          ['+', '  const ceiling = Math.min('],
+          ['+', '    maxDelay,'],
+          ['+', '    baseDelay * 2 ** attempt'],
+          ['+', '  );'],
+          ['+', '  return Math.random() * ceiling;'],
+          ['', '}'],
+          ['', ''],
+          ['', 'export async function withRetry(fn, policy) {'],
+          ['+', '  for (let attempt = 0; ; attempt++) {'],
+          ['+', '    try { return await fn(); }'],
+          ['+', '    catch (error) {'],
+          ['+', '      if (attempt >= policy.attempts ||'],
+          ['+', '          !policy.shouldRetry(error)) throw error;'],
+          ['+', '      await sleep(fullJitter(attempt, policy));'],
+          ['+', '    }'],
+          ['+', '  }'],
+          ['', '}'],
+        ],
+      },
+      test: {
+        start: 12,
+        lines: [
+          ['+', "it('preserves the original idempotency key',"],
+          ['+', '  async () => {'],
+          ['+', '    await charge(fixturePayload);'],
+          ['+', '    expect(requests.map(r => r.key))'],
+          ['+', '      .toEqual([originalKey, originalKey]);'],
+          ['+', '  });'],
+          ['', ''],
+          ['+', "it('does not retry business errors',"],
+          ['+', '  async () => {'],
+          ['+', '    client.mockRejectedValue(businessError);'],
+          ['+', '    await expect(charge(fixturePayload))'],
+          ['+', '      .rejects.toThrow(businessError);'],
+          ['+', '    expect(client).toHaveBeenCalledTimes(1);'],
+          ['+', '  });'],
+        ],
+      },
+    };
+    function save() {
+      if (!window.openai?.setWidgetState) return;
+      window.openai
+        .setWidgetState({
+          modelContent: {
+            hexuDemo: {
+              page: state.page,
+              theme: state.theme,
+              density: state.density,
+              branch: state.branch,
+              tool: state.tool,
+            },
+          },
+          privateContent: {
+            hexuWorkbench: {
+              ...state,
+              notes: state.notes.slice(-12),
+              messages: state.messages.slice(-8),
+            },
+          },
+        })
+        .catch(() => {});
+    }
+    function toast(text) {
+      clearTimeout(toastTimer);
+      q('#wb-toast span').textContent = text;
+      q('#wb-toast').hidden = false;
+      toastTimer = setTimeout(() => {
+        q('#wb-toast').hidden = true;
+      }, 4200);
+    }
+    function colorCode(code) {
+      const frag = document.createDocumentFragment();
+      const regex =
+        /(\b(?:export|async|function|const|return|await|for|let|try|catch|if|throw)\b|'[^']*'|\b\d+\b|\b[a-zA-Z_][\w]*(?=\())/g;
+      let at = 0;
+      for (const match of code.matchAll(regex)) {
+        frag.append(document.createTextNode(code.slice(at, match.index)));
+        const word = match[0];
+        const cls = word.startsWith("'")
+          ? 'wb-str'
+          : /^\d/.test(word)
+            ? 'wb-num'
+            : /^(export|async|function|const|return|await|for|let|try|catch|if|throw)$/.test(word)
+              ? 'wb-kw'
+              : 'wb-fn';
+        frag.append(el('span', cls, word));
+        at = match.index + word.length;
+      }
+      frag.append(document.createTextNode(code.slice(at)));
+      return frag;
+    }
+    function renderCode() {
+      const data = files[state.file];
+      q('#wb-code').replaceChildren(
+        ...data.lines.map(([sign, text], i) => {
+          const row = el(
+            'div',
+            'wb-code-row ' + (sign === '+' ? 'add' : sign === '-' ? 'del' : ''),
+          );
+          row.append(
+            el('span', 'wb-line-number', String(data.start + i)),
+            el('span', 'wb-line-sign', sign),
+          );
+          const content = el('span', 'wb-code-text');
+          content.append(colorCode(text));
+          row.append(content);
+          return row;
+        }),
+      );
+    }
+    function renderMessages() {
+      q('#wb-added-messages').replaceChildren(
+        ...state.messages.map((m) => {
+          const row = el('article', 'wb-entry');
+          const avatar = el(
+            'span',
+            'wb-avatar' + (m.kind === 'agent' ? ' agent' : ''),
+            m.kind === 'human' ? 'AL' : 'H',
+          );
+          const head = el('div', 'wb-row wb-entry-header');
+          head.append(
+            el('strong', '', m.kind === 'human' ? 'Alex' : 'HEXU'),
+            el('span', 'wb-tag', m.kind === 'human' ? '下一轮' : '演示记录'),
+          );
+          row.append(avatar, head, el('p', '', m.text));
+          return row;
+        }),
+      );
+    }
+    function addMessage(text, kind = 'system') {
+      state.messages.push({ text: text.slice(0, 600), kind });
+      state.messages = state.messages.slice(-8);
+      renderMessages();
+    }
+    function render() {
+      root.dataset.theme = state.theme;
+      root.dataset.density = state.density;
+      root.dataset.guide = state.guide ? 'open' : 'closed';
+      root.style.setProperty('--w-trace', state.split + '%');
+      qa('[data-view]').forEach((n) => (n.hidden = n.dataset.view !== state.page));
+      qa('.wb-rail [data-page]').forEach((n) =>
+        state.page === n.dataset.page
+          ? n.setAttribute('aria-current', 'page')
+          : n.removeAttribute('aria-current'),
+      );
+      q('[data-view="task"]').classList.toggle('wb-inspector-hidden', !state.inspector);
+      qa('[data-inspector-panel]').forEach(
+        (n) => (n.hidden = n.dataset.inspectorPanel !== state.inspect),
+      );
+      qa('[data-inspect]').forEach((n) =>
+        n.setAttribute('aria-selected', String(n.dataset.inspect === state.inspect)),
+      );
+      qa('[data-trace]').forEach((n) =>
+        n.setAttribute('aria-selected', String(n.dataset.trace === state.trace)),
+      );
+      q('#wb-trace-feed').setAttribute(
+        'aria-labelledby',
+        state.trace === 'all' ? 'wb-trace-tab' : 'wb-discuss-tab',
+      );
+      qa('[data-agent-entry]').forEach((n) => (n.hidden = state.trace === 'human'));
+      qa('[data-team-entry]').forEach((n) => (n.hidden = state.space === 'personal'));
+      q('#wb-space').value = state.space;
+      q('#wb-tool').value = state.tool;
+      q('#wb-file').value = state.file;
+      q('#wb-dispatch-mode').value = state.dispatch;
+      const models = state.tool === 'claude' ? ['Sonnet', 'Opus'] : ['默认模型', '推理模型'];
+      if (!models.includes(state.model)) state.model = models[0];
+      q('#wb-model').replaceChildren(
+        ...models.map((name) => {
+          const option = el('option', '', name);
+          option.value = name;
+          return option;
+        }),
+      );
+      q('#wb-model').value = state.model;
+      if (document.activeElement !== q('#wb-prompt')) q('#wb-prompt').value = state.prompt;
+      q('#wb-task-status').textContent = state.done ? '已完成' : '进行中';
+      q('#wb-task-status').className = 'wb-tag ' + (state.done ? 'green' : 'cyan');
+      q('#wb-complete-button span').textContent = state.done ? '重新打开' : '完成任务';
+      const runLabel = {
+        running: names[state.engine] + ' 运行中',
+        stopping: '正在停止 · 等待确认',
+        preparing: '新一轮准备中',
+        ended: '本次执行已结束',
+      };
+      q('#wb-run-state').textContent = runLabel[state.run];
+      q('#wb-run-dot').classList.toggle('active', state.run === 'running');
+      q('#wb-run-dot').style.background =
+        state.run === 'running'
+          ? 'var(--w-green)'
+          : state.run === 'ended'
+            ? 'var(--w-dim)'
+            : 'var(--w-amber)';
+      const stop = q('[data-action="stop"]');
+      stop.disabled = state.run === 'ended' || state.run === 'stopping';
+      q('#wb-send-label').textContent =
+        state.dispatch === 'queue' ? '保存要求' : state.done ? '重开并继续' : '停止后继续';
+      q('#wb-input-hint').textContent =
+        state.run === 'running'
+          ? '执行中 · 新要求将保存到下一轮'
+          : state.run === 'stopping'
+            ? '正在等待结束确认，目录现场保持不变'
+            : '新要求保留在当前任务，明确选择后开始下一轮';
+      q('#wb-queue-count').textContent = '下一轮 ' + state.notes.filter((n) => !n.used).length;
+      q('#wb-footer-engine').textContent =
+        names[state.engine] + ' / ' + (state.engine === 'claude' ? 'Sonnet' : '默认模型');
+      q('#wb-branch-label').textContent =
+        state.branch === 'Main' ? '主方案' : '方案 ' + state.branch;
+      q('#wb-footer-branch').textContent =
+        state.branch === 'Main'
+          ? 'feat/retry-gateway*'
+          : 'variant-' + state.branch.toLowerCase() + '*';
+      q('#wb-directory-branch').textContent =
+        state.branch === 'Main' ? 'feat/retry-gateway' : 'variant-' + state.branch.toLowerCase();
+      q('#wb-result-count').textContent = state.resultCount;
+      q('#wb-variant-b-state').textContent = state.bStopped ? '已停止' : '执行中';
+      q('#wb-stop-variant').disabled = state.bStopped;
+      q('.wb-plan .wb-tag').textContent = state.initialStopped
+        ? '源执行已结束'
+        : state.run === 'stopping'
+          ? '停止中'
+          : '执行中';
+      renderCode();
+      renderMessages();
+    }
+    function navigate(page) {
+      state.page = page;
+      closeDrawer();
+      render();
+      save();
+    }
+    function cloneTemplate(id, target) {
+      target.replaceChildren(document.getElementById(id).content.cloneNode(true));
+    }
+    function closeDrawer() {
+      drawer = '';
+      q('#wb-drawer').hidden = true;
+      qa('.wb-side-rail [data-drawer]').forEach((n) => n.setAttribute('aria-pressed', 'false'));
+    }
+    function openDrawer(kind) {
+      if (drawer === kind && !q('#wb-drawer').hidden) {
+        closeDrawer();
+        return;
+      }
+      drawer = kind;
+      q('#wb-drawer').hidden = false;
+      q('#wb-drawer-title').textContent = {
+        assist: '旁路协助',
+        context: '当前上下文',
+        results: '阶段成果',
+        history: '执行历史',
+        queue: '下一轮要求',
+      }[kind];
+      qa('.wb-side-rail [data-drawer]').forEach((n) =>
+        n.setAttribute('aria-pressed', String(n.dataset.drawer === kind)),
+      );
+      const body = q('#wb-drawer-body');
+      body.replaceChildren();
+      if (kind === 'assist') {
+        cloneTemplate('wb-assist-template', body);
+        q('#wb-assist-source').textContent = q('#wb-file').selectedOptions[0].textContent;
+        q('#wb-assist-ask').addEventListener('click', () => {
+          const ask = q('#wb-assist-ask'),
+            response = q('#wb-assist-response'),
+            recipient = q('#wb-assist-person').value;
+          if (!q('#wb-assist-question').value.trim()) {
+            toast('请写下需要协助的问题');
+            return;
+          }
+          ask.disabled = true;
+          ask.textContent = '正在准备示例回复…';
+          setTimeout(() => {
+            if (!ask.isConnected) return;
+            response.hidden = false;
+            response.querySelector('strong').textContent = recipient.startsWith('David')
+              ? 'David · 示例回复'
+              : 'Codex · 示例回复';
+            ask.textContent = '再次请求协助 · 演示';
+            ask.disabled = false;
+          }, 600);
+        });
+        q('#wb-assist-adopt').addEventListener('click', () => {
+          queueNote('采用 Full Jitter：等待时间在 0 与本轮退避上限之间随机分布，保留原始幂等键。');
+          toast('建议已加入下一轮，当前执行保持不变');
+        });
+      } else if (kind === 'context') {
+        cloneTemplate('wb-context-template', body);
+        [...body.querySelectorAll('input')].forEach((n, i) => (n.checked = state.materials[i]));
+        q('#wb-context-save').addEventListener('click', () => {
+          state.materials = [...body.querySelectorAll('input')].map((n) => n.checked);
+          save();
+          toast('已保存材料选择，下次继续时采用');
+        });
+      } else if (kind === 'queue') {
+        body.append(
+          el('p', 'wb-small wb-muted', '要求保留在任务中。选择需要的内容，再准备下一轮。'),
+        );
+        state.notes.forEach((note, i) => {
+          const item = el('div', 'wb-queued-item');
+          const line = el('div', 'wb-row wb-between');
+          const label = el('label', 'wb-checkline');
+          const check = el('input');
+          check.type = 'checkbox';
+          check.dataset.note = String(i);
+          check.disabled = note.used;
+          label.append(check, el('span', '', note.used ? '随新一轮开始' : '待选择'));
+          line.append(label);
+          if (!note.used)
+            line.append(
+              button('撤回', () => {
+                state.notes.splice(i, 1);
+                drawer = '';
+                openDrawer('queue');
+                render();
+                save();
+              }),
+            );
+          item.append(line, el('p', '', note.body));
+          body.append(item);
+        });
+        if (!state.notes.length) body.append(el('p', 'wb-muted', '还没有保存的下一轮要求。'));
+        const start = button(
+          '选择材料并继续',
+          () => {
+            const selected = [...body.querySelectorAll('input:checked')].map((n) =>
+              Number(n.dataset.note),
+            );
+            if (!selected.length) {
+              toast('先选择至少一条待用要求');
+              return;
+            }
+            openSwitch(selected);
+          },
+          true,
+        );
+        start.style.marginTop = '18px';
+        body.append(start);
+      } else if (kind === 'results') {
+        for (
+          let version = state.resultCount;
+          version > Math.max(0, state.resultCount - 3);
+          version--
+        ) {
+          const box = el('div', 'wb-context-card');
+          const head = el('div', 'wb-row wb-between');
+          head.append(el('strong', '', '支付网关重试'), el('span', 'wb-tag cyan', 'v' + version));
+          box.append(
+            head,
+            el('p', '', '独立退避策略、幂等键保留与边界说明。'),
+            el('p', 'wb-mono wb-dim', 'HX-104 · 3 个文件 · 示例成果'),
+          );
+          body.append(box);
+        }
+        body.append(
+          button('查看工作区变更', () => {
+            navigate('task');
+            state.inspect = 'diff';
+            render();
+          }),
+        );
+        const field = el('label', 'wb-field', '提出修改');
+        field.style.marginTop = '20px';
+        const input = el('textarea');
+        input.placeholder = '对这版成果有什么建议？';
+        field.append(input);
+        body.append(
+          field,
+          button(
+            '保存反馈',
+            () => {
+              if (!input.value.trim()) {
+                toast('请填写反馈');
+                return;
+              }
+              addMessage('成果反馈：' + input.value, 'human');
+              save();
+              input.value = '';
+              toast('反馈已保留在原任务');
+            },
+            true,
+          ),
+        );
+      } else if (kind === 'history') {
+        [
+          [
+            names[state.engine],
+            { running: '运行中', stopping: '停止中', preparing: '准备中', ended: '已结束' }[
+              state.run
+            ],
+            '当前工作目录 · 新会话',
+          ],
+          ['Codex', '已结束', '20:02 — 20:13 · 分析异常边界'],
+          ['Claude Code', '已结束', '19:40 — 19:56 · 梳理支付调用'],
+        ].forEach(([name, status, description]) => {
+          const item = el('div', 'wb-history-item');
+          const head = el('div', 'wb-row wb-between');
+          head.append(el('strong', '', name), el('span', 'wb-tag', status));
+          item.append(head, el('p', '', description));
+          body.append(item);
+        });
+      }
+      icons();
+    }
+    function queueNote(text) {
+      if (state.notes.filter((n) => !n.used).length >= 8) {
+        toast('演示队列最多保存 8 条要求');
+        return false;
+      }
+      state.notes.push({ body: text.slice(0, 1000), used: false });
+      render();
+      save();
+      return true;
+    }
+    function closeModal(cancel = true) {
+      q('#wb-modal').hidden = true;
+      const fn = modalCancel;
+      modalConfirm = null;
+      modalCancel = null;
+      if (cancel) fn?.();
+      opener?.focus();
+    }
+    function modal(title, template, confirmLabel, confirm, cancel) {
+      opener = document.activeElement;
+      q('#wb-modal-title').textContent = title;
+      const body = q('#wb-modal-body');
+      body.replaceChildren();
+      if (template) cloneTemplate(template, body);
+      q('#wb-modal-confirm').textContent = confirmLabel;
+      modalConfirm = confirm;
+      modalCancel = cancel;
+      q('#wb-modal').hidden = false;
+      icons();
+      q('[data-action="close-modal"]').focus();
+      return body;
+    }
+    function simulateContinue(tool, prompt, selected, materials) {
+      const id = ++generation;
+      state.done = false;
+      const launch = () => {
+        if (id !== generation) return;
+        state.engine = tool;
+        state.run = 'preparing';
+        render();
+        save();
+        setTimeout(() => {
+          if (id !== generation) return;
+          state.run = 'running';
+          for (const i of selected) if (state.notes[i]) state.notes[i].used = true;
+          addMessage(prompt, 'human');
+          addMessage(
+            names[tool] + ' 已在同一目录开始新一轮，带入 ' + materials + ' 类材料（演示）。',
+          );
+          render();
+          save();
+          toast('新一轮已开始 · 演示');
+          setTimeout(() => {
+            if (id !== generation) return;
+            state.run = 'ended';
+            addMessage('本轮演示结束。修改与工作记录保留，任务是否完成由你决定。');
+            render();
+            save();
+          }, 4200);
+        }, 650);
+      };
+      closeDrawer();
+      if (state.run !== 'ended') {
+        state.run = 'stopping';
+        render();
+        toast('已请求停止，等待原执行结束确认');
+        setTimeout(() => {
+          if (id !== generation) return;
+          state.run = 'ended';
+          state.initialStopped = true;
+          render();
+          setTimeout(launch, 350);
+        }, 900);
+      } else launch();
+    }
+    function openSwitch(selected = []) {
+      const originalTool = state.engine,
+        target = state.tool;
+      modal(
+        state.done ? '重新打开并继续' : '跨工具与模型接续',
+        'wb-switch-template',
+        state.done
+          ? '重开并继续 · 演示'
+          : state.run === 'ended'
+            ? '开始下一轮 · 演示'
+            : '停止后继续 · 演示',
+        () => {
+          const prompt = q('#wb-switch-prompt').value.trim() || '继续处理当前任务';
+          const count = qa('#wb-modal-body input:checked').length;
+          closeModal(false);
+          state.prompt = prompt;
+          simulateContinue(target, prompt, selected, count);
+        },
+        () => {
+          state.tool = originalTool;
+          render();
+          save();
+        },
+      );
+      q('#wb-source-engine').textContent = names[state.engine];
+      q('#wb-target-engine').textContent = names[target];
+      q('#wb-switch-prompt').value = selected.length
+        ? selected.map((i) => state.notes[i].body).join('\n\n')
+        : state.prompt;
+      qa('#wb-modal-body input[type="checkbox"]').forEach(
+        (input, i) => (input.checked = state.materials[[0, 2, 3][i]]),
+      );
+      q('#wb-switch-hint').textContent =
+        state.run === 'ended'
+          ? '原执行已结束。沿用当前目录与所选材料，创建新会话。'
+          : '当前执行仍在运行。确认后请求停止，收到结束确认后再开始新一轮。';
+    }
+    function stopRun() {
+      if (state.run === 'ended') return;
+      const id = ++generation;
+      state.run = 'stopping';
+      render();
+      save();
+      toast('已请求停止，正在等待结束确认');
+      setTimeout(() => {
+        if (id !== generation) return;
+        state.run = 'ended';
+        state.initialStopped = true;
+        addMessage('原执行已确认结束（演示），未提交修改仍在当前目录。');
+        render();
+        save();
+      }, 1100);
+    }
+    function renderConventions() {
+      q('#wb-convention-list').replaceChildren(
+        ...conventions.map((c, i) => {
+          const row = el('div', 'wb-convention-row');
+          const copy = el('div', 'wb-convention-copy');
+          copy.append(el('strong', '', c.title), el('p', '', c.body));
+          const edit = button('', () => editConvention(i));
+          edit.className = 'wb-icon wb-convention-edit cursor-interaction';
+          edit.setAttribute('aria-label', '编辑' + c.title);
+          edit.append(icon('pencil'));
+          row.append(
+            el('span', 'wb-convention-category wb-muted', c.category),
+            copy,
+            el('span', 'wb-convention-scope wb-mono wb-dim', c.scope),
+            el(
+              'span',
+              'wb-convention-sync wb-tag ' + (c.updated ? 'amber' : 'green'),
+              c.updated ? '下轮采用' : '本轮已带入',
+            ),
+            edit,
+          );
+          return row;
+        }),
+      );
+      icons();
+    }
+    function editConvention(index, extract = false) {
+      const current = index === undefined ? null : conventions[index];
+      modal(current ? '编辑团队约定' : '保存团队约定', 'wb-convention-template', '保存约定', () => {
+        const title = q('#wb-convention-title').value.trim(),
+          body = q('#wb-convention-body').value.trim();
+        if (!title || !body) {
+          toast('请填写约定标题和内容');
+          return;
+        }
+        const item = {
+          category: current?.category || '团队',
+          title: title.slice(0, 100),
+          body: body.slice(0, 600),
+          scope: current?.scope || '项目',
+          revision: (current?.revision || 0) + 1,
+          updated: true,
+        };
+        if (current) conventions[index] = item;
+        else conventions.push(item);
+        closeModal(false);
+        renderConventions();
+        toast('约定已保存，相关执行将在下一轮采用');
+      });
+      if (current) {
+        q('#wb-convention-title').value = current.title;
+        q('#wb-convention-body').value = current.body;
+      } else if (extract) {
+        q('#wb-convention-title').value = '重试时保留原始幂等键';
+        q('#wb-convention-body').value =
+          '网络超时请求可以重试，并沿用原始幂等键；业务拒绝直接返回，不进入重试。';
+      }
+    }
+    function simpleModal(title, text, confirm = '知道了') {
+      const body = modal(title, null, confirm, () => closeModal(false));
+      body.append(el('p', 'wb-muted', text));
+    }
+    function publish() {
+      const body = modal('发布阶段成果', null, '保存成果 · 演示', () => {
+        const title = q('#wb-publish-title').value.trim();
+        if (!title) {
+          toast('请填写成果标题');
+          return;
+        }
+        state.resultCount++;
+        closeModal(false);
+        render();
+        drawer = '';
+        openDrawer('results');
+        save();
+        toast('已保存示例成果 v' + state.resultCount + '，任务状态保持不变');
+      });
+      const field = el('label', 'wb-field', '成果标题');
+      const input = el('input');
+      input.id = 'wb-publish-title';
+      input.value = '支付网关重试 · 阶段成果';
+      field.append(input);
+      body.append(
+        field,
+        el(
+          'p',
+          'wb-small wb-muted',
+          '包含当前工作说明、3 个文件的变更摘要与讨论入口。成果可在任务进行中发布。',
+        ),
+      );
+    }
+    function runTest() {
+      if (testBusy) return;
+      testBusy = true;
+      const log = q('#wb-terminal-log');
+      log.append(
+        el('p', 'wb-cyan', '❯ npm run test:gateway  [演示]'),
+        el('p', 'wb-muted', '正在读取模拟检查结果…'),
+      );
+      setTimeout(() => {
+        log.append(
+          el('p', 'wb-green', '✓ full jitter stays within the retry ceiling'),
+          el('p', 'wb-green', '4 passed · 模拟日志，未执行项目测试'),
+        );
+        testBusy = false;
+      }, 900);
+    }
+    function previewRequest() {
+      if (previewBusy) return;
+      previewBusy = true;
+      const area = q('#wb-preview-steps');
+      area.replaceChildren(el('div', 'wb-preview-step wb-amber', '① 请求超时 · 504'));
+      setTimeout(() => {
+        area.append(el('div', 'wb-preview-step wb-muted', '② 等待随机退避 · 幂等键保持不变'));
+      }, 650);
+      setTimeout(() => {
+        area.append(el('div', 'wb-preview-step wb-green', '③ 重试成功 · 共 2 次请求（示例）'));
+        previewBusy = false;
+      }, 1500);
+    }
+    const commands = [
+      ['panels-top-left', '打开当前任务', 'HX-104', () => navigate('task')],
+      ['git-branch', '打开并行方案', '比较与选择', () => navigate('variants')],
+      ['book-open', '查看团队约定', '项目上下文', () => navigate('conventions')],
+      ['server', '查看节点与用量', '运行环境', () => navigate('resources')],
+      ['messages-square', '请人或 AI 协助', '只读求助', () => openDrawer('assist')],
+      ['list-plus', '查看下一轮要求', '输入队列', () => openDrawer('queue')],
+      [
+        'arrow-right-left',
+        '用 Codex 继续',
+        '同目录接续',
+        () => {
+          state.tool = 'codex';
+          render();
+          openSwitch();
+        },
+      ],
+      [
+        'sun-moon',
+        '切换浅色 / 深色',
+        '外观',
+        () => {
+          state.theme = state.theme === 'dark' ? 'light' : 'dark';
+          render();
+          save();
+        },
+      ],
+    ];
+    function renderCommands() {
+      const term = q('#wb-command-input').value.toLowerCase();
+      const choices = commands.filter((c) => (c[1] + c[2]).toLowerCase().includes(term));
+      q('#wb-command-list').replaceChildren(
+        ...choices.map(([name, label, detail, fn]) => {
+          const b = el('button', 'wb-command cursor-interaction');
+          b.append(icon(name), el('span', '', label), el('small', '', detail));
+          b.addEventListener('click', () => {
+            closeCommand();
+            fn();
+          });
+          return b;
+        }),
+      );
+      if (!choices.length) q('#wb-command-list').append(el('p', 'wb-muted', '没有匹配的操作'));
+      icons();
+    }
+    function openCommand() {
+      opener = document.activeElement;
+      q('#wb-command-overlay').hidden = false;
+      q('#wb-command-input').value = '';
+      renderCommands();
+      q('#wb-command-input').focus();
+    }
+    function closeCommand() {
+      q('#wb-command-overlay').hidden = true;
+      opener?.focus();
+    }
+    function action(name) {
+      if (name === 'command') openCommand();
+      if (name === 'close-command') closeCommand();
+      if (name === 'close-modal') closeModal();
+      if (name === 'close-drawer') closeDrawer();
+      if (name === 'guide') {
+        state.guide = !state.guide;
+        render();
+        save();
+      }
+      if (name === 'inspector') {
+        state.inspector = !state.inspector;
+        render();
+        save();
+      }
+      if (name === 'theme') {
+        state.theme = state.theme === 'dark' ? 'light' : 'dark';
+        render();
+        save();
+      }
+      if (name === 'density') {
+        state.density = state.density === 'compact' ? 'comfortable' : 'compact';
+        render();
+        save();
+        toast(state.density === 'compact' ? '已切换为紧凑密度' : '已切换为舒适密度');
+      }
+      if (name === 'personal') {
+        state.space = 'personal';
+        navigate('task');
+        toast('已切换个人空间，协作信息按私人工作收起');
+      }
+      if (name === 'send') {
+        state.prompt = q('#wb-prompt').value.trim();
+        if (!state.prompt) {
+          q('#wb-prompt').focus();
+          toast('请先写下要补充的要求');
+          return;
+        }
+        if (state.dispatch === 'queue') {
+          if (queueNote(state.prompt)) {
+            addMessage(state.prompt, 'human');
+            state.prompt = '';
+            render();
+            save();
+            toast('已保存到下一轮，当前执行保持不变');
+          }
+        } else openSwitch();
+      }
+      if (name === 'stop') stopRun();
+      if (name === 'publish') publish();
+      if (name === 'complete') {
+        if (state.done) {
+          state.done = false;
+          render();
+          save();
+          return;
+        }
+        modal('完成当前任务', 'wb-complete-template', '标记完成', () => {
+          const stop = q('#wb-stop-on-complete').checked;
+          state.done = true;
+          closeModal(false);
+          if (stop) stopRun();
+          render();
+          save();
+          toast('任务已标记完成，执行与代码状态分别保留');
+        });
+      }
+      if (name === 'test') runTest();
+      if (name === 'preview-request') previewRequest();
+      if (name === 'new-convention') editConvention();
+      if (name === 'extract-convention') editConvention(undefined, true);
+      if (name === 'integrate')
+        modal('选择性整合', 'wb-integrate-template', '生成整合草案 · 演示', () => {
+          const count = qa('#wb-modal-body input:checked').length;
+          if (!count) {
+            toast('请选择需要整合的文件');
+            return;
+          }
+          closeModal(false);
+          toast('已生成 ' + count + ' 个文件的整合草案（演示），未自动合并');
+        });
+      if (name === 'stop-variant') {
+        q('#wb-variant-b-state').textContent = '停止中';
+        q('#wb-stop-variant').disabled = true;
+        setTimeout(() => {
+          state.bStopped = true;
+          render();
+          save();
+          toast('方案 B 已确认停止（演示），文件仍保留');
+        }, 850);
+      }
+      if (name === 'policy')
+        simpleModal(
+          '本机授权范围',
+          '节点属于 Alex；当前范围为 payments-core 的文件编辑。新目录、工具与预算变更需要在节点本机确认。此处展示示例配置。',
+        );
+      if (name === 'preset')
+        simpleModal(
+          '支付组配置',
+          'Claude Code / Sonnet；本机 payments-core；文件编辑；最长 15 分钟。账号由本人配置，本轮上下文可以单独调整。',
+        );
+      if (name === 'connect-node')
+        simpleModal(
+          '连接独立节点',
+          '先选择项目并生成一次性配对码，再在目标机器确认目录和工具范围。连接默认只同步摘要，执行需要另外授权。此演示不会注册真实节点。',
+          '了解接入流程',
+        );
+      if (name === 'new-task')
+        simpleModal(
+          '一句话开始新任务',
+          '个人工作可从问题或授权目录开始；团队任务默认带入当前项目与自己。此版演示聚焦 HX-104 的完整工作过程。',
+        );
+    }
+    root.addEventListener('click', (event) => {
+      const target = event.target.closest('button');
+      if (!target || !root.contains(target)) return;
+      if (target.dataset.action) action(target.dataset.action);
+      if (target.dataset.page) navigate(target.dataset.page);
+      if (target.dataset.drawer) openDrawer(target.dataset.drawer);
+      if (target.dataset.inspect) {
+        state.inspect = target.dataset.inspect;
+        render();
+        save();
+      }
+      if (target.dataset.trace) {
+        state.trace = target.dataset.trace;
+        render();
+        save();
+      }
+      if (target.dataset.variant) {
+        state.branch = target.dataset.variant;
+        navigate('task');
+        toast('已选择方案 ' + state.branch + '；其他执行与主分支保持原状');
+      }
+    });
+    q('#wb-modal-confirm').addEventListener('click', () => modalConfirm?.());
+    q('#wb-tool').addEventListener('change', (event) => {
+      state.tool = event.target.value;
+      state.model = state.tool === 'claude' ? 'Sonnet' : '默认模型';
+      render();
+      if (state.tool !== state.engine) openSwitch();
+      save();
+    });
+    q('#wb-model').addEventListener('change', (event) => {
+      state.model = event.target.value;
+      save();
+      toast('模型选择将在下一轮采用');
+    });
+    q('#wb-node').addEventListener('change', () =>
+      toast('这是运行环境选择示意；跨节点恢复仍需核对代码现场。'),
+    );
+    q('#wb-file').addEventListener('change', (event) => {
+      state.file = event.target.value;
+      renderCode();
+      save();
+    });
+    q('#wb-space').addEventListener('change', (event) => {
+      state.space = event.target.value;
+      render();
+      save();
+      toast(state.space === 'personal' ? '个人工作，仅自己可见' : '团队项目，分享必要工作记录');
+    });
+    q('#wb-dispatch-mode').addEventListener('change', (event) => {
+      state.dispatch = event.target.value;
+      render();
+      save();
+    });
+    q('#wb-prompt').addEventListener('input', (event) => {
+      state.prompt = event.target.value.slice(0, 2000);
+    });
+    q('#wb-prompt').addEventListener('change', save);
+    q('#wb-terminal-command').addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const value = event.target.value.trim();
+      if (!value) return;
+      q('#wb-terminal-log').append(
+        el('p', 'wb-cyan', '❯ ' + value.slice(0, 200)),
+        el('p', 'wb-muted', '演示终端：输入已显示，未执行系统命令。'),
+      );
+      event.target.value = '';
+    });
+    q('#wb-command-input').addEventListener('input', renderCommands);
+    q('#wb-command-input').addEventListener('keydown', (event) => {
+      if (['ArrowDown', 'Enter'].includes(event.key)) {
+        event.preventDefault();
+        const first = q('.wb-command');
+        if (event.key === 'Enter') first?.click();
+        else first?.focus();
+      }
+    });
+    q('#wb-command-list').addEventListener('keydown', (event) => {
+      if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+      event.preventDefault();
+      const list = qa('.wb-command'),
+        index = list.indexOf(document.activeElement);
+      list[(index + (event.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length]?.focus();
+    });
+    root.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        q('#wb-command-overlay').hidden ? openCommand() : closeCommand();
+      }
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key === 'Enter' &&
+        event.target === q('#wb-prompt')
+      ) {
+        event.preventDefault();
+        action('send');
+      }
+      if (event.key === 'Escape') {
+        if (!q('#wb-command-overlay').hidden) closeCommand();
+        else if (!q('#wb-modal').hidden) closeModal();
+        else closeDrawer();
+      }
+      const active = !q('#wb-command-overlay').hidden
+        ? q('#wb-command-overlay')
+        : !q('#wb-modal').hidden
+          ? q('#wb-modal')
+          : null;
+      if (event.key === 'Tab' && active) {
+        const nodes = [...active.querySelectorAll('button,input,textarea,select')].filter(
+          (n) => !n.disabled && n.getClientRects().length,
+        );
+        if (event.shiftKey && document.activeElement === nodes[0]) {
+          event.preventDefault();
+          nodes.at(-1).focus();
+        } else if (!event.shiftKey && document.activeElement === nodes.at(-1)) {
+          event.preventDefault();
+          nodes[0].focus();
+        }
+      }
+    });
+    for (const id of ['wb-modal', 'wb-command-overlay'])
+      q('#' + id).addEventListener('click', (event) => {
+        if (event.target === event.currentTarget) id === 'wb-modal' ? closeModal() : closeCommand();
+      });
+    const splitter = q('#wb-splitter');
+    let dragging = false;
+    splitter.addEventListener('pointerdown', (event) => {
+      dragging = true;
+      splitter.setPointerCapture(event.pointerId);
+    });
+    splitter.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      const rect = q('#wb-split').getBoundingClientRect();
+      state.split = Math.max(32, Math.min(67, ((event.clientX - rect.left) / rect.width) * 100));
+      root.style.setProperty('--w-trace', state.split + '%');
+    });
+    splitter.addEventListener('pointerup', () => {
+      dragging = false;
+      save();
+    });
+    splitter.addEventListener('pointercancel', () => {
+      dragging = false;
+    });
+    splitter.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      state.split = Math.max(32, Math.min(67, state.split + (event.key === 'ArrowRight' ? 3 : -3)));
+      render();
+      save();
+    });
+    function restore(saved) {
+      const v = saved?.privateContent?.hexuWorkbench;
+      if (!v || typeof v !== 'object') return;
+      for (const [key, values] of Object.entries({
+        page: ['task', 'variants', 'conventions', 'resources'],
+        theme: ['dark', 'light'],
+        density: ['compact', 'comfortable'],
+        space: ['personal', 'team'],
+        inspect: ['diff', 'terminal', 'preview'],
+        trace: ['all', 'human'],
+        file: ['payment', 'backoff', 'test'],
+        tool: ['claude', 'codex'],
+        engine: ['claude', 'codex'],
+        run: ['running', 'stopping', 'preparing', 'ended'],
+        branch: ['Main', 'A', 'B'],
+        dispatch: ['queue', 'continue'],
+      }))
+        if (values.includes(v[key])) state[key] = v[key];
+      for (const key of ['guide', 'inspector', 'done', 'bStopped', 'initialStopped'])
+        if (typeof v[key] === 'boolean') state[key] = v[key];
+      if (Number.isFinite(v.split)) state.split = Math.max(32, Math.min(67, v.split));
+      if (typeof v.prompt === 'string') state.prompt = v.prompt.slice(0, 2000);
+      if (typeof v.model === 'string') state.model = v.model.slice(0, 40);
+      if (Array.isArray(v.notes))
+        state.notes = v.notes
+          .filter((n) => typeof n.body === 'string')
+          .slice(-12)
+          .map((n) => ({ body: n.body.slice(0, 1000), used: !!n.used }));
+      if (Array.isArray(v.messages))
+        state.messages = v.messages
+          .filter((m) => typeof m.text === 'string')
+          .slice(-8)
+          .map((m) => ({
+            text: m.text.slice(0, 600),
+            kind: m.kind === 'human' ? 'human' : 'system',
+          }));
+      if (Array.isArray(v.materials) && v.materials.length === 4)
+        state.materials = v.materials.map(Boolean);
+      if (Number.isInteger(v.resultCount))
+        state.resultCount = Math.max(1, Math.min(20, v.resultCount));
+    }
+    restore(window.openai?.widgetState);
+    render();
+    renderConventions();
+    window.addEventListener('openai:set_globals', (event) => {
+      if (event.detail?.globals?.widgetState) {
+        restore(event.detail.globals.widgetState);
+        render();
+      }
+    });
+  })();
+</script>

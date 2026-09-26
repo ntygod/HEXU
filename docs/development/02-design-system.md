@@ -5,7 +5,7 @@
 
 ## 1. 交付目标与范围
 
-将 v1.1 的 UI 方向转成可复用组件与页面结构。工作台、项目看板、任务协作、继续面板、并行对比和成果反馈使用一套设计语言。现有会话图用于参考，不自动代表完整设计资产、可点击原型或代码已经存在。
+将产品 v1.1 和已确认的 [Workbench W1](../design/README.md) 转成可复用组件与页面结构。工作台、项目看板、任务协作、继续面板、并行对比和成果反馈使用同一设计语言。W1 的 tokens 与交互参考已归档，现有应用尚未整体迁移；参考图不代表真实业务能力已经存在。
 
 管理页和开发页共享事实但密度不同。导航只有工作台、项目、成果和资源设置；任务从项目或搜索直接进入，不再建一个同级的 AI 工作区。
 
@@ -24,15 +24,15 @@
 
 ## 3. 组件与视觉实现
 
-默认使用 v1.1 建议：靛蓝主色 `#4F46E5`、页面 `#F7F8FA`、白色面板、主要文字 `#182230`。所有值进入语义 tokens，不让业务页散落十几种紫色。深色工作区使用独立 tokens，不简单反相。
+视觉以 W1 的暗色优先、青色强调、完整浅色主题、紧凑／舒适密度为准。数值见 [设计 tokens](../design/tokens.css)，新组件逐步迁移到 `packages/ui` 的共享实现，不在业务页复制另一套配色。参考 tokens 尚未被应用导入，旧 `packages/ui/src/tokens.css` 的靛蓝色不再代表新的设计选择。
 
-建立 `AppShell`、`ProjectHeader`、`TaskRow`、`TaskStatusBadge`、`RunStatusBadge`、`Participant`、`ContextReference`、`ExecutionEvent`、`ResultCard`、`FeedbackThread`、`CapabilitySelect`、`ActionDrawer` 和 `EmptyState`。TaskStatus 与 RunStatus 是两个组件，不能复用一个 status pill 隐藏事实区别。
+建立 `AppShell`、`ProjectHeader`、`TaskRow`、`TaskStatusBadge`、`RunStatusBadge`、`CodeStatus`、`PromptBar`、`Participant`、`ContextReference`、`ExecutionEvent`、`ResultCard`、`FeedbackThread`、`CapabilitySelect`、`ActionDrawer` 和 `EmptyState`。TaskStatus、RunStatus 与代码事实分别表达，不能用一个 status pill 隐藏区别。桌面和 Web 共用这些组件与业务契约，见 [ADR-0008](../engineering/adr-0008-client-surfaces.md)。
 
-人显示头像和姓名，AI 显示工具名与配置。先用可合法使用的文字/图标占位；第三方 Logo 的来源需登记，不能复制来源不明的图片资产。界面中文优先，代码等宽，正文建议 14—16px；长标题和译文自然换行。
+人显示头像和姓名，AI 显示工具名与配置。先用可合法使用的文字/图标占位；第三方 Logo 的来源需登记，不能复制来源不明的图片资产。中文优先，代码等宽，紧凑正文 13px、舒适 14px，次要标签 12px；必要内容不为塞入多栏而缩小。长标题和译文自然换行。
 
 ## 4. 关键布局
 
-桌面侧栏约 216—232px 可收起。任务页默认协作主区加成果辅助区，目标与上下文从侧面展开；宽屏可三栏。约 1280px 以下切标签页，约 768px 以下重点支持查看和回复。断点是设计参数，不假定所有人屏幕一样。
+任务页采用顶栏、约 48px 导航轨、可收起的 180–220px 导引栏、过程与结果双栏、稳定输入区和按需旁路抽屉。约 1024px 优先收起辅助区域，约 768px 以下切换或堆叠内容，重点支持查看和回复；不强行常驻全部面板。项目、团队、成果页保持阅读布局。断点按实际内容校验。
 
 工作台第一屏应有继续工作与待回复；不放大幅宣传山景、成员在线排名、无依据的进度百分比。成果可以在任务未完成时出现，不加“必须验收”的绿色进度条。
 
