@@ -47,13 +47,28 @@ jobs:
           retention-days: 2
       - run: npm run format:check
       - run: npm run check
+        id: engineering
       - name: Official Codex pinned no-model compatibility
         run: |
           python - <<'PY'
           import urllib.request, json, hashlib, tarfile, pathlib, io, subprocess
-          req = urllib.request.Request('https://api.github.com/repos/openai/codex/releases/tags/rust-v0.157.0', headers={'User-Agent': 'HEXU-no-model-compatibility'})
-          release = json.load(urllib.request.urlopen(req, timeout=30))
-          asset = next(a for a in release['assets'] if a['name'] == 'codex-x86_64-unknown-linux-gnu.tar.zst')
+          def read_json(url):
+              req = urllib.request.Request(url, headers={'User-Agent': 'HEXU-no-model-compatibility'})
+              return json.load(urllib.request.urlopen(req, timeout=30))
+          release = read_json('https://api.github.com/repos/openai/codex/releases/tags/rust-v0.157.0')
+          assert release['tag_name'] == 'rust-v0.157.0'
+          assets_url = release['assets_url']
+          assert assets_url.startswith('https://api.github.com/repos/openai/codex/releases/')
+          assets = []
+          for page in range(1, 11):
+              batch = read_json(assets_url + '?per_page=100&page=' + str(page))
+              assets.extend(batch)
+              if len(batch) < 100: break
+          print('Pinned release:', release['id'], release['tag_name'])
+          print('Published asset names:', json.dumps([a['name'] for a in assets]))
+          matches = [a for a in assets if a['name'] == 'codex-x86_64-unknown-linux-gnu.tar.zst']
+          assert len(matches) == 1, 'Expected exactly one pinned GNU archive'
+          asset = matches[0]
           url = asset['browser_download_url']
           assert url == 'https://github.com/openai/codex/releases/download/rust-v0.157.0/codex-x86_64-unknown-linux-gnu.tar.zst'
           raw = urllib.request.urlopen(url, timeout=120).read()
@@ -63,6 +78,8 @@ jobs:
           out = pathlib.Path('/tmp/hexu-official-codex'); out.mkdir()
           unpacked = subprocess.run(['zstd', '-d', '-c'], input=raw, stdout=subprocess.PIPE, check=True).stdout
           with tarfile.open(fileobj=io.BytesIO(unpacked), mode='r:') as archive:
+              names = [m.name for m in archive.getmembers() if m.isfile()]
+              print('Archive regular files:', json.dumps(names))
               member = next(m for m in archive.getmembers() if m.isfile() and pathlib.PurePosixPath(m.name).name == 'codex-x86_64-unknown-linux-gnu')
               binary = out / 'codex'
               binary.write_bytes(archive.extractfile(member).read())
@@ -71,7 +88,9 @@ jobs:
           /tmp/hexu-official-codex/codex --version
           node scripts/check-codex-protocol.mjs /tmp/hexu-official-codex/codex
       - run: npx playwright install --with-deps chromium
+        if: ${{ !cancelled() && steps.engineering.outcome == 'success' }}
       - run: npm run test:e2e
+        if: ${{ !cancelled() && steps.engineering.outcome == 'success' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
