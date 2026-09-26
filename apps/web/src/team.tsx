@@ -452,7 +452,12 @@ export function ProjectAccess({ project }: { project: Project }) {
           >
             <label className="field">
               添加空间成员
-              <select required value={target} onChange={(e) => setTarget(e.target.value)}>
+              <select
+                aria-label="添加空间成员"
+                required
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              >
                 <option value="">选择成员</option>
                 {data.members
                   .filter((m) => !value?.items.some((existing) => existing.id === m.id))
@@ -465,7 +470,11 @@ export function ProjectAccess({ project }: { project: Project }) {
             </label>
             <label className="field">
               访问权限
-              <select value={role} onChange={(e) => setRole(e.target.value as ProjectRole)}>
+              <select
+                aria-label="访问权限"
+                value={role}
+                onChange={(e) => setRole(e.target.value as ProjectRole)}
+              >
                 <option value="view">只读</option>
                 <option value="edit">可编辑</option>
                 <option value="manage">项目管理</option>
