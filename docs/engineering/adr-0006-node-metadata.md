@@ -23,3 +23,5 @@ Git porcelain 稳定格式、未跟踪目录与 submodule 的范围参见 [git-s
 ## Git 配置隔离补充
 
 Git 状态采集使用临时隔离的 Git 元数据目录和只读复制的有界索引，不加载原仓库的可执行配置；仅通过允许的核心布尔/换行设置读取现有对象。配置中的 clean/smudge/process 过滤器会使摘要显示“不可用”，不会执行过滤器来换取精确数字。配置在预检后变化也不会进入状态进程；采集后再次核对。稀疏工作区、分割索引等尚未覆盖的形式可能显示不可用；临时元数据随后清理，不改写原索引。这仍不是操作系统沙箱。
+
+过滤器和 Git 管理目录的官方语义参见 [gitattributes](https://git-scm.com/docs/gitattributes) 与 [git --git-dir](https://git-scm.com/docs/git)。实际隔离保证按本轮代码和回归测试记录，不将其描述为操作系统沙箱。

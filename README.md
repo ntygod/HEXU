@@ -47,7 +47,7 @@ npm start
 
 team-local 登录后，在“空间与账号 → 独立节点与授权目录”生成配对码。本机准备仓库外的 runner.json，执行 `npm run build`，再执行 `npm run runner -- connect --config /path/runner.json`，在终端确认账号、项目和目录；随后 `npm run runner -- start`。配对码不放入命令参数，节点凭证与路径不上传服务。
 
-当前只同步目录别名和变更数量，不读取/上传代码，不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
+当前只同步目录别名和变更数量。Git 会在获授权的本机目录读取文件以计算状态，但代码、文件名和路径不会上传，也不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
 
 ## 当前能操作什么
 

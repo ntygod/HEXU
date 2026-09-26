@@ -40,7 +40,7 @@
 | HX-DEV-03-02 | 空间、成员与邀请 | BE/FE | 部分实现 | 真实个人/团队空间、绑定邮箱的邀请、接受/撤销/过期与成员退出/移除已有；无邮件发送、完整空间角色管理与所有者转移。 | [协作数据](../../packages/db/src/collaboration.ts) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-03 | 统一访问策略与资源授权 | BE | 部分实现 | 统一 Task/Run/Result/Operation 和项目权限已实现；E2b1 节点凭证与浏览器会话分离，摘要按项目过滤。通用 AccessGrant、文件读取与任务派发的节点授权仍未实现。 | [权限](../../packages/db/src/permissions.ts) / [节点](../../packages/db/src/nodes.ts) |
 | HX-DEV-03-04 | 项目、仓库引用与成员配置 | BE/FE | 部分实现 | 真实空间中的项目创建、读取、成员添加/移除及角色配置已实现；项目编辑/归档、仓库引用与完整目标配置尚缺。 | [项目成员](../../packages/db/src/collaboration.ts) / [界面](../../apps/web/src/team.tsx) |
-| HX-DEV-03-05 | 个人/团队渐进入门 | FE | 部分实现 | 建立首个账号后直接进入个人空间，可建团队、邀请和加入，真实界面已有；独立节点连接与完整渐进入门偏好未实现。 | [身份](../../apps/web/src/identity.tsx) / [空间](../../apps/web/src/team.tsx) |
+| HX-DEV-03-05 | 个人/团队渐进入门 | FE | 部分实现 | 账号建立、团队创建/加入与节点配对入口已有；完整渐进入门偏好和节点任务执行授权尚未实现。 | [身份](../../apps/web/src/identity.tsx) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-06 | 成员撤销、归档与权限事件 | BE | 部分实现 | 成员、项目和会话撤销已有；节点及待配对码随所有者项目撤权永久失效，重新加回成员不复活旧凭证。项目归档和活动远程执行的撤销联动未实现。 | [撤销触发器](../../packages/db/src/schema.ts) |
 | HX-DEV-04-01 | Task 基础、归属和修订 | BE | 部分实现 | Task 修订、创建者归属和真实个人/项目访问范围已有；改派、参与者及正式存储的完整模型尚缺。 | [任务](../../packages/db/src/store.ts) |
 | HX-DEV-04-02 | 完成、重开、取消与活动执行联动 | BE/FE | 部分实现 | 完成/重开/取消及活动执行后端联动已有，团队编辑权限已校验；完整动作 UI 与远程执行联动仍待收口。 | [任务](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
