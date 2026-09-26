@@ -4,6 +4,17 @@ import {
   type Task,
   type TaskStatus,
 } from '../../contracts/src/index.js';
+import type { TaskPeopleFilters } from '../../contracts/src/task-participants.js';
+export function matchesTaskPeopleFilters(task: Task, filters: TaskPeopleFilters): boolean {
+  if (filters.ownerUserId && task.ownerUserId !== filters.ownerUserId) return false;
+  if (filters.participantUserId && !task.participantUserIds?.includes(filters.participantUserId))
+    return false;
+  const query = filters.q?.trim().toLocaleLowerCase();
+  return (
+    !query ||
+    `${task.title} ${task.shortId} ${task.description}`.toLocaleLowerCase().includes(query)
+  );
+}
 export const activeRunStates: readonly RunState[] = [
   'queued',
   'preparing',

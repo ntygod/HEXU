@@ -1,6 +1,11 @@
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import { parseNodeContinuationOperation } from '../../../packages/contracts/src/node-continuation.js';
+import {
+  parseParticipantHistoryQuery,
+  parseTaskPeopleFilters,
+} from '../../../packages/contracts/src/task-participants.js';
+import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import { NextInputs } from '../../../packages/db/src/next-inputs.js';
 import { parseNextInput } from '../../../packages/contracts/src/next-input.js';
 import { parseNodeRun } from '../../../packages/contracts/src/node-execution.js';
@@ -244,6 +249,7 @@ export async function createApp(
     if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     const query = record(request.query);
+    const peopleFilters = parseTaskPeopleFilters(query);
     const limit = query.limit === undefined ? 50 : Number(query.limit);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
       throw new DomainError('INVALID_INPUT', 'limit 必须为 1–100');
@@ -253,12 +259,9 @@ export async function createApp(
       store.project(id);
       items = items.filter((task) => task.projectId === id);
     }
-    if (query.q) {
-      const q = text(query.q, '搜索', 160).toLocaleLowerCase();
-      items = items.filter((task) =>
-        (task.title + ' ' + task.description + ' ' + task.shortId).toLocaleLowerCase().includes(q),
-      );
-    }
+    items = items
+      .map((task) => store.taskParticipants.decorate(task))
+      .filter((task) => matchesTaskPeopleFilters(task, peopleFilters));
     if (query.cursor) {
       const position = items.findIndex((task) => task.id === query.cursor);
       if (position < 0) throw new DomainError('INVALID_CURSOR', '列表已变化，请重新加载');
@@ -281,6 +284,25 @@ export async function createApp(
   );
   app.get('/api/v1/tasks/:taskId/assignment', async (request) =>
     store.taskAssignment.options(param(request.params, 'taskId')),
+  );
+  app.get('/api/v1/tasks/:taskId/participants', async (request) =>
+    store.taskParticipants.view(param(request.params, 'taskId')),
+  );
+  app.post('/api/v1/tasks/:taskId/participants', async (request) =>
+    store.taskParticipants.change(
+      param(request.params, 'taskId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.get('/api/v1/tasks/:taskId/participants/history', async (request) =>
+    store.taskParticipants.history(
+      param(request.params, 'taskId'),
+      parseParticipantHistoryQuery(request.query),
+    ),
+  );
+  app.get('/api/v1/projects/:projectId/task-people', async (request) =>
+    store.taskParticipants.people(param(request.params, 'projectId')),
   );
   app.post('/api/v1/tasks/:taskId/assignment', async (request) =>
     store.taskAssignment.assign(

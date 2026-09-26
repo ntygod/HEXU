@@ -187,6 +187,7 @@ export class CollaborationStore {
           '此成员仍独自管理项目，请先交接项目管理权限',
           409,
         );
+      this.store.taskParticipants.revokeSpaceMember(space.id, userId);
       this.store.db
         .prepare(
           'DELETE FROM collab_project_members WHERE user_id=? AND project_id IN (SELECT id FROM projects WHERE space_id=?)',
@@ -231,11 +232,12 @@ export class CollaborationStore {
           .get(projectId, userId)
       )
         throw new DomainError('PROJECT_MANAGER_REQUIRED', '项目必须保留一名管理者', 409);
-      if (role === null)
+      if (role === null) {
+        this.store.taskParticipants.revokeProjectMember(projectId, userId);
         this.store.db
           .prepare('DELETE FROM collab_project_members WHERE project_id=? AND user_id=?')
           .run(projectId, userId);
-      else
+      } else
         this.store.db
           .prepare(
             'INSERT INTO collab_project_members VALUES(?,?,?) ON CONFLICT(project_id,user_id) DO UPDATE SET role=excluded.role',

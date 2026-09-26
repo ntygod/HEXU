@@ -177,6 +177,63 @@ async function preparedPair(owner: Page, member: Page, suffix: string) {
   return { space, project, task, memberIdentity };
 }
 
+test('只读成员自行参与不增加任务权限；编辑降权关闭管理抽屉，撤权结束参与且重新加入不复活', async ({
+  page,
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    member = await context.newPage();
+  try {
+    const f = await preparedPair(page, member, 'participants');
+    const setRole = (role: 'view' | 'edit' | null) =>
+      post(page, `projects/${f.project.id}/members/${f.memberIdentity.id}`, { role }, f.space.id);
+    const open = () => member.getByRole('button', { name: /^任务参与者（\d+）$/ }).click();
+    const drawer = member.getByRole('dialog', { name: '任务参与者', exact: true });
+    await setRole('view');
+    await expect(member.getByRole('button', { name: '更改负责人', exact: true })).toHaveCount(0);
+    await open();
+    await expect(member.getByLabel('查找参与成员', { exact: true })).toHaveCount(0);
+    await member.getByRole('button', { name: '参与此任务', exact: true }).click();
+    await expect(member.getByLabel('当前参与者', { exact: true })).toContainText(
+      f.memberIdentity.name,
+    );
+    await member.getByRole('button', { name: '退出参与', exact: true }).click();
+    await expect(member.getByLabel('当前参与者', { exact: true })).not.toContainText(
+      f.memberIdentity.name,
+    );
+    await member.getByRole('button', { name: '参与此任务', exact: true }).click();
+    await expect(member.getByLabel('当前参与者', { exact: true })).toContainText('当前只读成员');
+    await setRole('edit');
+    await expect(drawer).toHaveCount(0);
+    await open();
+    await member.getByLabel('查找参与成员', { exact: true }).fill('不应恢复的选择');
+    await setRole('view');
+    await expect(drawer).toHaveCount(0);
+    await setRole('edit');
+    await expect(member.getByRole('button', { name: '更改负责人', exact: true })).toBeVisible();
+    await open();
+    await expect(member.getByLabel('查找参与成员', { exact: true })).toHaveValue('');
+    await setRole(null);
+    await expect(drawer).toHaveCount(0);
+    await expect(member.getByRole('heading', { name: f.task.title, exact: true })).toHaveCount(0);
+    const denied = await member.request.get(
+      `${origin}/api/v1/tasks/${f.task.id}/participants/history`,
+      { headers: headers(f.space.id) },
+    );
+    expect(denied.status()).toBe(404);
+    await setRole('view');
+    await member.reload();
+    await open();
+    await expect(member.getByLabel('当前参与者', { exact: true })).toContainText('还没有参与者');
+    await member.getByRole('button', { name: '参与变更记录', exact: true }).click();
+    await expect(member.getByLabel('参与变更历史', { exact: true })).toContainText(
+      '因访问撤销结束参与',
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test('撤销项目权限清除已打开的任务，移除成员后返回个人空间', async ({ page, browser }) => {
   const context = await browser.newContext(),
     member = await context.newPage();

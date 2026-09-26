@@ -3,6 +3,7 @@ import { ContinuationStore } from '../../../packages/db/src/continuations.js';
 import type { Store } from '../../../packages/db/src/store.js';
 import type { IdentityService } from '../../../packages/identity/src/index.js';
 import { DomainError, enumValue, record, text } from '../../../packages/contracts/src/index.js';
+import { parseParticipantChange } from '../../../packages/contracts/src/task-participants.js';
 import {
   emailAddress,
   secretText,
@@ -88,8 +89,17 @@ export function attachIdentity(
     const p = record(request.params ?? {});
     if (p.spaceId && p.spaceId !== store.spaceId)
       throw new DomainError('NOT_FOUND', '空间不匹配', 404);
+    // Self participation is metadata for an already-visible task, even for a viewer.
+    // Every other write retains the edit guard; the store validates this exact command again.
+    const selfParticipation =
+      request.method === 'POST' &&
+      request.routeOptions.url === '/api/v1/tasks/:taskId/participants' &&
+      parseParticipantChange(request.body).userId === store.actorId;
     if (p.taskId)
-      store.getTask(text(p.taskId, '任务', 150), !['GET', 'HEAD'].includes(request.method));
+      store.getTask(
+        text(p.taskId, '任务', 150),
+        !['GET', 'HEAD'].includes(request.method) && !selfParticipation,
+      );
     if (p.runId)
       store.getTask(
         store.run(text(p.runId, '执行', 150)).taskId,

@@ -1,5 +1,21 @@
 import type { Task } from '../../contracts/src/index.js';
 import type {
+  ParticipantChange,
+  ParticipantReceipt,
+  ParticipantHistory,
+} from '../../contracts/src/task-participants.js';
+export const changeTaskParticipant = (id: string, body: ParticipantChange, key: string) =>
+  request<ParticipantReceipt>(`/tasks/${encodeURIComponent(id)}/participants`, {
+    method: 'POST',
+    body,
+    key,
+  });
+export const taskParticipantHistory = (id: string, before?: number, signal?: AbortSignal) =>
+  request<ParticipantHistory>(
+    `/tasks/${encodeURIComponent(id)}/participants/history${before ? `?before=${before}` : ''}`,
+    { signal },
+  );
+import type {
   TaskAssignmentInput,
   TaskAssignmentOptions,
   TaskAssignmentHistory,

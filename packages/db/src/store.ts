@@ -1,4 +1,5 @@
 import { TaskAssignmentStore } from './task-assignment.js';
+import { TaskParticipantsStore } from './task-participants.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
@@ -54,6 +55,7 @@ export class Store {
   readonly projectSettings: ProjectSettingsStore;
   readonly projectLifecycle: ProjectLifecycleStore;
   readonly taskAssignment: TaskAssignmentStore;
+  readonly taskParticipants: TaskParticipantsStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -89,6 +91,7 @@ export class Store {
     this.projectSettings = new ProjectSettingsStore(this);
     this.projectLifecycle = new ProjectLifecycleStore(this);
     this.taskAssignment = new TaskAssignmentStore(this);
+    this.taskParticipants = new TaskParticipantsStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
@@ -865,7 +868,7 @@ export class Store {
   }
   detail(id: string) {
     return {
-      task: this.getTask(id),
+      task: this.taskParticipants.decorate(this.getTask(id)),
       messages: this.messages(id),
       runs: this.runs(id),
       results: this.results(id),
@@ -884,7 +887,7 @@ export class Store {
         ? this.collaboration.members().map((user) => this.profile(user))
         : demoMembers,
       projects: this.projects(),
-      tasks: this.tasks(),
+      tasks: this.tasks().map((task) => this.taskParticipants.decorate(task)),
       results: this.results(),
       runs: this.tasks().flatMap((task) => this.runs(task.id)),
     };
