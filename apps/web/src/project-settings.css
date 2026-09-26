@@ -1,0 +1,57 @@
+.project-settings-intro p {
+  margin: var(--hx-space-2) 0 0;
+  color: var(--hx-text-secondary);
+  line-height: 1.6;
+}
+.project-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.project-conflict {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-raised);
+}
+.project-conflict h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  margin: 0 0 var(--hx-space-2);
+  font-size: inherit;
+  color: var(--hx-pending-text);
+}
+.project-conflict p,
+.project-conflict dd {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.project-conflict dl {
+  margin: var(--hx-space-3) 0;
+}
+.project-conflict dt {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.project-conflict dd {
+  margin: var(--hx-space-1) 0 var(--hx-space-3);
+  white-space: pre-wrap;
+}
+.project-history {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-3);
+}
+.project-history details {
+  border-bottom: 1px solid var(--hx-border-subtle);
+  padding: var(--hx-space-3) 0;
+  overflow-wrap: anywhere;
+}
+.project-history summary {
+  cursor: pointer;
+  line-height: 1.6;
+}
+.project-history .text-block {
+  margin-top: var(--hx-space-2);
+}

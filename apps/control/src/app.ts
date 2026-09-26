@@ -1,3 +1,4 @@
+import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import { parseNodeContinuationOperation } from '../../../packages/contracts/src/node-continuation.js';
 import { NextInputs } from '../../../packages/db/src/next-inputs.js';
 import { parseNextInput } from '../../../packages/contracts/src/next-input.js';
@@ -209,6 +210,18 @@ export async function createApp(
   app.get('/api/v1/projects/:projectId', async (request) =>
     store.project(param(request.params, 'projectId')),
   );
+  app.patch('/api/v1/projects/:projectId', async (request) =>
+    store.projectSettings.patch(
+      param(request.params, 'projectId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.get('/api/v1/projects/:projectId/revisions', async (request) => {
+    const id = param(request.params, 'projectId');
+    store.project(id);
+    return store.projectSettings.history(id, parseProjectRevisionQuery(request.query));
+  });
   app.get('/api/v1/spaces/:spaceId/tasks', async (request) => {
     if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);

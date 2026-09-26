@@ -43,7 +43,7 @@
 | HX-DEV-03-01 | 认证组件、登录与会话恢复 | BE/FE | 部分实现 | Better Auth 真实密码账号、初始化代码、登录/退出、改密、会话恢复及撤销已实现；邮件验证、忘记密码恢复、SSO 和正式部署未接入。 | [认证](../../packages/identity/src/index.ts) / [界面](../../apps/web/src/identity.tsx) |
 | HX-DEV-03-02 | 空间、成员与邀请 | BE/FE | 部分实现 | 真实个人/团队空间、绑定邮箱的邀请、接受/撤销/过期与成员退出/移除已有；无邮件发送、完整空间角色管理与所有者转移。 | [协作数据](../../packages/db/src/collaboration.ts) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-03 | 统一访问策略与资源授权 | BE | 部分实现 | 统一真实项目/私有数据权限已有，节点本人执行权限与目录摘要可见性分离；指定他人执行、通用 AccessGrant、附件和远程授权仍未实现。 | [权限](../../packages/db/src/permissions.ts) / [派发](../../packages/db/src/node-execution.ts) |
-| HX-DEV-03-04 | 项目、仓库引用与成员配置 | BE/FE | 部分实现 | 真实空间中的项目创建、读取、成员添加/移除及角色配置已实现；项目编辑/归档、仓库引用与完整目标配置尚缺。 | [项目成员](../../packages/db/src/collaboration.ts) / [界面](../../apps/web/src/team.tsx) |
+| HX-DEV-03-04 | 项目、仓库引用与成员配置 | BE/FE | 部分实现 | 真实项目创建/读取、成员和角色配置已有；新增管理者名称/说明编辑、修订冲突、历史分页与 W1 设置抽屉，保存/通知/幂等原子提交；归档/恢复、仓库引用与完整目标配置尚缺。 | [设置事务](../../packages/db/src/project-settings.ts) / [界面](../../apps/web/src/project-settings.tsx) / [回归](../../tests/project-settings.test.ts) |
 | HX-DEV-03-05 | 个人/团队渐进入门 | FE | 部分实现 | 账号建立、团队创建/加入与节点配对入口已有；完整渐进入门偏好和节点任务执行授权尚未实现。 | [身份](../../apps/web/src/identity.tsx) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-06 | 成员撤销、归档与权限事件 | BE | 部分实现 | 成员、项目和会话撤销已有；节点及待配对码随所有者项目撤权永久失效，重新加回成员不复活旧凭证。项目归档和活动远程执行的撤销联动未实现。 | [撤销触发器](../../packages/db/src/schema.ts) |
 | HX-DEV-04-01 | Task 基础、归属和修订 | BE | 部分实现 | Task 修订、创建者归属和真实个人/项目访问范围已有；改派、参与者及正式存储的完整模型尚缺。 | [任务](../../packages/db/src/store.ts) |

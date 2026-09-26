@@ -239,3 +239,62 @@ test('会话撤销清空旧工作台，真实重新登录和刷新恢复，不�
     await context.close();
   }
 });
+
+test('项目设置仅管理者可写；撤权清除打开的草稿，重新授权不恢复旧内容', async ({
+  page,
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    member = await context.newPage();
+  try {
+    const f = await preparedPair(page, member, 'project-settings');
+    const url = `${origin}/projects/${f.project.id}`;
+    await member.goto(url);
+    await expect(member.getByRole('button', { name: '项目设置', exact: true })).toBeDisabled();
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'manage' },
+      f.space.id,
+    );
+    await expect(member.getByRole('button', { name: '项目设置', exact: true })).toBeEnabled();
+    await member.getByRole('button', { name: '项目设置', exact: true }).click();
+    await member.getByLabel('项目名称', { exact: true }).fill('撤权时必须清除的草稿');
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'edit' },
+      f.space.id,
+    );
+    await expect(member.getByRole('dialog', { name: '项目设置', exact: true })).toHaveCount(0);
+    await expect(member.getByRole('button', { name: '项目设置', exact: true })).toBeDisabled();
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'manage' },
+      f.space.id,
+    );
+    await member.getByRole('button', { name: '项目设置', exact: true }).click();
+    await expect(member.getByLabel('项目名称', { exact: true })).toHaveValue(f.project.name);
+    const storage = await member.evaluate(() =>
+      JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }),
+    );
+    expect(storage).not.toContain('撤权时必须清除的草稿');
+    await member.getByLabel('项目名称', { exact: true }).fill('团队已保存的新项目名');
+    await member.getByRole('button', { name: '保存项目设置', exact: true }).click();
+    await expect(member.getByRole('dialog', { name: '项目设置', exact: true })).toHaveCount(0);
+    await member.getByRole('button', { name: '项目设置', exact: true }).click();
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: null },
+      f.space.id,
+    );
+    await expect(member.getByRole('dialog', { name: '项目设置', exact: true })).toHaveCount(0);
+    await expect(
+      member.getByRole('heading', { name: '项目不存在或当前无权访问', exact: true }),
+    ).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});

@@ -13,7 +13,7 @@
 
 ## 继续开发与 AI 接手
 
-从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1-01—09 已完成；Claude 显式恢复代码路径已补齐；下一主线是项目编辑/归档与已有权限、节点执行的联动。原 102 项工作清单及历史继续保留。
+从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1-01—09 已完成；Claude 显式恢复代码路径已补齐；项目名称/说明编辑与修订记录已接入；下一主线是项目归档/恢复与已有权限、节点执行的联动。原 102 项工作清单及历史继续保留。
 
 ## 启动
 
@@ -46,6 +46,12 @@ npm start
 在本机 `.env` 设置 `HEXU_MODE=team-local`、`HEXU_NATIVE_ENABLED=0` 后启动。未指定数据目录时使用 `.hexu/team`，首次初始化代码在该目录的 `setup-code` 文件；已有 HEXU_DATA_DIR 设置优先。账号建立后可以创建团队、手动转交邀请，并在项目中配置只读/编辑/管理成员。
 
 旧 preview 数据不自动公开或导入。team-local 不调用控制服务宿主机工具；可派发到节点所有者在本机明确启用的独立节点；两个浏览器会话能协作数据，不代表已支持两台电脑。详见 [本机账号模式](docs/engineering/team-local.md)。
+
+## 修改项目基本信息
+
+进入项目，点击右上角“项目设置”。preview 可编辑示例项目；team-local 仅项目管理者可修改名称与说明，空间所有者不自动取得项目管理权。已有任务、成果、成员角色、节点目录和接续材料保持不变。
+
+多人同时编辑时会保留本页草稿并展示最新内容，明确选择比较后再保存，不静默覆盖。可展开修订记录；旧数据库只保留升级时已知的项目快照，不补造历史作者或时间。保存回执丢失时可用同一操作标识再次确认，关闭抽屉不撤回已发送请求。草稿只在当前抽屉内存中，关闭、刷新、切换身份/空间或撤权后清除。项目归档/恢复尚未接入。
 
 ## 可选：配对独立节点
 

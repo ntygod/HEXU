@@ -108,4 +108,10 @@ Keep Claude native transcript format opaque. Check the documented private transc
 
 Validate init ID/cwd/model/dontAsk/tools/empty MCP before accepting session output; resumed model is pinned to the saved resolved model. ID checks do not prove no model request occurred before init; do not claim zero charge after process launch. Failure/stop/unknown never silently starts a fresh paid turn or clears workspace claims. Optional check:claude-protocol uses no key and a nonexistent UUID, not a real successful session. The exact 2.1.283 hidden --max-turns help exception cannot waive restriction flags or become a blanket version claim.
 
-After this slice, continue 03-04/03-06 project editing/archival via the existing 22-next-delivery plan; do not repeat W1 or block all product development on unavailable live-provider credentials.
+Project name/description editing (03-04) is now implemented; continue 03-06 archive/restore via the existing 22-next-delivery plan. Do not repeat W1 or block product development on unavailable live-provider credentials.
+
+## Project settings
+
+Project metadata edits require current project manage permission before replay and inside the transaction. Strictly accept name/description/expectedRevision; never persist request-scoped access or memberIds. The project update, immutable revision snapshot, project-scoped outbox event and idempotent receipt commit together. Old database migration records only the known snapshot with unknown author/time, not invented history. History and SSE use the parent's current access rules.
+
+Keep the edit baseline fixed while the drawer is open. SSE updates show a comparison without replacing the draft or silently rebasing. Uncertain replies reuse the exact original payload/key when the user confirms; never infer that closing a drawer cancels a sent request. Drafts are drawer-local memory, cleared on close/refresh/identity or space changes and revoked manage access. Project edits do not update tasks, nodes, frozen material or running models. Archive/restore is still the next slice.

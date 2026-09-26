@@ -145,4 +145,18 @@ CREATE UNIQUE INDEX node_continuation_pending_task ON node_continuation_operatio
 CREATE UNIQUE INDEX node_continuation_pending_node ON node_continuation_operations(node_id) WHERE state IN ('waiting_for_stop','preparing');
 `,
   },
+  {
+    version: 9,
+    sql: `
+CREATE TABLE project_revisions (
+ project_id TEXT NOT NULL REFERENCES projects(id), revision INTEGER NOT NULL,
+ name TEXT NOT NULL, description TEXT NOT NULL, actor_id TEXT, actor_name TEXT, saved_at TEXT,
+ PRIMARY KEY(project_id,revision)
+);
+-- Preserve the known snapshot only; older authors, dates and missing revisions are unknown.
+INSERT INTO project_revisions(project_id,revision,name,description)
+ SELECT id,json_extract(body,'$.revision'),json_extract(body,'$.name'),json_extract(body,'$.description') FROM projects;
+ALTER TABLE outbox ADD COLUMN project_id TEXT REFERENCES projects(id);
+`,
+  },
 ];
