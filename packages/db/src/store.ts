@@ -1,3 +1,4 @@
+import { ProjectSettingsStore } from './project-settings.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IdentityUser, Principal } from '../../contracts/src/identity.js';
@@ -48,6 +49,7 @@ export class Store {
   readonly context = new AsyncLocalStorage<Principal>();
   readonly permissions: PermissionService;
   readonly collaboration: CollaborationStore;
+  readonly projectSettings: ProjectSettingsStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -80,6 +82,7 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.permissions = new PermissionService(this.db, () => this.principal());
     this.collaboration = new CollaborationStore(this);
+    this.projectSettings = new ProjectSettingsStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
@@ -158,21 +161,22 @@ export class Store {
       return result;
     });
   }
-  private event(taskId: string | null, kind: string) {
+  private event(taskId: string | null, kind: string, projectId: string | null = null) {
     this.db
-      .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
-      .run(taskId, kind, now(), this.spaceId);
+      .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id,project_id) VALUES(?,?,?,?,?)')
+      .run(taskId, kind, now(), this.spaceId, projectId);
   }
   events(after: number, taskId?: string) {
     if (this.teamMode) this.permissions.space();
     if (taskId) this.getTask(taskId);
     const rows = this.db
       .prepare(
-        'SELECT sequence,task_id AS taskId,kind,created_at AS createdAt,space_id AS spaceId FROM outbox WHERE sequence>? ORDER BY sequence LIMIT 100',
+        'SELECT sequence,task_id AS taskId,kind,created_at AS createdAt,space_id AS spaceId,project_id AS projectId FROM outbox WHERE sequence>? ORDER BY sequence LIMIT 100',
       )
       .all(after) as unknown as {
       sequence: number;
       spaceId: string | null;
+      projectId: string | null;
       taskId: string | null;
       kind: string;
       createdAt: string;
@@ -181,6 +185,13 @@ export class Store {
     const cursor = rows.at(-1)?.sequence ?? after;
     const visible = rows.filter((row) => {
       if (taskId && row.taskId !== taskId) return false;
+      if (row.projectId) {
+        try {
+          this.project(row.projectId);
+        } catch {
+          return false;
+        }
+      }
       if (!row.taskId) return !taskId && (!this.teamMode || row.spaceId === this.spaceId);
       try {
         this.getTask(row.taskId);
@@ -244,7 +255,8 @@ export class Store {
         this.db
           .prepare('INSERT INTO collab_project_members VALUES(?,?,?)')
           .run(item.id, this.actorId, 'manage');
-      this.event(null, 'project.created');
+      this.projectSettings.record(item, this.actorId, this.actorName(), now());
+      this.event(null, 'project.created', item.id);
       return item;
     });
   }
@@ -869,10 +881,12 @@ export class Store {
   }
   private seed() {
     this.transaction(() => {
-      for (const project of demoProjects)
+      for (const project of demoProjects) {
         this.db
           .prepare('INSERT INTO projects VALUES(?,?,?)')
           .run(project.id, SPACE_ID, JSON.stringify(project));
+        this.projectSettings.record(project, null, null, null);
+      }
       for (const task of demoTasks)
         this.db
           .prepare('INSERT INTO tasks VALUES(?,?,?,?)')

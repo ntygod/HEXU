@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ProjectSettings } from './project-settings.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
 import { Avatar, Button, Empty, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, useApp, canEditTask } from './state.js';
@@ -64,7 +65,12 @@ export function ProjectPage({ id }: { id: string }) {
   const [view, setView] = useState('board');
   const [filter, setFilter] = useState('');
   const [creating, setCreating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
+  const manageable = !!project && (data.mode === 'local-preview' || project.access === 'manage');
+  useEffect(() => {
+    if (!manageable) setSettingsOpen(false);
+  }, [manageable]);
   if (!project)
     return (
       <Empty title="项目不存在或当前无权访问">
@@ -95,11 +101,24 @@ export function ProjectPage({ id }: { id: string }) {
           <h1>{project.name}</h1>
           <p>{project.description || '从一项任务开始，逐步明确要完成的工作。'}</p>
         </div>
-        <Button variant="primary" disabled={!editable} onClick={() => setCreating(true)}>
-          <Icon name="plus" />
-          新建任务
-        </Button>
+        <div className="project-settings-actions">
+          <Button
+            disabled={!manageable}
+            title={manageable ? '修改项目基本信息' : '需要项目管理权限'}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Icon name="settings" />
+            项目设置
+          </Button>
+          <Button variant="primary" disabled={!editable} onClick={() => setCreating(true)}>
+            <Icon name="plus" />
+            新建任务
+          </Button>
+        </div>
       </header>
+      {settingsOpen && manageable && (
+        <ProjectSettings project={project} onClose={() => setSettingsOpen(false)} />
+      )}
       {data.mode === 'team-local' && <ProjectAccess project={project} />}
       <div className="work-tabs">
         {[

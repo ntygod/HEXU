@@ -14,10 +14,11 @@
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-03-04：项目配置与归档**，联动 03-03/06、04-06 及节点执行/接续。先做名称/说明的修订式编辑，再做归档与新派发/既有 Operation 的联动；范围以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-03-06：项目归档/恢复**，联动 03-03/04、04-06 及节点执行/接续。名称/说明编辑、修订历史与 W1 设置抽屉已经接入；下一步做归档与新派发/既有 Operation 的联动，范围以 [22](22-next-delivery.md) 为准。
 
 | 工作 | 先查看 |
 | --- | --- |
+| 已交付的项目基本设置 | [设置事务](../../packages/db/src/project-settings.ts)、[严格契约](../../packages/contracts/src/project.ts)、[W1 抽屉](../../apps/web/src/project-settings.tsx)、[回归](../../tests/project-settings.test.ts) |
 | 项目基础和成员管理 | [03 工作包](03-identity-projects.md)、[协作数据](../../packages/db/src/collaboration.ts)、[团队页面](../../apps/web/src/team.tsx)、[项目页面](../../apps/web/src/projects.tsx) |
 | 权限、持久化和事件 | [权限](../../packages/db/src/permissions.ts)、[迁移](../../packages/db/src/schema.ts)、[控制 API](../../apps/control/src/app.ts) |
 | 归档和派发/接续联动 | [节点派发](../../packages/db/src/node-execution.ts)、[节点接续](../../packages/db/src/node-continuations.ts)、[节点执行器](../../apps/runner/src/agent/executor.ts)；归档不等于进程结束 |
