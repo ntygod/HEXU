@@ -1,0 +1,69 @@
+.command-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  padding: 4px var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-bg-app);
+}
+.command-search-field:focus-within {
+  border-color: var(--hx-brand);
+}
+.command-search-field input {
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  outline: none;
+}
+.command-search-field kbd {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-metadata);
+}
+.command-results {
+  margin-top: var(--hx-space-4);
+  max-height: min(420px, 50dvh);
+  overflow: auto;
+}
+.command-results > button {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-2);
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-control);
+  background: transparent;
+  text-align: left;
+}
+.command-results > button:hover,
+.command-results > button:focus-visible {
+  background: var(--hx-surface-hover);
+}
+.command-results > button > div {
+  flex: 1;
+  min-width: 0;
+}
+.command-results strong {
+  display: block;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.command-results small {
+  color: var(--hx-text-secondary);
+}
+.command-results > p {
+  padding: var(--hx-space-3);
+  color: var(--hx-text-secondary);
+}
+@media (max-width: 500px) {
+  .command-results > button {
+    flex-wrap: wrap;
+  }
+  .command-results > button > div {
+    flex-basis: 60%;
+  }
+}

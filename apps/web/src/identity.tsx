@@ -1,3 +1,5 @@
+import { useAppearance } from './appearance.js';
+import './identity.css';
 import { createContext, Fragment, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { IdentityState } from '../../../packages/contracts/src/identity.js';
 import { request, setActiveSpace } from '../../../packages/client/src/index.js';
@@ -122,6 +124,7 @@ export function IdentityGate({ children }: { children: ReactNode }) {
   );
 }
 function AccountEntry() {
+  const { theme, toggleTheme } = useAppearance();
   const { state, refresh, signOut } = useIdentity();
   const joining = location.pathname === '/join',
     token = location.hash.slice(1);
@@ -150,209 +153,222 @@ function AccountEntry() {
         })
         .catch((e) => setError(e.message));
   }, [joining, token]);
-  useEffect(() => {
-    try {
-      document.documentElement.dataset.theme = localStorage.getItem('hexu-theme') ?? 'light';
-    } catch {}
-  }, []);
   const register = setup || (joining && !existing && !state.user);
   return (
-    <main className="account-shell">
-      <section className="account-story">
+    <main className="account-workbench">
+      <header className="account-brandbar">
         <Brand />
-        <div className="account-story-copy">
-          <span className="eyebrow">人和 AI，一起交付</span>
-          <h1>
-            从你开始，
-            <br />
-            让协作有序发生。
-          </h1>
-          <p>保留自己的工作空间，在共同项目里连接讨论、任务和成果。</p>
-          <div className="account-story-cards">
-            <article>
-              <Icon name="folder" />
-              <strong>共同的项目</strong>
-              <span>只分享需要协作的内容</span>
-            </article>
-            <article>
-              <Icon name="people" />
-              <strong>清楚的边界</strong>
-              <span>账号、项目与执行权限各自独立</span>
-            </article>
-          </div>
-        </div>
-        <p className="account-footnote">
-          E2a · 真实账号的本机开发模式
-          <br />
-          不依赖企业 SSO；暂不开放远程访问与宿主机执行。
-        </p>
-      </section>
-      <section className="account-form-panel">
-        <div className="account-form-header">
-          <span className="badge neutral">
-            {setup ? '首次启动' : joining ? '邀请加入' : '账号登录'}
-          </span>
-          <h2>
-            {setup
-              ? '建立你的第一个账号'
-              : joining
-                ? `加入${invitation?.spaceName ?? '团队空间'}`
-                : '欢迎回到合序'}
-          </h2>
-          <p>
-            {setup
-              ? '初始化代码保存在本机数据目录的 setup-code 文件中。'
-              : joining
-                ? '邀请只授予空间成员资格，项目访问需要单独分配。'
-                : '用你的账号继续工作，个人任务仍只对你可见。'}
-          </p>
-        </div>
-        <form
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setBusy(true);
-            setError('');
-            try {
-              if (joining && existing && !state.user) {
-                await request('/identity/sign-in', { method: 'POST', body: { email, password } });
-                await refresh();
-                return;
-              }
-              if (joining) {
-                const result = await request<{ spaceId: string }>('/identity/join', {
-                  method: 'POST',
-                  body: { token, name, password },
-                });
-                await refresh(result.spaceId);
-                home();
-              } else {
-                await request(setup ? '/identity/setup' : '/identity/sign-in', {
-                  method: 'POST',
-                  body: setup ? { name, email, password, code: code.trim() } : { email, password },
-                });
-                await refresh();
-                home();
-              }
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
+        <span>本机账号模式</span>
+        <button
+          className="icon-button"
+          aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
+          onClick={toggleTheme}
         >
-          {state.user ? (
-            <div className="account-current">
-              <strong>{state.user.name}</strong>
-              <p>当前账号：{state.user.email}</p>
-              <Button type="button" onClick={() => void signOut()}>
-                换一个账号
-              </Button>
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+        </button>
+      </header>
+      <div className="account-layout">
+        <aside className="account-context">
+          <span className="eyebrow">你的工作，从这里接着做</span>
+          <h2>
+            一个任务，
+            <br />
+            连接整个过程。
+          </h2>
+          <p>把讨论、工具执行和成果留在一起。先开始自己的工作，需要时再与团队协作。</p>
+          <div className="account-path">
+            <Icon name="chat" />
+            <span>讨论与要求</span>
+            <Icon name="arrow" />
+            <span>工具执行</span>
+            <Icon name="arrow" />
+            <span>代码与成果</span>
+          </div>
+          <dl>
+            <div>
+              <dt>个人工作</dt>
+              <dd>个人任务仅自己可见，加入团队不自动公开。</dd>
             </div>
-          ) : (
-            <>
-              {register && (
-                <label className="field">
-                  你的名字
-                  <input
-                    name="name"
-                    autoComplete="name"
-                    required
-                    maxLength={80}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </label>
-              )}
-              <label className="field">
-                邮箱
-                <input
-                  name="email"
-                  type="email"
-                  autoComplete="username"
-                  required
-                  readOnly={joining}
-                  maxLength={254}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                密码
-                <input
-                  name="password"
-                  aria-label="密码"
-                  aria-describedby="account-password-help"
-                  type="password"
-                  autoComplete={register ? 'new-password' : 'current-password'}
-                  required
-                  minLength={register ? 12 : 1}
-                  maxLength={128}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <small id="account-password-help">
-                  {register
-                    ? '至少 12 个字符；密码由认证组件处理。'
-                    : '输入账号密码，不是模型 API key。'}
-                </small>
-              </label>
-              {setup && (
-                <label className="field">
-                  初始化代码
-                  <input
-                    name="setupCode"
-                    type="password"
-                    autoComplete="off"
-                    required
-                    minLength={32}
-                    maxLength={128}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                  />
-                </label>
-              )}
-            </>
-          )}
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
+            <div>
+              <dt>团队项目</dt>
+              <dd>通过邀请加入，按项目分配查看和编辑权限。</dd>
+            </div>
+            <div>
+              <dt>本机节点</dt>
+              <dd>按需连接目录与工具，代码执行需要独立授权。</dd>
+            </div>
+          </dl>
+        </aside>
+        <section className="account-form-panel">
+          <div className="account-form-header">
+            <span className="badge neutral">
+              {setup ? '首次启动' : joining ? '邀请加入' : '账号登录'}
+            </span>
+            <h2>
+              {setup
+                ? '建立你的第一个账号'
+                : joining
+                  ? `加入${invitation?.spaceName ?? '团队空间'}`
+                  : '欢迎回到合序'}
+            </h2>
+            <p>
+              {setup
+                ? '初始化代码保存在本机数据目录的 setup-code 文件中。'
+                : joining
+                  ? '邀请只授予空间成员资格，项目访问需要单独分配。'
+                  : '用你的账号继续工作，个人任务仍只对你可见。'}
             </p>
-          )}
-          <Button variant="primary" type="submit" busy={busy} disabled={joining && !invitation}>
-            {setup
-              ? '创建账号并开始'
-              : joining
-                ? state.user
-                  ? '接受邀请'
-                  : existing
-                    ? '登录受邀账号'
-                    : '创建账号并加入'
-                : '登录工作台'}
-            <Icon name="arrow-right" />
-          </Button>
-        </form>
-        {joining && !state.user && (
-          <button
-            className="account-text-button"
-            onClick={() => {
-              setExisting(!existing);
+          </div>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
               setError('');
+              try {
+                if (joining && existing && !state.user) {
+                  await request('/identity/sign-in', { method: 'POST', body: { email, password } });
+                  await refresh();
+                  return;
+                }
+                if (joining) {
+                  const result = await request<{ spaceId: string }>('/identity/join', {
+                    method: 'POST',
+                    body: { token, name, password },
+                  });
+                  await refresh(result.spaceId);
+                  home();
+                } else {
+                  await request(setup ? '/identity/setup' : '/identity/sign-in', {
+                    method: 'POST',
+                    body: setup
+                      ? { name, email, password, code: code.trim() }
+                      : { email, password },
+                  });
+                  await refresh();
+                  home();
+                }
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
             }}
           >
-            {existing ? '还没有账号？通过此邀请创建' : '已有账号？先登录再接受邀请'}
-          </button>
-        )}
-        {!joining && !setup && (
-          <p className="account-help">
-            新成员请使用邀请链接创建账号。邮箱找回密码尚未接入，不会显示虚假的“邮件已发送”。
-          </p>
-        )}
-        {joining && (
-          <button className="account-text-button" onClick={home}>
-            返回工作台
-          </button>
-        )}
-      </section>
+            {state.user ? (
+              <div className="account-current">
+                <strong>{state.user.name}</strong>
+                <p>当前账号：{state.user.email}</p>
+                <Button type="button" onClick={() => void signOut()}>
+                  换一个账号
+                </Button>
+              </div>
+            ) : (
+              <>
+                {register && (
+                  <label className="field">
+                    你的名字
+                    <input
+                      name="name"
+                      autoComplete="name"
+                      required
+                      maxLength={80}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </label>
+                )}
+                <label className="field">
+                  邮箱
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="username"
+                    required
+                    readOnly={joining}
+                    maxLength={254}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  密码
+                  <input
+                    name="password"
+                    aria-label="密码"
+                    aria-describedby="account-password-help"
+                    type="password"
+                    autoComplete={register ? 'new-password' : 'current-password'}
+                    required
+                    minLength={register ? 12 : 1}
+                    maxLength={128}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <small id="account-password-help">
+                    {register
+                      ? '至少 12 个字符；密码由认证组件处理。'
+                      : '输入账号密码，不是模型 API key。'}
+                  </small>
+                </label>
+                {setup && (
+                  <label className="field">
+                    初始化代码
+                    <input
+                      name="setupCode"
+                      type="password"
+                      autoComplete="off"
+                      required
+                      minLength={32}
+                      maxLength={128}
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                    />
+                  </label>
+                )}
+              </>
+            )}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            <Button variant="primary" type="submit" busy={busy} disabled={joining && !invitation}>
+              {setup
+                ? '创建账号并开始'
+                : joining
+                  ? state.user
+                    ? '接受邀请'
+                    : existing
+                      ? '登录受邀账号'
+                      : '创建账号并加入'
+                  : '登录工作台'}
+              <Icon name="arrow" />
+            </Button>
+          </form>
+          {joining && !state.user && (
+            <button
+              className="account-text-button"
+              onClick={() => {
+                setExisting(!existing);
+                setError('');
+              }}
+            >
+              {existing ? '还没有账号？通过此邀请创建' : '已有账号？先登录再接受邀请'}
+            </button>
+          )}
+          {!joining && !setup && (
+            <p className="account-help">新成员请通过邀请链接创建账号。当前暂不支持邮箱找回密码。</p>
+          )}
+          {joining && (
+            <button className="account-text-button" onClick={home}>
+              返回工作台
+            </button>
+          )}
+        </section>
+      </div>
+      <footer className="account-footer">
+        HEXU · 合序 <span>个人与团队，都从一项任务开始</span>
+      </footer>
     </main>
   );
 }
@@ -362,8 +378,8 @@ export function SpaceSwitcher() {
     return (
       <div className="space-switch">
         <span className="space-grid">▦</span>
-        <strong>合序团队</strong>
-        <span className="space-demo">本地</span>
+        <strong>本地预览</strong>
+        <span className="space-demo">示例</span>
       </div>
     );
   return (

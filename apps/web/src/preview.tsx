@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, Icon } from '../../../packages/ui/src/index.js';
+import './preview.css';
 const orders = [
   { id: 'OD-0925-103', name: '演示客户 A', amount: 1280, status: 'paid', month: '2026-09' },
   { id: 'OD-0925-104', name: '演示客户 B', amount: 468, status: 'paid', month: '2026-09' },

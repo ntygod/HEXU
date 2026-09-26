@@ -1,0 +1,98 @@
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+  margin-bottom: var(--hx-space-5);
+}
+.message:last-child {
+  margin-bottom: 4px;
+}
+.message-content {
+  flex: 1;
+  min-width: 0;
+}
+.message-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  font-size: var(--hx-font-secondary);
+}
+.message-meta time {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-metadata);
+}
+.message p {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-primary);
+  line-height: var(--hx-line-height-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message > .toolmark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  font-size: 22px;
+}
+.composer-wrap {
+  padding: var(--hx-space-3);
+  margin-top: auto;
+}
+.composer {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-bg-app);
+}
+.composer:focus-within {
+  border-color: var(--hx-brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hx-brand) 20%, transparent);
+}
+.composer textarea {
+  width: 100%;
+  min-height: 74px;
+  max-height: 220px;
+  resize: vertical;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: var(--hx-font-body);
+  line-height: 1.6;
+}
+.composer textarea:focus-visible {
+  outline: none;
+}
+.composer > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-2);
+}
+.composer > div > span {
+  font-size: var(--hx-font-metadata);
+  color: var(--hx-text-secondary);
+}
+.composer .button {
+  padding: 0;
+  width: var(--hx-control-height);
+}
+.context-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-2);
+  margin-bottom: var(--hx-space-2);
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-pending-soft);
+  color: var(--hx-pending-text);
+  font-size: var(--hx-font-secondary);
+}
+.context-banner button {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: inherit;
+}

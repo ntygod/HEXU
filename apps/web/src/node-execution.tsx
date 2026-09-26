@@ -1,3 +1,4 @@
+import './execution.css';
 import {
   nodeContinuationContext,
   type NextInput,
@@ -8,7 +9,7 @@ import type { Run, Task } from '../../../packages/contracts/src/index.js';
 import type { NodeExecutionOption } from '../../../packages/contracts/src/node-execution.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon, RunBadge, ToolMark } from '../../../packages/ui/src/index.js';
-import { useApp } from './state.js';
+import { useApp, useTaskDraft } from './state.js';
 
 export function NodeRunPanel({
   task,
@@ -26,8 +27,8 @@ export function NodeRunPanel({
   const [nodeId, setNode] = useState(''),
     [workspaceId, setWorkspace] = useState(''),
     [mode, setMode] = useState<'read-only' | 'edit'>('read-only');
-  const [prompt, setPrompt] = useState(''),
-    [busy, setBusy] = useState(false);
+  const [prompt, setPrompt] = useTaskDraft(task.id, `node-run:${source?.id ?? 'new'}`);
+  const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState({ scope: '', approved: false });
   const [sessionMode, setSessionMode] = useState<'new' | 'resume'>('new');
   const [loadedSessionMode, setLoadedSessionMode] = useState<'new' | 'resume'>('new');
@@ -167,6 +168,7 @@ export function NodeRunPanel({
                 },
               },
             );
+            setPrompt('');
             await refresh();
             notice(
               source
@@ -227,188 +229,201 @@ export function NodeRunPanel({
             <code>npm run runner -- enable-execution --config /path/execution.json</code>
           </div>
         ) : null}
-        <label className="field">
-          执行节点
-          <select
-            aria-label="执行节点"
-            required
-            value={nodeId}
-            disabled={busy || !!source}
-            onChange={(e) => {
-              setNode(e.target.value);
-              setWorkspace('');
-              setMode('read-only');
-              setConsent(false);
-            }}
-          >
-            <option value="">选择我的节点</option>
-            {options.map((n) => (
-              <option key={n.nodeId} value={n.nodeId} disabled={!n.available}>
-                {n.name} · {n.policy.tool === 'codex' ? 'Codex' : 'Claude Code'}
-                {n.available ? '' : ' · 暂不可用'}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selected && (
-          <>
-            <div className="node-policy-summary">
-              <ToolMark tool={selected.policy.tool} />
-              <div>
-                <strong>
-                  {selected.policy.tool === 'codex' ? 'Codex' : 'Claude Code'} · 本机 API 账户
-                </strong>
-                <p>{selected.reason}</p>
-                <small>
-                  {selected.policy.timeoutSeconds} 秒上限 ·{' '}
-                  {selected.policy.maxBudgetUsd === null
-                    ? '不支持美元硬预算'
-                    : `预算参数 USD ${selected.policy.maxBudgetUsd}`}{' '}
-                  · {selected.policy.model ?? '工具默认模型'}
-                </small>
-              </div>
-            </div>
-            <label className="field">
-              授权工作目录
-              <select
-                aria-label="授权工作目录"
-                required
-                value={workspaceId}
-                disabled={busy || !!source}
-                onChange={(e) => setWorkspace(e.target.value)}
-              >
-                <option value="">选择已授权目录</option>
-                {selected.workspaces.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              本次执行模式
-              <select
-                aria-label="本次执行模式"
-                value={mode}
-                disabled={busy}
-                onChange={(e) => setMode(e.target.value as typeof mode)}
-              >
-                <option value="read-only">只读分析</option>
-                {selected.policy.mode === 'edit' && (
-                  <option value="edit">修改授权目录内的文件</option>
-                )}
-              </select>
-            </label>
-          </>
-        )}
-        {source && (
-          <section className="native-session-choice" aria-label="原生会话选择">
-            <label className="field">
-              接续会话方式
-              <select
-                aria-label="接续会话方式"
-                value={sessionMode}
-                disabled={busy}
-                onChange={(e) => {
-                  setSessionMode(e.target.value as 'new' | 'resume');
-                  setConsent(false);
-                  if (e.target.value === 'resume' && source.node) setMode(source.node.mode);
-                }}
-              >
-                <option value="new">新会话 · 只带入本次材料</option>
-                <option value="resume" disabled={!continuation?.nativeSession?.available}>
-                  恢复 Codex 原生会话（实验性）
-                </option>
-              </select>
-            </label>
-            <p>{continuation?.nativeSession?.reason ?? '正在读取会话状态'}</p>
-            {sessionMode === 'resume' && (
-              <div className="notice-box">
-                <p>
-                  原生历史只保存在节点，将由 Codex
-                  重新读取。模型会看到原会话历史，不能通过本次取消勾选来删除历史材料。
-                  下方预览仅是新增文本，不是完整历史。仅在原执行成功结束、同一账户/工具/模式下恢复；失败不自动新建或重试。
-                </p>
-              </div>
-            )}
-            {resumeBlocked && (
-              <p className="form-error" role="status">
-                会话状态或模式不满足恢复条件，请恢复原模式或明确选择新会话。
-              </p>
-            )}
-          </section>
-        )}
-        {source && sessionMode === 'new' && (
+        <fieldset className="execution-section" disabled={busy}>
+          <legend>工具配置与目录</legend>
           <label className="field">
-            原执行处理方式
+            执行节点
             <select
-              aria-label="原执行处理方式"
-              value={onActiveRun}
-              disabled={busy}
-              onChange={(e) => setOnActiveRun(e.target.value as 'wait' | 'request_stop')}
+              aria-label="执行节点"
+              required
+              value={nodeId}
+              disabled={busy || !!source}
+              onChange={(e) => {
+                setNode(e.target.value);
+                setWorkspace('');
+                setMode('read-only');
+                setConsent(false);
+              }}
             >
-              <option value="wait">等待原执行自然结束后继续</option>
-              <option value="request_stop">请求停止原执行后继续</option>
-            </select>
-            <small>确认后保存接续安排。页面关闭不取消；取消安排不会撤销已发出的停止请求。</small>
-          </label>
-        )}
-        {source && (
-          <fieldset className="node-input-selection">
-            <legend>选择本次带入的要求（不会自动全选）</legend>
-            {notes.filter((n) => n.state === 'queued' || chosen.includes(n.id)).length === 0 && (
-              <p className="muted">没有待选择要求，也可以直接填写本次要求。</p>
-            )}
-            {notes
-              .filter((n) => n.state === 'queued' || chosen.includes(n.id))
-              .map((n) => (
-                <label key={n.id} className="check-field">
-                  <input
-                    type="checkbox"
-                    aria-label={`带入：${n.body}`}
-                    disabled={busy || (n.state !== 'queued' && !chosen.includes(n.id))}
-                    checked={chosen.includes(n.id)}
-                    onChange={(e) => {
-                      setConsent(false);
-                      setChosen(
-                        e.target.checked ? [...chosen, n.id] : chosen.filter((id) => id !== n.id),
-                      );
-                    }}
-                  />
-                  <span>
-                    <strong>{n.authorName}</strong>
-                    <p>{n.body}</p>
-                    {n.state !== 'queued' && <small>此要求状态已变化，请取消选择</small>}
-                  </span>
-                </label>
+              <option value="">选择我的节点</option>
+              {options.map((n) => (
+                <option key={n.nodeId} value={n.nodeId} disabled={!n.available}>
+                  {n.name} · {n.policy.tool === 'codex' ? 'Codex' : 'Claude Code'}
+                  {n.available ? '' : ' · 暂不可用'}
+                </option>
               ))}
+            </select>
+          </label>
+          {selected && (
+            <>
+              <div className="node-policy-summary">
+                <ToolMark tool={selected.policy.tool} />
+                <div>
+                  <strong>
+                    {selected.policy.tool === 'codex' ? 'Codex' : 'Claude Code'} · 本机 API 账户
+                  </strong>
+                  <p>{selected.reason}</p>
+                  <small>
+                    {selected.policy.timeoutSeconds} 秒上限 ·{' '}
+                    {selected.policy.maxBudgetUsd === null
+                      ? '不支持美元硬预算'
+                      : `预算参数 USD ${selected.policy.maxBudgetUsd}`}{' '}
+                    · {selected.policy.model ?? '工具默认模型'}
+                  </small>
+                </div>
+              </div>
+              <label className="field">
+                授权工作目录
+                <select
+                  aria-label="授权工作目录"
+                  required
+                  value={workspaceId}
+                  disabled={busy || !!source}
+                  onChange={(e) => setWorkspace(e.target.value)}
+                >
+                  <option value="">选择已授权目录</option>
+                  {selected.workspaces.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                本次执行模式
+                <select
+                  aria-label="本次执行模式"
+                  value={mode}
+                  disabled={busy}
+                  onChange={(e) => setMode(e.target.value as typeof mode)}
+                >
+                  <option value="read-only">只读分析</option>
+                  {selected.policy.mode === 'edit' && (
+                    <option value="edit">修改授权目录内的文件</option>
+                  )}
+                </select>
+              </label>
+            </>
+          )}
+        </fieldset>
+        {source && (
+          <fieldset className="execution-section" disabled={busy}>
+            <legend>接续与会话方式</legend>
+            {source && (
+              <section className="native-session-choice" aria-label="原生会话选择">
+                <label className="field">
+                  接续会话方式
+                  <select
+                    aria-label="接续会话方式"
+                    value={sessionMode}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setSessionMode(e.target.value as 'new' | 'resume');
+                      setConsent(false);
+                      if (e.target.value === 'resume' && source.node) setMode(source.node.mode);
+                    }}
+                  >
+                    <option value="new">新会话 · 只带入本次材料</option>
+                    <option value="resume" disabled={!continuation?.nativeSession?.available}>
+                      恢复 Codex 原生会话（实验性）
+                    </option>
+                  </select>
+                </label>
+                <p>{continuation?.nativeSession?.reason ?? '正在读取会话状态'}</p>
+                {sessionMode === 'resume' && (
+                  <div className="notice-box">
+                    <p>
+                      原生历史只保存在节点，将由 Codex
+                      重新读取。模型会看到原会话历史，不能通过本次取消勾选来删除历史材料。
+                      下方预览仅是新增文本，不是完整历史。仅在原执行成功结束、同一账户/工具/模式下恢复；失败不自动新建或重试。
+                    </p>
+                  </div>
+                )}
+                {resumeBlocked && (
+                  <p className="form-error" role="status">
+                    会话状态或模式不满足恢复条件，请恢复原模式或明确选择新会话。
+                  </p>
+                )}
+              </section>
+            )}
+            {source && sessionMode === 'new' && (
+              <label className="field">
+                原执行处理方式
+                <select
+                  aria-label="原执行处理方式"
+                  value={onActiveRun}
+                  disabled={busy}
+                  onChange={(e) => setOnActiveRun(e.target.value as 'wait' | 'request_stop')}
+                >
+                  <option value="wait">等待原执行自然结束后继续</option>
+                  <option value="request_stop">请求停止原执行后继续</option>
+                </select>
+                <small>
+                  确认后保存接续安排。页面关闭不取消；取消安排不会撤销已发出的停止请求。
+                </small>
+              </label>
+            )}
           </fieldset>
         )}
-        <label className="field">
-          本次要求
-          <textarea
-            aria-label="本次要求"
-            required
-            maxLength={6000}
-            rows={5}
-            value={prompt}
-            disabled={busy}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="描述要完成的工作或需要分析的问题"
-          />
-        </label>
-        <details className="node-context-preview">
-          <summary>查看本次发送的任务材料</summary>
-          <pre>{source ? fullContext : context}</pre>
-          <p>
-            {source
-              ? sessionMode === 'resume'
-                ? '上方仅为本轮新增文本，Codex 另会读取节点保留的原生历史。恢复不保证代码回到历史状态，不自动删除历史材料。'
-                : '上方为本次保存并发送的完整文本。等待期间新模型输出不自动加入；原目录的实际文件会保留。要求被编辑或撤回将暂停安排，没有隐藏会话或 diff 迁移。'
-              : '本次要求会一并发送。没有跨工具历史迁移；节点按授权读取目录。'}
-            排队期间人工讨论或任务说明变化会阻止启动，新保存的下一轮要求不会悄悄加入当前派发。
-          </p>
-        </details>
+        <fieldset className="execution-section" disabled={busy}>
+          <legend>本次要求与材料</legend>
+          {source && (
+            <fieldset className="node-input-selection">
+              <legend>选择本次带入的要求（不会自动全选）</legend>
+              {notes.filter((n) => n.state === 'queued' || chosen.includes(n.id)).length === 0 && (
+                <p className="muted">没有待选择要求，也可以直接填写本次要求。</p>
+              )}
+              {notes
+                .filter((n) => n.state === 'queued' || chosen.includes(n.id))
+                .map((n) => (
+                  <label key={n.id} className="check-field">
+                    <input
+                      type="checkbox"
+                      aria-label={`带入：${n.body}`}
+                      disabled={busy || (n.state !== 'queued' && !chosen.includes(n.id))}
+                      checked={chosen.includes(n.id)}
+                      onChange={(e) => {
+                        setConsent(false);
+                        setChosen(
+                          e.target.checked ? [...chosen, n.id] : chosen.filter((id) => id !== n.id),
+                        );
+                      }}
+                    />
+                    <span>
+                      <strong>{n.authorName}</strong>
+                      <p>{n.body}</p>
+                      {n.state !== 'queued' && <small>此要求状态已变化，请取消选择</small>}
+                    </span>
+                  </label>
+                ))}
+            </fieldset>
+          )}
+          <label className="field">
+            本次要求
+            <textarea
+              aria-label="本次要求"
+              required
+              maxLength={6000}
+              rows={5}
+              value={prompt}
+              disabled={busy}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="描述要完成的工作或需要分析的问题"
+            />
+          </label>
+          <details className="node-context-preview">
+            <summary>查看本次发送的任务材料</summary>
+            <pre>{source ? fullContext : context}</pre>
+            <p>
+              {source
+                ? sessionMode === 'resume'
+                  ? '上方仅为本轮新增文本，Codex 另会读取节点保留的原生历史。恢复不保证代码回到历史状态，不自动删除历史材料。'
+                  : '上方为本次保存并发送的完整文本。等待期间新模型输出不自动加入；原目录的实际文件会保留。要求被编辑或撤回将暂停安排，没有隐藏会话或 diff 迁移。'
+                : '本次要求会一并发送。没有跨工具历史迁移；节点按授权读取目录。'}
+              排队期间人工讨论或任务说明变化会阻止启动，新保存的下一轮要求不会悄悄加入当前派发。
+            </p>
+          </details>
+        </fieldset>
         <label className="check-field">
           <input
             type="checkbox"
