@@ -84,6 +84,9 @@ test('两页改派冲突不自动覆盖选择，明确核对后保存，原任�
     await mkdir('artifacts', { recursive: true });
     await page.screenshot({ path: 'artifacts/47-task-assignment-conflict.png', fullPage: true });
     await page.getByRole('button', { name: '保留选择，基于最新修订', exact: true }).click();
+    await expect(drawer(page)).toBeVisible();
+    await expect(owner(other)).toContainText('周悦');
+    await expect(save(page)).toBeEnabled();
     await save(page).click();
     await expect(owner(other)).toContainText('陈一');
     await expect(page.getByLabel('任务评论', { exact: true })).toHaveValue('未发送的讨论仍然保留');
@@ -137,13 +140,17 @@ test('改派回执丢失时复用原请求确认，不重复历史；历史读�
     { times: 1 },
   );
   await open(page);
+  await page.getByLabel('新的负责人', { exact: true }).selectOption('user-demo-zhou');
   await page.getByRole('button', { name: '改派记录', exact: true }).click();
   await expect(drawer(page)).toContainText('测试中的历史读取失败');
   await page.getByRole('button', { name: '重试改派记录', exact: true }).click();
   await expect(page.getByLabel('负责人变更历史', { exact: true }).locator('article')).toHaveCount(
     1,
   );
+  await expect(drawer(page)).toBeVisible();
+  await expect(page.getByLabel('新的负责人', { exact: true })).toHaveValue('user-demo-zhou');
   await page.keyboard.press('Escape');
+  await expect(owner(page)).toContainText('陈一');
   const response = await page.request.post('/api/v1/spaces/space-demo/tasks', {
     headers: headers(),
     data: { title: '我的私有任务', projectId: null },
