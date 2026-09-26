@@ -152,7 +152,7 @@ export function App() {
             <span className="preview-label">
               <span className={`connection-dot ${connected ? 'online' : ''}`} />
               {data.mode === 'team-local'
-                ? '本机团队模式 · 节点仅同步状态'
+                ? '本机团队模式 · 本人授权节点执行'
                 : '本地开发预览 · 执行模式明确标识'}
             </span>
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
@@ -198,7 +198,9 @@ export function App() {
         <footer className="app-footer">
           <span>HEXU · 让人和 AI，一起交付。</span>
           <span>
-            {data.mode === 'team-local' ? 'E2b1 · 真实账号 / 节点状态' : '开发预览 E2b1 · 示例数据'}
+            {data.mode === 'team-local'
+              ? 'E2b2 · 真实账号 / 本人节点执行'
+              : '开发预览 E2b2 · 示例数据'}
           </span>
         </footer>
       </div>
@@ -1282,7 +1284,7 @@ function Settings({ theme, onTheme }: { theme: string; onTheme: () => void }) {
           <h1>资源与设置</h1>
           <p>明确工具、模型与执行位置，不把不同能力混在一起。</p>
         </div>
-        <span className="badge neutral">E2b1 · 本机预览</span>
+        <span className="badge neutral">E2b2 · 本机预览</span>
       </div>
       <div className="notice-box">
         <Icon name="monitor" />

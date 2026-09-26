@@ -216,6 +216,7 @@ test('节点运行中停止确认，手机深色页面不把关闭或离线当�
       true,
     );
     await mkdir('artifacts', { recursive: true });
+    await expect(page.locator('.toast')).not.toBeVisible();
     await page.screenshot({ path: 'artifacts/25-node-execution-mobile-dark.png', fullPage: true });
     await page.getByRole('button', { name: '停止节点执行', exact: true }).click();
     await expect
