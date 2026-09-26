@@ -646,6 +646,11 @@ for (const tool of ['codex', 'claude-code'] as const) {
         timeout: 15000,
       });
       await way.selectOption('resume');
+      const historyNotice = page.locator('.native-session-choice .notice-box');
+      await expect(historyNotice).toContainText(`将由 ${toolName} 重新读取`);
+      await expect(historyNotice).not.toContainText(
+        `将由 ${tool === 'codex' ? 'Claude Code' : 'Codex'} 重新读取`,
+      );
       await expect(
         page.getByText('下方预览仅是新增文本，不是完整历史。', { exact: false }),
       ).toBeVisible();

@@ -337,7 +337,8 @@ export function NodeRunPanel({
                 {sessionMode === 'resume' && (
                   <div className="notice-box">
                     <p>
-                      原生历史只保存在节点，将由 Codex
+                      原生历史只保存在节点，将由{' '}
+                      {source.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'}{' '}
                       重新读取。模型会看到原会话历史，不能通过本次取消勾选来删除历史材料。
                       下方预览仅是新增文本，不是完整历史。仅在原执行成功结束、同一账户/工具/模式下恢复；失败不自动新建或重试。
                     </p>
