@@ -1,0 +1,108 @@
+name: Development Claude session delivery
+on:
+  push:
+    branches: [codex/claude-session-mapping]
+    paths: [.github/workflows/dev-apply-claude.yml]
+permissions:
+  contents: write
+jobs:
+  delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Apply checksum-bound source patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD^)" = 93c814ff1dfa35c03ac9c430b4d3584a7e75554d
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, urllib.request
+          shas = ['a028169733bd63189665838b2917664187228687', 'c02206c02cc0d7e7e94d9af552d516ef67d79d15', '1b9c0a6ff7d0efdf0a902c06ba614c9be0f7a388', '33175a45cf5531c72f0aef7957fa9a81eb567223', 'd86b8a9029af48587563bdfc361423658f625797']
+          chunks = []
+          for sha in shas:
+              request = urllib.request.Request('https://api.github.com/repos/ntygod/HEXU/git/blobs/' + sha, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  payload = json.load(response)
+              data = base64.b64decode(payload['content'])
+              assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == sha
+              chunks.append(data)
+          patch = lzma.decompress(b''.join(chunks))
+          assert hashlib.sha256(patch).hexdigest() == 'f4c8bf7d9c03e13de433f5133f9588c15e433e64fd3b789286fda3477b2ded44'
+          pathlib.Path('/tmp/hexu-claude.patch').write_bytes(patch)
+          PY
+          git apply --check --index --unidiff-zero /tmp/hexu-claude.patch
+          git apply --index --unidiff-zero /tmp/hexu-claude.patch
+          git diff --cached --check
+          test "$(git diff --cached --name-only | wc -l)" -eq 25
+          git config user.name 'HEXU Development'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: add explicit retained Claude Code sessions (HX-DEV-08-03)'
+          git rev-parse HEAD > /tmp/hexu-checked-sha.txt
+          rm .github/workflows/dev-snapshot.yml .github/workflows/dev-claude-probe.yml .github/workflows/dev-apply-claude.yml
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - name: Typecheck, engineering regression and build
+        run: npm run check | tee /tmp/hexu-engineering.log
+      - run: npx playwright install --with-deps chromium
+      - name: Browser regression without retries
+        run: npm run test:e2e | tee /tmp/hexu-browser.log
+      - name: Official pinned no-model compatibility
+        run: |
+          mkdir -p /tmp/hexu-official-claude
+          curl --fail --location --retry 2 https://github.com/anthropics/claude-code/releases/download/v2.1.283/claude-linux-x64.tar.gz -o /tmp/hexu-official-claude.tgz
+          echo 'db404a91bec8baffb53463166fdc8bf579208a527d60afc2d984d7507dc0c2f9  /tmp/hexu-official-claude.tgz' | sha256sum --check
+          tar -xzf /tmp/hexu-official-claude.tgz -C /tmp/hexu-official-claude
+          BIN=$(find /tmp/hexu-official-claude -type f -name claude | head -1)
+          test -n "$BIN"
+          chmod +x "$BIN"
+          npm run check:claude-protocol -- "$BIN" | tee /tmp/hexu-official-claude.log
+      - name: Record only observed successful checks and fast-forward development branch
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          engineering = pathlib.Path('/tmp/hexu-engineering.log').read_text()
+          browser = pathlib.Path('/tmp/hexu-browser.log').read_text()
+          assert re.search(r'(?:ℹ |# )tests 184\b', engineering)
+          assert re.search(r'(?:ℹ |# )pass 184\b', engineering)
+          assert re.search(r'(?:ℹ |# )fail 0\b', engineering)
+          assert '37 passed' in browser
+          sha = pathlib.Path('/tmp/hexu-checked-sha.txt').read_text().strip()
+          url = os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY'] + '/actions/runs/' + os.environ['GITHUB_RUN_ID']
+          p = pathlib.Path('docs/development/21-implementation-status.md')
+          text = p.read_text()
+          record = f'### E2c2 完整 Linux 开发检查\n\n[开发检查 {os.environ["GITHUB_RUN_ID"]}]({url}) 已通过；实际被检查的功能源码提交为 `{sha}`，不是触发工作流的临时传输提交。Node 24 全新锁文件安装、格式、双端类型与生产构建通过；**184 条工程测试、37 条 Chromium 浏览器流程全部通过**，无失败、跳过或重试。新增 2 条 Claude 浏览器流程实际启动独立节点 CLI，覆盖授权保留、节点重启后的显式恢复、清理后明确拒绝和用户主动新开会话；原有 35 条流程保留。\n\n同一检查还下载并校验官方 Claude Code 2.1.283 固定资产，执行 `check:claude-protocol` 通过；仍仅验证无模型的参数/缺失会话拒绝，不是有效账户生成或成功历史恢复。临时传输工作流仅用于此开发分支，合并前移除，正常 CI 保持只读。\n\n'
+          assert '\n## E2c1 历史工程记录\n' in text
+          p.write_text(text.replace('\n## E2c1 历史工程记录\n', '\n' + record + '## E2c1 历史工程记录\n', 1))
+          PY
+          npx prettier --write docs/development/21-implementation-status.md
+          git add docs/development/21-implementation-status.md
+          git diff --cached --check
+          git commit -m 'docs: record observed E2c2 Linux and official no-model checks'
+          git restore --worktree .github/workflows/dev-snapshot.yml .github/workflows/dev-claude-probe.yml .github/workflows/dev-apply-claude.yml
+          git diff --exit-code
+          test "$(git ls-remote origin refs/heads/codex/claude-session-mapping | cut -f1)" = "$GITHUB_SHA"
+          git push origin HEAD:refs/heads/codex/claude-session-mapping
+      - name: Archive tracked implementation for exact source comparison
+        if: always()
+        run: git archive HEAD | gzip > /tmp/hexu-claude-checked-source.tgz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-claude-delivery-results
+          path: |
+            /tmp/hexu-checked-sha.txt
+            /tmp/hexu-claude-checked-source.tgz
+            /tmp/hexu-engineering.log
+            /tmp/hexu-browser.log
+            /tmp/hexu-official-claude.log
+            playwright-report/
+            test-results/
+            artifacts/
+          retention-days: 7
