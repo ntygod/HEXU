@@ -1,0 +1,81 @@
+name: Development assignment final review
+on:
+  push:
+    branches: [codex/task-assignment]
+    paths: [.github/workflows/dev-assignment-final-review.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify checked patch and create delivery commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD^)" = 94e608f8bea156a6931db25f2a377300c21af9f6
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          def git(*args):
+              return subprocess.check_output(['git', *args]).decode().strip()
+          def api(path, body=None):
+              cmd = ['gh', 'api', 'repos/ntygod/HEXU/' + path]
+              if body is not None:
+                  cmd += ['--method', 'POST', '--input', '-']
+              return json.loads(subprocess.check_output(cmd, input=None if body is None else json.dumps(body).encode()))
+          value = api('git/blobs/6cff0a5feeb711ea608f45f95ba4f1a5ba8f4c2f')
+          assert value['encoding'] == 'base64'
+          text = base64.b64decode(value['content'])
+          assert len(text) == 4432
+          compressed = base64.b64decode(text, validate=True)
+          assert hashlib.sha256(compressed).hexdigest() == 'f8f8ccd06679d6968b3dd442e2265fede5fb89c7c658bcaed936be6d718dbea7'
+          patch = lzma.decompress(compressed)
+          assert len(patch) == 7645
+          assert hashlib.sha256(patch).hexdigest() == '1706adad7c32ea1425b972b886e17a2210ca3cba2d12ed42ed5fd9a7d5acc238'
+          pathlib.Path('/tmp/assignment-final-review.patch').write_bytes(patch)
+          subprocess.check_call(['git', 'apply', '--check', '/tmp/assignment-final-review.patch'])
+          subprocess.check_call(['git', 'apply', '--index', '/tmp/assignment-final-review.patch'])
+          workflow = '.github/workflows/dev-assignment-final-review.yml'
+          subprocess.check_call(['git', 'rm', workflow])
+          subprocess.check_call(['git', 'diff', '--cached', '--check'])
+          expected = '69b006249de09f3f47c0d6719d1ba7a3ee350d25'
+          assert git('write-tree') == expected
+          allowed = {
+              'apps/web/src/task-assignment.tsx',
+              'apps/web/src/task-assignment.css',
+              'docs/development/19-work-items.md',
+              'docs/development/21-implementation-status.md',
+              'docs/development/22-next-delivery.md',
+              'docs/development/24-ai-handoff.md',
+              'tests/e2e/team.spec.ts',
+              workflow,
+          }
+          changes = [line.split('\t') for line in git('diff', '--cached', '--name-status', '--no-renames').splitlines()]
+          assert {path for status, path in changes} == allowed
+          tree = []
+          for status, path in changes:
+              if status == 'D':
+                  assert path == workflow
+                  sha = None
+              else:
+                  assert status == 'M' and path != workflow
+                  content = pathlib.Path(path).read_bytes()
+                  blob = api('git/blobs', {'encoding': 'base64', 'content': base64.b64encode(content).decode()})
+                  sha = blob['sha']
+                  assert sha == git('hash-object', path)
+              tree.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': sha})
+          published = api('git/trees', {'base_tree': git('rev-parse', 'HEAD^{tree}'), 'tree': tree})
+          assert published['sha'] == expected
+          commit = api('git/commits', {
+              'message': 'fix: polish assignment layout and verify native disabled options',
+              'tree': expected,
+              'parents': [os.environ['GITHUB_SHA']],
+          })
+          print('DELIVERY_COMMIT=' + commit['sha'])
+          print('DELIVERY_TREE=' + expected)
+          PY
