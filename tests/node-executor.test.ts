@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
-import { mkdir, mkdtemp, chmod, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, chmod, writeFile, readFile, rm, symlink } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -21,7 +21,7 @@ import type { NodeExecutionOption } from '../packages/contracts/src/node-executi
 import type { Run } from '../packages/contracts/src/index.js';
 const pause = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const fakeKey = 'sk-ant-node-protocol-fixture-not-a-real-key';
-async function fixture(tool: 'claude-code' | 'codex' = 'claude-code') {
+async function fixture(tool: 'claude-code' | 'codex' = 'claude-code', retainSessions = false) {
   const f = await teamFixture(),
     { alice, bob } = await f.pair(),
     project = await f.project(alice),
@@ -93,6 +93,7 @@ async function fixture(tool: 'claude-code' | 'codex' = 'claude-code') {
       workspaces: ['测试工作副本'],
       timeoutSeconds: 30,
       maxBudgetUsd: tool === 'codex' ? null : 1,
+      ...(retainSessions ? { retainSessions: true } : {}),
     }),
   );
   const policy = await configureExecution(
@@ -664,5 +665,237 @@ test('节点等待期间要求编辑在实际 API 中暂停安排，不发送修
     assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
   } finally {
     await f.close();
+  }
+});
+
+async function completedCodex(f: Awaited<ReturnType<typeof fixture>>) {
+  const { run } = await f.create('CODEX_WRITE');
+  const done = await f.until(
+    () => f.getRun(run.id),
+    (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+  );
+  assert.equal(done.state, 'succeeded', JSON.stringify(done));
+  assert.ok(done.node?.nativeSession, JSON.stringify(done));
+  return done;
+}
+async function resumeBody(f: Awaited<ReturnType<typeof fixture>>, source: Run) {
+  const preview = (
+    await f.call(`tasks/${f.task.id}/node-continuation-preview?sourceRunId=${source.id}`, f.alice)
+  ).json();
+  assert.equal(preview.nativeSession.available, true);
+  return {
+    provider: 'node',
+    nodeId: f.pair.nodeId,
+    workingCopyId: f.directories[0]!.id,
+    policyHash: f.option.policyHash,
+    mode: 'edit',
+    prompt: 'SESSION_RECALL',
+    expectedRevision: preview.taskRevision,
+    confirmExecution: true,
+    sessionMode: 'resume',
+    continuation: { sourceRunId: source.id, expectedContextHash: preview.contextHash, inputs: [] },
+  };
+}
+
+test('Codex 私有会话跨实际进程重启恢复：真实 thread/read + thread/resume，历史不上传且不同于新会话', async () => {
+  const f = await fixture('codex', true);
+  try {
+    const source = await completedCodex(f);
+    const ref = source.node!.nativeSession!.ref;
+    const vault = join(f.home, 'codex-sessions', ref);
+    const initial = JSON.parse(await readFile(join(vault, 'fixture-provider-state.json'), 'utf8'));
+    assert.ok(initial.threadId && initial.memory);
+    await f.restart();
+    const body = await resumeBody(f, source),
+      key = randomUUID();
+    const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key);
+    assert.equal(posted.statusCode, 201, posted.body);
+    const next = await f.until(
+      () => f.getRun(posted.json().id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(next.state, 'succeeded', JSON.stringify(next));
+    assert.equal(next.node?.nativeSession?.ref, ref);
+    assert.equal(next.node?.nativeSession?.action, 'resumed');
+    assert.equal(next.previousRunId, source.id);
+    assert.equal(
+      await readFile(join(vault, 'fixture-resume-methods.txt'), 'utf8'),
+      'thread/read\nthread/resume\n',
+    );
+    const detail = (await f.call(`tasks/${f.task.id}`, f.bob)).json();
+    assert.ok(JSON.stringify(detail).includes('restored=' + initial.memory));
+    assert.ok(!JSON.stringify(detail).includes(initial.threadId));
+    assert.ok(!JSON.stringify(detail).includes('private-history-must-not-show'));
+    assert.ok(!JSON.stringify(detail).includes(fakeKey));
+    assert.equal(detail.task.status, 'in_progress');
+    assert.equal((await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key)).json().id, next.id);
+    await f.restart();
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\none\n');
+    const fresh = await completedCodex(f);
+    assert.notEqual(fresh.node?.nativeSession?.ref, ref);
+    assert.equal(fresh.node?.nativeSession?.action, 'created');
+  } finally {
+    await f.close();
+  }
+});
+
+test('原生恢复拒绝没有明确本机保留授权、外部 ID、模式变化与自动等待；项目编辑权不是节点恢复权', async () => {
+  const f = await fixture('codex', true);
+  try {
+    const source = await completedCodex(f),
+      body = await resumeBody(f, source);
+    assert.equal((await f.call(`tasks/${f.task.id}/runs`, f.bob, body)).statusCode, 403);
+    assert.equal(
+      (await f.call(`tasks/${f.task.id}/runs`, f.alice, { ...body, mode: 'read-only' })).statusCode,
+      409,
+    );
+    assert.equal(
+      (
+        await f.call(`tasks/${f.task.id}/runs`, f.alice, {
+          ...body,
+          threadId: 'foreign-provider-id',
+        })
+      ).statusCode,
+      400,
+    );
+    assert.equal(
+      (await f.call(`tasks/${f.task.id}/continuations`, f.alice, { ...body, onActiveRun: 'wait' }))
+        .statusCode,
+      400,
+    );
+    const detail = (await f.call(`tasks/${f.task.id}`, f.alice)).json();
+    assert.equal(detail.runs.length, 1);
+  } finally {
+    await f.close();
+  }
+});
+
+test('本机 Key 变化拒绝恢复，不生成原生进程、不静默新建；密钥摘要不离开节点', async () => {
+  const f = await fixture('codex', true);
+  try {
+    const source = await completedCodex(f);
+    process.env.OPENAI_API_KEY = 'sk-different-protocol-fixture-not-a-real-key';
+    const body = await resumeBody(f, source);
+    const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body);
+    assert.equal(posted.statusCode, 201, posted.body);
+    const next = await f.until(
+      () => f.getRun(posted.json().id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(next.state, 'failed');
+    assert.equal(next.node?.nativeSession, undefined);
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+    assert.ok((await f.call(`tasks/${f.task.id}`, f.alice)).body.includes('本机账户已变化'));
+  } finally {
+    await f.close();
+  }
+});
+
+test('原生恢复遇缺失历史、提供方拒绝或错误 thread ID 明确失败，不回退 thread/start', async () => {
+  for (const fault of ['missing', 'denied', 'wrong'] as const) {
+    const f = await fixture('codex', true);
+    try {
+      const source = await completedCodex(f),
+        body = await resumeBody(f, source);
+      const path = join(
+        f.home,
+        'codex-sessions',
+        source.node!.nativeSession!.ref,
+        'fixture-provider-state.json',
+      );
+      if (fault === 'missing') await rm(path);
+      else {
+        const saved = JSON.parse(await readFile(path, 'utf8'));
+        saved[fault === 'denied' ? 'failResume' : 'wrongId'] = true;
+        await writeFile(path, JSON.stringify(saved));
+      }
+      const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body);
+      const next = await f.until(
+        () => f.getRun(posted.json().id),
+        (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+      );
+      assert.equal(next.state, 'failed', fault);
+      assert.equal(next.node?.nativeSession, undefined);
+      assert.equal(await readFile(join(f.root, 'codex-count.txt'), 'utf8'), 'one invocation\n');
+      assert.equal(f.executor.sessions.list()[0]!.state, 'blocked');
+    } finally {
+      await f.close();
+    }
+  }
+});
+
+test('本机会话清理后不能恢复；公开任务历史和代码保持不变', async () => {
+  const f = await fixture('codex', true);
+  try {
+    const source = await completedCodex(f),
+      ref = source.node!.nativeSession!.ref;
+    const { CodexSessions } = await import('../apps/runner/src/agent/codex-sessions.js');
+    const vault = new CodexSessions(f.storage);
+    const text = JSON.stringify(vault.list());
+    assert.ok(!text.includes('thread_id') && !text.includes(fakeKey) && !text.includes(f.root));
+    vault.forget(ref);
+    assert.deepEqual(vault.list(), []);
+    const body = await resumeBody(f, source);
+    const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body);
+    const next = await f.until(
+      () => f.getRun(posted.json().id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(next.state, 'failed');
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+    assert.ok(
+      (await f.call(`tasks/${f.task.id}`, f.alice))
+        .json()
+        .runs.some((r: Run) => r.id === source.id),
+    );
+    assert.ok(await readFile(join(f.root, 'codex-output.txt'), 'utf8'));
+  } finally {
+    await f.close();
+  }
+});
+
+test('节点异常退出只阻止活跃原生会话恢复，不将 unknown 标成保留成功', async () => {
+  const f = await fixture('codex', true);
+  try {
+    const source = await completedCodex(f),
+      ref = source.node!.nativeSession!.ref;
+    f.storage.db.prepare("UPDATE native_codex_sessions SET state='active' WHERE ref=?").run(ref);
+    await f.restart();
+    assert.equal(f.executor.sessions.list()[0]!.state, 'blocked');
+    const body = await resumeBody(f, source);
+    const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, body);
+    const next = await f.until(
+      () => f.getRun(posted.json().id),
+      (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+    );
+    assert.equal(next.state, 'failed');
+    assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+  } finally {
+    await f.close();
+  }
+});
+
+test('私有会话过期或存在符号链接拒绝恢复，原始文件和进程占用不被伪造修复', async () => {
+  for (const fault of ['expired', 'symlink'] as const) {
+    const f = await fixture('codex', true);
+    try {
+      const source = await completedCodex(f),
+        ref = source.node!.nativeSession!.ref;
+      if (fault === 'expired')
+        f.storage.db
+          .prepare('UPDATE native_codex_sessions SET expires_at=? WHERE ref=?')
+          .run('2000-01-01T00:00:00.000Z', ref);
+      else await symlink(f.root, join(f.home, 'codex-sessions', ref, 'foreign-link'));
+      const posted = await f.call(`tasks/${f.task.id}/runs`, f.alice, await resumeBody(f, source));
+      const next = await f.until(
+        () => f.getRun(posted.json().id),
+        (r) => ['succeeded', 'failed', 'cancelled'].includes(r.state),
+      );
+      assert.equal(next.state, 'failed');
+      assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+      assert.ok(await readFile(join(f.root, 'README.md'), 'utf8'));
+    } finally {
+      await f.close();
+    }
   }
 });

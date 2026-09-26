@@ -1,6 +1,7 @@
 import type {
   DispatchCommand,
   ExecutionEvent,
+  NativeSessionInfo,
 } from '../../../../packages/contracts/src/node-execution.js';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
@@ -84,6 +85,7 @@ export class ExecutionJournal {
     kind: ExecutionEvent['kind'],
     text = '',
     result: ExecutionEvent['result'] = null,
+    nativeSession?: NativeSessionInfo,
   ) {
     const seq = Number(
       this.storage.db
@@ -99,17 +101,23 @@ export class ExecutionJournal {
       text: text.slice(0, 6000),
       result,
       terminationConfirmed: kind === 'terminal',
+      ...(nativeSession ? { nativeSession } : {}),
     };
     this.storage.db
       .prepare('INSERT INTO execution_events(dispatch_id,sequence,body) VALUES(?,?,?)')
       .run(id, seq, JSON.stringify(event));
     return event;
   }
-  settle(id: string, result: 'succeeded' | 'failed' | 'cancelled', text: string) {
+  settle(
+    id: string,
+    result: 'succeeded' | 'failed' | 'cancelled',
+    text: string,
+    nativeSession?: NativeSessionInfo,
+  ) {
     if (this.get(id)?.phase === 'terminal') return;
     this.storage.db.exec('BEGIN IMMEDIATE');
     try {
-      this.append(id, 'terminal', text, result);
+      this.append(id, 'terminal', text, result, nativeSession);
       this.phase(id, 'terminal');
       this.storage.db.exec('COMMIT');
     } catch (e) {

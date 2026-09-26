@@ -20,6 +20,7 @@ export async function openCodex(options: {
   root: string;
   apiKey: string;
   config?: NativeRunConfig;
+  retained?: { home: string; threadId?: string; resolvedModel?: string };
   onSpawn?(): void;
   onEvent(kind: NativeEvent['kind'], body: string): void;
   onReferences(refs: { sessionId?: string; turnId?: string; resolvedModel?: string }): void;
@@ -51,7 +52,12 @@ export async function openCodex(options: {
       executable: options.executable,
       args: codexArguments(options.root),
       cwd: home,
-      env: { PATH: process.env.PATH, HOME: home, CODEX_HOME: home, LANG: 'C.UTF-8' },
+      env: {
+        PATH: process.env.PATH,
+        HOME: home,
+        CODEX_HOME: options.retained?.home ?? home,
+        LANG: 'C.UTF-8',
+      },
       keepInputOpen: true,
       timeoutMs: (options.config?.timeoutSeconds ?? 30) * 1000,
       onSpawn: options.onSpawn,
@@ -64,7 +70,7 @@ export async function openCodex(options: {
   const bootstrap = (async () => {
     await session.initialize();
     if (stoppedByUser) return;
-    await session.checkConfiguration(options.root);
+    await session.checkConfiguration(options.root, !!options.retained);
     await session.authenticate(options.apiKey);
     if (stoppedByUser) return;
     if (options.config) {
@@ -73,6 +79,8 @@ export async function openCodex(options: {
         options.config.mode,
         options.config.contextText,
         options.config.model,
+        options.retained,
+        () => stoppedByUser || closing,
       );
       if (stoppedByUser) void session.interrupt().catch(() => {});
     } else {

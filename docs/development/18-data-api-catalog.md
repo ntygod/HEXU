@@ -266,3 +266,7 @@ GET /tasks/:id/node-continuation-preview?sourceRunId=... 仅供节点所有者�
 `GET /tasks/:id/continuations` 返回最近 20 个安排；`GET /operations/:id` 返回当前记录；`POST /operations/:id/cancel` 要求 expectedRevision/幂等键及任务编辑权限。Run 已创建返回 RUN_ALREADY_STARTED，应走 `/runs/:id/stop`。新增 SQLite 迁移 8，唯一活动 task/node 预约；普通 Run 创建也核对。
 
 状态 waiting_for_stop / preparing / needs_attention / succeeded / cancelled / failed 复用已有标签。succeeded 仅指派发事务创建了 Run。记录固定已授权全文和本机策略，不存模型 Key；服务恢复不重放付费执行。旧 preview Operation 读取/权限行为保留，两个数据模式不自动导入互换。
+
+## E2c1：Codex 原生恢复子集
+
+本机 ExecutionPolicy 可选 retainSessions:true（仅 Codex）。节点 DispatchCommand 可携带由服务端根据已验证来源构造的 session:{ref,sourceDispatchId}，不接受浏览器原生 threadId、history 或路径。POST /tasks/:id/runs 允许 sessionMode=resume，必须提供最新成功来源、材料哈希和明确执行授权；POST continuations 拒绝该模式，自动等待仍新会话。成功终态节点事件可带 nativeSession:{ref,action,expiresAt}，服务端核查来源及策略。原生 thread/turn/model 和 Key HMAC 只在节点私有 SQLite/文件保存；任务权限不提供原生文件访问。

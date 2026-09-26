@@ -3644,3 +3644,20 @@ main {
     flex-wrap: wrap;
   }
 }
+
+.native-session-choice,
+.native-session-record {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+.native-session-choice p,
+.native-session-record p {
+  color: var(--muted);
+  margin-top: 8px;
+}
+.native-session-record {
+  margin: 12px 0;
+}

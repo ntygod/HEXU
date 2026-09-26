@@ -38,6 +38,9 @@ export function codexArguments(root: string): string[] {
     'features.unified_exec=false',
     'features.apps=false',
     'features.multi_agent=false',
+    'features.goals=false',
+    'features.memories=false',
+    'features.proactivity=false',
     'features.skill_mcp_dependency_install=false',
     'mcp_servers={}',
     'hooks={}',
@@ -128,7 +131,7 @@ export class CodexSession {
     const login = object(await this.request('account/login/start', { type: 'apiKey', apiKey }));
     if (login.type !== 'apiKey') throw new Error('Codex 未确认 API-key 认证方式');
   }
-  async checkConfiguration(root: string) {
+  async checkConfiguration(root: string, retained = false) {
     const response = object(await this.request('config/read', { cwd: root, includeLayers: false }));
     const config = object(response.config),
       features = object(config.features);
@@ -140,6 +143,11 @@ export class CodexSession {
       config.cli_auth_credentials_store !== 'ephemeral'
     )
       throw new Error('Codex 未确认本次受限配置；不会回退到默认权限');
+    if (
+      retained &&
+      (features.goals !== false || features.memories !== false || features.proactivity !== false)
+    )
+      throw new Error('Codex 未确认会话自动行为关闭，拒绝保留或恢复');
     const projects = object(config.projects);
     if (object(projects[root]).trust_level !== 'untrusted')
       throw new Error('Codex 未确认当前目录为不信任项目，已拒绝执行');
@@ -182,23 +190,64 @@ export class CodexSession {
     }
     throw new Error('Codex 模型目录超过分页限制');
   }
-  async start(root: string, mode: NativeMode, prompt: string, model: string | null) {
+  async start(
+    root: string,
+    mode: NativeMode,
+    prompt: string,
+    model: string | null,
+    retained?: { threadId?: string; resolvedModel?: string },
+    cancelled: () => boolean = () => false,
+  ) {
+    const checkCancelled = () => {
+      if (cancelled()) throw new Error('Codex 启动已取消，没有发送下一轮请求');
+    };
+    checkCancelled();
+    if (retained?.threadId) {
+      const read = object(
+        await this.request('thread/read', { threadId: retained.threadId, includeTurns: false }),
+      );
+      const thread = object(read.thread);
+      if (
+        thread.id !== retained.threadId ||
+        thread.ephemeral !== false ||
+        thread.cwd !== root ||
+        !['notLoaded', 'idle'].includes(String(object(thread.status).type))
+      )
+        throw new Error('Codex 原会话状态或目录不匹配，没有开始新一轮');
+    }
+    checkCancelled();
     const response = object(
-      await this.request('thread/start', {
+      await this.request(retained?.threadId ? 'thread/resume' : 'thread/start', {
+        ...(retained?.threadId ? { threadId: retained.threadId } : { ephemeral: !retained }),
         cwd: root,
         approvalPolicy: 'never',
-        sandbox: mode === 'edit' ? 'workspace-write' : 'read-only',
-        ephemeral: true,
-        ...(model ? { model } : {}),
+        // Loading persistent state must not restore broader historical permissions.
+        sandbox: retained ? 'read-only' : mode === 'edit' ? 'workspace-write' : 'read-only',
+        ...((retained?.resolvedModel ?? model) ? { model: retained?.resolvedModel ?? model } : {}),
       }),
     );
-    this.summary.sessionId = identifier(object(response.thread).id);
+    const thread = object(response.thread);
+    const sessionId = identifier(thread.id);
+    if (
+      retained &&
+      (thread.ephemeral !== false ||
+        response.cwd !== root ||
+        response.approvalPolicy !== 'never' ||
+        object(response.sandbox).type !== 'readOnly' ||
+        typeof response.model !== 'string' ||
+        !response.model ||
+        (retained.threadId && sessionId !== retained.threadId) ||
+        (retained.resolvedModel && response.model !== retained.resolvedModel))
+    )
+      throw new Error('Codex 未确认原生会话或受限恢复配置，不会回退新会话');
+    this.summary.sessionId = sessionId;
     if (typeof response.model === 'string')
       this.summary.resolvedModel = response.model.slice(0, 100);
     this.references({
       sessionId: this.summary.sessionId,
       ...(this.summary.resolvedModel ? { resolvedModel: this.summary.resolvedModel } : {}),
     });
+    checkCancelled();
     this.awaitingTurn = true;
     const started = object(
       await this.request('turn/start', {
@@ -207,7 +256,7 @@ export class CodexSession {
         cwd: root,
         approvalPolicy: 'never',
         sandboxPolicy: codexSandbox(root, mode),
-        ...(model ? { model } : {}),
+        ...((retained?.resolvedModel ?? model) ? { model: retained?.resolvedModel ?? model } : {}),
       }),
     );
     this.summary.turnId = identifier(object(started.turn).id);

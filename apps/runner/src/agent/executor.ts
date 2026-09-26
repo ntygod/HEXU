@@ -1,3 +1,5 @@
+import { CodexSessions, type CodexSessionLease } from './codex-sessions.js';
+import type { CodexSummary } from '../../../../packages/adapters/codex/src/index.js';
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,6 +8,7 @@ import { DomainError, text } from '../../../../packages/contracts/src/index.js';
 import { exact, nodeId } from '../../../../packages/contracts/src/nodes.js';
 import {
   parsePolicy,
+  parseSessionRequest,
   type DispatchCommand,
 } from '../../../../packages/contracts/src/node-execution.js';
 import type { NativeRunConfig } from '../../../../packages/contracts/src/native.js';
@@ -33,6 +36,7 @@ const hash = (value: unknown) => createHash('sha256').update(canonicalJson(value
  * after a journal/ACK ambiguity, and never use credentials supplied by the server. */
 export class NodeExecutor {
   readonly journal: ExecutionJournal;
+  readonly sessions: CodexSessions;
   private local: LocalExecution | null;
   private publishedConnection: string | null = null;
   private closed = false;
@@ -49,6 +53,8 @@ export class NodeExecutor {
   ) {
     this.journal = new ExecutionJournal(connection.storage);
     this.journal.recover();
+    this.sessions = new CodexSessions(connection.storage);
+    this.sessions.recover();
     this.local = readExecutionPolicy(connection.storage.home);
     // A confirmed terminal journal is enough to release its own stale local claim.
     for (const row of this.journal.commands().filter((r) => r.phase === 'terminal')) {
@@ -85,6 +91,7 @@ export class NodeExecutor {
       'mode',
       'context',
       'expiresAt',
+      'session',
     ]);
     const policy = parsePolicy(b.policy);
     if (
@@ -100,7 +107,10 @@ export class NodeExecutor {
         'EXECUTION_SCOPE_MISMATCH',
         '服务端命令超出本机确认的执行范围，没有启动',
       );
+    if (b.session !== undefined && (policy.tool !== 'codex' || !policy.retainSessions))
+      throw new DomainError('SESSION_NOT_ENABLED', '本机未授权保留或恢复会话');
     return {
+      ...(b.session === undefined ? {} : { session: parseSessionRequest(b.session) }),
       id: nodeId(b.id),
       generation: nodeId(b.generation),
       runId: nodeId(b.runId),
@@ -247,6 +257,7 @@ export class NodeExecutor {
     let handle: ProcessHandle | null = null,
       home: string | null = null,
       attemptedSpawn = false;
+    let retained: CodexSessionLease | undefined;
     let emitted = 0;
     const clean = (value: string) =>
       redact(value, [
@@ -278,6 +289,18 @@ export class NodeExecutor {
     try {
       let summary: { resultReceived: boolean; success: boolean; text: string };
       if (command.policy.tool === 'codex') {
+        if (command.policy.retainSessions) {
+          const directory = this.connection.credentials.directories.find(
+            (d) => d.id === command.workspaceId,
+          )!;
+          retained = this.sessions.prepare(
+            command,
+            this.connection.credentials,
+            directory,
+            local.executable,
+            apiKey,
+          );
+        }
         attemptedSpawn = true;
         const codex = await openCodex({
           executable: local.executable,
@@ -286,7 +309,10 @@ export class NodeExecutor {
           config,
           onSpawn,
           onEvent: emit,
-          onReferences: () => {},
+          retained,
+          onReferences: (refs) => {
+            if (retained) this.sessions.references(retained.ref, command.id, refs);
+          },
         });
         handle = codex;
         summary = codex.summary;
@@ -321,6 +347,9 @@ export class NodeExecutor {
         : outcome.stopped && !outcome.error
           ? 'cancelled'
           : 'failed';
+      const nativeSession = retained
+        ? this.sessions.finish(retained, command, summary as CodexSummary, success)
+        : undefined;
       this.journal.settle(
         command.id,
         state,
@@ -332,7 +361,11 @@ export class NodeExecutor {
                 ? '独立节点已确认原进程停止，文件修改保留。'
                 : '工具执行未完成，进程已结束；没有自动重试。',
             summary.text.slice(0, 4800),
-            outcome.error ? '原生进程或协议发生错误。' : '',
+            outcome.error
+              ? command.session
+                ? '原生会话恢复或后续执行失败，没有改用新会话；请核对节点会话状态后明确选择。'
+                : '原生进程或协议发生错误。'
+              : '',
             !summary.resultReceived && !outcome.stopped
               ? '未收到有效完成事件，未将退出码当作成功。'
               : '',
@@ -340,19 +373,27 @@ export class NodeExecutor {
             .filter(Boolean)
             .join('\n\n'),
         ),
+        nativeSession,
       );
       lease.release();
-    } catch {
+    } catch (error) {
       handle?.stop();
       const outcome = handle ? await handle.done : null;
       if (outcome?.terminationConfirmed || !attemptedSpawn) {
-        this.journal.settle(command.id, 'failed', '执行未完成，已确认没有遗留受管进程。');
+        this.journal.settle(
+          command.id,
+          'failed',
+          error instanceof DomainError
+            ? clean(error.message)
+            : '执行未完成，已确认没有遗留受管进程。',
+        );
         lease.release();
       } else {
         this.journal.phase(command.id, 'unknown');
         this.journal.append(command.id, 'unknown');
       }
     } finally {
+      if (retained) this.sessions.block(retained.ref); // ready is unaffected; interrupted state stays blocked.
       lease.close();
       if (home && this.journal.get(command.id)?.phase === 'terminal')
         await rm(home, { recursive: true, force: true });

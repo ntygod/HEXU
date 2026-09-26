@@ -69,3 +69,7 @@ turn/interrupt 返回响应只说明请求得到处理；继续等目标 turn/co
 Codex 已新增本机 stdio 初始化、配置检查、API-key 内存认证、thread/start、turn/start、事件、model/list 和 interrupt；原生 resume、运行中输入和完整授权问答仍未实现。官方 0.157.0 仅做无模型协议检查，完整流程用协议替身，真实账户联调未执行。
 
 实际使用与限制见 [原生说明](../engineering/native-execution.md)，最新进度见 [21](21-implementation-status.md)。
+
+## E2c1 当前增量
+
+节点可选 retainSessions，保存私有原生引用并显式 thread/read → thread/resume → turn/start；同范围最新成功来源才可恢复，无失败回退。原生历史不上传，新增本机列表/清理和继承历史 UI。真实账户生成/恢复未联调；09-02/05/06 仍部分实现。见 [会话说明](../engineering/codex-sessions.md) 和 [21](21-implementation-status.md)。

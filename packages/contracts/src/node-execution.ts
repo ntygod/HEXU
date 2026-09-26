@@ -13,6 +13,16 @@ export interface ExecutionPolicy {
   maxTurns: number;
   maxBudgetUsd: number | null;
   toolVersion: string;
+  retainSessions?: true;
+}
+export interface NativeSessionInfo {
+  ref: string;
+  action: 'created' | 'resumed';
+  expiresAt: string;
+}
+export interface SessionRequest {
+  ref: string;
+  sourceDispatchId: string;
 }
 export interface NodeRunInfo {
   nodeId: string;
@@ -31,6 +41,8 @@ export interface NodeRunInfo {
   permittedAt?: string;
   startedAt?: string;
   continuationInputIds?: string[];
+  sessionMode?: 'resume';
+  nativeSession?: NativeSessionInfo;
 }
 export interface NodeRunInput {
   provider: 'node';
@@ -43,6 +55,7 @@ export interface NodeRunInput {
   reopenTask: boolean;
   confirmExecution: true;
   continuation?: NodeContinuationSelection;
+  sessionMode?: 'resume';
 }
 export interface DispatchCommand {
   id: string;
@@ -56,6 +69,7 @@ export interface DispatchCommand {
   mode: 'read-only' | 'edit';
   context: string;
   expiresAt: string;
+  session?: SessionRequest;
 }
 export interface ExecutionEvent {
   sequence: number;
@@ -63,6 +77,7 @@ export interface ExecutionEvent {
   text: string;
   result: 'succeeded' | 'failed' | 'cancelled' | null;
   terminationConfirmed: boolean;
+  nativeSession?: NativeSessionInfo;
 }
 export interface NodeExecutionOption {
   nodeId: string;
@@ -84,8 +99,11 @@ export function parsePolicy(value: unknown): ExecutionPolicy {
     'maxTurns',
     'maxBudgetUsd',
     'toolVersion',
+    'retainSessions',
   ]);
   const tool = enumValue(b.tool, ['claude-code', 'codex'] as const, '工具');
+  if (b.retainSessions !== undefined && (b.retainSessions !== true || tool !== 'codex'))
+    throw new DomainError('INVALID_POLICY', '原生会话保留目前仅支持明确启用的 Codex');
   const integer = (n: unknown, min: number, max: number) => {
     if (typeof n !== 'number' || !Number.isInteger(n) || n < min || n > max)
       throw new DomainError('INVALID_POLICY', `执行限额应为 ${min}–${max} 的整数`);
@@ -118,6 +136,7 @@ export function parsePolicy(value: unknown): ExecutionPolicy {
     maxTurns: integer(b.maxTurns, 1, 30),
     maxBudgetUsd: b.maxBudgetUsd as number | null,
     toolVersion: text(b.toolVersion, '工具版本', 200),
+    ...(b.retainSessions === true ? { retainSessions: true as const } : {}),
   };
 }
 export function parseNodeRun(value: unknown): NodeRunInput {
@@ -132,9 +151,12 @@ export function parseNodeRun(value: unknown): NodeRunInput {
     'reopenTask',
     'confirmExecution',
     'continuation',
+    'sessionMode',
   ]);
   if (b.provider !== 'node' || b.confirmExecution !== true)
     throw new DomainError('EXECUTION_CONSENT_REQUIRED', '请确认共享输出、目录范围及模型费用', 422);
+  if (b.sessionMode !== undefined && (b.sessionMode !== 'resume' || !b.continuation))
+    throw new DomainError('INVALID_SESSION_MODE', '恢复原会话必须明确选择来源执行');
   const hash = text(b.policyHash, '授权版本', 64);
   if (!/^[a-f0-9]{64}$/.test(hash)) throw new DomainError('INVALID_INPUT', '授权版本无效');
   return {
@@ -147,13 +169,21 @@ export function parseNodeRun(value: unknown): NodeRunInput {
     expectedRevision: revision(b.expectedRevision),
     reopenTask: b.reopenTask === true,
     confirmExecution: true,
+    ...(b.sessionMode === 'resume' ? { sessionMode: 'resume' as const } : {}),
     ...(b.continuation === undefined
       ? {}
       : { continuation: parseNodeContinuation(b.continuation) }),
   };
 }
 export function parseExecutionEvent(value: unknown): ExecutionEvent {
-  const b = exact(value, ['sequence', 'kind', 'text', 'result', 'terminationConfirmed']);
+  const b = exact(value, [
+    'sequence',
+    'kind',
+    'text',
+    'result',
+    'terminationConfirmed',
+    'nativeSession',
+  ]);
   const kind = enumValue(
     b.kind,
     ['accepted', 'running', 'output', 'terminal', 'unknown'] as const,
@@ -169,11 +199,31 @@ export function parseExecutionEvent(value: unknown): ExecutionEvent {
     (kind !== 'terminal' && (result !== null || b.terminationConfirmed))
   )
     throw new DomainError('INVALID_EVENT', '终态必须明确确认进程已停止；其他事件不能伪造终态');
+  if (b.nativeSession !== undefined && (kind !== 'terminal' || result !== 'succeeded'))
+    throw new DomainError('INVALID_SESSION_EVENT', '只有成功终态可声明会话已保留');
   return {
+    ...(b.nativeSession === undefined
+      ? {}
+      : { nativeSession: parseNativeSession(b.nativeSession) }),
     sequence: parseSequence(b.sequence),
     kind,
     text: text(b.text, '事件文本', 6000, true),
     result,
     terminationConfirmed: b.terminationConfirmed,
   };
+}
+
+export function parseNativeSession(value: unknown): NativeSessionInfo {
+  const b = exact(value, ['ref', 'action', 'expiresAt']);
+  if (typeof b.expiresAt !== 'string' || !Number.isFinite(Date.parse(b.expiresAt)))
+    throw new DomainError('INVALID_SESSION_EVENT', '会话期限无效');
+  return {
+    ref: nodeId(b.ref),
+    action: enumValue(b.action, ['created', 'resumed'] as const, '会话操作'),
+    expiresAt: b.expiresAt,
+  };
+}
+export function parseSessionRequest(value: unknown): SessionRequest {
+  const b = exact(value, ['ref', 'sourceDispatchId']);
+  return { ref: nodeId(b.ref), sourceDispatchId: nodeId(b.sourceDispatchId) };
 }

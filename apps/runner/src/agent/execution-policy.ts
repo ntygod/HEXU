@@ -114,6 +114,7 @@ export async function configureExecution(
     'timeoutSeconds',
     'maxTurns',
     'maxBudgetUsd',
+    'retainSessions',
   ]);
   if (!Array.isArray(b.workspaces) || !b.workspaces.length)
     throw new DomainError('INVALID_POLICY', '请选择已配对的目录别名');
@@ -141,6 +142,7 @@ export async function configureExecution(
     maxTurns: b.maxTurns ?? 8,
     maxBudgetUsd: b.tool === 'codex' ? (b.maxBudgetUsd ?? null) : (b.maxBudgetUsd ?? 1),
     toolVersion: 'pending-probe',
+    ...(b.retainSessions === undefined ? {} : { retainSessions: b.retainSessions }),
   });
   if (!keyFor(policy))
     throw new DomainError(
