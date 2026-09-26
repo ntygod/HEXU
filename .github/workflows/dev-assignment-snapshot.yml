@@ -1,0 +1,29 @@
+name: Development assignment source snapshot
+on:
+  push:
+    branches: [codex/task-assignment]
+    paths: [.github/workflows/dev-assignment-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Archive tracked source and commit object only
+        run: |
+          git archive HEAD | gzip > /tmp/hexu-assignment-source.tgz
+          git cat-file commit HEAD > /tmp/hexu-assignment-commit.txt
+          git rev-parse HEAD > /tmp/hexu-assignment-sha.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-assignment-source
+          path: |
+            /tmp/hexu-assignment-source.tgz
+            /tmp/hexu-assignment-commit.txt
+            /tmp/hexu-assignment-sha.txt
+          retention-days: 1
