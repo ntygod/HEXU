@@ -1,0 +1,60 @@
+name: E2b3 development checks
+on:
+  push:
+    branches: [codex/e2b3-node-continuation-20260926]
+permissions:
+  contents: write
+concurrency:
+  group: e2b3-development
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/e2b3-node-continuation-20260926
+      - name: Apply reviewed development source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = codex/e2b3-node-continuation-20260926
+          for patch in .staging/patch-*.py; do python "$patch"; done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run format
+      - name: Preserve exact formatted development source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = codex/e2b3-node-continuation-20260926
+          git config user.name 'HEXU development'
+          git config user.email 'hexu-development@users.noreply.github.com'
+          git add apps packages tests docs scripts README.md AGENTS.md .staging
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: integrate E2b3 next-round inputs and node continuation'
+            git push origin HEAD:codex/e2b3-node-continuation-20260926
+          fi
+          echo "Checked source: $(git rev-parse HEAD)"
+      - name: Export credential-free source snapshot
+        run: git archive --format=tar.gz HEAD > /tmp/hexu-e2b3-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-e2b3-source
+          path: /tmp/hexu-e2b3-source.tar.gz
+          retention-days: 2
+      - run: npm run format:check
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-e2b3-browser-results
+          path: |
+            playwright-report/
+            test-results/
+            artifacts/
+          retention-days: 7
