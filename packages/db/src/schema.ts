@@ -306,4 +306,15 @@ DROP TABLE assistance_grants_v17;
 -- No existing human consent is upgraded to model sending permission.
 `,
   },
+  {
+    version: 19,
+    sql: `
+CREATE TABLE assistance_adoptions (
+ id TEXT PRIMARY KEY, assistance_id TEXT NOT NULL REFERENCES assistances(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), body TEXT NOT NULL
+);
+CREATE INDEX assistance_adoptions_scope ON assistance_adoptions(assistance_id,task_id);
+-- Only explicit adoption writes history. Never infer adoption from an existing reply or grant.
+`,
+  },
 ];

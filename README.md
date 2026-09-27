@@ -13,7 +13,7 @@
 
 ## 继续开发与 AI 接手
 
-从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、项目选材、AI 草稿、真人协助及 Claude 纯文本 AI 协助已接入。下一主线是协助建议的明确局部采用。原 102 项工作清单及历史继续保留。
+从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、项目选材、AI 草稿、真人协助及 Claude 纯文本 AI 协助已接入。协助建议现可明确局部采用到原任务说明；下一主线是本机不可变提交检查点。原 102 项工作清单及历史继续保留。
 
 ## 启动
 
@@ -80,6 +80,12 @@ team-local 中，在任务的一条讨论或 AI 回复下点击“请同事协�
 ## 请 AI 分析片段
 
 team-local 项目任务可明确选择消息片段，请本人已单独授权的 Claude 节点分析。使用空临时目录并禁用工具，不接触主代码现场，结果回到任务协助记录；须另行确认材料和费用。真人协助保持原行为。用法见 [AI 文本协助](docs/engineering/ai-text-assistance.md)，实际回归与未完成范围仍以 [当前进度](docs/development/21-implementation-status.md) 为准，不表示真实模型或跨电脑已经联调。
+
+## 采用协助中的建议
+
+在原任务“协助记录”或有任务权限的协助详情中，对同事或 AI 已保存的建议点击“采用此条建议”。选中需要的一个或多个片段，比较采用前后，明确追加或替换原任务说明。保留建议来源、片段、操作者及前后版本，不自动改代码、发布约定或完成任务。
+
+仅当前任务编辑者可采用；对方只有协助回复授权时，没有采用入口，也看不到任务说明的修改历史。版本冲突保留片段，核对后再提交；回执丢失确认原请求，不重复追加。等待接续会暂停且保留原材料，主运行与未知目录锁不变。用法和当前限制见 [协助建议局部采用](docs/engineering/assistance-adoption.md)。
 
 ## 项目资料
 

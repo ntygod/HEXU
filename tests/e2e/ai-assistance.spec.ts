@@ -225,6 +225,25 @@ test('明确材料与费用后 AI 文本协助独立运行，结果回到任务�
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
       true,
     );
+    await page.getByRole('button', { name: '采用此条建议', exact: true }).click();
+    const field = page.getByLabel('选择建议片段', { exact: true });
+    await expect(field).toContainText('协议替身建议');
+    await field.focus();
+    await field.press('Control+Home');
+    for (let i = 0; i < 6; i++) await field.press('Shift+ArrowRight');
+    await page.getByRole('button', { name: '添加建议片段', exact: true }).click();
+    await page.getByRole('button', { name: '确认采用建议片段', exact: true }).click();
+    await expect(page.getByLabel('建议采用成功', { exact: true })).toBeVisible();
+    const adopted = await (
+      await page.request.get(
+        `${origin}/api/v1/tasks/${f.task.id}/assistances/${item.id}/adoptions`,
+        { headers: headers(f.space.id) },
+      )
+    ).json();
+    expect(adopted.items).toHaveLength(1);
+    expect(adopted.items[0].selectedText).toBe('协议替身建议');
+    expect(adopted.items[0].source.reply.runId).toBe(item.ai.run.id);
+    expect((await records(f)).length).toBe(1);
   } finally {
     await agent?.stop();
     await rm(f.dir, { recursive: true, force: true });

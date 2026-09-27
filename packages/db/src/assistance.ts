@@ -154,6 +154,17 @@ export class AssistanceStore {
   belongsToTask(id: string, taskId: string) {
     return this.read(id).item.taskId === taskId;
   }
+  /** Internal task-scoped adoption boundary; snapshot_reply never satisfies task access. */
+  adoptionContext(taskId: string, id: string, write = false) {
+    this.store.getTask(taskId, write);
+    const data = this.read(id);
+    if (data.item.taskId !== taskId)
+      throw new DomainError('NOT_FOUND', '协助不属于当前任务或不可访问', 404);
+    return {
+      ...data,
+      accessEnded: !!data.grant.revoked_at || !this.sourceReadable(data.item, data.task),
+    };
+  }
   private source(taskId: string, messageId: string) {
     this.store.getTask(taskId, true);
     const row = this.store.db
@@ -370,6 +381,8 @@ export class AssistanceStore {
         accessEnded,
         canReply,
         canManage,
+        canEditTask: writer,
+        canAdopt: writer && !accessEnded && item.state !== 'cancelled',
         taskLink: visibleTask ? { id: task.id, title: task.title, shortId: task.shortId } : null,
       },
       replies: page.reverse(),

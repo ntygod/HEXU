@@ -1,3 +1,4 @@
+import { AssistanceAdoptionsStore } from './assistance-adoption.js';
 import { AssistanceStore } from './assistance.js';
 import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
@@ -71,6 +72,7 @@ export class Store {
   readonly projectMaterials: ProjectMaterialsStore;
   readonly aiDrafts: AiDraftsStore;
   readonly assistance: AssistanceStore;
+  readonly assistanceAdoptions: AssistanceAdoptionsStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -112,6 +114,7 @@ export class Store {
     this.projectMaterials = new ProjectMaterialsStore(this);
     this.aiDrafts = new AiDraftsStore(this);
     this.assistance = new AssistanceStore(this);
+    this.assistanceAdoptions = new AssistanceAdoptionsStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()

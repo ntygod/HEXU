@@ -45,6 +45,8 @@ export interface Assistance {
   taskLink: { id: string; title: string; shortId: string } | null;
   canReply: boolean;
   canManage: boolean;
+  canAdopt: boolean;
+  canEditTask: boolean;
   accessEnded: boolean;
 }
 export interface AssistanceReply {

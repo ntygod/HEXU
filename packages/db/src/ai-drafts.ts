@@ -15,8 +15,10 @@ import {
   type DraftTarget,
 } from '../../contracts/src/ai-drafts.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
-import type { ContinuationOperation } from '../../contracts/src/continuation.js';
-import type { NodeContinuationOperation } from '../../contracts/src/node-continuation.js';
+import {
+  applyTaskDescriptionAdoption,
+  taskDescriptionTarget,
+} from './task-description-adoption.js';
 import type { Store } from './store.js';
 
 const hash = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
@@ -152,13 +154,7 @@ export class AiDraftsStore {
     if (ref.kind === 'task') {
       if (ref.id !== taskId)
         throw new DomainError('DRAFT_TARGET_SCOPE', '只能采用到当前任务说明', 409);
-      return {
-        ...ref,
-        title: task.title,
-        content: task.description,
-        revision: task.revision,
-        limit: 12000,
-      };
+      return taskDescriptionTarget(this.store, taskId, write);
     }
     if (!task.projectId || task.visibility !== 'project')
       throw new DomainError('DRAFT_TARGET_PRIVATE', '私有草稿不能直接公开到项目资料', 409);
@@ -172,34 +168,6 @@ export class AiDraftsStore {
       revision: source.revision,
       limit: 8000,
     };
-  }
-  private pausePlans(taskId: string, at: string) {
-    for (const table of ['continuation_operations', 'node_continuation_operations']) {
-      const rows = this.store.db
-        .prepare(
-          `SELECT id,body FROM ${table} WHERE task_id=? AND state IN ('waiting_for_stop','preparing')`,
-        )
-        .all(taskId) as { id: string; body: string }[];
-      for (const row of rows) {
-        const op = JSON.parse(row.body) as ContinuationOperation | NodeContinuationOperation;
-        const paused = {
-          ...op,
-          state: 'needs_attention',
-          revision: op.revision + 1,
-          updatedAt: at,
-          blockers: [
-            {
-              code: 'TASK_DESCRIPTION_CHANGED',
-              message: '任务说明采用了新内容，请核对原材料后重新安排；已有执行未因此停止。',
-            },
-          ],
-        };
-        this.store.db
-          .prepare(`UPDATE ${table} SET state=?,body=? WHERE id=?`)
-          .run(paused.state, JSON.stringify(paused), row.id);
-        this.event(taskId, 'continuation.updated');
-      }
-    }
   }
   adopt(taskId: string, id: string, input: unknown, key: string): DraftAdoption {
     this.get(taskId, id, true);
@@ -216,19 +184,13 @@ export class AiDraftsStore {
       let afterRevision = target.revision;
       if (nextContent !== target.content) {
         if (target.kind === 'task') {
-          const task = this.store.getTask(taskId, true);
-          const next = {
-            ...task,
-            description: nextContent,
-            revision: task.revision + 1,
-            updatedAt: at,
-          };
-          this.store.db
-            .prepare('UPDATE tasks SET body=? WHERE id=? AND space_id=?')
-            .run(JSON.stringify(next), taskId, task.spaceId);
-          this.pausePlans(taskId, at);
-          this.event(taskId, 'task.updated');
-          afterRevision = next.revision;
+          afterRevision = applyTaskDescriptionAdoption(
+            this.store,
+            taskId,
+            target.revision,
+            nextContent,
+            at,
+          );
         } else {
           const task = this.store.getTask(taskId, true);
           // The outer adoption transaction owns revision + source event + receipt atomicity.

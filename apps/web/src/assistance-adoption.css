@@ -1,0 +1,52 @@
+.assistance-adoption,
+.assistance-adoption-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  padding-block: var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.assistance-adoption > header {
+  gap: var(--hx-space-3);
+}
+.assistance-adoption h4,
+.assistance-adoption-history h4 {
+  margin-block: var(--hx-space-3) var(--hx-space-2);
+}
+.assistance-adoption-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hx-space-3);
+}
+.assistance-adoption-comparison > div {
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  min-width: 0;
+}
+.assistance-adoption-comparison pre {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.assistance-adoption-fragment {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+}
+.assistance-adoption-fragment pre {
+  flex: 1;
+  min-width: 0;
+}
+.assistance-drawer .assistance-adoption-comparison {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 600px) {
+  .assistance-adoption-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .assistance-adoption .button {
+    min-height: 44px;
+  }
+}
