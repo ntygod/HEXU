@@ -271,6 +271,12 @@ GET /tasks/:id/node-continuation-preview?sourceRunId=... 仅供节点所有者�
 
 本机 ExecutionPolicy 可选 retainSessions:true（仅 Codex）。节点 DispatchCommand 可携带由服务端根据已验证来源构造的 session:{ref,sourceDispatchId}，不接受浏览器原生 threadId、history 或路径。POST /tasks/:id/runs 允许 sessionMode=resume，必须提供最新成功来源、材料哈希和明确执行授权；POST continuations 拒绝该模式，自动等待仍新会话。成功终态节点事件可带 nativeSession:{ref,action,expiresAt}，服务端核查来源及策略。原生 thread/turn/model 和 Key HMAC 只在节点私有 SQLite/文件保存；任务权限不提供原生文件访问。
 
+## 05-03 实现子集：从讨论保存项目约定
+
+`GET /tasks/:taskId/messages/:messageId/agreement-preview` 返回同项目公开讨论的有界来源预览及完整消息指纹；`GET /tasks/:taskId/agreements-notice` 返回当前项目的有效数量和变更版本。`GET/POST /projects/:projectId/agreements` 读取/发布，`GET/PATCH .../:id` 读取/修改，`POST .../:id/lifecycle` 停用/启用，`GET .../:id/revisions` 读取不可变历史。具体字段和限制见 [约定契约](../../packages/contracts/src/project-agreements.ts) 与 [使用说明](../engineering/project-agreements.md)。
+
+迁移 14 增加独立约定、修订和项目变更版本。发布需 sourceTaskId/sourceMessageId/expectedSourceHash；可选 replaces 绑定同项目有效约定的 id/expectedRevision，新旧状态与历史/outbox/回执同事务。private/foreign/system 来源拒绝直接发布，源权限在旧回执前重新检查。约定不自动进入模型材料，任务内提示不代表持久通知或 provider receipt。
+
 ## 05-02 实现子集：项目文本资料与链接
 
 `GET/POST /projects/:projectId/sources` 读取分页列表或创建文本/链接；`GET/PATCH /projects/:projectId/sources/:sourceId` 读取当前资料或按 expectedRevision 完整修改内容；`POST .../:sourceId/lifecycle` 明确 delete/restore；`GET .../:sourceId/revisions` 按不可变修订分页。完整字段及限制见 [项目资料契约](../../packages/contracts/src/project-sources.ts) 和 [使用说明](../engineering/project-sources.md)。

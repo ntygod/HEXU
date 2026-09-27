@@ -4,6 +4,7 @@ import { request } from '../../../packages/client/src/index.js';
 import { Avatar, Button, Icon, ToolMark } from '../../../packages/ui/src/index.js';
 import { useApp, canEditTask, time, useTaskDraft } from './state.js';
 import './discussion.css';
+import { PublishAgreement } from './agreement-create.js';
 
 export function MessageComposer({
   taskId,
@@ -108,6 +109,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
               )}
             </div>
             <p>{message.body}</p>
+            <PublishAgreement message={message} />
           </div>
         </article>
       ))}

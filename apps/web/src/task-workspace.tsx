@@ -1,5 +1,6 @@
 import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
+import { TaskAgreements } from './project-agreements.js';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { TaskDetail } from '../../../packages/contracts/src/index.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
@@ -192,6 +193,7 @@ export function TaskPage({ id }: { id: string }) {
           <span>{task.visibility === 'private' ? '仅自己可见' : '项目成员可见'}</span>
           <TaskOwner task={task} />
           <TaskParticipants task={task} />
+          <TaskAgreements task={task} />
           <span className="spacer" />
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明
