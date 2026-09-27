@@ -2,6 +2,20 @@
 
 更新：2026-09-27（UTC+8）。本页是接手入口，不另建功能清单或进度总账。
 
+## 本次关机交接：先收尾 PR #10，再接真人协助
+
+用户要求本机关机前告一段落，由另一位 AI 继续。本分支 **codex/human-assistance-wip** 是未完成工作保存点，不可直接当作已验证交付合并。
+
+- `main` 已合并到 `e13abb57eb184ee792798f4e04db18ab0aa796de`：PR #8 项目约定、PR #9 选材快照已交付；后者完整 Linux CI 为 256 工程 / 68 Chromium 全通过。
+- [PR #10｜AI 草稿与局部采用](https://github.com/ntygod/HEXU/pull/10) 尚未合并，分支 `codex/ai-drafts`，当前功能头 `f8f8e5855a81175ed9864fb03dc67bc7ba270458`。首轮 69 浏览器通过 / 3 失败均停在测试的片段选择；已改为真实键盘操作，保留局部采用断言。重跑 [CI 36302013091](https://github.com/ntygod/HEXU/actions/runs/36302013091) 已通过安装、格式、类型、工程测试和构建，关机交接时浏览器仍运行。**接手先读取最终结果，不能把 pending 当成功。** 失败产物下载遇到 GitHub EOF/TLS 错误，未完成截图复核。
+- 本分支基于上述 PR #10 功能头，只额外保存真人协助的三个初稿：[契约](../../packages/contracts/src/assistance.ts)、[存储](../../packages/db/src/assistance.ts)、[前端请求/读取助手](../../apps/web/src/assistance-common.tsx)。它们未接入应用，不是可用功能。当前 Node 24 类型检查通过，未有协助行为或浏览器验证。
+- 协助仍缺迁移、Store 初始化、API、成员撤权事务联动、SSE 过滤、请求/收件/回复界面和测试。数据库初稿引用尚不存在的 `assistances`、`assistance_grants`、`assistance_replies`、`assistance_events` 及 `outbox.assistance_id`；不要提前启用调用。已有范围设计与后续顺序仍在 [22](22-next-delivery.md)。
+- PR #10 收尾后，从最新 `origin/main` 开始集成协助；本保存分支含未合并的上游草稿提交，先核对提交关系，可只 cherry-pick 此分支相对 `f8f8e58` 的保存提交，避免把未通过功能一并带入。不要强推或重置其他人的工作。
+
+下一步具体验证：PR #10 的原 68 流程与新增 4 流程都需通过；下载/查看 64—66 深色采用、浅色历史和手机截图。通过后据实补 21 并合并，再接通协助。协助权限必须区分快照和完整 Task，取消/成员移除的授权永久撤销，事件只暴露可读记录或对原收件人的无正文失效通知；不能借通用 outbox 暴露私有任务。AI assist Run、活动目录只读/隔离及远程部署没有实现。
+
+本机预览工作树仍保留在已合并的 `e13abb5`，独立示例库和历史产物未删除。关机前停止自己的预览服务；重启方式、Node 24 路径和日志看可选 `.hexu/local-environment.md`。GitHub CI 在远端运行，不依赖本机保持开机。
+
 ## 1. 从哪里开始
 
 1. 先读根 [AGENTS.md](../../AGENTS.md)，检查 `git status`、当前分支和远端进度。保留其他人的改动；共享主分支同步使用 fast-forward，不强推、不自动 stash。
