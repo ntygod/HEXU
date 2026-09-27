@@ -1,3 +1,4 @@
+import { TaskAssistances } from './assistance.js';
 import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
 import { TaskAgreements } from './project-agreements.js';
@@ -197,6 +198,7 @@ export function TaskPage({ id }: { id: string }) {
           <TaskParticipants task={task} />
           <TaskAgreements task={task} />
           <TaskDrafts task={task} />
+          <TaskAssistances task={task} />
           <span className="spacer" />
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明

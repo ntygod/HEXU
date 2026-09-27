@@ -1,3 +1,4 @@
+import { AssistancePage } from './assistance.js';
 import { useEffect, useState } from 'react';
 import { Empty } from '../../../packages/ui/src/index.js';
 import { Link, usePath } from './state.js';
@@ -44,6 +45,8 @@ export function App() {
           ) : (
             <Results />
           )
+        ) : active === 'assistances' ? (
+          <AssistancePage id={segment[1]} key={segment[1] ?? 'inbox'} />
         ) : active === 'settings' ? (
           <Settings />
         ) : (

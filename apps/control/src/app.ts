@@ -1,3 +1,4 @@
+import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import {
@@ -168,6 +169,7 @@ export async function createApp(
     if (request.url.startsWith('/api/') || nodeProtocol) reply.header('Cache-Control', 'no-store');
   });
   attachIdentity(app, store, identity);
+  attachAssistance(app, store);
   const nodeExecution = attachNodes(app, store);
   const operationRecords = (id: string) =>
     nodeExecution &&

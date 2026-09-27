@@ -1,3 +1,4 @@
+import { AssistanceStore } from './assistance.js';
 import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
@@ -69,6 +70,7 @@ export class Store {
   readonly projectAgreements: ProjectAgreementsStore;
   readonly projectMaterials: ProjectMaterialsStore;
   readonly aiDrafts: AiDraftsStore;
+  readonly assistance: AssistanceStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -109,6 +111,7 @@ export class Store {
     this.projectAgreements = new ProjectAgreementsStore(this);
     this.projectMaterials = new ProjectMaterialsStore(this);
     this.aiDrafts = new AiDraftsStore(this);
+    this.assistance = new AssistanceStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
@@ -197,10 +200,11 @@ export class Store {
     if (taskId) this.getTask(taskId);
     const rows = this.db
       .prepare(
-        'SELECT sequence,task_id AS taskId,kind,created_at AS createdAt,space_id AS spaceId,project_id AS projectId FROM outbox WHERE sequence>? ORDER BY sequence LIMIT 100',
+        'SELECT sequence,task_id AS taskId,kind,created_at AS createdAt,space_id AS spaceId,project_id AS projectId,assistance_id AS assistanceId FROM outbox WHERE sequence>? ORDER BY sequence LIMIT 100',
       )
       .all(after) as unknown as {
       sequence: number;
+      assistanceId: string | null;
       spaceId: string | null;
       projectId: string | null;
       taskId: string | null;
@@ -210,6 +214,11 @@ export class Store {
     // Scan cursor progresses across filtered entries without revealing those entries.
     const cursor = rows.at(-1)?.sequence ?? after;
     const visible = rows.filter((row) => {
+      if (row.assistanceId) {
+        if (row.spaceId !== this.spaceId || !this.assistance.canRead(row.assistanceId))
+          return false;
+        return !taskId || this.assistance.belongsToTask(row.assistanceId, taskId);
+      }
       if (taskId && row.taskId !== taskId) return false;
       if (row.projectId) {
         try {

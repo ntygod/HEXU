@@ -16,7 +16,9 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-11-03/04/05：有限材料的真人协助**。资料、约定、明确选材与 AI 草稿的当前本机切片已接入，不重复实施。先做选择快照、明确接收者、有限授权及回复，不把邀请解释为完整任务或执行权限；范围以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-11-04/05：有限文本 AI 协助**，先核对 21 的本批实际回归。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
+
+真人协助入口为 `packages/contracts/src/assistance.ts`、`packages/db/src/assistance.ts`、`apps/control/src/assistance.ts` 与 `apps/web/src/assistance*.tsx/css`。读取/旧回执检查当前范围；撤权钩子在 collaboration.ts，SSE 只发送独立协助 ID；独立受限详情不包含不可访问的 Task 信息。
 
 | 工作 | 先查看 |
 | --- | --- |
