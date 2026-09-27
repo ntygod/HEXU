@@ -1,3 +1,4 @@
+import { AdoptAssistance, AssistanceAdoptionHistory } from './assistance-adoption.js';
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import type {
@@ -269,7 +270,9 @@ function ThreadContent({
   const replies = before ? history.value : value;
   const [body, setBody] = useState(''),
     [baseRevision, setBaseRevision] = useState(item.revision),
-    [action, setAction] = useState<'close' | 'cancel' | null>(null);
+    [action, setAction] = useState<'close' | 'cancel' | null>(null),
+    [adoptReplyId, setAdoptReplyId] = useState<string | null>(null),
+    [adoptionBusy, setAdoptionBusy] = useState(false);
   const command = useAssistanceCommand<AssistanceDetail>((next) => {
     setBody('');
     setAction(null);
@@ -277,12 +280,12 @@ function ThreadContent({
     setBefore(null);
     onRetry();
   });
-  const locked = command.busy || !!command.uncertain,
+  const locked = command.busy || !!command.uncertain || adoptionBusy,
     conflict = baseRevision !== item.revision;
   useEffect(() => {
-    onBusy?.(command.busy);
+    onBusy?.(command.busy || adoptionBusy);
     return () => onBusy?.(false);
-  }, [command.busy, onBusy]);
+  }, [command.busy, adoptionBusy, onBusy]);
   useEffect(() => {
     if (!body && !action && !locked) setBaseRevision(item.revision);
   }, [item.revision, body, action, locked]);
@@ -292,6 +295,9 @@ function ThreadContent({
     if (!item.canReply) setBody('');
     if (!item.canManage || (!item.ai && !item.canReply)) setAction(null);
   }, [item.canReply, item.canManage, !!item.ai]);
+  useEffect(() => {
+    if (!item.canEditTask) setAdoptReplyId(null);
+  }, [item.canEditTask]);
   if (command.denied)
     return (
       <div className="dialog-body assistance-content">
@@ -406,6 +412,15 @@ function ThreadContent({
               <time>{time(r.createdAt)}</time>
             </div>
             <pre>{r.body}</pre>
+            {item.canAdopt && r.author.id === item.recipient.id && (
+              <Button
+                type="button"
+                disabled={locked || !!readError || !!history.error}
+                onClick={() => setAdoptReplyId(r.id)}
+              >
+                采用此条建议
+              </Button>
+            )}
           </article>
         ))}
         {replies?.replies.length === 0 && (
@@ -416,6 +431,17 @@ function ThreadContent({
           </p>
         )}
       </section>
+      {adoptReplyId && item.taskLink && item.canEditTask && (
+        <AdoptAssistance
+          key={adoptReplyId}
+          taskId={item.taskLink.id}
+          id={item.id}
+          replyId={adoptReplyId}
+          onBusy={setAdoptionBusy}
+          onClose={() => setAdoptReplyId(null)}
+        />
+      )}
+      {item.taskLink && <AssistanceAdoptionHistory taskId={item.taskLink.id} id={item.id} />}
       {item.canReply && (
         <form
           className="assistance-reply-form"
