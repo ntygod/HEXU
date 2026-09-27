@@ -101,8 +101,9 @@ export function TaskPage({ id }: { id: string }) {
   const { task, messages, runs, results } = value;
   const editable = canEditTask(data, task);
   const team = data.mode === 'team-local';
-  const lastRun = runs.at(-1),
-    active = runs.find((run) => isActiveRun(run.state));
+  const codingRuns = runs.filter((run) => run.purpose !== 'assist');
+  const lastRun = codingRuns.at(-1),
+    active = codingRuns.find((run) => isActiveRun(run.state));
   const preview = results.find((result) => result.kind === 'demo-preview');
   async function action(path: string, body: unknown = {}) {
     setBusy(true);
@@ -525,7 +526,12 @@ export function TaskPage({ id }: { id: string }) {
                 <div className="flex-line">
                   <ToolMark tool={run.requestedTool} />
                   <strong>
-                    {run.requestedTool === 'codex' ? 'Codex' : 'Claude Code'} ·{' '}
+                    {run.purpose === 'assist'
+                      ? 'AI 文本协助'
+                      : run.requestedTool === 'codex'
+                        ? 'Codex'
+                        : 'Claude Code'}{' '}
+                    ·{' '}
                     {run.provider === 'node'
                       ? '独立节点'
                       : run.provider === 'native'
@@ -537,6 +543,9 @@ export function TaskPage({ id }: { id: string }) {
                 </div>
                 <p>发起者：{recordedPerson(run.createdByUserId, data.members)}</p>
                 <p>{run.prompt || '未补充要求'}</p>
+                {run.purpose === 'assist' && run.assistanceId && (
+                  <Link to={`/assistances/${run.assistanceId}`}>查看协助材料、结果与停止状态</Link>
+                )}
                 <small>
                   {time(run.createdAt)} · {run.previousRunId ? '关联此前执行' : '首次执行'}
                 </small>

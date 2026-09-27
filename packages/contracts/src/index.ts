@@ -62,6 +62,9 @@ export interface Message {
   resultId: string | null;
 }
 export interface Run {
+  /** Assist runs never replace the main coding run or mutate task business state. */
+  purpose?: 'assist';
+  assistanceId?: string;
   materialBundleId?: string;
   /** Original requester, independent of later task reassignment. */
   createdByUserId?: string | null;

@@ -3,6 +3,11 @@ import { createApp } from '../dist/apps/control/src/app.js';
 
 // Called only by start-e2e.mjs after it prepares the fixed disposable directory.
 const fixtures = {
+  'ai-assistance': {
+    port: 4314,
+    secret: 'fictional-ai-assistance-browser-auth-secret-0123456789',
+    setupCode: 'fictional-ai-assistance-browser-setup-code-0123456789',
+  },
   team: {
     port: 4311,
     secret: 'fictional-browser-auth-secret-not-real-0123456789',

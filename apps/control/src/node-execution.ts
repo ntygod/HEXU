@@ -21,6 +21,21 @@ export function attachNodeExecution(app: FastifyInstance, store: Store, nodes: N
       throw new DomainError('NODE_AUTH_REQUIRED', '缺少节点凭证', 401);
     return nodeSecret(value.slice(7));
   };
+  app.get('/api/v1/tasks/:taskId/ai-assistance-options', async (r) => {
+    exact(r.query, []);
+    return execution.assistanceOptions(nodeId((r.params as { taskId: string }).taskId));
+  });
+  app.post('/api/v1/tasks/:taskId/ai-assistances', async (r, reply) =>
+    reply
+      .code(201)
+      .send(
+        execution.createAssistance(
+          nodeId((r.params as { taskId: string }).taskId),
+          r.body,
+          text(r.headers['idempotency-key'], '操作标识', 128),
+        ),
+      ),
+  );
   app.get('/api/v1/tasks/:taskId/node-options', async (r) => {
     const q = exact(r.query, ['sourceRunId']);
     const taskId = nodeId((r.params as { taskId: string }).taskId);

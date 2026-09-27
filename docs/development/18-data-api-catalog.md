@@ -300,3 +300,9 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 迁移 17：assistances / assistance_grants / assistance_replies / assistance_events；outbox 新增 assistance_id。`snapshot_reply` 是限定到单协助固定文本与回复的授权，不用于 Task/Project/目录判权。
 
 新增 `GET /tasks/:taskId/messages/:messageId/assistance-preview`、`GET /tasks/:taskId/assistance-recipients`、`GET/POST /tasks/:taskId/assistances`、`GET /assistances`、`GET /assistances/:id`、`POST /assistances/:id/replies`、`POST /assistances/:id/state`。接收者路由不绕过原 Task 守卫；当前权限和有限授权由 AssistanceStore 独立校验。请求体与分页见 [真人协助 API](../engineering/human-assistance.md)。
+
+## 11-04/05/06 Claude 纯文本 AI 协助实现
+
+迁移 18 在原 assistance_grants 增加 model_text，不改变 snapshot_reply 记录或旧授权。Run 增加可选 purpose=assist 和 assistanceId；Assistance 增加 recipientKind=ai 及固定输入/Run 关联。节点 policy 只有明确 textAssistance:true 才允许该种派发。命令使用独立文本环境 ID 而非项目目录，不能由浏览器填写路径/会话。
+
+新增 `GET /tasks/:id/ai-assistance-options` 和 `POST /tasks/:id/ai-assistances`（201 + AssistanceDetail）。创建严格限定来源哈希/任务修订、单片段、问题、节点/policyHash 与两项同意；事务同时保存授权、辅助 Run、派发、事件及回执。读取和取消复用 Assistance，不能通过真人 replies 接口触发模型。主编程查询排除 assist，完整执行历史保留。协议与剩余边界见 [AI 文本协助](../engineering/ai-text-assistance.md)。

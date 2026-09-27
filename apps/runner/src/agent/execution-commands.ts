@@ -51,6 +51,10 @@ export async function executionCommand(
       console.log(
         `另外保留 ${local.policy.tool === 'codex' ? 'Codex' : 'Claude Code'} 原生历史到节点私有目录（可能含代码及敏感材料），恢复有效期 7 天；到期不自动删除，请用 forget-native-session 清理。不会上传原生历史到控制服务。`,
       );
+    if (local.policy.textAssistance)
+      console.log(
+        '另外允许本人发起 Claude 纯文本协助：每次使用空临时目录、独立 HOME、禁用全部工具且不保留会话；不访问上述项目目录。仍使用本机账户并可能计费，这不是操作系统沙箱。',
+      );
     await confirm('确认以上范围，输入 EXECUTE：', 'EXECUTE');
     writeExecutionPolicy(storage.home, local);
     console.log('本机执行授权已保存；下次 start 将核对工具版本并发布。');
@@ -69,7 +73,8 @@ export async function executionCommand(
       throw new DomainError('RECOVERY_NOT_REQUIRED', '没有此待核对执行');
     const record = JSON.parse(row.body) as DispatchCommand;
     const directory = credentials.directories.find((w) => w.id === record.workspaceId);
-    if (!directory) throw new DomainError('WORKSPACE_SCOPE_MISMATCH', '原执行目录授权记录不存在');
+    if (!directory && record.purpose !== 'assist')
+      throw new DomainError('WORKSPACE_SCOPE_MISMATCH', '原执行目录授权记录不存在');
     await confirm(
       `请先在本机核实原执行及其子进程已全部停止，保留文件修改；此命令不会杀旧 PID。输入 STOPPED ${dispatchId}：`,
       `STOPPED ${dispatchId}`,
@@ -79,7 +84,12 @@ export async function executionCommand(
       'cancelled',
       '节点操作者在本机明确确认旧进程已全部停止；文件修改保留。',
     );
-    new WorkspaceLease(directory.root, dispatchId, true).release();
+    if (record.purpose !== 'assist' && directory)
+      new WorkspaceLease(directory.root, dispatchId, true).release();
+    if (record.purpose === 'assist')
+      console.log(
+        '纯文本协助没有项目目录占用；未触碰其他运行的目录锁，也不会自动清理未定位的临时目录。',
+      );
     console.log('停止证据已保存；下次 start 上报，不会恢复或重跑旧执行。');
   }
 }

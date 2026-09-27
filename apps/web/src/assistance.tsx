@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import type {
+  Assistance,
   AssistanceDetail,
   AssistanceList,
   AssistanceState,
 } from '../../../packages/contracts/src/assistance.js';
-import { Button, Dialog, Icon } from '../../../packages/ui/src/index.js';
+import { isActiveRun } from '../../../packages/domain/src/index.js';
+import { Button, Dialog, Icon, RunBadge } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp } from './state.js';
 import {
   assistancePath,
@@ -20,6 +22,12 @@ const states: Record<AssistanceState, string> = {
   closed: '已结束',
   cancelled: '已撤销分享',
 };
+function assistanceState(item: Pick<Assistance, 'ai' | 'state'>) {
+  if (!item.ai) return states[item.state];
+  if (item.state === 'cancelled') return '已取消协助';
+  if (item.state === 'closed') return '已结束';
+  return item.state === 'responded' ? 'AI 建议已返回' : 'AI 文本协助';
+}
 export function TaskAssistances({ task }: { task: Task }) {
   const { data } = useApp();
   const [open, setOpen] = useState(false),
@@ -65,7 +73,7 @@ export function AssistanceWorkbench() {
     <section className="assistance-entry">
       <Icon name="chat" />
       <div>
-        <strong>同事协助</strong>
+        <strong>同事与 AI 协助</strong>
         <p>查看收到的片段和回复，或继续你发起的问题。</p>
         <Link to="/assistances">
           打开我的协助 <Icon name="arrow" size={14} />
@@ -159,7 +167,7 @@ function AssistanceItems({ taskId, onSelect }: { taskId?: string; onSelect?(id: 
             <>
               <span className="assistance-card-meta">
                 {item.requester.name} → {item.recipient.name}
-                <span className="badge neutral">{states[item.state]}</span>
+                <span className="badge neutral">{assistanceState(item)}</span>
               </span>
               <strong>{item.question}</strong>
               <small>
@@ -282,8 +290,8 @@ function ThreadContent({
     // Losing reply/manage authority clears unsaved edits without dropping the receipt
     // of an already-sent close/cancel request when its status arrives before its reply.
     if (!item.canReply) setBody('');
-    if (!item.canManage || !item.canReply) setAction(null);
-  }, [item.canReply, item.canManage]);
+    if (!item.canManage || (!item.ai && !item.canReply)) setAction(null);
+  }, [item.canReply, item.canManage, !!item.ai]);
   if (command.denied)
     return (
       <div className="dialog-body assistance-content">
@@ -297,9 +305,41 @@ function ThreadContent({
         <span>
           {item.requester.name} → {item.recipient.name}
         </span>
-        <span className="badge neutral">{states[item.state]}</span>
+        <span className="badge neutral">{assistanceState(item)}</span>
       </div>
       <h2 className="assistance-question">{item.question}</h2>
+      {item.ai && (
+        <section className="assistance-snapshot" aria-label="AI 协助执行状态">
+          <strong>独立文本执行 · Claude Code</strong>
+          <RunBadge run={item.ai.run} />
+          <p>
+            {item.ai.run.observation === 'unknown'
+              ? '进程状态未知；节点不会自动重跑，需要本机确认。'
+              : item.ai.run.node?.terminationConfirmed
+                ? '节点已确认进程结束；不代表任务完成或建议已验证。'
+                : item.ai.run.node?.phase === 'running'
+                  ? '节点已报告实际进程启动；未核实提供方收件。'
+                  : item.ai.run.state === 'stopping'
+                    ? '已请求停止，尚未确认进程结束；已发生费用不能撤回。'
+                    : '正在等待节点接单或启动；保存与许可不是模型收件回执。'}
+          </p>
+          <p className="hint">
+            空临时目录、禁用工具、不继承原生历史。主编程执行和任务状态保持独立。实际费用未知；本次预算参数
+            USD {item.ai.run.node?.maxBudgetUsd}。
+          </p>
+          <details>
+            <summary>查看本次固定模型材料</summary>
+            <pre>{item.ai.inputText}</pre>
+            <code>{item.ai.inputHash}</code>
+            <p className="hint">节点可能进一步遮盖已知密钥；没有从保存快照推断提供方已接收。</p>
+          </details>
+          <details>
+            <summary>本机执行排查信息</summary>
+            <p>运行 {item.ai.run.id}</p>
+            <p>派发 {item.ai.run.node?.dispatchId}</p>
+          </details>
+        </section>
+      )}
       <section className="assistance-snapshot" aria-label="已分享的固定片段">
         <span className="eyebrow">固定分享片段</span>
         <pre>{item.snapshot.text}</pre>
@@ -369,7 +409,11 @@ function ThreadContent({
           </article>
         ))}
         {replies?.replies.length === 0 && (
-          <p className="hint">还没有回复。协助请求不会自动发给 AI。</p>
+          <p className="hint">
+            {item.ai
+              ? '尚未取得有效 AI 建议；失败或取消不会自动重试。后续问题需重新选择材料并授权。'
+              : '还没有回复。协助请求不会自动发给 AI。'}
+          </p>
         )}
       </section>
       {item.canReply && (
@@ -428,7 +472,7 @@ function ThreadContent({
           {item.state !== 'closed' && (
             <Button
               type="button"
-              disabled={locked || !!readError}
+              disabled={locked || !!readError || (!!item.ai && isActiveRun(item.ai.run.state))}
               onClick={() => {
                 setBaseRevision(item.revision);
                 setAction('close');
@@ -446,16 +490,20 @@ function ThreadContent({
               setAction('cancel');
             }}
           >
-            撤销分享
+            {item.ai ? '取消 AI 协助' : '撤销分享'}
           </Button>
         </div>
       )}
       {action && (
         <section className="assistance-warning" aria-label="协助状态确认">
           <p>
-            {action === 'close'
-              ? '结束后不再接受回复，接收者仍可查看已有片段和历史。任务和执行状态保持不变。'
-              : '撤销后接收者不能继续读取或回复；原任务仍保留历史。无法收回对方已经看过或复制的内容。'}
+            {item.ai
+              ? action === 'close'
+                ? '结束本次协助，保留已返回的建议和执行历史，不改变任务状态。'
+                : '取消本次模型授权并请求节点停止。只有节点确认进程终止才算停止；不影响其他主编程执行，也不能撤回已发生的费用。'
+              : action === 'close'
+                ? '结束后不再接受回复，接收者仍可查看已有片段和历史。任务和执行状态保持不变。'
+                : '撤销后接收者不能继续读取或回复；原任务仍保留历史。无法收回对方已经看过或复制的内容。'}
           </p>
           <div className="assistance-actions">
             <Button
@@ -469,7 +517,7 @@ function ThreadContent({
                 })
               }
             >
-              {action === 'close' ? '确认结束协助' : '确认撤销分享'}
+              {action === 'close' ? '确认结束协助' : item.ai ? '确认取消 AI 协助' : '确认撤销分享'}
             </Button>
             <Button type="button" disabled={locked} onClick={() => setAction(null)}>
               暂不操作

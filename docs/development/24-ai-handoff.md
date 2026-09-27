@@ -16,13 +16,13 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-11-04/05：有限文本 AI 协助**，先核对 21 的本批实际回归。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
+默认继续 **HX-DEV-11-06：协助建议的明确局部采用**，先核对 21 的本批实际回归。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
 
 真人协助入口为 `packages/contracts/src/assistance.ts`、`packages/db/src/assistance.ts`、`apps/control/src/assistance.ts` 与 `apps/web/src/assistance*.tsx/css`。读取/旧回执检查当前范围；撤权钩子在 collaboration.ts，SSE 只发送独立协助 ID；独立受限详情不包含不可访问的 Task 信息。
 
 | 工作 | 先查看 |
 | --- | --- |
-| 下一项有限文本 AI 协助 | [11 工作包](11-continuation-assistance.md)、[协助事务](../../packages/db/src/assistance.ts)、[节点执行](../../packages/db/src/node-execution.ts)、[执行器](../../apps/runner/src/agent/executor.ts)；另行绑定模型材料与费用同意，不能默认访问活动代码目录或借用他人账户 |
+| 已接入的 Claude 纯文本 AI 协助 | [11 工作包](11-continuation-assistance.md)、[协助事务](../../packages/db/src/assistance.ts)、[节点执行](../../packages/db/src/node-execution.ts)、[执行器](../../apps/runner/src/agent/executor.ts)；另行绑定模型材料与费用同意，不能默认访问活动代码目录或借用他人账户 |
 | 已交付的真人协助 | [契约](../../packages/contracts/src/assistance.ts)、[权限事务](../../packages/db/src/assistance.ts)、[邀请](../../apps/web/src/assistance-create.tsx)、[收发件与回复](../../apps/web/src/assistance.tsx)、[用法](../engineering/human-assistance.md)；快照/回复授权与完整 Task 访问分开，历史分页不清空输入，撤权不复活 |
 | 已交付的 AI 草稿 | [契约](../../packages/contracts/src/ai-drafts.ts)、[事务](../../packages/db/src/ai-drafts.ts)、[编辑/记录](../../apps/web/src/ai-drafts.tsx)、[采用界面](../../apps/web/src/draft-adoption.tsx)、[用法](../engineering/ai-drafts.md)；两个版本分别核对，私有内容不因采用而公开 |
 | 已交付的项目选材 | [契约](../../packages/contracts/src/project-materials.ts)、[快照事务](../../packages/db/src/project-materials.ts)、[面板/记录](../../apps/web/src/project-materials.tsx)、[用法](../engineering/project-materials.md)；Node 完整输入冻结，preview 保留原代码摘录重建语义，启动不等于模型收到 |
@@ -58,7 +58,7 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 - 提交前执行 `npm run format`，用 `git diff --check` 检查差异。
 - 按改动选择现有检查：`npm run typecheck`、`npm test`、`npm run build`；`npm run check` 已包含这三项。
-- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312/4313 端口（协助使用独立认证进程）；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
+- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312/4313/4314 端口（协助使用独立认证进程）；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
 - 原生／独立节点的完整回归以 Linux 为准；macOS 未验证，Windows 原生执行不支持。Windows 可以做页面、格式、类型与构建检查，不能据此宣称进程和凭证边界跨平台完成。
 - 测试必须使用明确协议替身和虚构 Key，不使用开发者或提供方凭证。`check:codex-protocol` / `check:claude-protocol` 是可选无模型检查，不使用真实账户或发起真实模型 turn。
 

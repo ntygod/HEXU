@@ -108,7 +108,13 @@ export async function probeExecution(executable: string, policy: ExecutionPolicy
       policy.tool === 'codex'
         ? !!version && ['--listen', '--config'].every((flag) => help.includes(flag))
         : claudeCapabilities(version, help, !!policy.retainSessions);
-    if (!compatible)
+    if (
+      !compatible ||
+      (policy.textAssistance &&
+        !['--tools', '--disallowedTools', '--system-prompt', '--settings'].every((flag) =>
+          help.includes(flag),
+        ))
+    )
       throw new DomainError('CAPABILITY_UNAVAILABLE', '原生工具缺少必要受限参数；不降级权限');
     return version;
   } finally {
@@ -131,6 +137,7 @@ export async function configureExecution(
     'maxTurns',
     'maxBudgetUsd',
     'retainSessions',
+    'textAssistance',
   ]);
   if (!Array.isArray(b.workspaces) || !b.workspaces.length)
     throw new DomainError('INVALID_POLICY', '请选择已配对的目录别名');
@@ -159,6 +166,7 @@ export async function configureExecution(
     maxBudgetUsd: b.tool === 'codex' ? (b.maxBudgetUsd ?? null) : (b.maxBudgetUsd ?? 1),
     toolVersion: 'pending-probe',
     ...(b.retainSessions === undefined ? {} : { retainSessions: b.retainSessions }),
+    ...(b.textAssistance === undefined ? {} : { textAssistance: b.textAssistance }),
   });
   if (!keyFor(policy))
     throw new DomainError(
