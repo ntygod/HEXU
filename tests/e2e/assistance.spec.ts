@@ -351,3 +351,94 @@ test('发起者项目访问撤销会终止旧协助，重新加入项目不复�
     await f.context.close();
   }
 });
+
+test('翻看更早回复和历史读故障不丢输入，结束回执先到状态也可确认原请求', async ({
+  page,
+  browser,
+}) => {
+  const f = await prepare(page, browser);
+  try {
+    const id = await createUI(page, f);
+    for (let index = 1; index <= 21; index++)
+      await post(
+        page,
+        `assistances/${id}/replies`,
+        { expectedRevision: index, body: `历史问题 ${index}` },
+        f.space.id,
+      );
+    await f.member.goto(origin + `/assistances/${id}`);
+    await expect(f.member.getByLabel('协助回复记录', { exact: true })).toContainText('历史问题 21');
+    const editor = f.member.getByLabel('协助回复', { exact: true });
+    await editor.fill('查看历史时仍保留的回复');
+    let failHistory = true;
+    await f.member.route(`**/api/v1/assistances/${id}?before=*`, async (route) => {
+      if (failHistory)
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'TEMPORARY', message: '更早回复暂时不可读' } }),
+        });
+      else await route.continue();
+    });
+    await f.member.getByRole('button', { name: '查看更早回复', exact: true }).click();
+    await expect(f.member.locator('body')).toContainText('更早回复暂时不可读');
+    await expect(editor).toHaveValue('查看历史时仍保留的回复');
+    failHistory = false;
+    await f.member.getByRole('button', { name: '重读更早回复', exact: true }).click();
+    await expect(f.member.getByLabel('协助回复记录', { exact: true })).toContainText('历史问题 1');
+    await expect(f.member.getByLabel('协助回复记录', { exact: true })).not.toContainText(
+      '历史问题 21',
+    );
+    await post(
+      page,
+      `assistances/${id}/replies`,
+      { expectedRevision: 22, body: '查看历史期间的新问题' },
+      f.space.id,
+    );
+    await expect(f.member.getByLabel('协助版本冲突', { exact: true })).toBeVisible();
+    await expect(editor).toHaveValue('查看历史时仍保留的回复');
+    await expect(f.member.getByLabel('协助回复记录', { exact: true })).not.toContainText(
+      '查看历史期间的新问题',
+    );
+    await f.member.getByRole('button', { name: '查看最新回复并保留输入', exact: true }).click();
+    await expect(f.member.getByLabel('协助回复记录', { exact: true })).toContainText(
+      '查看历史期间的新问题',
+    );
+    await expect(editor).toHaveValue('查看历史时仍保留的回复');
+    await f.member.getByRole('button', { name: '已查看更新，保留我的输入', exact: true }).click();
+    await f.member.getByRole('button', { name: '发送协助回复', exact: true }).click();
+    await expect(f.member.getByLabel('协助回复记录', { exact: true })).toContainText(
+      '查看历史时仍保留的回复',
+    );
+    const attempts: { key: string | undefined; body: unknown }[] = [];
+    let drop = true;
+    await page.route(`**/api/v1/assistances/${id}/state`, async (route) => {
+      attempts.push({
+        key: route.request().headers()['idempotency-key'],
+        body: route.request().postDataJSON(),
+      });
+      if (drop) {
+        drop = false;
+        expect((await route.fetch()).ok()).toBe(true);
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await expect(page.getByLabel('协助回复记录', { exact: true })).toContainText(
+      '查看历史时仍保留的回复',
+    );
+    await page.getByRole('button', { name: '结束协助', exact: true }).click();
+    await page.getByRole('button', { name: '确认结束协助', exact: true }).click();
+    await expect(page.getByLabel('协助操作待确认', { exact: true })).toBeVisible();
+    await expect(page.getByText('已结束', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '查看更早回复', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '确认上次协助操作', exact: true }).click();
+    await expect(page.getByLabel('协助操作待确认', { exact: true })).toHaveCount(0);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toEqual(attempts[1]);
+    const result = await (await get(page, `assistances/${id}`, f.space.id)).json();
+    expect(result.assistance.state).toBe('closed');
+    expect(result.assistance.revision).toBe(25);
+  } finally {
+    await f.context.close();
+  }
+});

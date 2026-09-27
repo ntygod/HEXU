@@ -206,14 +206,18 @@ function AssistanceItems({ taskId, onSelect }: { taskId?: string; onSelect?(id: 
 }
 export function AssistanceThread({ id, onBusy }: { id: string; onBusy?(busy: boolean): void }) {
   const [before, setBefore] = useState<number | null>(null);
-  const read = useAssistanceRead<AssistanceDetail>(
-    assistancePath(id) + (before ? '?before=' + before : ''),
+  const read = useAssistanceRead<AssistanceDetail>(assistancePath(id));
+  const history = useAssistanceRead<AssistanceDetail>(
+    before ? assistancePath(id) + '?before=' + before : null,
+    0,
   );
-  if (!read.value || read.denied)
+  if (!read.value || read.denied || history.denied)
     return (
       <div className="dialog-body assistance-content">
-        <p role={read.error ? 'alert' : 'status'}>{read.error || '正在读取协助…'}</p>
-        {read.denied && (
+        <p role={read.error ? 'alert' : 'status'}>
+          {read.error || history.error || '正在读取协助…'}
+        </p>
+        {(read.denied || history.denied) && (
           <p>协助链接不授予访问权。请核对当前账号与空间；已撤销的内容和未发送回复已清除。</p>
         )}
         {read.error && (
@@ -225,12 +229,13 @@ export function AssistanceThread({ id, onBusy }: { id: string; onBusy?(busy: boo
     );
   return (
     <ThreadContent
-      key={`${id}:${read.value.assistance.canReply}:${read.value.assistance.canManage}`}
+      key={id}
       value={read.value}
       readError={read.error}
       onRetry={read.retry}
       before={before}
       setBefore={setBefore}
+      history={history}
       onBusy={onBusy}
     />
   );
@@ -241,6 +246,7 @@ function ThreadContent({
   onRetry,
   before,
   setBefore,
+  history,
   onBusy,
 }: {
   value: AssistanceDetail;
@@ -248,9 +254,11 @@ function ThreadContent({
   onRetry(): void;
   before: number | null;
   setBefore(v: number | null): void;
+  history: ReturnType<typeof useAssistanceRead<AssistanceDetail>>;
   onBusy?(v: boolean): void;
 }) {
   const item = value.assistance;
+  const replies = before ? history.value : value;
   const [body, setBody] = useState(''),
     [baseRevision, setBaseRevision] = useState(item.revision),
     [action, setAction] = useState<'close' | 'cancel' | null>(null);
@@ -270,6 +278,12 @@ function ThreadContent({
   useEffect(() => {
     if (!body && !action && !locked) setBaseRevision(item.revision);
   }, [item.revision, body, action, locked]);
+  useEffect(() => {
+    // Losing reply/manage authority clears unsaved edits without dropping the receipt
+    // of an already-sent close/cancel request when its status arrives before its reply.
+    if (!item.canReply) setBody('');
+    if (!item.canManage || !item.canReply) setAction(null);
+  }, [item.canReply, item.canManage]);
   if (command.denied)
     return (
       <div className="dialog-body assistance-content">
@@ -325,18 +339,27 @@ function ThreadContent({
       <section aria-label="协助回复记录" className="assistance-replies">
         <h3>围绕这段材料讨论</h3>
         <div className="assistance-actions">
-          {value.nextBefore && (
-            <Button type="button" onClick={() => setBefore(value.nextBefore)}>
+          {replies?.nextBefore && (
+            <Button type="button" disabled={locked} onClick={() => setBefore(replies.nextBefore)}>
               查看更早回复
             </Button>
           )}
           {before && (
-            <Button type="button" onClick={() => setBefore(null)}>
+            <Button type="button" disabled={locked} onClick={() => setBefore(null)}>
               返回最新回复
             </Button>
           )}
         </div>
-        {value.replies.map((r) => (
+        {before && history.error && (
+          <p className="form-error" role="alert">
+            {history.error}；未发送回复已保留。
+            <Button type="button" disabled={locked} onClick={history.retry}>
+              重读更早回复
+            </Button>
+          </p>
+        )}
+        {before && !history.value && !history.error && <p role="status">正在读取更早回复…</p>}
+        {replies?.replies.map((r) => (
           <article key={r.id} className="assistance-reply">
             <div className="assistance-card-meta">
               <strong>{r.author.name}</strong>
@@ -345,7 +368,7 @@ function ThreadContent({
             <pre>{r.body}</pre>
           </article>
         ))}
-        {value.replies.length === 0 && (
+        {replies?.replies.length === 0 && (
           <p className="hint">还没有回复。协助请求不会自动发给 AI。</p>
         )}
       </section>
@@ -389,9 +412,15 @@ function ThreadContent({
       {conflict && (body || action) && !command.uncertain && (
         <section className="assistance-warning" aria-label="协助版本冲突">
           <p>协助已更新，请先查看新回复或状态。你的输入已保留，不会自动发送。</p>
-          <Button type="button" disabled={locked} onClick={() => setBaseRevision(item.revision)}>
-            已查看更新，保留我的输入
-          </Button>
+          {before ? (
+            <Button type="button" disabled={locked} onClick={() => setBefore(null)}>
+              查看最新回复并保留输入
+            </Button>
+          ) : (
+            <Button type="button" disabled={locked} onClick={() => setBaseRevision(item.revision)}>
+              已查看更新，保留我的输入
+            </Button>
+          )}
         </section>
       )}
       {item.canManage && item.state !== 'cancelled' && (
