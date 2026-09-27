@@ -57,7 +57,7 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 - 提交前执行 `npm run format`，用 `git diff --check` 检查差异。
 - 按改动选择现有检查：`npm run typecheck`、`npm test`、`npm run build`；`npm run check` 已包含这三项。
-- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312 端口；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
+- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312/4313 端口（协助使用独立认证进程）；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
 - 原生／独立节点的完整回归以 Linux 为准；macOS 未验证，Windows 原生执行不支持。Windows 可以做页面、格式、类型与构建检查，不能据此宣称进程和凭证边界跨平台完成。
 - 测试必须使用明确协议替身和虚构 Key，不使用开发者或提供方凭证。`check:codex-protocol` / `check:claude-protocol` 是可选无模型检查，不使用真实账户或发起真实模型 turn。
 

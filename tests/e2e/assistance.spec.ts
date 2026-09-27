@@ -1,8 +1,8 @@
 import { test, expect, type Page, type Browser } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
-const origin = 'http://127.0.0.1:4312';
-const password = 'Fictional Node Browser Password 2026!';
+const origin = 'http://127.0.0.1:4313';
+const password = 'Fictional Assistance Browser Password 2026!';
 const shared = '请查看这个错误';
 const hidden = '不分享的另一段内部说明';
 const headers = (spaceId?: string) => ({
@@ -26,12 +26,12 @@ async function prepare(page: Page, browser: Browser, privateTask = false) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } }),
     member = await context.newPage();
   const initial = await (await page.request.get(origin + '/api/v1/identity')).json();
-  const identity = { email: 'node-browser-owner@example.invalid', password };
+  const identity = { email: 'assistance-browser-owner@example.invalid', password };
   if (initial.setupRequired)
     await post(page, 'identity/setup', {
       ...identity,
-      name: '林舟（节点测试）',
-      code: 'fictional-node-browser-setup-code-0123456789',
+      name: '林舟（协助测试）',
+      code: 'fictional-assistance-browser-setup-code-0123456789',
     });
   else await post(page, 'identity/sign-in', identity);
   const owner = (await (await page.request.get(origin + '/api/v1/identity')).json()).user;
@@ -304,6 +304,8 @@ test('临时读取故障和来源/回复版本冲突保留草稿，明确核对�
     await expect(f.member.getByLabel('协助回复记录', { exact: true })).toContainText(
       '我的未发送建议',
     );
+    // Wait for the requester's actual view to observe the reply before closing its revision.
+    await expect(page.getByLabel('协助回复记录', { exact: true })).toContainText('我的未发送建议');
     await page.getByRole('button', { name: '结束协助', exact: true }).click();
     await page.getByRole('button', { name: '确认结束协助', exact: true }).click();
     await expect(f.member.getByLabel('协助回复', { exact: true })).toHaveCount(0);
