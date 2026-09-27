@@ -294,3 +294,9 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 `GET /tasks/:taskId/messages/:messageId/draft-preview` 读取当前任务 AI 回复的源指纹/节选；`GET/POST /tasks/:taskId/ai-drafts` 列表/保存，`GET/PATCH .../:draftId` 读取/修订。`GET .../:draftId/target?kind=task|source&id=...` 返回有权限目标的当前正文/版本；`POST .../:draftId/adoptions` 接受 expectedRevision、ranges:[{start,end}]、mode:append|replace 与 target:{kind,id,expectedRevision}，实际采用文本由服务端从已保存草稿计算。
 
 迁移 16 新增 ai_drafts、ai_draft_revisions、ai_draft_adoptions。目标、采用前后记录、资料修订、任务待接续暂停、事件及回执同事务。当前权限在读取、写入和旧回执前重查；私有草稿不能借目标参数公开。`GET .../:draftId/revisions` 和 `/adoptions` 提供分页历史。原输出不自动变草稿，采用不启动执行或发布约定；详情见 [用法](../engineering/ai-drafts.md)。
+
+## 真人有限协助切片（11）
+
+迁移 17：assistances / assistance_grants / assistance_replies / assistance_events；outbox 新增 assistance_id。`snapshot_reply` 是限定到单协助固定文本与回复的授权，不用于 Task/Project/目录判权。
+
+新增 `GET /tasks/:taskId/messages/:messageId/assistance-preview`、`GET /tasks/:taskId/assistance-recipients`、`GET/POST /tasks/:taskId/assistances`、`GET /assistances`、`GET /assistances/:id`、`POST /assistances/:id/replies`、`POST /assistances/:id/state`。接收者路由不绕过原 Task 守卫；当前权限和有限授权由 AssistanceStore 独立校验。请求体与分页见 [真人协助 API](../engineering/human-assistance.md)。

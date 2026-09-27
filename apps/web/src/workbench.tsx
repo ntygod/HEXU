@@ -1,3 +1,4 @@
+import { AssistanceWorkbench } from './assistance.js';
 import { useState } from 'react';
 import {
   Button,
@@ -130,6 +131,7 @@ export function Workbench() {
             </Link>
           ))}
           {!attention.length && <p className="work-empty-text">没有等待回复的事项。</p>}
+          <AssistanceWorkbench />
           <div className="home-resource-link">
             <Icon name="monitor" />
             <div>

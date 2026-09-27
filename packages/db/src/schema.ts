@@ -265,4 +265,32 @@ CREATE INDEX ai_draft_adoptions_draft ON ai_draft_adoptions(draft_id,task_id);
 -- Existing AI replies are not silently converted to saved drafts or adopted content.
 `,
   },
+  {
+    version: 17,
+    sql: `
+CREATE TABLE assistances (
+ id TEXT PRIMARY KEY, space_id TEXT NOT NULL, task_id TEXT NOT NULL REFERENCES tasks(id),
+ requester_id TEXT NOT NULL, recipient_id TEXT NOT NULL, state TEXT NOT NULL,
+ body TEXT NOT NULL, CHECK(state IN ('open','responded','closed','cancelled'))
+);
+CREATE INDEX assistances_task ON assistances(task_id,space_id);
+CREATE INDEX assistances_recipient ON assistances(space_id,recipient_id,state);
+CREATE INDEX assistances_requester ON assistances(space_id,requester_id,state);
+CREATE TABLE assistance_grants (
+ assistance_id TEXT PRIMARY KEY REFERENCES assistances(id), recipient_id TEXT NOT NULL,
+ snapshot_hash TEXT NOT NULL, scope TEXT NOT NULL CHECK(scope='snapshot_reply'), revoked_at TEXT
+);
+CREATE TABLE assistance_replies (
+ assistance_id TEXT NOT NULL REFERENCES assistances(id), revision INTEGER NOT NULL, body TEXT NOT NULL,
+ PRIMARY KEY(assistance_id,revision)
+);
+CREATE TABLE assistance_events (
+ assistance_id TEXT NOT NULL REFERENCES assistances(id), revision INTEGER NOT NULL,
+ actor_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL,
+ PRIMARY KEY(assistance_id,revision)
+);
+ALTER TABLE outbox ADD COLUMN assistance_id TEXT REFERENCES assistances(id);
+-- Existing messages and task memberships never imply consent to share an excerpt.
+`,
+  },
 ];

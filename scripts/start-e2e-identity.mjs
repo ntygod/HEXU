@@ -8,6 +8,11 @@ const fixtures = {
     secret: 'fictional-browser-auth-secret-not-real-0123456789',
     setupCode: 'fictional-browser-setup-code-not-real-0123456789',
   },
+  assistance: {
+    port: 4313,
+    secret: 'fictional-assistance-browser-auth-secret-0123456789',
+    setupCode: 'fictional-assistance-browser-setup-code-0123456789',
+  },
   node: {
     port: 4312,
     secret: 'fictional-node-browser-auth-secret-0123456789',

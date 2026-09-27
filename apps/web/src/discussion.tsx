@@ -1,3 +1,4 @@
+import { RequestAssistance } from './assistance-create.js';
 import { useState, type FormEvent } from 'react';
 import type { Message, Run } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
@@ -112,6 +113,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
             <p>{message.body}</p>
             <PublishAgreement message={message} />
             <DraftFromMessage message={message} />
+            <RequestAssistance message={message} />
           </div>
         </article>
       ))}
