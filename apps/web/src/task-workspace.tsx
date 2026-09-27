@@ -2,6 +2,7 @@ import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
 import { TaskAgreements } from './project-agreements.js';
 import { RunProjectMaterials } from './project-materials.js';
+import { TaskDrafts } from './ai-drafts.js';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { TaskDetail } from '../../../packages/contracts/src/index.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
@@ -195,6 +196,7 @@ export function TaskPage({ id }: { id: string }) {
           <TaskOwner task={task} />
           <TaskParticipants task={task} />
           <TaskAgreements task={task} />
+          <TaskDrafts task={task} />
           <span className="spacer" />
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明

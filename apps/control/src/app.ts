@@ -1,6 +1,11 @@
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import {
+  parseDraftPageQuery,
+  parseDraftHistoryQuery,
+  parseDraftTarget,
+} from '../../../packages/contracts/src/ai-drafts.js';
+import {
   parseProjectMaterialPreview,
   parseProjectMaterialQuery,
 } from '../../../packages/contracts/src/project-materials.js';
@@ -206,6 +211,61 @@ export async function createApp(
     mode: store.teamMode ? 'team-local' : 'local-preview',
   }));
   app.get('/api/v1/workbench', async () => store.workbench());
+  app.get('/api/v1/tasks/:taskId/messages/:messageId/draft-preview', async (request) =>
+    store.aiDrafts.preview(param(request.params, 'taskId'), param(request.params, 'messageId')),
+  );
+  app.get('/api/v1/tasks/:taskId/ai-drafts', async (request) =>
+    store.aiDrafts.list(param(request.params, 'taskId'), parseDraftPageQuery(request.query)),
+  );
+  app.post('/api/v1/tasks/:taskId/ai-drafts', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        store.aiDrafts.create(param(request.params, 'taskId'), request.body, key(request.headers)),
+      ),
+  );
+  app.get('/api/v1/tasks/:taskId/ai-drafts/:draftId', async (request) =>
+    store.aiDrafts.get(param(request.params, 'taskId'), param(request.params, 'draftId')),
+  );
+  app.patch('/api/v1/tasks/:taskId/ai-drafts/:draftId', async (request) =>
+    store.aiDrafts.edit(
+      param(request.params, 'taskId'),
+      param(request.params, 'draftId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.get('/api/v1/tasks/:taskId/ai-drafts/:draftId/target', async (request) => {
+    const taskId = param(request.params, 'taskId');
+    store.aiDrafts.get(taskId, param(request.params, 'draftId'));
+    return store.aiDrafts.target(taskId, parseDraftTarget(request.query), false, true);
+  });
+  app.post('/api/v1/tasks/:taskId/ai-drafts/:draftId/adoptions', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        store.aiDrafts.adopt(
+          param(request.params, 'taskId'),
+          param(request.params, 'draftId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
+  app.get('/api/v1/tasks/:taskId/ai-drafts/:draftId/adoptions', async (request) =>
+    store.aiDrafts.adoptions(
+      param(request.params, 'taskId'),
+      param(request.params, 'draftId'),
+      parseDraftPageQuery(request.query),
+    ),
+  );
+  app.get('/api/v1/tasks/:taskId/ai-drafts/:draftId/revisions', async (request) =>
+    store.aiDrafts.history(
+      param(request.params, 'taskId'),
+      param(request.params, 'draftId'),
+      parseDraftHistoryQuery(request.query),
+    ),
+  );
   app.get('/api/v1/tasks/:taskId/project-materials', async (request) =>
     store.projectMaterials.catalog(
       param(request.params, 'taskId'),

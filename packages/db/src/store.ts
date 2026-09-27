@@ -5,6 +5,7 @@ import { ProjectSettingsStore } from './project-settings.js';
 import { ProjectSourcesStore } from './project-sources.js';
 import { ProjectAgreementsStore } from './project-agreements.js';
 import { ProjectMaterialsStore } from './project-materials.js';
+import { AiDraftsStore } from './ai-drafts.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IdentityUser, Principal } from '../../contracts/src/identity.js';
@@ -67,6 +68,7 @@ export class Store {
   readonly projectSources: ProjectSourcesStore;
   readonly projectAgreements: ProjectAgreementsStore;
   readonly projectMaterials: ProjectMaterialsStore;
+  readonly aiDrafts: AiDraftsStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -106,6 +108,7 @@ export class Store {
     this.projectSources = new ProjectSourcesStore(this);
     this.projectAgreements = new ProjectAgreementsStore(this);
     this.projectMaterials = new ProjectMaterialsStore(this);
+    this.aiDrafts = new AiDraftsStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()

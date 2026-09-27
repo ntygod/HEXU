@@ -5,6 +5,7 @@ import { Avatar, Button, Icon, ToolMark } from '../../../packages/ui/src/index.j
 import { useApp, canEditTask, time, useTaskDraft } from './state.js';
 import './discussion.css';
 import { PublishAgreement } from './agreement-create.js';
+import { DraftFromMessage } from './ai-drafts.js';
 
 export function MessageComposer({
   taskId,
@@ -110,6 +111,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
             </div>
             <p>{message.body}</p>
             <PublishAgreement message={message} />
+            <DraftFromMessage message={message} />
           </div>
         </article>
       ))}

@@ -168,3 +168,13 @@ Context bundles bind atomically with Run/dispatch/notes/idempotency and Operatio
 Only actual native spawn or node running evidence records material startup. Queue/ACK/permit/Operation success is not provider receipt; old runs have no fabricated bundle. Run material history follows current task/project permissions. Native key-specific redaction stays local; the team host never receives provider keys. Retained sessions may inherit earlier material even when current checkboxes omit it.
 
 Execution panels bind consent to task-context and project-material versions. Uncertain writes confirm a cloned original body and idempotency key, never generate a second paid request; preserve the originally chosen continuation source while the parent Run list updates. Changing filters is not permission to submit a form. Current selection is manual; automatic recommendations, summaries, persistent preferences and remote deployment remain pending.
+
+## AI drafts and partial adoption (05-04)
+
+Drafts come only from an existing AI reply in the same task, with a source hash and independent revisions. Human edits are explicit; no native transcript import, model call, automatic agreement publication or model-context inclusion. Persisted drafts are task-scoped business records, distinct from unsaved drawer-local edits.
+
+Adoption checks current task/target edit access before receipt replay and again in the transaction, plus exact draft and target revisions. Only the same task description or same-project source body may change; private drafts cannot publish to project sources or other tasks. Compute selected text from bounded non-overlapping ranges of the saved revision, never trust supplied adopted text or target paths. Preserve source title/URL/identity and immutable before/after adoption history. Target update, source revision, adoption, outbox and receipt commit atomically.
+
+Task-description adoption durably pauses pending preview/node Operations in the same transaction, retaining fixed material, stop requests and unknown locks. It does not complete a Task, change its owner, stop a Run, deliver live input, issue permits or dispatch work. Source adoption uses the existing source revision and material-validation rules. Later draft edits never rewrite adopted targets. Archived projects still permit human collaboration.
+
+Keep draft and target baselines fixed in the W1 drawer; conflicts retain local edits/ranges for explicit comparison, not silent rebasing. Unknown replies confirm the identical body/key. Authority or identity/space changes discard unsaved editors. Current targets are task descriptions and project sources; requirements/results, automated drafting and batch adoption remain pending. Continue finite-material human assistance per 22.
