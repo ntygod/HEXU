@@ -204,4 +204,19 @@ CREATE TABLE task_participant_events (
 -- Legacy tasks start with an empty relation set; do not invent participation or authorship.
 `,
   },
+  {
+    version: 13,
+    sql: `
+CREATE TABLE project_sources (
+ id TEXT PRIMARY KEY, space_id TEXT NOT NULL, project_id TEXT NOT NULL REFERENCES projects(id), body TEXT NOT NULL
+);
+CREATE INDEX project_sources_project ON project_sources(project_id,space_id);
+CREATE TABLE project_source_revisions (
+ source_id TEXT NOT NULL REFERENCES project_sources(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ action TEXT NOT NULL CHECK(action IN ('created','updated','deleted','restored')), body TEXT NOT NULL,
+ PRIMARY KEY(source_id,revision)
+);
+-- Do not relabel old project descriptions, messages or demo files as user-authored sources.
+`,
+  },
 ];

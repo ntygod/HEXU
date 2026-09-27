@@ -2,6 +2,7 @@ import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
+import { ProjectSourcesStore } from './project-sources.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IdentityUser, Principal } from '../../contracts/src/identity.js';
@@ -56,6 +57,7 @@ export class Store {
   readonly projectLifecycle: ProjectLifecycleStore;
   readonly taskAssignment: TaskAssignmentStore;
   readonly taskParticipants: TaskParticipantsStore;
+  readonly projectSources: ProjectSourcesStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -92,6 +94,7 @@ export class Store {
     this.projectLifecycle = new ProjectLifecycleStore(this);
     this.taskAssignment = new TaskAssignmentStore(this);
     this.taskParticipants = new TaskParticipantsStore(this);
+    this.projectSources = new ProjectSourcesStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()

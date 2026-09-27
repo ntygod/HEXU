@@ -108,7 +108,7 @@ Keep Claude native transcript format opaque. Check the documented private transc
 
 Validate init ID/cwd/model/dontAsk/tools/empty MCP before accepting session output; resumed model is pinned to the saved resolved model. ID checks do not prove no model request occurred before init; do not claim zero charge after process launch. Failure/stop/unknown never silently starts a fresh paid turn or clears workspace claims. Optional check:claude-protocol uses no key and a nonexistent UUID, not a real successful session. The exact 2.1.283 hidden --max-turns help exception cannot waive restriction flags or become a blanket version claim.
 
-Project name/description editing (03-04) and archive/restore with execution controls (03-06) are implemented as local slices; continue task ownership/participants via the existing 22-next-delivery plan. Do not repeat W1 or block product development on unavailable live-provider credentials.
+Project settings/lifecycle and task assignment/participation are implemented as local slices; follow the existing 22-next-delivery plan. Do not repeat W1 or block product development on unavailable live-provider credentials.
 
 ## Project settings
 
@@ -139,4 +139,14 @@ Participants are collaboration metadata, never access grants. Current project vi
 
 Use the independent participation revision, immutable events, scoped outbox and idempotent receipt in one transaction. Project/space revocation ends active relations in the same membership transaction; rejoining or replaying an old receipt cannot reactivate them. Leaving participation does not revoke existing project access. Preserve recorded task-scoped names without looking up outsiders.
 
-Participation is excluded from model materials: do not update Task revision/timestamps, owner, Run, dispatch, frozen Operation or workspace locks. Actual access revocation still uses existing execution/continuation checks. participantUserIds is only a read projection, never persisted Task JSON or model input. Keep one pure people/search predicate for API and board/list, filter after current access checks, and preserve URL selection across reload/back. Uncertain UI changes confirm the same payload/key; authority changes discard the drawer. Next delivery is project sources per 22; complete sorting, status/label/attention filters and private sharing remain pending.
+Participation is excluded from model materials: do not update Task revision/timestamps, owner, Run, dispatch, frozen Operation or workspace locks. Actual access revocation still uses existing execution/continuation checks. participantUserIds is only a read projection, never persisted Task JSON or model input. Keep one pure people/search predicate for API and board/list, filter after current access checks, and preserve URL selection across reload/back. Uncertain UI changes confirm the same payload/key; authority changes discard the drawer. Follow 22 for the next slice; complete sorting, status/label/attention filters and private sharing remain pending.
+
+## Project sources (05-02)
+
+Project sources support manual text and HTTP/HTTPS references only. Current project viewers can read; edit/manage members can create, edit, soft-delete and restore, including in archived projects. Revalidate current project/space permissions before receipts and inside transactions. Direct IDs, lists, search, immutable history and SSE share this boundary; being a space owner or holding a source URL does not grant access.
+
+Keep stable source IDs and kinds, exact body text, canonical credential-free HTTP(S) links, content hashes and recorded authors. Commit current source, independent revision snapshot, project outbox and receipt together. Migration must not fabricate sources from old descriptions/messages. Delete preserves history; restore keeps the ID and creates a revision. Old receipts cannot reapply a state change, and deleted sources cannot be edited until explicitly restored.
+
+Sources are not yet model context or project agreements. Saving/editing/deleting them must not alter Project/Task revisions, existing Run/dispatch/Operation material or workspace locks. Never fetch a reference URL, access a path, enable a provider or claim delivery from this feature. File uploads/storage, source selection/sending and global source search remain pending; next work is 05-03 per 22.
+
+The feature owns its W1 page/drawers/styles. Render raw text safely and open validated links only on user action. Freeze editor baselines, preserve drafts on transient reads, clear content/editor state on confirmed revocation, and discard drafts on identity/space change or close. Uncertain writes confirm the same body/key. Historical reading refreshes explicitly, not on every SSE. Source deep links do not carry draft content or confer authorization.

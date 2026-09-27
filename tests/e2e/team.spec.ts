@@ -177,6 +177,76 @@ async function preparedPair(owner: Page, member: Page, suffix: string) {
   return { space, project, task, memberIdentity };
 }
 
+test('项目资料允许编辑成员协作，只读不可写；撤权清除草稿和已打开内容', async ({
+  page,
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    member = await context.newPage();
+  try {
+    const f = await preparedPair(page, member, 'sources');
+    const s = await post(
+      page,
+      `projects/${f.project.id}/sources`,
+      { kind: 'text', title: '团队接口资料', content: '当前已保存的说明' },
+      f.space.id,
+    );
+    await member.goto(`${origin}/projects/${f.project.id}?tab=sources&source=${s.id}`);
+    const detail = member.getByRole('dialog', { name: '项目资料', exact: true });
+    await member.getByRole('button', { name: '编辑资料', exact: true }).click();
+    await member.getByLabel('资料正文', { exact: true }).fill('降权时必须清除的资料草稿');
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'view' },
+      f.space.id,
+    );
+    await expect(member.getByLabel('资料正文', { exact: true })).toHaveCount(0);
+    await expect(detail).toContainText('当前已保存的说明');
+    await expect(member.getByRole('button', { name: '编辑资料', exact: true })).toHaveCount(0);
+    await expect(member.getByRole('button', { name: '删除资料', exact: true })).toHaveCount(0);
+    await member.getByRole('button', { name: '关闭资料', exact: true }).click();
+    await expect(member.getByRole('button', { name: '新建资料', exact: true })).toBeDisabled();
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'edit' },
+      f.space.id,
+    );
+    await member.getByRole('button', { name: '查看资料 团队接口资料', exact: true }).click();
+    await member.getByRole('button', { name: '编辑资料', exact: true }).click();
+    await expect(member.getByLabel('资料正文', { exact: true })).toHaveValue('当前已保存的说明');
+    await member.getByLabel('资料正文', { exact: true }).fill('编辑者明确保存的新资料');
+    await member.getByRole('button', { name: '保存资料修改', exact: true }).click();
+    await expect(detail).toContainText('编辑者明确保存的新资料');
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: null },
+      f.space.id,
+    );
+    await expect(detail).toHaveCount(0);
+    await expect(
+      member.getByRole('heading', { name: '项目不存在或当前无权访问', exact: true }),
+    ).toBeVisible();
+    expect(
+      (
+        await member.request.get(
+          `${origin}/api/v1/projects/${f.project.id}/sources/${s.id}/revisions`,
+          { headers: headers(f.space.id) },
+        )
+      ).status(),
+    ).toBe(404);
+    const storage = await member.evaluate(() =>
+      JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }),
+    );
+    expect(storage).not.toContain('降权时必须清除的资料草稿');
+    expect(storage).not.toContain('当前已保存的说明');
+  } finally {
+    await context.close();
+  }
+});
+
 test('只读成员自行参与不增加任务权限；编辑降权关闭管理抽屉，撤权结束参与且重新加入不复活', async ({
   page,
   browser,

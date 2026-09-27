@@ -142,5 +142,6 @@ Figma 参考只决定信息组织，不自动批准示例模型、隐藏会话�
 - `identity`／`team`：账号、空间和项目成员；`settings`／`resources.css`：能力与节点。
 - `workbench`、`projects`、`results`、`work-cards`／`work-pages.css`：工作聚合、项目与成果；`project-task-filters.tsx/css`：看板/列表共用人员/关键词条件及 URL 状态；`project-settings.tsx/css`：基本信息、修订与冲突处理抽屉；`project-lifecycle.tsx`：同一抽屉中的归档影响、运行选择与恢复。
 - `command-menu`：权限范围内的实际搜索与现有动作；`preview.css`：仅虚构订单示例。
+- `project-sources.tsx/css`：项目资料列表、原文/链接阅读、修订、冲突与删除/恢复抽屉；资料状态与模型送达状态保持区别，来源信息按需展开。
 
 面板宽度使用原生滑杆提供拖动与键盘操作，布局按身份／空间保存；手机在讨论和代码／成果之间切换。输入草稿只在当前身份／空间的内存中保留，刷新会清空；不把账号凭证或任务文本写入外观偏好。

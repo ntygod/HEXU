@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
+import { ProjectSources } from './project-sources.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
 import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
@@ -77,7 +78,31 @@ export function Projects() {
 
 export function ProjectPage({ id }: { id: string }) {
   const { data, changeStatus } = useApp();
-  const [tab, setTab] = useState('tasks');
+  const readLocation = () => {
+    const query = new URLSearchParams(location.search);
+    return {
+      tab: ['overview', 'results', 'sources'].includes(query.get('tab') ?? '')
+        ? query.get('tab')!
+        : 'tasks',
+      sourceId: query.get('source') ?? '',
+    };
+  };
+  const [projectLocation, setProjectLocation] = useState(readLocation);
+  const { tab, sourceId } = projectLocation;
+  useEffect(() => {
+    const update = () => setProjectLocation(readLocation());
+    window.addEventListener('popstate', update);
+    return () => window.removeEventListener('popstate', update);
+  }, []);
+  function setTab(tab: string, source = '') {
+    const url = new URL(location.href);
+    if (tab === 'tasks') url.searchParams.delete('tab');
+    else url.searchParams.set('tab', tab);
+    if (source) url.searchParams.set('source', source);
+    else url.searchParams.delete('source');
+    history.pushState({}, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
   const { view, setView, filters, setFilter, clear } = useProjectTaskFilters();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -143,6 +168,7 @@ export function ProjectPage({ id }: { id: string }) {
         {[
           ['tasks', '需求与任务'],
           ['overview', '总览'],
+          ['sources', '项目资料'],
           ['results', '项目成果'],
         ].map(([key, label]) => (
           <button key={key} aria-pressed={tab === key} onClick={() => setTab(key!)}>
@@ -150,7 +176,14 @@ export function ProjectPage({ id }: { id: string }) {
           </button>
         ))}
       </div>
-      {tab === 'results' ? (
+      {tab === 'sources' ? (
+        <ProjectSources
+          key={id}
+          project={project}
+          sourceId={sourceId}
+          onSelect={(source) => setTab('sources', source)}
+        />
+      ) : tab === 'results' ? (
         <div className="work-result-grid">
           {results.map((result) => (
             <ResultCard key={result.id} result={result} />

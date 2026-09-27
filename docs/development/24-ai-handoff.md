@@ -14,11 +14,12 @@
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-05-02：项目资料与修订**，联动 03 权限、05-03/05/06 和项目/任务工作区。项目设置、归档/恢复、真人负责人改派、参与关系和人员筛选已经接入，不重复实施。先补可人工维护的文本资料/链接与修订，再接按权限和目的选材；范围以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-05-03：从讨论保存项目约定**，联动 03 权限、05-01/02/05/06 和项目/任务工作区。项目设置、归档/恢复、任务分工/筛选、文本/链接资料与修订已经接入，不重复实施。先把有权限来源通过明确编辑保存为项目约定，再接按权限和目的选材；范围以 [22](22-next-delivery.md) 为准。
 
 | 工作 | 先查看 |
 | --- | --- |
-| 下一项项目资料 | [05 工作包](05-context-discussion.md)、[项目设置事务](../../packages/db/src/project-settings.ts)、[现有节点材料装配](../../packages/db/src/node-execution.ts)；文本/链接不等于文件上传或网络导入，保存不等于模型收到 |
+| 下一项项目约定 | [05 工作包](05-context-discussion.md)、[讨论入口](../../apps/web/src/discussion.tsx)、[消息事务](../../packages/db/src/store.ts)、[现有节点材料装配](../../packages/db/src/node-execution.ts)；私有任务不能借保存约定公开，明确来源与项目边界，保存不等于模型收到 |
+| 已交付的项目资料 | [资料契约](../../packages/contracts/src/project-sources.ts)、[原子事务](../../packages/db/src/project-sources.ts)、[W1 页面/抽屉](../../apps/web/src/project-sources.tsx)、[用法与边界](../engineering/project-sources.md)；文本/链接不等于文件上传或网络导入 |
 | 已交付的参与者/筛选 | [参与事务](../../packages/db/src/task-participants.ts)、[抽屉](../../apps/web/src/task-participants.tsx)、[URL 筛选](../../apps/web/src/project-task-filters.tsx)、[使用说明](../engineering/task-participants.md)；参与独立修订，不改变当前模型材料或执行授权 |
 | 已交付的负责人改派 | [改派契约](../../packages/contracts/src/task-assignment.ts)、[原子事务](../../packages/db/src/task-assignment.ts)、[W1 抽屉](../../apps/web/src/task-assignment.tsx)、[使用说明](../engineering/task-assignment.md)；不转移代码/节点/个人账户 |
 | 任务归属、状态与界面 | [04 工作包](04-tasks-requirements.md)、[Task 契约](../../packages/contracts/src/index.ts)、[任务事务](../../packages/db/src/store.ts)、[任务工作区](../../apps/web/src/task-workspace.tsx) |
