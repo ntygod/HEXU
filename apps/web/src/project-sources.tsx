@@ -102,6 +102,7 @@ function SourceFields({
         <label className="field">
           资料类型
           <select
+            aria-label="资料类型"
             value={kind}
             disabled={disabled}
             onChange={(event) => setKind(event.target.value as SourceKind)}
@@ -114,6 +115,7 @@ function SourceFields({
       <label className="field">
         资料标题
         <input
+          aria-label="资料标题"
           required
           maxLength={120}
           disabled={disabled}
@@ -126,6 +128,7 @@ function SourceFields({
         <label className="field">
           资料链接
           <input
+            aria-label="资料链接"
             type="url"
             required
             maxLength={2048}
@@ -139,6 +142,7 @@ function SourceFields({
       <label className="field">
         {kind === 'text' ? '资料正文' : '链接说明'}
         <textarea
+          aria-label={kind === 'text' ? '资料正文' : '链接说明'}
           required={kind === 'text'}
           rows={12}
           maxLength={8000}
