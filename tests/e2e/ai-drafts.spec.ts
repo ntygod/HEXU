@@ -60,6 +60,15 @@ async function selectRange(page: Page, start: number, end: number) {
   await field.press('Control+Home');
   for (let i = 0; i < start; i++) await field.press('ArrowRight');
   for (let i = start; i < end; i++) await field.press('Shift+ArrowRight');
+  await expect
+    .poll(() =>
+      field.evaluate((element: HTMLTextAreaElement) => [
+        element.selectionStart,
+        element.selectionEnd,
+      ]),
+    )
+    .toEqual([start, end]);
+  await expect(page.getByRole('button', { name: '添加所选片段', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '添加所选片段', exact: true }).click();
 }
 
@@ -238,4 +247,109 @@ test('明确替换同项目资料保留任务说明，私有草稿只能采用�
   await page.getByRole('button', { name: '选择片段采用', exact: true }).click();
   await expect(page.getByLabel('采用目标', { exact: true }).locator('option')).toHaveCount(1);
   await expect(dialog(page)).toContainText('私有草稿只可采用到当前任务说明');
+});
+
+test('鼠标局部拖选保留未选正文，重复片段明确拒绝，移除后可重新采用', async ({ page }) => {
+  const f = await fixture(page);
+  await saved(page, f);
+  await openDraft(page, f.task.id);
+  await page.getByRole('button', { name: '选择片段采用', exact: true }).click();
+  const field = page.getByLabel('选择草稿片段', { exact: true });
+  await field.scrollIntoViewIfNeeded();
+  const point = await field.evaluate((element: HTMLTextAreaElement) => {
+    const rect = element.getBoundingClientRect(),
+      style = getComputedStyle(element);
+    const canvas = document.createElement('canvas'),
+      context = canvas.getContext('2d')!;
+    context.font = style.font;
+    return {
+      x: rect.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) + 1,
+      y:
+        rect.top +
+        parseFloat(style.borderTopWidth) +
+        parseFloat(style.paddingTop) +
+        (parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2) / 2,
+      width: context.measureText(element.value.split('\n')[0]!).width,
+    };
+  });
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.move(point.x + point.width, point.y, { steps: 8 });
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      field.evaluate((element: HTMLTextAreaElement) => [
+        element.selectionStart,
+        element.selectionEnd,
+      ]),
+    )
+    .toEqual([0, 5]);
+  const add = page.getByRole('button', { name: '添加所选片段', exact: true });
+  await expect(add).toBeEnabled();
+  await add.click();
+  await expect(page.getByLabel('待采用片段', { exact: true })).toContainText('采用第一段');
+  await expect(page.getByLabel('待采用片段', { exact: true })).not.toContainText('保留第二段');
+  await add.click();
+  await expect(dialog(page)).toContainText('草稿片段不能重叠');
+  await expect(dialog(page).locator('.draft-selection-item')).toHaveCount(1);
+  await page.getByRole('button', { name: '移除片段 1', exact: true }).click();
+  await expect(page.getByRole('button', { name: '采用所选片段', exact: true })).toBeDisabled();
+  await add.click();
+  await page.getByRole('button', { name: '采用所选片段', exact: true }).click();
+  await expect(page.getByLabel('草稿历史与采用记录', { exact: true })).toBeVisible();
+  const detail = await (await page.request.get(`/api/v1/tasks/${f.task.id}`)).json();
+  expect(detail.task.description).toBe('现有工作说明\n\n采用第一段');
+  expect(detail.runs).toHaveLength(1);
+});
+
+test('键盘反向选择完整表情并映射 CRLF 原文，不修改草稿或误采用邻接文字', async ({ page }) => {
+  const f = await fixture(page),
+    draft = await saved(page, f);
+  const raw = '首行\r\n🙂采用\r\n保留';
+  const changed = await page.request.patch(`/api/v1/tasks/${f.task.id}/ai-drafts/${draft.id}`, {
+    headers: headers(),
+    data: { expectedRevision: 1, title: draft.title, content: raw },
+  });
+  expect(changed.ok()).toBe(true);
+  await page.goto(`/tasks/${f.task.id}`);
+  await page.getByRole('button', { name: 'AI 草稿', exact: true }).click();
+  await dialog(page)
+    .getByRole('button', { name: /可选择的建议/ })
+    .click();
+  await page.getByRole('button', { name: '选择片段采用', exact: true }).click();
+  const field = page.getByLabel('选择草稿片段', { exact: true });
+  await field.focus();
+  await field.press('Control+Home');
+  for (let i = 0; i < 3; i++) await field.press('ArrowRight');
+  await field.press('End');
+  for (let i = 0; i < 3; i++) await field.press('Shift+ArrowLeft');
+  await expect
+    .poll(() =>
+      field.evaluate((element: HTMLTextAreaElement) => [
+        element.selectionStart,
+        element.selectionEnd,
+        element.selectionDirection,
+      ]),
+    )
+    .toEqual([3, 7, 'backward']);
+  await field.press('x');
+  await expect(field).toHaveValue(raw.replace(/\r\n/g, '\n'));
+  await field.press('Tab');
+  await expect(page.getByRole('button', { name: '添加所选片段', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('待采用片段', { exact: true })).toContainText('🙂采用');
+  await expect(page.getByLabel('待采用片段', { exact: true })).not.toContainText('保留');
+  await page.getByRole('button', { name: '采用所选片段', exact: true }).click();
+  await expect(page.getByLabel('草稿历史与采用记录', { exact: true })).toBeVisible();
+  const detail = await (await page.request.get(`/api/v1/tasks/${f.task.id}`)).json();
+  expect(detail.task.description).toBe('现有工作说明\n\n🙂采用');
+  const after = await (
+    await page.request.get(`/api/v1/tasks/${f.task.id}/ai-drafts/${draft.id}`)
+  ).json();
+  expect(after.content).toBe(raw);
+  expect(after.revision).toBe(2);
+  const adoptions = await (
+    await page.request.get(`/api/v1/tasks/${f.task.id}/ai-drafts/${draft.id}/adoptions`)
+  ).json();
+  expect(adoptions.items[0].ranges).toEqual([{ start: 4, end: 8 }]);
 });

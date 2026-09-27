@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import {
   composeDraftAdoption,
@@ -12,6 +12,7 @@ import {
 import type { ProjectMaterialCatalog } from '../../../packages/contracts/src/project-materials.js';
 import { Button } from '../../../packages/ui/src/index.js';
 import { draftPath, DraftFeedback, useDraftCommand, useDraftRead } from './draft-common.js';
+import { moveDraftSelection, savedDraftRange } from './draft-selection.js';
 
 export function AdoptDraft({
   task,
@@ -47,7 +48,15 @@ export function AdoptDraft({
     draftPath(task.id, draft.id) +
       `/target?kind=${targetRef.kind}&id=${encodeURIComponent(targetRef.id)}`,
   );
+  const selectionHelp = useId();
   const changed = draft.revision !== base.revision;
+  function readSelection(field: HTMLTextAreaElement) {
+    setSelection(
+      field.selectionEnd > field.selectionStart
+        ? savedDraftRange(base.content, field.selectionStart, field.selectionEnd)
+        : null,
+    );
+  }
   let selectedText = '',
     rangeError = '';
   if (ranges.length)
@@ -71,16 +80,38 @@ export function AdoptDraft({
           readOnly
           rows={12}
           disabled={locked}
-          onSelect={(event) => {
+          aria-describedby={selectionHelp}
+          onSelect={(event) => readSelection(event.currentTarget)}
+          onKeyDown={(event) => {
+            if (locked || changed) return;
             const field = event.currentTarget;
-            setSelection(
-              field.selectionEnd > field.selectionStart
-                ? { start: field.selectionStart, end: field.selectionEnd }
-                : null,
+            const next = moveDraftSelection(
+              field.value,
+              {
+                start: field.selectionStart,
+                end: field.selectionEnd,
+                direction: field.selectionDirection,
+              },
+              {
+                key: event.key,
+                shiftKey: event.shiftKey,
+                ctrlKey: event.ctrlKey,
+                metaKey: event.metaKey,
+                altKey: event.altKey,
+                isComposing: event.nativeEvent.isComposing,
+              },
             );
+            if (!next) return;
+            event.preventDefault();
+            field.setSelectionRange(next.start, next.end, next.direction);
+            readSelection(field);
           }}
         />
       </label>
+      <p id={selectionHelp} className="hint">
+        可用鼠标拖选；键盘用左右方向键移动，按住 Shift 扩展选区。Home / End 定位行首/行尾， Ctrl 或
+        Command + Home / End 定位全文首尾。选好后点击“添加所选片段”。原文只读，不会被修改。
+      </p>
       <div className="draft-actions">
         <Button
           type="button"
