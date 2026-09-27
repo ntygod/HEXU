@@ -371,9 +371,21 @@ function AdoptionRecord({ item }: { item: AssistanceAdoption }) {
         <pre>{item.target.afterContent}</pre>
         <h4>原建议 · 回复 r{item.source.reply.revision}</h4>
         <pre>{item.source.reply.body}</pre>
+        <h4>当时的协助问题</h4>
+        <pre>{item.source.question}</pre>
         <h4>协助依据的固定片段</h4>
+        <p className="hint">
+          {item.source.snapshot.actorName} · {time(item.source.snapshot.createdAt)} · 协助 r
+          {item.source.assistanceRevision}
+        </p>
         <pre>{item.source.snapshot.text}</pre>
-        <code>{item.source.replyHash}</code>
+        <details>
+          <summary>来源指纹</summary>
+          <p className="hint">建议回复</p>
+          <code>{item.source.replyHash}</code>
+          <p className="hint">固定材料</p>
+          <code>{item.source.snapshotHash}</code>
+        </details>
       </details>
     </article>
   );

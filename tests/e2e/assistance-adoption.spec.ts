@@ -163,6 +163,13 @@ test('真人建议多片段采用保留 CRLF/表情原文，任务内预览与�
     await expect(page.getByLabel('协助建议采用记录', { exact: true })).toContainText(
       '不要采用的文字',
     );
+    await expect(page.getByLabel('协助建议采用记录', { exact: true })).toContainText(
+      '当时的协助问题',
+    );
+    await expect(page.getByLabel('协助建议采用记录', { exact: true })).toContainText(
+      '只采用有用建议',
+    );
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: 'artifacts/74-assistance-adoption-history-light.png',
       fullPage: true,
@@ -332,6 +339,71 @@ test('采用编辑在项目降权时清除且恢复不复活，撤销后不能�
     expect((await (await get(page, a.path + '/adoptions', f.space.id)).json()).items).toHaveLength(
       0,
     );
+  } finally {
+    await f.context.close();
+  }
+});
+
+test('采用已保存但回执丢失后撤销分享，仍可确认原记录且不覆盖后来的任务修改', async ({
+  page,
+  browser,
+}) => {
+  const f = await prepare(page, browser);
+  try {
+    const a = await withReply(page, f);
+    await openAdoption(page);
+    await selectFirst(page);
+    const attempts: { body: unknown; key: string | undefined }[] = [];
+    let savedId = '';
+    let drop = true;
+    await page.route(`**/api/v1/${a.path}/adoptions`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      attempts.push({
+        body: route.request().postDataJSON(),
+        key: route.request().headers()['idempotency-key'],
+      });
+      if (drop) {
+        drop = false;
+        const result = await route.fetch();
+        expect(result.ok(), await result.text()).toBe(true);
+        savedId = (await result.json()).id;
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await page.getByRole('button', { name: '确认采用建议片段', exact: true }).click();
+    await expect(page.getByLabel('建议采用待确认', { exact: true })).toBeVisible();
+    await post(
+      page,
+      `assistances/${a.id}/state`,
+      { expectedRevision: 2, action: 'cancel' },
+      f.space.id,
+    );
+    const task = (await (await get(page, `tasks/${f.task.id}`, f.space.id)).json()).task;
+    const changed = await page.request.patch(`${origin}/api/v1/tasks/${f.task.id}`, {
+      headers: headers(f.space.id),
+      data: {
+        expectedRevision: task.revision,
+        description: '后来人工修改的说明，不应被旧回执覆盖',
+      },
+    });
+    expect(changed.ok(), await changed.text()).toBe(true);
+    await expect(page.getByLabel('协助建议采用', { exact: true })).toContainText('不能新采用');
+    await expect(
+      page.getByRole('button', { name: '确认采用建议片段', exact: true }),
+    ).toBeDisabled();
+    await page.getByRole('button', { name: '确认上次建议采用', exact: true }).click();
+    await expect(page.getByLabel('建议采用成功', { exact: true })).toBeVisible();
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toEqual(attempts[1]);
+    const history = (await (await get(page, a.path + '/adoptions', f.space.id)).json()).items;
+    expect(history).toHaveLength(1);
+    expect(history[0].id).toBe(savedId);
+    expect(history[0].target.beforeContent).toBe(f.task.description);
+    expect(history[0].target.afterContent).toBe(f.task.description + '\n\n建议甲');
+    expect(history[0].source.question).toBe('只采用有用建议');
+    const current = (await (await get(page, `tasks/${f.task.id}`, f.space.id)).json()).task;
+    expect(current.description).toBe('后来人工修改的说明，不应被旧回执覆盖');
+    expect(current.revision).toBe(task.revision + 1);
   } finally {
     await f.context.close();
   }
