@@ -1,7 +1,7 @@
 # 19｜可领取工作项与团队分工
 
 > D1 · 17 个工作包 × 6 项 = 102 个工作项。  
-> **2026-09-27（UTC+8）核对至 E2c2 + W1 + 真人有限材料协助。保留原 102 个编号与标题，记录实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**
+> **2026-09-27（UTC+8）核对至 E2c2 + W1 + 真人与 AI 有限文本协助。保留原 102 个编号与标题，记录实际状态、剩余范围和代码入口。工程检查与当前边界见 [21｜实现进度](21-implementation-status.md)。**
 > [计划入口](README.md) · [先后依赖](00-delivery-map.md) · [接口总表](18-data-api-catalog.md)
 
 ## 1. 使用方式
@@ -18,13 +18,13 @@
 
 “已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3/E2b4/E2c1/E2c2 是实际代码批次，二者不互相替代。
 
-上一批推进 **05-04**：已有 AI 回复保存为有版本草稿，局部编辑/选择、任务说明或同项目资料采用、双版本冲突和不可变采用记录已接入。独立需求/成果目标、自动生成和批量采用仍缺；本批继续接入真人有限材料协助，下一步按 [22](22-next-delivery.md) 推进有限文本 AI 协助。05-05/06 自动推荐/总结、持久偏好和完整 provider receipt 仍缺。
+上一批推进 **05-04**：已有 AI 回复保存为有版本草稿，局部编辑/选择、任务说明或同项目资料采用、双版本冲突和不可变采用记录已接入。独立需求/成果目标、自动生成和批量采用仍缺；随后真人有限材料协助与 Claude 纯文本 AI 协助已接入，下一步按 [22](22-next-delivery.md) 推进协助建议的明确局部采用。05-05/06 自动推荐/总结、持久偏好和完整 provider receipt 仍缺。
 
 设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1 全套新页面已接入真实应用并删除旧呈现层，整套回归通过；桌面尚未交付。原工作项完整范围未全部收口，当前 **2 完成 / 67 部分实现 / 33 未实现**；历史批次统计保留在下方。
 
 执行拆分见 [23｜W1 前端重建](23-workbench-rebuild.md)：W1-01—09 映射到原 02／03／04／07／09／10／11／14／15 项，状态按各子任务实际交付记录。旧 UI 的已完成历史保留，接管后清理呈现代码；已有接口、权限、执行器和原生能力不归零。原表是唯一总账，W1 标签不另计为新增全局工作项。
 
-本批推进 **11-04/05/06 Claude 纯文本 AI 协助**；仅推进已有部分项，统计不变。固定文本辅助执行不是完整代码协助、Codex 或远程共享；实际回归见 21。
+本批推进 **11-04/05/06 Claude 纯文本 AI 协助**；仅推进已有部分项，统计不变。固定文本辅助执行不是完整代码协助、Codex 或远程共享；功能头 `f49921f` 的完整 Linux 回归 291 项工程检查和 83 项浏览器流程全部通过，原 279/80 基线保留，实际证据与未验证范围见 21。
 
 ## 2. 工作项索引
 
@@ -40,7 +40,7 @@
 | HX-DEV-02-02 | 应用外壳、导航与空间切换 | FE | 部分实现 | W1 顶栏、导航轨、项目导引栏、面包屑和命令入口已替换旧壳层；原路由和空间切换保留，导引栏偏好按身份／空间隔离。完整工作区布局偏好与正式个人客户端仍未交付。 | [新外壳](../../apps/web/src/shell.tsx) / [客户端决定](../engineering/adr-0008-client-surfaces.md) |
 | HX-DEV-02-03 | 任务、执行、人物、工具、成果组件 | FE | 部分实现 | W1 共享控件、输入与配置面板、状态与抽屉已接入。旧全局页面样式删除并按功能归属；未交付业务对应控件不以演示补足。 | [控件](../../packages/ui/src/index.tsx) / [任务](../../apps/web/src/task-workspace.tsx) |
 | HX-DEV-02-04 | 四类核心页面的模拟交互 | UX/FE | 已完成 | 工作台、项目、任务和成果四类页面骨架已接统一示例数据并可交互；此完成状态仅指页面骨架。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
-| HX-DEV-02-05 | 继续、协助、并行与反馈面板 | UX/FE | 部分实现 | 继续、反馈、接续状态界面已有；W1 归档交互参考并选用 Figma 求助材料／交接信息结构。真人有限材料协助已接入；AI 协助、并行与接手仍未实现，参考按钮不计作功能交付。 | [设计参考](../design/workbench-reference.html) / [界面](../../apps/web/src/App.tsx) |
+| HX-DEV-02-05 | 继续、协助、并行与反馈面板 | UX/FE | 部分实现 | 继续、反馈、接续状态界面已有；W1 归档交互参考并选用 Figma 求助材料／交接信息结构。真人有限材料与 Claude 纯文本 AI 协助已接入；完整代码协助、并行与接手仍未实现，参考按钮不计作功能交付。 | [设计参考](../design/workbench-reference.html) / [界面](../../apps/web/src/App.tsx) |
 | HX-DEV-02-06 | 响应式、键盘、文案与异常状态 | FE | 部分实现 | W1 已接浅深色／密度、按身份空间保存的布局偏好、键盘焦点、窄屏面板切换、草稿与历史阅读保护；完整业务文案字典及后续功能状态仍未收口。 | [工作区](../../apps/web/src/task-workspace.tsx) / [浏览器检查](../../tests/e2e/workbench.spec.ts) |
 | HX-DEV-03-01 | 认证组件、登录与会话恢复 | BE/FE | 部分实现 | Better Auth 真实密码账号、初始化代码、登录/退出、改密、会话恢复及撤销已实现；邮件验证、忘记密码恢复、SSO 和正式部署未接入。 | [认证](../../packages/identity/src/index.ts) / [界面](../../apps/web/src/identity.tsx) |
 | HX-DEV-03-02 | 空间、成员与邀请 | BE/FE | 部分实现 | 真实个人/团队空间、绑定邮箱的邀请、接受/撤销/过期与成员退出/移除已有；无邮件发送、完整空间角色管理与所有者转移。 | [协作数据](../../packages/db/src/collaboration.ts) / [空间](../../apps/web/src/team.tsx) |
@@ -90,7 +90,7 @@
 | HX-DEV-10-04 | 文件、diff 与外部 IDE | FE/RN | 部分实现 | W1 面板显示本机授权目录的文件列表、diff、分支及实际采集时间，读取失败隐藏旧快照；节点远程 diff、编辑器、固定代码快照和 IDE 衔接仍未交付。 | [代码](../../apps/web/src/native.tsx) |
 | HX-DEV-10-05 | 受控交互终端与输入权 | FE/RN | 未实现 | 带输入权的受控交互终端、重连和会话清理未实现。 | —（尚无可用实现） |
 | HX-DEV-10-06 | 上下文、协助、成果插槽整合 | FE | 部分实现 | W1 已整合工作说明、过程、成果、配置／队列抽屉和接续异常状态；已接入原任务的真人有限协助；完整 ContextBundle、AI 协助与其他未交付能力继续缺失。 | [工作区](../../apps/web/src/task-workspace.tsx) |
-| HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 与 node 均有 202 持久化 Operation、显式 wait/request_stop、查询/取消和幂等；节点固定本次材料与授权。完整 ContextBundle、跨节点和有限协助权限未实现。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
+| HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 与 node 均有 202 持久化 Operation、显式 wait/request_stop、查询/取消和幂等；节点固定本次材料与授权。完整 ContextBundle、跨节点与扩展协助材料权限仍缺；已有单消息有限授权见 11-03。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
 | HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | E2b4 自动等待仍新会话；E2c1/E2c2 Codex 与 Claude 可在成功终态后显式恢复私有原生会话，保留来源与原目录。自动等待原生恢复、跨成员/机器接手与真实模型联调仍缺。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-11-03 | Assistance、所选快照与有限访问 | BE | 部分实现 | 已接入同空间真人 Assistance、单条消息固定摘录、明确分享与 snapshot_reply 有限授权；接收者不获得 Task/Project 权限，撤权同事务永久失效。文件/diff/成果材料、跨空间与远程共享仍缺。 | [协助事务](../../packages/db/src/assistance.ts) / [契约](../../packages/contracts/src/assistance.ts) |
 | HX-DEV-11-04 | 真人回应与 AI 协助 Run | BE/RN | 部分实现 | 真人回复/追问、修订冲突、结束/撤销和原任务关联已接入，不修改负责人/运行或模型材料。另接入本人明确授权的 Claude 纯文本 assist Run、独立临时环境及最终建议回写；文件/代码协助、Codex 文本边界与真实模型联调未交付。 | [协助](../../packages/db/src/assistance.ts) / [界面](../../apps/web/src/assistance.tsx) |

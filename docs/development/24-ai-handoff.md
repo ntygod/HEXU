@@ -16,7 +16,7 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-11-06：协助建议的明确局部采用**，先核对 21 的本批实际回归。Claude 纯文本 AI 代码已接入，见 [用法](../engineering/ai-text-assistance.md)；不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
+默认继续 **HX-DEV-11-06：协助建议的明确局部采用**，先核对 21 的本批实际回归。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
 
 真人协助入口为 `packages/contracts/src/assistance.ts`、`packages/db/src/assistance.ts`、`apps/control/src/assistance.ts` 与 `apps/web/src/assistance*.tsx/css`。读取/旧回执检查当前范围；撤权钩子在 collaboration.ts，SSE 只发送独立协助 ID；独立受限详情不包含不可访问的 Task 信息。
 
