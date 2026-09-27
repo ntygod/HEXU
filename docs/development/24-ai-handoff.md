@@ -12,7 +12,7 @@
 
 业务底座为 E2c2：preview 是明确的示例身份；team-local 使用真实账号／项目权限和可选本人授权节点。两者都只支持回环地址。SSH 能登录一台测试机，不等于产品已交付跨电脑节点或公开部署。桌面宿主尚未选定，不能因为前端完成就添加 Electron／Tauri 或宣称客户端已交付。
 
-AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection.ts)：只读键盘按文字簇移动，浏览器 LF 范围映射到保存的 CRLF/CR 原文，不能直接把 DOM 偏移当成原文偏移。接手先按 21 核对 PR #10 完整回归和合并状态，不跳过失败用例。
+AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection.ts)：只读键盘按文字簇移动，浏览器 LF 范围映射到保存的 CRLF/CR 原文，不能直接把 DOM 偏移当成原文偏移。该修复的完整 Linux 回归已通过，实际证据见 21；后续保持这些选区及原文边界，不重复已交付切片。
 
 ## 2. 下一项的具体入口
 
