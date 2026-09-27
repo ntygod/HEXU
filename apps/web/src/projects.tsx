@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
+import { ProjectAgreements } from './project-agreements.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
 import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
@@ -81,14 +82,15 @@ export function ProjectPage({ id }: { id: string }) {
   const readLocation = () => {
     const query = new URLSearchParams(location.search);
     return {
-      tab: ['overview', 'results', 'sources'].includes(query.get('tab') ?? '')
+      tab: ['overview', 'results', 'sources', 'agreements'].includes(query.get('tab') ?? '')
         ? query.get('tab')!
         : 'tasks',
       sourceId: query.get('source') ?? '',
+      agreementId: query.get('agreement') ?? '',
     };
   };
   const [projectLocation, setProjectLocation] = useState(readLocation);
-  const { tab, sourceId } = projectLocation;
+  const { tab, sourceId, agreementId } = projectLocation;
   useEffect(() => {
     const update = () => setProjectLocation(readLocation());
     window.addEventListener('popstate', update);
@@ -98,8 +100,10 @@ export function ProjectPage({ id }: { id: string }) {
     const url = new URL(location.href);
     if (tab === 'tasks') url.searchParams.delete('tab');
     else url.searchParams.set('tab', tab);
-    if (source) url.searchParams.set('source', source);
-    else url.searchParams.delete('source');
+    url.searchParams.delete('source');
+    url.searchParams.delete('agreement');
+    if (source && tab === 'sources') url.searchParams.set('source', source);
+    if (source && tab === 'agreements') url.searchParams.set('agreement', source);
     history.pushState({}, '', url);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
@@ -169,6 +173,7 @@ export function ProjectPage({ id }: { id: string }) {
           ['tasks', '需求与任务'],
           ['overview', '总览'],
           ['sources', '项目资料'],
+          ['agreements', '项目约定'],
           ['results', '项目成果'],
         ].map(([key, label]) => (
           <button key={key} aria-pressed={tab === key} onClick={() => setTab(key!)}>
@@ -176,7 +181,14 @@ export function ProjectPage({ id }: { id: string }) {
           </button>
         ))}
       </div>
-      {tab === 'sources' ? (
+      {tab === 'agreements' ? (
+        <ProjectAgreements
+          key={id}
+          project={project}
+          agreementId={agreementId}
+          onSelect={(agreement) => setTab('agreements', agreement)}
+        />
+      ) : tab === 'sources' ? (
         <ProjectSources
           key={id}
           project={project}

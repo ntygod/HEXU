@@ -219,4 +219,20 @@ CREATE TABLE project_source_revisions (
 -- Do not relabel old project descriptions, messages or demo files as user-authored sources.
 `,
   },
+  {
+    version: 14,
+    sql: `
+CREATE TABLE project_agreements (
+ id TEXT PRIMARY KEY, space_id TEXT NOT NULL, project_id TEXT NOT NULL REFERENCES projects(id), body TEXT NOT NULL
+);
+CREATE INDEX project_agreements_project ON project_agreements(project_id,space_id);
+CREATE TABLE project_agreement_revisions (
+ agreement_id TEXT NOT NULL REFERENCES project_agreements(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ action TEXT NOT NULL CHECK(action IN ('created','updated','deactivated','reactivated','superseded')), body TEXT NOT NULL,
+ PRIMARY KEY(agreement_id,revision)
+);
+CREATE TABLE project_agreement_versions (project_id TEXT PRIMARY KEY REFERENCES projects(id), version INTEGER NOT NULL);
+-- Publication is explicit; no existing message, source or AI reply becomes an agreement on migration.
+`,
+  },
 ];

@@ -177,6 +177,66 @@ async function preparedPair(owner: Page, member: Page, suffix: string) {
   return { space, project, task, memberIdentity };
 }
 
+test('只读成员可看约定但不能发布，撤销编辑权清除约定草稿，项目撤权清空已打开约定', async ({
+  page,
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    member = await context.newPage();
+  try {
+    const f = await preparedPair(page, member, 'agreements');
+    await post(page, `tasks/${f.task.id}/messages`, { body: '团队接口约定的来源讨论' }, f.space.id);
+    await expect(member.getByRole('button', { name: '设为项目约定', exact: true })).toBeVisible();
+    await member.getByRole('button', { name: '设为项目约定', exact: true }).click();
+    await member.getByLabel('约定标题', { exact: true }).fill('撤权时丢弃的约定草稿');
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'view' },
+      f.space.id,
+    );
+    await expect(member.getByRole('dialog', { name: '设为项目约定', exact: true })).toHaveCount(0);
+    await expect(member.getByRole('button', { name: '设为项目约定', exact: true })).toHaveCount(0);
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'edit' },
+      f.space.id,
+    );
+    await member.getByRole('button', { name: '设为项目约定', exact: true }).click();
+    await expect(member.getByLabel('约定标题', { exact: true })).toHaveValue('');
+    await member.getByLabel('约定标题', { exact: true }).fill('成员明确发布的约定');
+    await member.getByRole('button', { name: '保存项目约定', exact: true }).click();
+    await expect(member.getByRole('dialog', { name: '设为项目约定', exact: true })).toHaveCount(0);
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: 'view' },
+      f.space.id,
+    );
+    await member.getByRole('button', { name: /^项目约定（1）/ }).click();
+    await member.getByRole('button', { name: '查看约定 成员明确发布的约定', exact: true }).click();
+    await expect(member.getByRole('button', { name: '编辑约定', exact: true })).toHaveCount(0);
+    await expect(member.getByRole('button', { name: '停用约定', exact: true })).toHaveCount(0);
+    await post(
+      page,
+      `projects/${f.project.id}/members/${f.memberIdentity.id}`,
+      { role: null },
+      f.space.id,
+    );
+    await expect(member.getByRole('dialog', { name: '任务中的项目约定', exact: true })).toHaveCount(
+      0,
+    );
+    await expect(member.getByRole('heading', { name: f.task.title, exact: true })).toHaveCount(0);
+    const storage = await member.evaluate(() =>
+      JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }),
+    );
+    expect(storage).not.toContain('撤权时丢弃的约定草稿');
+  } finally {
+    await context.close();
+  }
+});
+
 test('项目资料允许编辑成员协作，只读不可写；撤权清除草稿和已打开内容', async ({
   page,
   browser,

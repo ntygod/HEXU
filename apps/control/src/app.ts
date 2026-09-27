@@ -1,6 +1,10 @@
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import {
+  parseAgreementQuery,
+  parseAgreementHistoryQuery,
+} from '../../../packages/contracts/src/project-agreements.js';
+import {
   parseSourceListQuery,
   parseSourceRevisionQuery,
 } from '../../../packages/contracts/src/project-sources.js';
@@ -219,6 +223,61 @@ export async function createApp(
   });
   app.get('/api/v1/projects/:projectId', async (request) =>
     store.project(param(request.params, 'projectId')),
+  );
+  app.get('/api/v1/tasks/:taskId/messages/:messageId/agreement-preview', async (request) =>
+    store.projectAgreements.preview(
+      param(request.params, 'taskId'),
+      param(request.params, 'messageId'),
+    ),
+  );
+  app.get('/api/v1/tasks/:taskId/agreements-notice', async (request) =>
+    store.projectAgreements.notice(param(request.params, 'taskId')),
+  );
+  app.get('/api/v1/projects/:projectId/agreements', async (request) =>
+    store.projectAgreements.list(
+      param(request.params, 'projectId'),
+      parseAgreementQuery(request.query),
+    ),
+  );
+  app.post('/api/v1/projects/:projectId/agreements', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        store.projectAgreements.create(
+          param(request.params, 'projectId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
+  app.get('/api/v1/projects/:projectId/agreements/:agreementId', async (request) =>
+    store.projectAgreements.get(
+      param(request.params, 'projectId'),
+      param(request.params, 'agreementId'),
+    ),
+  );
+  app.patch('/api/v1/projects/:projectId/agreements/:agreementId', async (request) =>
+    store.projectAgreements.edit(
+      param(request.params, 'projectId'),
+      param(request.params, 'agreementId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.post('/api/v1/projects/:projectId/agreements/:agreementId/lifecycle', async (request) =>
+    store.projectAgreements.lifecycle(
+      param(request.params, 'projectId'),
+      param(request.params, 'agreementId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.get('/api/v1/projects/:projectId/agreements/:agreementId/revisions', async (request) =>
+    store.projectAgreements.history(
+      param(request.params, 'projectId'),
+      param(request.params, 'agreementId'),
+      parseAgreementHistoryQuery(request.query),
+    ),
   );
   app.patch('/api/v1/projects/:projectId', async (request) =>
     store.projectSettings.patch(
