@@ -31,7 +31,9 @@ export class ContinuationCoordinator {
   create(taskId: string, input: ContinuationInput, key: string) {
     if (this.closing)
       throw new DomainError('SERVICE_CLOSING', '服务正在关闭，没有接收接续操作', 503);
-    return this.records.create(taskId, input, key);
+    return this.records.create(taskId, input, key, () =>
+      this.native.prepareProjectMaterials(taskId, input.run),
+    );
   }
   tick(): Promise<void> {
     if (this.closing) return Promise.resolve();
@@ -56,6 +58,7 @@ export class ContinuationCoordinator {
           409,
         );
       const source = this.records.assertSource(op.taskId, op.input.run);
+      this.records.assertMaterials(op);
       if (source.observation === 'unknown' || source.native?.recoveryRequired)
         throw new DomainError(
           'SOURCE_STATE_UNKNOWN',

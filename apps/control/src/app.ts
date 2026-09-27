@@ -1,6 +1,10 @@
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import {
+  parseProjectMaterialPreview,
+  parseProjectMaterialQuery,
+} from '../../../packages/contracts/src/project-materials.js';
+import {
   parseAgreementQuery,
   parseAgreementHistoryQuery,
 } from '../../../packages/contracts/src/project-agreements.js';
@@ -202,6 +206,26 @@ export async function createApp(
     mode: store.teamMode ? 'team-local' : 'local-preview',
   }));
   app.get('/api/v1/workbench', async () => store.workbench());
+  app.get('/api/v1/tasks/:taskId/project-materials', async (request) =>
+    store.projectMaterials.catalog(
+      param(request.params, 'taskId'),
+      parseProjectMaterialQuery(request.query),
+    ),
+  );
+  app.post('/api/v1/tasks/:taskId/project-materials/preview', async (request) => {
+    const input = parseProjectMaterialPreview(request.body);
+    return store.projectMaterials.preview(
+      param(request.params, 'taskId'),
+      input.items,
+      store.teamMode ? undefined : (value) => native.clean(value),
+    );
+  });
+  app.get('/api/v1/tasks/:taskId/material-bundles/:bundleId', async (request) =>
+    store.projectMaterials.get(param(request.params, 'taskId'), param(request.params, 'bundleId')),
+  );
+  app.get('/api/v1/runs/:runId/materials', async (request) =>
+    store.projectMaterials.runView(param(request.params, 'runId')),
+  );
   app.get('/api/v1/spaces/:spaceId/projects', async (request) => {
     if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
@@ -511,6 +535,12 @@ export async function createApp(
       );
       return reply.code(201).send(run);
     }
+    if (record(request.body).projectMaterials !== undefined)
+      throw new DomainError(
+        'CAPABILITY_UNAVAILABLE',
+        '模拟执行不接收模型项目选材，请使用明确授权的原生或节点执行',
+        422,
+      );
     const run = store.createRun(
       param(request.params, 'taskId'),
       parseRunCreate(request.body),
@@ -607,9 +637,16 @@ export async function createApp(
   );
   app.post('/api/v1/native/codex/models', async () => native.codexModels());
   app.get('/api/v1/native', async () => native.overview());
-  app.get('/api/v1/tasks/:taskId/native-context', async (request) => ({
-    text: native.context(param(request.params, 'taskId')),
-  }));
+  app.get('/api/v1/tasks/:taskId/native-context', async (request) => {
+    const id = param(request.params, 'taskId'),
+      task = store.getTask(id);
+    return {
+      text: native.context(id),
+      taskRevision: task.revision,
+      taskStatus: task.status,
+      taskContextHash: native.taskContextHash(id),
+    };
+  });
   app.get('/api/v1/native/workspaces/:workingCopyId', async (request) =>
     native.workspaces.snapshot(param(request.params, 'workingCopyId')),
   );

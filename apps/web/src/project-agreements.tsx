@@ -375,7 +375,7 @@ function AgreementViewer({
                 发布人：{agreement.createdByName} · {time(agreement.createdAt)}
               </p>
             </details>
-            <p className="hint">模型选材与发送尚未接入；保存或停用不会改变已有运行和冻结材料。</p>
+            <p className="hint">可在执行面板明确选取约定；保存或停用不会反向改写已有运行的材料。</p>
             <div className="agreement-actions">
               {editable && agreement.state === 'active' && (
                 <Button disabled={changing} onClick={() => setEditing(true)}>

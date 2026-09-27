@@ -329,7 +329,7 @@ export function ProjectSources({
         </Button>
       )}
       <p className="hint source-boundary">
-        目前支持文本和链接；附件上传、任务选材与模型发送尚未接入。
+        支持文本和链接；可在原生或节点执行面板明确选材。附件上传尚未接入。
       </p>
       {creating && editable && (
         <CreateSource
@@ -497,7 +497,9 @@ function SourceDetails({
               </p>
             )}
             <SourceText source={source} />
-            <p className="hint">资料尚未作为模型上下文发送。链接仅作引用，不会自动读取外部网页。</p>
+            <p className="hint">
+              每次执行的选材版本与启动状态可在任务中查看。链接仅作引用，不会自动读取外部网页。
+            </p>
             {editable && (
               <div className="source-actions">
                 {!source.deletedAt && (

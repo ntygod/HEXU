@@ -281,4 +281,10 @@ GET /tasks/:id/node-continuation-preview?sourceRunId=... 仅供节点所有者�
 
 `GET/POST /projects/:projectId/sources` 读取分页列表或创建文本/链接；`GET/PATCH /projects/:projectId/sources/:sourceId` 读取当前资料或按 expectedRevision 完整修改内容；`POST .../:sourceId/lifecycle` 明确 delete/restore；`GET .../:sourceId/revisions` 按不可变修订分页。完整字段及限制见 [项目资料契约](../../packages/contracts/src/project-sources.ts) 和 [使用说明](../engineering/project-sources.md)。
 
-SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独立 ID、revision、contentHash、创建/更新者和删除标记，不修改父项目/任务修订或模型材料。当前项目 view 可读、edit/manage 可写，历史/搜索/回执/SSE 同范围；重放前及事务内复核当前权限，记录、历史、项目 outbox 和回执原子提交。删除可恢复且保留历史；不允许请求改变类型/归属/作者或永久清除。链接不触发网络抓取，附件上传、项目约定和资料模型发送尚未交付。
+SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独立 ID、revision、contentHash、创建/更新者和删除标记，不修改父项目/任务修订或模型材料。当前项目 view 可读、edit/manage 可写，历史/搜索/回执/SSE 同范围；重放前及事务内复核当前权限，记录、历史、项目 outbox 和回执原子提交。删除可恢复且保留历史；不允许请求改变类型/归属/作者或永久清除。链接不触发网络抓取，附件上传尚未交付；约定与明确模型选材见对应实现子集。
+
+## 05-05/06 实现子集：项目选材与执行快照
+
+`GET /tasks/:taskId/project-materials` 返回当前可读的同项目有效资料/约定目录，支持 q/kind/cursor/limit；`POST .../project-materials/preview` 接受最多 16 个 kind/id/revision/contentHash/maxChars，返回有界补充文本、hash、遗漏及遮盖标记，不持久化。`GET /runs/:runId/materials` 返回固定材料与启动事实；`GET /tasks/:taskId/material-bundles/:bundleId` 用父任务/项目的当前权限读取历史快照。
+
+原生/节点 `/runs` 与 `/continuations` 可带 `projectMaterials:{items,expectedHash}` 和 `expectedTaskContextHash`。模拟运行拒绝选材。迁移 15 新增 context_bundles，和 Run/Operation、派发、回执同事务；等待节点 Run 复用 bundle 和完整输入，原生等待在停止后补齐原有代码摘要。版本变化在停止或启动前复核，暂停保留材料和未知锁。只有真实 spawn/running 记录启动，ACK/许可不是 provider receipt。完整契约与预算见 [项目选材](../engineering/project-materials.md)。

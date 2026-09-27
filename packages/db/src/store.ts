@@ -4,12 +4,18 @@ import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { ProjectSourcesStore } from './project-sources.js';
 import { ProjectAgreementsStore } from './project-agreements.js';
+import { ProjectMaterialsStore } from './project-materials.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IdentityUser, Principal } from '../../contracts/src/identity.js';
 import { PermissionService } from './permissions.js';
 import { CollaborationStore } from './collaboration.js';
-import { ContinuationStore, assertNoPendingContinuation } from './continuations.js';
+import {
+  ContinuationStore,
+  assertNoPendingContinuation,
+  humanContextHash,
+} from './continuations.js';
+import type { ProjectMaterialSnapshot } from '../../contracts/src/project-materials.js';
 import type {
   WorkingCopy,
   NativeRunConfig,
@@ -60,6 +66,7 @@ export class Store {
   readonly taskParticipants: TaskParticipantsStore;
   readonly projectSources: ProjectSourcesStore;
   readonly projectAgreements: ProjectAgreementsStore;
+  readonly projectMaterials: ProjectMaterialsStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
   principal(): Principal {
@@ -98,6 +105,7 @@ export class Store {
     this.taskParticipants = new TaskParticipantsStore(this);
     this.projectSources = new ProjectSourcesStore(this);
     this.projectAgreements = new ProjectAgreementsStore(this);
+    this.projectMaterials = new ProjectMaterialsStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
       this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").get()
@@ -623,6 +631,7 @@ export class Store {
   }
   replayNativeRun(taskId: string, input: NativeRunInput, key: string): Run | null {
     this.projectLifecycle.assertExecution(taskId);
+    this.projectMaterials.assertAccess(taskId, input.projectMaterials);
     const row = this.db
       .prepare('SELECT fingerprint,result FROM idempotency_records WHERE scope=? AND key=?')
       .get(`${this.actorId}:native.create:${taskId}`, key) as
@@ -654,10 +663,12 @@ export class Store {
     config: NativeRunConfig,
     key: string,
     operationId?: string,
+    materialSnapshot?: ProjectMaterialSnapshot,
   ): Run {
     if (this.teamMode) throw new DomainError('RUNNER_REQUIRED', '团队执行需独立节点授权', 422);
     this.getTask(taskId, true);
     this.projectLifecycle.assertExecution(taskId);
+    this.projectMaterials.assertAccess(taskId, input.projectMaterials);
     return this.mutate(`native.create:${taskId}`, key, input, () => {
       this.projectLifecycle.assertExecution(taskId);
       assertNoPendingNodeContinuation(this, taskId);
@@ -665,6 +676,12 @@ export class Store {
       if (operationId) new ContinuationStore(this).assertStart(operationId, taskId, input);
       const task = this.getTask(taskId, true);
       assertRevision(task.revision, input.expectedRevision);
+      if (
+        input.expectedTaskContextHash &&
+        humanContextHash(this, taskId) !== input.expectedTaskContextHash
+      )
+        throw new DomainError('CONTEXT_CHANGED', '工作说明或人工讨论已变化，请重新查看材料', 409);
+      this.projectMaterials.verify(taskId, input.projectMaterials, materialSnapshot);
       if (input.sourceRunId) {
         const source = this.run(input.sourceRunId);
         if (
@@ -729,6 +746,16 @@ export class Store {
         updatedAt: at,
       };
       this.db.prepare('INSERT INTO runs VALUES(?,?,?)').run(run.id, taskId, JSON.stringify(run));
+      if (materialSnapshot) {
+        run.materialBundleId = this.projectMaterials.bindRun(
+          taskId,
+          run.id,
+          materialSnapshot,
+          config.contextText,
+          operationId,
+        );
+        this.db.prepare('UPDATE runs SET body=? WHERE id=?').run(JSON.stringify(run), run.id);
+      }
       this.db
         .prepare('INSERT INTO native_workspace_locks VALUES(?,?)')
         .run(input.workingCopyId, run.id);
@@ -750,6 +777,14 @@ export class Store {
         'SELECT sequence,run_id AS runId,kind,body,created_at AS createdAt FROM native_run_events WHERE run_id=? AND sequence>? ORDER BY sequence LIMIT 200',
       )
       .all(id, after) as unknown as NativeEvent[];
+  }
+  markMaterialsStarted(runId: string) {
+    const run = this.run(runId);
+    if (!run.materialBundleId) return;
+    this.transaction(() => {
+      this.projectMaterials.started(runId);
+      this.event(run.taskId, 'materials.started');
+    });
   }
   appendNativeEvent(id: string, kind: NativeEvent['kind'], body: string) {
     return this.transaction(() => {

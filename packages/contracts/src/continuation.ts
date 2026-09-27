@@ -13,6 +13,7 @@ export interface ContinuationInput {
   onActiveRun: 'wait' | 'request_stop';
 }
 export interface ContinuationOperation {
+  materialBundleId?: string;
   id: string;
   kind: 'continue';
   taskId: string;

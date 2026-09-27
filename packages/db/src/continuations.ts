@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { DomainError, type Run } from '../../contracts/src/index.js';
 import type { NativeRunInput } from '../../contracts/src/native.js';
+import type { ProjectMaterialSnapshot } from '../../contracts/src/project-materials.js';
 import {
   isPendingContinuation,
   type ContinuationInput,
@@ -122,10 +123,23 @@ export class ContinuationStore {
       throw new DomainError('CONTINUATION_CHANGED', '任务已有更新的原生执行，请重新配置继续', 409);
     return source;
   }
-  create(taskId: string, input: ContinuationInput, key: string): ContinuationOperation {
+  create(
+    taskId: string,
+    input: ContinuationInput,
+    key: string,
+    prepareMaterials?: () => ProjectMaterialSnapshot | undefined,
+  ): ContinuationOperation {
     this.store.projectLifecycle.assertExecution(taskId);
+    this.store.projectMaterials.assertAccess(taskId, input.run.projectMaterials);
     const result = this.store.mutate(`continuation.create:${taskId}`, key, input, () => {
       this.assertSource(taskId, input.run);
+      if (
+        input.run.expectedTaskContextHash &&
+        humanContextHash(this.store, taskId) !== input.run.expectedTaskContextHash
+      )
+        throw new DomainError('CONTEXT_CHANGED', '工作说明或人工讨论已变化，请重新核对', 409);
+      const materials = prepareMaterials?.();
+      this.store.projectMaterials.verify(taskId, input.run.projectMaterials, materials);
       assertNoPendingContinuation(this.store, taskId, input.run.workingCopyId);
       const at = stamp();
       const op: ContinuationOperation = {
@@ -146,6 +160,8 @@ export class ContinuationStore {
           Date.now() + (input.onActiveRun === 'wait' ? 31 * 60_000 : 60_000),
         ).toISOString(),
       };
+      if (materials)
+        op.materialBundleId = this.store.projectMaterials.bindOperation(taskId, op.id, materials);
       this.store.db
         .prepare(
           'INSERT INTO continuation_operations(id,task_id,working_copy_id,state,body) VALUES(?,?,?,?,?)',
@@ -213,6 +229,10 @@ export class ContinuationStore {
       ]);
   }
   /** No await: used immediately before Run creation in the same SQLite transaction. */
+  assertMaterials(op: ContinuationOperation) {
+    const bundle = this.store.projectMaterials.forOperation(op.taskId, op.id);
+    this.store.projectMaterials.verify(op.taskId, op.input.run.projectMaterials, bundle?.snapshot);
+  }
   assertStart(id: string, taskId: string, input: NativeRunInput) {
     const op = this.get(id);
     if (
@@ -224,6 +244,7 @@ export class ContinuationStore {
     if (Date.parse(op.expiresAt) <= Date.now())
       throw new DomainError('CONTINUATION_EXPIRED', '接续等待已超时，请重新配置', 409);
     this.assertSource(taskId, input);
+    this.assertMaterials(op);
     if (humanContextHash(this.store, taskId) !== op.humanContextHash)
       throw new DomainError(
         'CONTEXT_CHANGED',

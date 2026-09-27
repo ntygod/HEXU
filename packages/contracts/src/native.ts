@@ -1,4 +1,5 @@
 import { DomainError, enumValue, record, revision, text, type Tool } from './index.js';
+import { parseProjectMaterialSelection, parseTaskContextHash } from './project-materials.js';
 
 export type NativeMode = 'read-only' | 'edit';
 export interface WorkingCopy {
@@ -108,6 +109,12 @@ export function parseNativeRunCreate(value: unknown) {
         : null,
     timeoutSeconds,
     expectedRevision: revision(body.expectedRevision),
+    ...(body.projectMaterials === undefined
+      ? {}
+      : { projectMaterials: parseProjectMaterialSelection(body.projectMaterials) }),
+    ...(body.expectedTaskContextHash === undefined
+      ? {}
+      : { expectedTaskContextHash: parseTaskContextHash(body.expectedTaskContextHash)! }),
     reopenTask: body.reopenTask === true,
   };
 }

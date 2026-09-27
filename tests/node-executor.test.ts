@@ -19,6 +19,7 @@ import { ExecutionJournal } from '../apps/runner/src/agent/execution-journal.js'
 import { WorkspaceLease } from '../apps/runner/src/workspace-lease.js';
 import type { NodeExecutionOption } from '../packages/contracts/src/node-execution.js';
 import type { Run } from '../packages/contracts/src/index.js';
+import { parseProjectMaterialRefs } from '../packages/contracts/src/project-materials.js';
 const pause = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const fakeKey = 'sk-ant-node-protocol-fixture-not-a-real-key';
 async function fixture(tool: 'claude-code' | 'codex' = 'claude-code', retainSessions = false) {
@@ -226,6 +227,67 @@ test('独立 Codex App Server 适配走实际进程，不借用控制服务账�
     assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
   } finally {
     await f.close();
+  }
+});
+
+test('两种独立协议进程收到完整固定项目材料，实际运行确认入库，回执重放不重复启动', async () => {
+  for (const tool of ['claude-code', 'codex'] as const) {
+    const f = await fixture(tool);
+    try {
+      const created = await f.call(`projects/${f.project.id}/sources`, f.alice, {
+        kind: 'text',
+        title: '节点输入资料',
+        content: 'NODE_PROJECT_MATERIAL_EXACT\n末行\n',
+      });
+      assert.equal(created.statusCode, 201, created.body);
+      const source = created.json();
+      const items = parseProjectMaterialRefs([
+        { kind: 'source', id: source.id, revision: 1, contentHash: source.contentHash },
+      ]);
+      const previewResponse = await f.call(
+        `tasks/${f.task.id}/project-materials/preview`,
+        f.alice,
+        { items },
+      );
+      assert.equal(previewResponse.statusCode, 200, previewResponse.body);
+      const snapshot = previewResponse.json();
+      const options = (await f.call(`tasks/${f.task.id}/node-options`, f.alice)).json();
+      const body = {
+        provider: 'node',
+        nodeId: f.pair.nodeId,
+        workingCopyId: f.directories[0]!.id,
+        policyHash: f.option.policyHash,
+        mode: 'edit',
+        prompt: tool === 'codex' ? 'CODEX_CAPTURE_INPUT' : 'FIXTURE_CAPTURE_INPUT',
+        expectedRevision: options.taskRevision,
+        expectedTaskContextHash: options.taskContextHash,
+        confirmExecution: true,
+        projectMaterials: { items, expectedHash: snapshot.hash },
+      };
+      const key = randomUUID(),
+        response = await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key);
+      assert.equal(response.statusCode, 201, response.body);
+      const run = response.json();
+      assert.equal((await f.call(`runs/${run.id}/materials`, f.alice)).json().state, 'fixed');
+      await f.until(
+        () => f.getRun(run.id),
+        (current) => current.state === 'succeeded',
+      );
+      const view = (await f.call(`runs/${run.id}/materials`, f.alice)).json();
+      assert.equal(view.state, 'started');
+      assert.ok(view.bundle.startedAt);
+      assert.equal(
+        await readFile(join(f.root, 'received-context.txt'), 'utf8'),
+        view.bundle.contextText,
+      );
+      assert.ok(view.bundle.contextText.includes(snapshot.text));
+      const replay = await f.call(`tasks/${f.task.id}/runs`, f.alice, body, key);
+      assert.equal(replay.json().id, run.id);
+      await f.restart();
+      assert.equal(await readFile(join(f.root, 'actual-starts.txt'), 'utf8'), 'one\n');
+    } finally {
+      await f.close();
+    }
   }
 });
 test('运行中的节点接到停止后确认进程退出，项目只读不能停止', async () => {

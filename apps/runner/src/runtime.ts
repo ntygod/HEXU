@@ -14,6 +14,8 @@ import type {
 } from '../../../packages/contracts/src/native.js';
 import { Store } from '../../../packages/db/src/store.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
+import { humanContextHash } from '../../../packages/db/src/continuations.js';
+import { appendProjectMaterials } from '../../../packages/contracts/src/project-materials.js';
 import {
   ClaudeStream,
   claudeArguments,
@@ -299,6 +301,14 @@ export class NativeRuntime {
       ].join('\n\n'),
     );
   }
+  taskContextHash(taskId: string) {
+    return humanContextHash(this.store, taskId);
+  }
+  prepareProjectMaterials(taskId: string, input: NativeRunInput) {
+    return this.store.projectMaterials.prepare(taskId, input.projectMaterials, (value) =>
+      this.clean(value),
+    );
+  }
   async create(taskId: string, input: NativeRunInput, key: string, operationId?: string) {
     const replay = this.store.replayNativeRun(taskId, input, key);
     if (replay) return replay;
@@ -316,6 +326,16 @@ export class NativeRuntime {
       checkpoint = preview.checkpoint;
       contextText = this.clean(preview.contextText + '\n\n# 本次要求\n' + input.prompt);
     }
+    if (
+      input.expectedTaskContextHash &&
+      this.taskContextHash(taskId) !== input.expectedTaskContextHash
+    )
+      throw new DomainError('CONTEXT_CHANGED', '工作说明或人工讨论已变化，请重新查看材料', 409);
+    const materialSnapshot = operationId
+      ? this.store.projectMaterials.forOperation(taskId, operationId)?.snapshot
+      : this.prepareProjectMaterials(taskId, input);
+    this.store.projectMaterials.verify(taskId, input.projectMaterials, materialSnapshot);
+    contextText = appendProjectMaterials(contextText, materialSnapshot);
     const config: NativeRunConfig = {
       workingCopyId: input.workingCopyId,
       mode: input.mode,
@@ -330,7 +350,14 @@ export class NativeRuntime {
       contextText,
       contextHash: createHash('sha256').update(contextText).digest('hex'),
     };
-    const run = this.store.createNativeRun(taskId, input, config, key, operationId);
+    const run = this.store.createNativeRun(
+      taskId,
+      input,
+      config,
+      key,
+      operationId,
+      materialSnapshot,
+    );
     // A replay returns the same run. Only queued, locally unclaimed work can spawn.
     if (!this.jobs.has(run.id) && this.store.run(run.id).state === 'queued') {
       const job = this.execute(run.id).finally(() => {
@@ -370,11 +397,14 @@ export class NativeRuntime {
       !isActiveRun(source.state) &&
       source.native.terminationConfirmed === true &&
       !snapshot.busyRunId;
+    const currentTask = this.store.getTask(taskId);
     return {
       sourceRunId,
       sourceTool: source.requestedTool,
       workingCopyId: source.native.workingCopyId,
-      taskRevision: task.revision,
+      taskRevision: currentTask.revision,
+      taskStatus: currentTask.status,
+      taskContextHash: this.taskContextHash(taskId),
       canContinue,
       reason: canContinue
         ? '沿用当前目录与未提交修改，新建目标工具会话'
@@ -416,6 +446,7 @@ export class NativeRuntime {
         return;
       }
       directoryLease = new WorkspaceLease(copy.root, id);
+      this.store.projectMaterials.validateRun(id);
       if (run.requestedTool === 'codex') {
         const handle = await openCodex({
           executable: this.codexExecutable!,
@@ -424,9 +455,11 @@ export class NativeRuntime {
           config,
           beforeSpawn: () => {
             this.store.projectLifecycle.assertExecution(run.taskId);
+            this.store.projectMaterials.validateRun(id);
             if (this.closing || this.store.run(id).state === 'stopping')
               throw new DomainError('RUN_CANCELLED', '执行在启动前已取消，没有模型调用', 409);
           },
+          onSpawn: () => this.store.markMaterialsStarted(id),
           onEvent: (kind, text) => this.store.appendNativeEvent(id, kind, this.clean(text)),
           onReferences: (refs) => this.store.recordNativeReferences(id, refs),
         });
@@ -478,6 +511,7 @@ export class NativeRuntime {
         cwd: copy.root,
         env: this.environment(true),
         input: config.contextText,
+        onSpawn: () => this.store.markMaterialsStarted(id),
         timeoutMs: config.timeoutSeconds * 1000,
         onLine: (line) => stream.line(line),
       });

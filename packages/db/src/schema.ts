@@ -235,4 +235,16 @@ CREATE TABLE project_agreement_versions (project_id TEXT PRIMARY KEY REFERENCES 
 -- Publication is explicit; no existing message, source or AI reply becomes an agreement on migration.
 `,
   },
+  {
+    version: 15,
+    sql: `
+CREATE TABLE context_bundles (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), created_at TEXT NOT NULL, created_by TEXT NOT NULL,
+ run_id TEXT UNIQUE REFERENCES runs(id), operation_id TEXT UNIQUE, body TEXT NOT NULL,
+ context_text TEXT, started_at TEXT
+);
+CREATE INDEX context_bundles_task ON context_bundles(task_id);
+-- Existing runs and operations have no invented project-material snapshot or delivery receipt.
+`,
+  },
 ];

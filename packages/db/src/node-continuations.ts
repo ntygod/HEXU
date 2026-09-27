@@ -7,6 +7,7 @@ import type {
 } from '../../contracts/src/node-continuation.js';
 import { isPendingContinuation } from '../../contracts/src/continuation.js';
 import { nodeContinuationContext } from '../../contracts/src/next-input.js';
+import { appendProjectMaterials } from '../../contracts/src/project-materials.js';
 import { assertRevision, canonicalJson, isActiveRun } from '../../domain/src/index.js';
 import { NextInputs } from './next-inputs.js';
 import { executionHash, type NodeExecution } from './node-execution.js';
@@ -110,10 +111,17 @@ export class NodeContinuations {
     if (this.closing) throw new DomainError('SERVICE_CLOSING', '服务正在关闭，未接收接续安排', 503);
     this.store.projectLifecycle.assertExecution(taskId);
     this.execution.nodes.ownedExecutionNode(input.run.nodeId); // Before idempotent replay.
+    this.store.projectMaterials.assertAccess(taskId, input.run.projectMaterials);
     const result = this.store.mutate(`node.continuation.create:${taskId}`, key, input, () => {
       const task = this.store.projectLifecycle.assertExecution(taskId),
         run = input.run;
       assertRevision(task.revision, run.expectedRevision);
+      if (
+        run.expectedTaskContextHash &&
+        executionHash(this.execution.humanContext(task)) !== run.expectedTaskContextHash
+      )
+        throw new DomainError('CONTEXT_CHANGED', '任务说明或人工讨论已变化，请重新核对', 409);
+      const materialSnapshot = this.store.projectMaterials.prepare(taskId, run.projectMaterials);
       assertNoPendingNodeContinuation(this.store, taskId, run.nodeId);
       const selection = run.continuation;
       if (!selection) throw new DomainError('INVALID_CONTINUATION', '需要明确来源执行', 409);
@@ -152,10 +160,13 @@ export class NodeContinuations {
         input,
         policy: option.policy,
         // Freeze exactly what the user saw. Later model output is NOT silently added.
-        contextText: nodeContinuationContext(
-          preview.contextText,
-          run.prompt,
-          new NextInputs(this.store).selected(taskId, selection),
+        contextText: appendProjectMaterials(
+          nodeContinuationContext(
+            preview.contextText,
+            run.prompt,
+            new NextInputs(this.store).selected(taskId, selection),
+          ),
+          materialSnapshot,
         ),
         humanContextHash: executionHash(this.execution.humanContext(task)),
         taskRevision: task.revision,
@@ -171,6 +182,13 @@ export class NodeContinuations {
           Date.now() + (input.onActiveRun === 'request_stop' ? 60_000 : 660_000),
         ).toISOString(),
       };
+      if (materialSnapshot)
+        op.materialBundleId = this.store.projectMaterials.bindOperation(
+          taskId,
+          op.id,
+          materialSnapshot,
+          op.contextText,
+        );
       this.store.db
         .prepare(
           'INSERT INTO node_continuation_operations(id,task_id,node_id,state,body) VALUES(?,?,?,?,?)',
@@ -214,6 +232,12 @@ export class NodeContinuations {
         409,
       );
     const task = this.store.projectLifecycle.assertExecution(op.taskId);
+    const materialBundle = this.store.projectMaterials.forOperation(op.taskId, op.id);
+    this.store.projectMaterials.verify(
+      op.taskId,
+      op.input.run.projectMaterials,
+      materialBundle?.snapshot,
+    );
     const preview = this.execution.continuationPreview(op.taskId, op.sourceRunId, !mustBeStopped);
     if (!preview.ready)
       throw new DomainError(preview.blockers[0]!.code, preview.blockers[0]!.message, 409);

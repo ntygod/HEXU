@@ -18,7 +18,7 @@
 
 “已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3/E2b4/E2c1/E2c2 是实际代码批次，二者不互相替代。
 
-本轮推进 **05-03** 从讨论明确发布项目约定：来源/修订、修改、停用/启用、原子替代和任务内变化提示已接入。该项改为部分实现；持久提醒、子范围约定和模型选材/送达仍待后续。下一步为 05-05/06，见 [22](22-next-delivery.md)。
+本轮推进 **05-05/06** 资料/约定选材与固定快照：同项目引用、版本/预算、Run/Operation 原子绑定、启动前复核、实际启动记录和 W1 选材已有。两个原工作项仍部分实现，自动推荐/总结、持久偏好和完整 provider receipt 仍缺。下一步按 [22](22-next-delivery.md) 推进 AI 草稿与局部采用。
 
 设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1 全套新页面已接入真实应用并删除旧呈现层，整套回归通过；桌面尚未交付。原工作项完整范围未全部收口，当前 **2 完成 / 63 部分实现 / 37 未实现**；历史批次统计保留在下方。
 
@@ -53,11 +53,11 @@
 | HX-DEV-04-05 | 子任务、依赖、标签与里程碑 | BE/FE | 未实现 | 子任务、依赖、可维护标签和里程碑未实现。 | —（尚无可用实现） |
 | HX-DEV-04-06 | 项目/个人入口与 Task DTO 统一 | BE/FE | 部分实现 | 真实项目/个人 Task 共用 DTO、创建和权限；负责人改派保留创建/执行身份，参与者作为当前权限下的读取投影，人员筛选与项目深链接一致。跨空间/私有选择性转移与完整归属切换未完成。 | [任务](../../packages/db/src/store.ts) / [参与者](../../packages/db/src/task-participants.ts) |
 | HX-DEV-05-01 | 线程、消息、提及与附件关联 | BE/FE | 部分实现 | 任务消息和成果回复已持久化；线程、提及及附件关联未完成。 | [消息](../../packages/db/src/store.ts) / [上下文](../../apps/runner/src/runtime.ts) |
-| HX-DEV-05-02 | 项目资料、修订与来源 | BE/FE | 部分实现 | 项目文本/链接资料、稳定 ID/指纹、独立修订/作者、删除恢复和 W1 资料页已接入；当前权限在列表/历史/事件/回执前校验。附件上传/存储、仓库连接与任务选材/模型发送仍未实现。 | [事务](../../packages/db/src/project-sources.ts) / [资料页](../../apps/web/src/project-sources.tsx) |
+| HX-DEV-05-02 | 项目资料、修订与来源 | BE/FE | 部分实现 | 项目文本/链接资料、稳定 ID/指纹、独立修订/作者、删除恢复和 W1 资料页已接入；当前权限在列表/历史/事件/回执前校验。明确执行选材见 05-05/06；附件上传/存储和仓库连接仍缺。 | [事务](../../packages/db/src/project-sources.ts) / [资料页](../../apps/web/src/project-sources.tsx) |
 | HX-DEV-05-03 | 从讨论保存团队约定 | BE/FE | 部分实现 | 同项目公开讨论可明确保存为约定，来源/修订、修改、停用/启用、原子替代、权限/回放和 W1 任务内变化提示已有；不自动发送模型。持久提醒、任务子范围和完整送达联动仍缺。 | [约定事务](../../packages/db/src/project-agreements.ts) / [界面](../../apps/web/src/project-agreements.tsx) |
 | HX-DEV-05-04 | AI 草稿与局部编辑/采用 | FE/BE | 未实现 | AI 草稿及局部编辑/采用流程未实现。 | —（尚无可用实现） |
-| HX-DEV-05-05 | 按权限与目的准备上下文 | BE/RN | 部分实现 | 本机说明/记录与有界 Git 摘录装配保留；节点可带入当前任务、源执行的共享输出及明确选择的下一轮要求。完整按权限/目的选材的 ContextBundle、资料附件和跨空间引用未实现。 | [上下文](../../packages/db/src/node-execution.ts) |
-| HX-DEV-05-06 | 上下文面板、送达状态与总结接入 | FE/RN | 部分实现 | 可查看执行/接续上下文；运行中送达状态、项目资料引用与总结接入未实现。 | [消息](../../packages/db/src/store.ts) / [上下文](../../apps/runner/src/runtime.ts) |
+| HX-DEV-05-05 | 按权限与目的准备上下文 | BE/RN | 部分实现 | 原生/节点开始与接续可明确选取同项目资料/约定、固定版本和摘录，ContextBundle 与 Run/Operation 原子绑定，预算和启动前权限/版本复核已有；原任务/来源材料规则保留。自动推荐、协助/并行目的、附件与跨空间引用仍缺。 | [选材](../../packages/db/src/project-materials.ts) / [节点](../../packages/db/src/node-execution.ts) |
+| HX-DEV-05-06 | 上下文面板、送达状态与总结接入 | FE/RN | 部分实现 | W1 明确选材/预算/截断预览、固定历史与启动确认已有；确认绑定选材和人工上下文，未知回执确认原请求。启动不等于 provider receipt；实时输入送达、AI 总结及持久选材偏好仍未交付。 | [选材面板](../../apps/web/src/project-materials.tsx) / [原生](../../apps/runner/src/runtime.ts) |
 | HX-DEV-06-01 | Runner CLI、配对与节点身份 | RN/BE | 部分实现 | 独立 CLI、配对、节点身份及本人执行的本机明确授权已有；系统凭证存储、跨电脑传输与完整安装分发未完成。 | [CLI](../../apps/runner/src/cli.ts) / [本机授权](../../apps/runner/src/agent/execution-policy.ts) |
 | HX-DEV-06-02 | 主动连接、心跳、spool 与重放 | RN/BE | 部分实现 | 回环主动连接、心跳、摘要和执行证据持久化 ACK/重放已有；重复启动许可拒绝，歧义不重跑。远程 WSS 与完整流量/版本协商未完成。 | [连接](../../apps/runner/src/agent/connection.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
 | HX-DEV-06-03 | 目录权限、WorkingCopy 与 Git 状态 | RN | 部分实现 | 本机目录身份、Git 数量摘要及明确执行目录子集已接节点；完整远程 diff/文件读取、跨平台与通用目录授权未完成。 | [目录](../../apps/runner/src/agent/workspaces.ts) / [本机授权](../../apps/runner/src/agent/execution-policy.ts) |

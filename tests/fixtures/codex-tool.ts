@@ -137,6 +137,8 @@ rl.on('line', (line) => {
     });
   } else if (method === 'turn/start') {
     prompt = p.input[0].text;
+    if (prompt.includes('CODEX_CAPTURE_INPUT'))
+      writeFileSync(join(root, 'received-context.txt'), prompt, 'utf8');
     if (retained) {
       turnId = randomUUID();
       saveState();

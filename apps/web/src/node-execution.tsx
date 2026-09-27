@@ -9,7 +9,10 @@ import type { Run, Task } from '../../../packages/contracts/src/index.js';
 import type { NodeExecutionOption } from '../../../packages/contracts/src/node-execution.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon, RunBadge, ToolMark } from '../../../packages/ui/src/index.js';
-import { useApp, useTaskDraft } from './state.js';
+import { useTaskDraft } from './state.js';
+import { ExecutionReceipt, useExecutionRequest } from './execution-request.js';
+import { ProjectMaterialPicker, useProjectMaterialSelection } from './project-materials.js';
+import { appendProjectMaterials } from '../../../packages/contracts/src/project-materials.js';
 
 export function NodeRunPanel({
   task,
@@ -20,15 +23,31 @@ export function NodeRunPanel({
   onClose(): void;
   source?: Run;
 }) {
-  const { refresh, notice } = useApp();
   const [options, setOptions] = useState<NodeExecutionOption[]>([]),
     [context, setContext] = useState(''),
     [error, setError] = useState('');
+  const materials = useProjectMaterialSelection(task);
+  const [taskContext, setTaskContext] = useState<{
+    taskRevision: number;
+    taskStatus: Task['status'];
+    taskContextHash: string;
+  } | null>(null);
   const [nodeId, setNode] = useState(''),
     [workspaceId, setWorkspace] = useState(''),
     [mode, setMode] = useState<'read-only' | 'edit'>('read-only');
   const [prompt, setPrompt] = useTaskDraft(task.id, `node-run:${source?.id ?? 'new'}`);
-  const [busy, setBusy] = useState(false);
+  const delivery = useExecutionRequest(
+    () => {
+      setPrompt('');
+      onClose();
+    },
+    () => {
+      setPrompt('');
+      onClose();
+    },
+  );
+  const busy = delivery.busy,
+    locked = delivery.locked;
   const [confirmation, setConfirmation] = useState({ scope: '', approved: false });
   const [sessionMode, setSessionMode] = useState<'new' | 'resume'>('new');
   const [loadedSessionMode, setLoadedSessionMode] = useState<'new' | 'resume'>('new');
@@ -46,7 +65,7 @@ export function NodeRunPanel({
     try {
       fullContext = nodeContinuationContext(
         continuation.contextText,
-        prompt,
+        prompt.trim(),
         selectedNotes,
         sessionMode === 'resume' ? 'resume' : undefined,
       );
@@ -54,11 +73,18 @@ export function NodeRunPanel({
       materialError = (e as Error).message;
     }
   }
+  if (!source)
+    fullContext = `${context}\n\n# 本次要求\n${prompt.trim()}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
+  try {
+    fullContext = appendProjectMaterials(fullContext, materials.snapshot ?? undefined);
+  } catch (cause) {
+    materialError = (cause as Error).message;
+  }
   const selectionVersion = selectedNotes.map((n) => `${n.id}:${n.revision}:${n.state}`).join(',');
   // The preview and its task revision come from the same synchronous server read.
   // A delayed parent snapshot cannot invalidate an already newer preview. A truly
   // newer task still requires refreshing materials and explicit confirmation.
-  const previewTask = source ? continuation : null;
+  const previewTask = source ? continuation : taskContext;
   const expectedRevision = previewTask?.taskRevision ?? task.revision;
   const taskStatus =
     previewTask && previewTask.taskRevision >= task.revision ? previewTask.taskStatus : task.status;
@@ -80,6 +106,9 @@ export function NodeRunPanel({
     selectionVersion,
     onActiveRun,
     sessionMode,
+    materials.selectionKey,
+    materials.snapshot?.hash,
+    previewTask?.taskContextHash,
   ]);
   // Invalidate during render, not a later effect that could clear a fresh click.
   // Remembering the current scope also prevents A -> B -> A from restoring consent.
@@ -91,9 +120,13 @@ export function NodeRunPanel({
     let disposed = false;
     const load = async () => {
       try {
-        const next = await request<{ items: NodeExecutionOption[]; contextText: string }>(
-          `/tasks/${task.id}/node-options${source ? `?sourceRunId=${source.id}` : ''}`,
-        );
+        const next = await request<{
+          items: NodeExecutionOption[];
+          contextText: string;
+          taskRevision: number;
+          taskStatus: Task['status'];
+          taskContextHash: string;
+        }>(`/tasks/${task.id}/node-options${source ? `?sourceRunId=${source.id}` : ''}`);
         const preview = source
           ? await request<NodeContinuationPreview>(
               `/tasks/${task.id}/node-continuation-preview?sourceRunId=${source.id}${sessionMode === 'new' ? '&waiting=true' : ''}`,
@@ -111,6 +144,11 @@ export function NodeRunPanel({
             setWorkspace(preview.workingCopyId);
           }
           setOptions(preview ? next.items.filter((n) => n.nodeId === preview.nodeId) : next.items);
+          setTaskContext({
+            taskRevision: next.taskRevision,
+            taskStatus: next.taskStatus,
+            taskContextHash: next.taskContextHash,
+          });
           setContext(next.contextText);
           setError('');
         }
@@ -118,6 +156,7 @@ export function NodeRunPanel({
         if (!disposed) {
           setOptions([]);
           setContinuation(null);
+          setTaskContext(null);
           setNotes([]);
           setConsent(false);
           setError((e as Error).message);
@@ -132,58 +171,57 @@ export function NodeRunPanel({
     };
   }, [task.id, source?.id, sessionMode]);
   return (
-    <Dialog title={source ? '沿原目录继续' : '在我的节点上执行'} onClose={onClose} drawer>
+    <Dialog
+      title={source ? '沿原目录继续' : '在我的节点上执行'}
+      onClose={() => !busy && onClose()}
+      drawer
+    >
       <form
         className="form-stack node-execution-form"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          if (!selected || busy || !consent || staleTask || resumeBlocked) return;
-          setBusy(true);
-          setError('');
-          try {
-            await request(
-              `/tasks/${task.id}/${source && sessionMode === 'new' ? 'continuations' : 'runs'}`,
-              {
-                method: 'POST',
-                body: {
-                  provider: 'node',
-                  nodeId,
-                  workingCopyId: workspaceId,
-                  policyHash: selected.policyHash,
-                  mode,
-                  prompt,
-                  expectedRevision,
-                  reopenTask: taskStatus === 'done',
-                  confirmExecution: consent,
-                  ...(source && continuation
-                    ? {
-                        ...(sessionMode === 'resume' ? { sessionMode: 'resume' } : { onActiveRun }),
-                        continuation: {
-                          sourceRunId: source.id,
-                          expectedContextHash: continuation.contextHash,
-                          inputs: selectedNotes.map((n) => ({ id: n.id, revision: n.revision })),
-                        },
-                      }
-                    : {}),
-                },
-              },
-            );
-            setPrompt('');
-            await refresh();
-            notice(
-              source
-                ? sessionMode === 'resume'
-                  ? '原生恢复派发已保存；结果以节点确认与工具响应为准，失败不自动新建'
-                  : '接续安排已保存；确认原执行结束后再派发，关闭页面不会取消'
-                : '节点派发已保存；接单和实际启动会分别显示',
-            );
-            onClose();
-          } catch (e) {
-            setError((e as Error).message);
-            await refresh();
-          } finally {
-            setBusy(false);
-          }
+          if (
+            !selected ||
+            locked ||
+            !consent ||
+            staleTask ||
+            resumeBlocked ||
+            !materials.ready ||
+            materialError ||
+            !previewTask
+          )
+            return;
+          void delivery.send(
+            `/tasks/${task.id}/${source && sessionMode === 'new' ? 'continuations' : 'runs'}`,
+            {
+              provider: 'node',
+              nodeId,
+              workingCopyId: workspaceId,
+              policyHash: selected.policyHash,
+              mode,
+              prompt,
+              expectedRevision,
+              reopenTask: taskStatus === 'done',
+              confirmExecution: consent,
+              expectedTaskContextHash: previewTask.taskContextHash,
+              projectMaterials: materials.selection,
+              ...(source && continuation
+                ? {
+                    ...(sessionMode === 'resume' ? { sessionMode: 'resume' } : { onActiveRun }),
+                    continuation: {
+                      sourceRunId: source.id,
+                      expectedContextHash: continuation.contextHash,
+                      inputs: selectedNotes.map((n) => ({ id: n.id, revision: n.revision })),
+                    },
+                  }
+                : {}),
+            },
+            source
+              ? sessionMode === 'resume'
+                ? '原生恢复派发已保存；结果以节点确认与工具响应为准，失败不自动新建'
+                : '接续安排已保存；确认原执行结束后再派发，关闭页面不会取消'
+              : '节点派发已保存；接单和实际启动会分别显示',
+          );
         }}
       >
         <div className="notice-box">
@@ -232,7 +270,7 @@ export function NodeRunPanel({
             <code>npm run runner -- enable-execution --config /path/execution.json</code>
           </div>
         ) : null}
-        <fieldset className="execution-section" disabled={busy}>
+        <fieldset className="execution-section" disabled={locked}>
           <legend>工具配置与目录</legend>
           <label className="field">
             执行节点
@@ -310,7 +348,7 @@ export function NodeRunPanel({
           )}
         </fieldset>
         {source && (
-          <fieldset className="execution-section" disabled={busy}>
+          <fieldset className="execution-section" disabled={locked}>
             <legend>接续与会话方式</legend>
             {source && (
               <section className="native-session-choice" aria-label="原生会话选择">
@@ -370,7 +408,7 @@ export function NodeRunPanel({
             )}
           </fieldset>
         )}
-        <fieldset className="execution-section" disabled={busy}>
+        <fieldset className="execution-section" disabled={locked}>
           <legend>本次要求与材料</legend>
           {source && (
             <fieldset className="node-input-selection">
@@ -418,26 +456,30 @@ export function NodeRunPanel({
           </label>
           <details className="node-context-preview">
             <summary>查看本次发送的任务材料</summary>
-            <pre>{source ? fullContext : context}</pre>
+            <pre>{fullContext}</pre>
             <p>
               {source
                 ? sessionMode === 'resume'
-                  ? '上方仅为本轮新增文本，Codex 另会读取节点保留的原生历史。恢复不保证代码回到历史状态，不自动删除历史材料。'
+                  ? '上方仅为本轮新增文本，所选工具另会读取节点保留的原生历史。恢复不保证代码回到历史状态，取消本次选材不清除旧历史。'
                   : '上方为本次保存并发送的完整文本。等待期间新模型输出不自动加入；原目录的实际文件会保留。要求被编辑或撤回将暂停安排，没有隐藏会话或 diff 迁移。'
-                : '本次要求会一并发送。没有跨工具历史迁移；节点按授权读取目录。'}
+                : '上方包含本次要求与所选项目材料。没有跨工具历史迁移；节点按授权读取目录。'}
               排队期间人工讨论或任务说明变化会阻止启动，新保存的下一轮要求不会悄悄加入当前派发。
             </p>
           </details>
+          <ProjectMaterialPicker state={materials} disabled={locked} />
         </fieldset>
         <label className="check-field">
           <input
             type="checkbox"
             checked={consent}
             disabled={
-              busy ||
+              locked ||
               !selected?.available ||
               staleTask ||
               resumeBlocked ||
+              !materials.ready ||
+              !!materialError ||
+              !previewTask ||
               (!!source && !continuation?.ready)
             }
             onChange={(e) => setConsent(e.target.checked)}
@@ -460,8 +502,9 @@ export function NodeRunPanel({
             {error}
           </p>
         )}
+        <ExecutionReceipt delivery={delivery} />
         <div className="form-actions">
-          <Button onClick={onClose} disabled={busy}>
+          <Button type="button" onClick={onClose} disabled={busy}>
             返回
           </Button>
           <Button
@@ -470,6 +513,9 @@ export function NodeRunPanel({
             busy={busy}
             disabled={
               !consent ||
+              locked ||
+              !materials.ready ||
+              !previewTask ||
               staleTask ||
               resumeBlocked ||
               !!materialError ||
@@ -576,7 +622,7 @@ export function NodeRunStatus({ run }: { run: Run }) {
           派发 ID：<code>{n.dispatchId}</code>
         </p>
         <p>
-          仅明确选择 Codex
+          仅明确选择 {run.requestedTool === 'claude-code' ? 'Claude Code' : 'Codex'}
           原生恢复时尝试原会话；失败不改成新会话，不自动完成任务。本轮不提供运行中输入、远程 diff
           或通用终端。
         </p>

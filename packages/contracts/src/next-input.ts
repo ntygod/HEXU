@@ -20,6 +20,7 @@ export interface NodeContinuationSelection {
   inputs: { id: string; revision: number }[];
 }
 export interface NodeContinuationPreview {
+  taskContextHash?: string;
   sourceRunId: string;
   sourceTool: Tool;
   taskRevision: number;
