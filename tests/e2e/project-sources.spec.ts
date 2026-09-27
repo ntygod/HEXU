@@ -171,21 +171,22 @@ test('两页修改同一资料保留草稿并明确比较，删除冲突不能�
     for (const current of [page, other])
       await current.getByRole('button', { name: '编辑资料', exact: true }).click();
     await page.getByLabel('资料正文', { exact: true }).fill('本页未发送的修改');
-    await page.route(
-      `**/api/v1/projects/${p.id}/sources/${s.id}`,
-      (route) =>
-        route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: { code: 'FIXTURE_READ_FAILED', message: '测试中的临时读取失败' },
-          }),
-        }),
-      { times: 1 },
+    let readUnavailable = true;
+    await page.route(`**/api/v1/projects/${p.id}/sources/${s.id}`, (route) =>
+      readUnavailable && route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 503,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              error: { code: 'FIXTURE_READ_FAILED', message: '测试中的临时读取失败' },
+            }),
+          })
+        : route.continue(),
     );
     await source(page, p.id, '触发资料刷新');
     await expect(drawer(page)).toContainText('测试中的临时读取失败');
     await expect(page.getByLabel('资料正文', { exact: true })).toHaveValue('本页未发送的修改');
+    readUnavailable = false;
     await page.getByRole('button', { name: '重新读取资料', exact: true }).click();
     await expect(drawer(page)).not.toContainText('测试中的临时读取失败');
     await other.getByLabel('资料正文', { exact: true }).fill('另一页先保存的内容');
