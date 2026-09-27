@@ -400,19 +400,17 @@ test('任务/运行/固定接续材料与未知目录锁不被协助创建、追
         'task',
       );
       const message = store.addMessage(task.id, visible, null, 'msg');
-      store.db
-        .prepare('INSERT INTO runs VALUES(?,?,?)')
-        .run(
-          'run',
-          task.id,
-          JSON.stringify({
-            id: 'run',
-            taskId: task.id,
-            provider: 'native',
-            state: 'running',
-            observation: 'unknown',
-          }),
-        );
+      store.db.prepare('INSERT INTO runs VALUES(?,?,?)').run(
+        'run',
+        task.id,
+        JSON.stringify({
+          id: 'run',
+          taskId: task.id,
+          provider: 'native',
+          state: 'running',
+          observation: 'unknown',
+        }),
+      );
       store.db
         .prepare('INSERT INTO native_workspaces VALUES(?,?,?)')
         .run('wc', '/fictional-only', '{}');
