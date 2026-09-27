@@ -8,6 +8,7 @@ import {
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Icon, ToolMark } from '../../../packages/ui/src/index.js';
 import { time, useApp, useLoad } from './state.js';
+import { OperationProjectMaterials } from './project-materials.js';
 
 export function ContinuationStatus({
   taskId,
@@ -73,6 +74,9 @@ export function ContinuationStatus({
           <Icon name="warning" size={16} /> {blocker.message}
         </p>
       ))}
+      {op.materialBundleId && (
+        <OperationProjectMaterials taskId={taskId} bundleId={op.materialBundleId} />
+      )}
       <div className="continuation-status-actions">
         <span className="muted">
           {time(op.createdAt)} · {op.input.run.mode === 'edit' ? '文件编辑' : '只读分析'} · 同一目录

@@ -1,6 +1,7 @@
 import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
 import { TaskAgreements } from './project-agreements.js';
+import { RunProjectMaterials } from './project-materials.js';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { TaskDetail } from '../../../packages/contracts/src/index.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
@@ -327,6 +328,9 @@ export function TaskPage({ id }: { id: string }) {
                 />
               )}
               {lastRun?.provider === 'node' && <NodeRunStatus run={lastRun} />}
+              {lastRun && lastRun.provider !== 'mock' && (
+                <RunProjectMaterials key={lastRun.id} run={lastRun} />
+              )}
               <MessageList messages={messages} />
               {lastRun?.provider === 'native' && <NativeEvents run={lastRun} />}
               {!messages.length && (

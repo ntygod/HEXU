@@ -11,6 +11,9 @@ import type {
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Empty, Icon, ToolMark } from '../../../packages/ui/src/index.js';
 import { useApp, useLoad, useTaskDraft, time } from './state.js';
+import { ProjectMaterialPicker, useProjectMaterialSelection } from './project-materials.js';
+import { appendProjectMaterials } from '../../../packages/contracts/src/project-materials.js';
+import { ExecutionReceipt, useExecutionRequest } from './execution-request.js';
 
 export function NativeContinue({
   task,
@@ -24,18 +27,22 @@ export function NativeContinue({
   onMock(): void;
 }) {
   const { value: native, error: loadError } = useLoad<NativeOverview>('/native');
-  const source = lastRun?.provider === 'native' && lastRun.native ? lastRun : undefined;
+  const [source] = useState(() =>
+    lastRun?.provider === 'native' && lastRun.native ? lastRun : undefined,
+  );
   const { value: context, error: contextError } = useLoad<{
     text?: string;
     contextText?: string;
     canContinue?: boolean;
     reason?: string;
+    taskRevision: number;
+    taskStatus: Task['status'];
+    taskContextHash: string;
   }>(
     source
       ? `/tasks/${task.id}/continuation-preview?sourceRunId=${encodeURIComponent(source.id)}`
       : `/tasks/${task.id}/native-context`,
   );
-  const { refresh, notice } = useApp();
   const [tool, setTool] = useState<'claude-code' | 'codex'>(source?.requestedTool ?? 'claude-code');
   const [workingCopyId, setWorkingCopyId] = useState(source?.native?.workingCopyId ?? '');
   const [mode, setMode] = useState<NativeMode>('read-only');
@@ -44,14 +51,62 @@ export function NativeContinue({
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [budget, setBudget] = useState(1);
-  const [consent, setConsent] = useState(false);
+  const materials = useProjectMaterialSelection(task);
+  const [confirmation, setConfirmation] = useState({ scope: '', approved: false });
   const [onActiveRun, setOnActiveRun] = useState<'wait' | 'request_stop'>('request_stop');
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+  const delivery = useExecutionRequest(
+    () => {
+      setPrompt('');
+      onClose();
+    },
+    () => {
+      setPrompt('');
+      onClose();
+    },
+  );
+  const busy = delivery.busy,
+    locked = delivery.locked;
+  const { notice } = useApp();
+  const [error, setError] = useState('');
   const chosen = source?.native?.workingCopyId || workingCopyId || native?.workspaces[0]?.id || '';
   const capability = tool === 'codex' ? native?.codex : native?.claude;
   const label = tool === 'codex' ? 'Codex' : 'Claude Code';
   const awaitingStop = source && context?.canContinue === false;
+  const expectedRevision = context?.taskRevision ?? task.revision;
+  const taskStatus =
+    context && context.taskRevision >= task.revision ? context.taskStatus : task.status;
+  const staleTask = !!context && task.revision > context.taskRevision;
+  let fullContext = context?.contextText ?? context?.text ?? '',
+    materialError = '';
+  try {
+    fullContext = appendProjectMaterials(fullContext, materials.snapshot ?? undefined);
+  } catch (cause) {
+    materialError = (cause as Error).message;
+  }
+  if (
+    materials.snapshot &&
+    fullContext.length + prompt.trim().length + (source ? '\n\n# 本次要求\n'.length : 0) > 60000
+  )
+    materialError = '本次全部材料超过 60000 字符，请缩短要求或减少项目选材';
+  const consentScope = JSON.stringify([
+    tool,
+    chosen,
+    mode,
+    prompt,
+    model,
+    budget,
+    onActiveRun,
+    source?.id,
+    expectedRevision,
+    taskStatus,
+    context?.taskContextHash,
+    materials.selectionKey,
+    materials.snapshot?.hash,
+  ]);
+  if (confirmation.scope !== consentScope)
+    setConfirmation({ scope: consentScope, approved: false });
+  const consent = confirmation.scope === consentScope && confirmation.approved;
+  const setConsent = (approved: boolean) => setConfirmation({ scope: consentScope, approved });
   return (
     <Dialog
       title={source ? '接着当前工作继续' : '使用本机原生工具'}
@@ -60,38 +115,37 @@ export function NativeContinue({
     >
       <form
         className="drawer-form"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          setBusy(true);
-          setError('');
-          try {
-            await request(`/tasks/${task.id}/${source ? 'continuations' : 'runs'}`, {
-              method: 'POST',
-              body: {
-                provider: 'native',
-                requestedTool: tool,
-                workingCopyId: chosen,
-                ...(source ? { sourceRunId: source.id, onActiveRun } : {}),
-                mode,
-                prompt,
-                model,
-                ...(tool === 'claude-code' ? { maxBudgetUsd: budget } : {}),
-                confirmExecution: consent,
-                expectedRevision: task.revision,
-                reopenTask: task.status === 'done',
-              },
-            });
-            setPrompt('');
-            await refresh();
-            onClose();
-            notice(
-              source ? `已保存 ${label} 接续安排；进度会保留在任务中` : `已派发 ${label} 原生执行`,
-            );
-          } catch (err) {
-            setError((err as Error).message);
-          } finally {
-            setBusy(false);
-          }
+          if (
+            locked ||
+            !consent ||
+            !materials.ready ||
+            !context ||
+            contextError ||
+            staleTask ||
+            materialError
+          )
+            return;
+          void delivery.send(
+            `/tasks/${task.id}/${source ? 'continuations' : 'runs'}`,
+            {
+              provider: 'native',
+              requestedTool: tool,
+              workingCopyId: chosen,
+              ...(source ? { sourceRunId: source.id, onActiveRun } : {}),
+              mode,
+              prompt,
+              model,
+              ...(tool === 'claude-code' ? { maxBudgetUsd: budget } : {}),
+              confirmExecution: consent,
+              expectedRevision,
+              expectedTaskContextHash: context.taskContextHash,
+              projectMaterials: materials.selection,
+              reopenTask: taskStatus === 'done',
+            },
+            source ? `已保存 ${label} 接续安排；进度会保留在任务中` : `已派发 ${label} 原生执行`,
+          );
         }}
       >
         <div className="dialog-body">
@@ -102,7 +156,7 @@ export function NativeContinue({
           )}
           <div className="native-mode-heading">
             <span className="badge status-in_progress">原生执行 · 实验接入</span>
-            <Button type="button" onClick={onMock} disabled={busy}>
+            <Button type="button" onClick={onMock} disabled={locked}>
               返回模拟体验
             </Button>
           </div>
@@ -118,7 +172,7 @@ export function NativeContinue({
               <p>同一任务 · 沿用目录和未提交修改 · 创建新会话</p>
             </div>
           )}
-          <fieldset className="tool-choice-field">
+          <fieldset className="tool-choice-field" disabled={locked}>
             <legend>接下来使用</legend>
             <div className="native-tool-choice">
               {(['claude-code', 'codex'] as const).map((value) => (
@@ -177,7 +231,7 @@ export function NativeContinue({
             </div>
           ) : (
             <>
-              <fieldset className="execution-section" disabled={busy}>
+              <fieldset className="execution-section" disabled={locked}>
                 <legend>工具配置与目录</legend>
                 <label className="field">
                   工作目录
@@ -310,7 +364,7 @@ export function NativeContinue({
                   </>
                 )}
               </fieldset>
-              <fieldset className="execution-section" disabled={busy}>
+              <fieldset className="execution-section" disabled={locked}>
                 <legend>本次要求与材料</legend>
                 <label className="field">
                   接下来做什么
@@ -329,25 +383,35 @@ export function NativeContinue({
                 </label>
                 <details className="native-details">
                   <summary>查看接续上下文与代码来源</summary>
-                  <pre>{context?.contextText ?? context?.text ?? '正在整理…'}</pre>
+                  <pre>{fullContext || '正在整理…'}</pre>
                   <p>
-                    本次要求会一并发送。等待原执行结束时，会在同一授权目录内重新整理最新输出和部分变更摘录；人工说明变化将暂停接续。
+                    本次要求会一并发送。等待原执行结束时，会在同一授权目录内重新整理最新输出和部分变更摘录；所选项目材料版本固定，人工说明或所选资料变化将暂停接续。
                   </p>
                 </details>
+                <ProjectMaterialPicker state={materials} disabled={locked} />
               </fieldset>
               <label className="check-line">
                 <input
                   type="checkbox"
                   checked={consent}
+                  disabled={
+                    locked || !materials.ready || !!contextError || staleTask || !!materialError
+                  }
                   onChange={(e) => setConsent(e.target.checked)}
                 />
                 我允许本次 {label} 访问以上目录与上下文，并使用其本机 API key 产生模型费用。
               </label>
             </>
           )}
+          <ExecutionReceipt delivery={delivery} />
           {error && (
-            <p role="alert" className="form-error">
+            <p className="form-error" role="alert">
               {error}
+            </p>
+          )}
+          {(staleTask || materialError) && (
+            <p className="form-error" role="alert">
+              {materialError || '工作说明已变化，正在重新读取；更新后请重新确认。'}
             </p>
           )}
         </div>
@@ -361,10 +425,15 @@ export function NativeContinue({
             busy={busy}
             disabled={
               !capability?.available ||
+              locked ||
               !chosen ||
               !consent ||
               !prompt.trim() ||
-              (!!source && !context)
+              !context ||
+              !!contextError ||
+              staleTask ||
+              !materials.ready ||
+              !!materialError
             }
           >
             <Icon name="play" />

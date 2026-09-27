@@ -8,6 +8,7 @@ import type { NodeContinuationOperation } from '../../../packages/contracts/src/
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Icon, ToolMark } from '../../../packages/ui/src/index.js';
 import { time, useApp, useLoad } from './state.js';
+import { OperationProjectMaterials } from './project-materials.js';
 
 export function NodeContinuationStatus({
   taskId,
@@ -76,6 +77,9 @@ export function NodeContinuationStatus({
           {b.message}
         </p>
       ))}
+      {op.materialBundleId && (
+        <OperationProjectMaterials taskId={taskId} bundleId={op.materialBundleId} />
+      )}
       <div className="continuation-status-actions">
         <span className="muted">
           {op.ownerName} · {time(op.createdAt)} · 已选{' '}

@@ -25,4 +25,4 @@ project view 可查看；edit/manage 可发布、修改、替代、停用和启�
 
 迁移 14 添加 project_agreements、project_agreement_revisions、project_agreement_versions。现有消息/资料不会自动变成约定。约定当前记录、历史、项目版本、project outbox、幂等回执同事务；替代包含新旧两份记录。已明确发布的约定是独立项目记录，不因原作者退出或源任务后续改变而冒充被撤回。
 
-本切片不把约定加入任何模型输入；Project/Task 修订、既有 Run/dispatch/Operation 和目录锁保持不变。选材、固定材料及真实送达状态由后续 05-05/06 接入。持久提醒、任务子范围约定与正式远程部署仍未交付。实际检查见 [21](../development/21-implementation-status.md)。
+发布和编辑约定不自动加入模型输入；Project/Task 修订、既有 Run/dispatch/Operation 和目录锁保持不变。开始或接续时可通过 [05-05/06 明确选材](project-materials.md) 固定版本，启动确认不代表模型收到。持久提醒、任务子范围约定与正式远程部署仍未交付。实际检查见 [21](../development/21-implementation-status.md)。

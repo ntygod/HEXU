@@ -163,6 +163,70 @@ async function detail(page: Page, f: Awaited<ReturnType<typeof prepare>>) {
   ).json();
 }
 
+test('独立节点选材在网页显示固定版本，实际输入一致，丢失回执不重复调用', async ({ page }) => {
+  test.setTimeout(90000);
+  const f = await prepare(page);
+  let agent: ReturnType<typeof cli> | null = null;
+  try {
+    const material = await post(
+      page,
+      `projects/${f.task.projectId}/sources`,
+      { kind: 'text', title: '节点选材接口说明', content: 'NODE_BROWSER_SELECTED_CONTEXT\n' },
+      f.space.id,
+    );
+    agent = await authorize(f);
+    await startUI(page, 'FIXTURE_CAPTURE_INPUT');
+    await page.getByRole('button', { name: '选择项目材料', exact: true }).click();
+    await page.getByLabel('选取资料：节点选材接口说明', { exact: true }).check();
+    const consent = page.getByRole('checkbox', { name: /我确认本次目录与模式/ });
+    await expect(consent).not.toBeChecked();
+    await consent.check();
+    const requests: { key: string; body: unknown }[] = [];
+    let drop = true;
+    await page.route(`${origin}/api/v1/tasks/${f.task.id}/runs`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      requests.push({
+        key: route.request().headers()['idempotency-key']!,
+        body: route.request().postDataJSON(),
+      });
+      if (drop) {
+        drop = false;
+        expect((await route.fetch()).ok()).toBe(true);
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await page.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect(page.getByLabel('执行请求待确认', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '确认上次执行请求', exact: true }).click();
+    await expect
+      .poll(async () => (await detail(page, f)).runs[0]?.state, { timeout: 20000 })
+      .toBe('succeeded');
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toEqual(requests[1]);
+    const data = await detail(page, f);
+    expect(data.runs).toHaveLength(1);
+    const view = await (
+      await page.request.get(`${origin}/api/v1/runs/${data.runs[0].id}/materials`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(view.state).toBe('started');
+    expect(view.bundle.snapshot.items[0].reference.id).toBe(material.id);
+    expect(await readFile(join(f.root, 'received-context.txt'), 'utf8')).toBe(
+      view.bundle.contextText,
+    );
+    expect(await readFile(join(f.root, 'actual-starts.txt'), 'utf8')).toBe('one\n');
+    await expect(page.getByLabel('执行项目选材', { exact: true })).toContainText(
+      '执行器已确认启动',
+    );
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/63-node-materials.png', fullPage: true });
+  } finally {
+    if (agent) await agent.stop();
+    await rm(f.dir, { recursive: true, force: true });
+  }
+});
+
 test('网页明确授权后由实际独立 CLI 执行，保留输出、来源和刷新状态', async ({ page }) => {
   test.setTimeout(90000);
   const f = await prepare(page);

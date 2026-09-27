@@ -9,6 +9,7 @@ export interface NodeContinuationInput {
 }
 /** A user-authorized, bounded plan. Success means Run creation, not model success. */
 export interface NodeContinuationOperation {
+  materialBundleId?: string;
   id: string;
   provider: 'node';
   kind: 'continue';
@@ -48,6 +49,8 @@ export function parseNodeContinuationOperation(value: unknown): NodeContinuation
     'continuation',
     'onActiveRun',
     'sessionMode',
+    'projectMaterials',
+    'expectedTaskContextHash',
   ]);
   if (b.sessionMode !== undefined)
     throw new DomainError(

@@ -1,4 +1,5 @@
 import { NextInputs } from '../packages/db/src/next-inputs.js';
+import { parseProjectMaterialRefs } from '../packages/contracts/src/project-materials.js';
 import { parseNextInput, nodeContinuationContext } from '../packages/contracts/src/next-input.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -177,6 +178,177 @@ test('执行契约拒绝伪造路径/账户/工具参数、未确认费用与非
         }),
       DomainError,
     );
+  } finally {
+    f.close();
+  }
+});
+
+function projectMaterial(f: ReturnType<typeof fixture>) {
+  const source = f.as(() =>
+    f.store.projectSources.create(
+      f.project.id,
+      { kind: 'text', title: '固定接口材料', content: 'PROJECT_MATERIAL_ORIGINAL' },
+      key(),
+    ),
+  );
+  const items = parseProjectMaterialRefs([
+    { kind: 'source', id: source.id, revision: 1, contentHash: source.contentHash },
+  ]);
+  const snapshot = f.as(() => f.store.projectMaterials.preview(f.task.id, items));
+  return { source, selection: { items, expectedHash: snapshot.hash }, snapshot };
+}
+test('节点材料绑定区分排队/许可/实际启动，许可后资料编辑不改写已授权命令', () => {
+  const f = fixture();
+  try {
+    f.publish();
+    const m = projectMaterial(f),
+      body = parseNodeRun({
+        ...f.body(),
+        projectMaterials: m.selection,
+        expectedTaskContextHash: f.as(() => f.execution.options(f.task.id).taskContextHash),
+      });
+    const run = f.as(() => f.execution.create(f.task.id, body, 'materials')),
+      command = f.command();
+    assert.ok(run.materialBundleId);
+    assert.equal(f.as(() => f.store.projectMaterials.runView(run.id)).state, 'fixed');
+    assert.ok(command.context.includes(m.snapshot.text));
+    f.send(command, 1, 'accepted');
+    assert.equal(f.as(() => f.store.projectMaterials.runView(run.id)).state, 'fixed');
+    assert.equal(
+      f.execution.permit(f.token, f.connection, command.id, command.generation).allowed,
+      true,
+    );
+    assert.equal(f.as(() => f.store.projectMaterials.runView(run.id)).state, 'uncertain');
+    f.as(() =>
+      f.store.projectSources.edit(
+        f.project.id,
+        m.source.id,
+        {
+          expectedRevision: 1,
+          title: m.source.title,
+          content: 'NEW_MATERIAL_AFTER_PERMIT',
+          url: null,
+        },
+        key(),
+      ),
+    );
+    f.send(command, 2, 'running');
+    const view = f.as(() => f.store.projectMaterials.runView(run.id));
+    assert.equal(view.state, 'started');
+    assert.ok(view.bundle!.startedAt);
+    assert.equal(view.bundle!.contextText, command.context);
+    assert.ok(!view.bundle!.contextText!.includes('NEW_MATERIAL_AFTER_PERMIT'));
+    assert.equal(
+      f.execution.permit(f.token, f.connection, command.id, command.generation).allowed,
+      false,
+    );
+    assert.equal(f.as(() => f.execution.create(f.task.id, body, 'materials')).id, run.id);
+  } finally {
+    f.close();
+  }
+});
+test('节点许可前资料/约定过期或人工上下文改变拒绝启动，旧快照保留且没有启动确认', () => {
+  const f = fixture();
+  try {
+    f.publish();
+    const m = projectMaterial(f),
+      expectedTaskContextHash = f.as(() => f.execution.options(f.task.id).taskContextHash),
+      body = parseNodeRun({ ...f.body(), projectMaterials: m.selection, expectedTaskContextHash });
+    f.as(() => f.store.addMessage(f.task.id, '新的人工要求', null, key()));
+    assert.throws(
+      () => f.as(() => f.execution.create(f.task.id, body, 'stale-human')),
+      code('CONTEXT_CHANGED'),
+    );
+    const run = f.as(() =>
+        f.execution.create(
+          f.task.id,
+          {
+            ...body,
+            expectedTaskContextHash: f.as(() => f.execution.options(f.task.id).taskContextHash),
+          },
+          key(),
+        ),
+      ),
+      command = f.command();
+    f.send(command, 1, 'accepted');
+    f.as(() =>
+      f.store.projectSources.lifecycle(
+        f.project.id,
+        m.source.id,
+        { expectedRevision: 1, action: 'delete' },
+        key(),
+      ),
+    );
+    assert.equal(
+      f.execution.permit(f.token, f.connection, command.id, command.generation).allowed,
+      false,
+    );
+    assert.equal(f.as(() => f.store.run(run.id)).state, 'cancelled');
+    const view = f.as(() => f.store.projectMaterials.runView(run.id));
+    assert.equal(view.state, 'fixed');
+    assert.equal(view.bundle!.startedAt, null);
+    assert.ok(view.bundle!.snapshot.text.includes('PROJECT_MATERIAL_ORIGINAL'));
+    f.send(command, 2, 'running');
+    assert.equal(f.as(() => f.store.run(run.id)).state, 'cancelled');
+    assert.equal(f.as(() => f.store.projectMaterials.runView(run.id)).bundle!.startedAt, null);
+  } finally {
+    f.close();
+  }
+});
+test('节点完整材料超限和材料绑定失败不留下 Run、派发、快照或幂等副作用', () => {
+  const f = fixture();
+  try {
+    f.publish();
+    const m = projectMaterial(f),
+      body = parseNodeRun({ ...f.body(), projectMaterials: m.selection });
+    f.store.db.exec(
+      "CREATE TRIGGER material_failure BEFORE INSERT ON context_bundles BEGIN SELECT RAISE(ABORT,'material bind rollback'); END",
+    );
+    assert.throws(
+      () => f.as(() => f.execution.create(f.task.id, body, 'bind-retry')),
+      /material bind rollback/,
+    );
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 0);
+    assert.equal(f.store.db.prepare('SELECT COUNT(*) n FROM node_dispatches').get()!.n, 0);
+    assert.equal(f.store.db.prepare('SELECT COUNT(*) n FROM context_bundles').get()!.n, 0);
+    f.store.db.exec('DROP TRIGGER material_failure');
+    f.as(() => {
+      f.store.patchTask(
+        f.task.id,
+        { expectedRevision: f.task.revision, description: '长'.repeat(5000) },
+        key(),
+      );
+      f.store.addMessage(f.task.id, '甲'.repeat(1000), null, key());
+      f.store.addMessage(f.task.id, '乙'.repeat(1000), null, key());
+    });
+    const large = f.as(() =>
+      f.store.projectSources.create(
+        f.project.id,
+        { kind: 'text', title: '大材料', content: '资'.repeat(8000) },
+        key(),
+      ),
+    );
+    const items = parseProjectMaterialRefs([
+        { kind: 'source', id: large.id, revision: 1, contentHash: large.contentHash },
+      ]),
+      snapshot = f.as(() => f.store.projectMaterials.preview(f.task.id, items));
+    assert.throws(
+      () =>
+        f.as(() =>
+          f.execution.create(
+            f.task.id,
+            parseNodeRun({
+              ...f.body(),
+              prompt: '求'.repeat(6000),
+              projectMaterials: { items, expectedHash: snapshot.hash },
+            }),
+            'over-budget',
+          ),
+        ),
+      code('MATERIAL_LIMIT'),
+    );
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 0);
+    assert.equal(f.store.db.prepare('SELECT COUNT(*) n FROM context_bundles').get()!.n, 0);
   } finally {
     f.close();
   }
@@ -711,6 +883,120 @@ test('节点接续契约必须明确来源、停止策略与费用确认，拒�
       { contextText: 'injected' },
     ])
       assert.throws(() => parseNodeContinuationOperation({ ...f.body(), ...patch }), DomainError);
+  } finally {
+    f.close();
+  }
+});
+
+test('节点等待选材只固定一次，未选择的新资料不补入，完成后原子沿用同一快照且不重复追加', () => {
+  const f = operationFixture();
+  try {
+    const m = projectMaterial(f),
+      input = parseNodeContinuationOperation({
+        ...f.body('wait'),
+        projectMaterials: m.selection,
+        expectedTaskContextHash: f.as(
+          () => f.execution.options(f.task.id, f.source.run.id).taskContextHash,
+        ),
+      });
+    const op = f.as(() => f.operations.create(f.task.id, input, 'selected-op'));
+    assert.ok(op.materialBundleId);
+    const saved = f.as(() => f.store.projectMaterials.get(f.task.id, op.materialBundleId!));
+    assert.equal(saved.contextText, op.contextText);
+    assert.equal(saved.runId, null);
+    f.as(() =>
+      f.store.projectSources.create(
+        f.project.id,
+        { kind: 'text', title: '未选择的新增', content: 'NEVER_APPEND_UNSELECTED' },
+        key(),
+      ),
+    );
+    f.send(f.source.c, 3, 'output', null, 'LATER_SOURCE_OUTPUT');
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'waiting_for_stop');
+    f.send(f.source.c, 4, 'terminal', 'succeeded');
+    f.operations.tick();
+    const done = f.read(op.id);
+    assert.equal(done.state, 'succeeded', JSON.stringify(done.blockers));
+    const run = f.as(() => f.store.run(done.runId!)),
+      command = f.command(),
+      bound = f.as(() => f.store.projectMaterials.runView(run.id));
+    assert.equal(run.materialBundleId, op.materialBundleId);
+    assert.equal(bound.bundle!.id, saved.id);
+    assert.equal(bound.bundle!.contextText, op.contextText);
+    assert.equal(command.context, op.contextText);
+    assert.equal(command.context.split('# 项目补充材料结束').length - 1, 1);
+    assert.ok(!command.context.includes('NEVER_APPEND_UNSELECTED'));
+    assert.ok(!command.context.includes('LATER_SOURCE_OUTPUT'));
+    assert.equal(f.as(() => f.operations.create(f.task.id, input, 'selected-op')).runId, run.id);
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 2);
+  } finally {
+    f.close();
+  }
+});
+test('等待所选资料变化先暂停再决定停止；版本改回也不复活旧计划或丢失快照', () => {
+  const f = operationFixture();
+  try {
+    const m = projectMaterial(f),
+      input = parseNodeContinuationOperation({
+        ...f.body('request_stop'),
+        projectMaterials: m.selection,
+      });
+    const op = f.as(() => f.operations.create(f.task.id, input, 'pending-material'));
+    const bundle = f.as(() => f.store.projectMaterials.get(f.task.id, op.materialBundleId!));
+    f.as(() =>
+      f.store.projectSources.edit(
+        f.project.id,
+        m.source.id,
+        { expectedRevision: 1, title: m.source.title, content: 'CHANGED_SELECTED', url: null },
+        key(),
+      ),
+    );
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'needs_attention');
+    assert.equal(f.read(op.id).blockers[0]!.code, 'PROJECT_MATERIAL_CHANGED');
+    assert.equal(f.as(() => f.store.run(f.source.run.id)).state, 'running');
+    f.as(() =>
+      f.store.projectSources.edit(
+        f.project.id,
+        m.source.id,
+        { expectedRevision: 2, title: m.source.title, content: m.source.content, url: null },
+        key(),
+      ),
+    );
+    f.operations.tick();
+    assert.equal(f.read(op.id).state, 'needs_attention');
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    assert.deepEqual(
+      f.as(() => f.store.projectMaterials.get(f.task.id, op.materialBundleId!)),
+      bundle,
+    );
+  } finally {
+    f.close();
+  }
+});
+test('节点接续绑定快照失败时 Run/派发/关联一同回滚，原材料保留且不自动重试', () => {
+  const f = operationFixture();
+  try {
+    const m = projectMaterial(f),
+      input = parseNodeContinuationOperation({ ...f.body('wait'), projectMaterials: m.selection }),
+      op = f.as(() => f.operations.create(f.task.id, input, key()));
+    f.send(f.source.c, 3, 'terminal', 'succeeded');
+    f.store.db.exec(
+      "CREATE TRIGGER material_bind_failure BEFORE UPDATE OF run_id ON context_bundles BEGIN SELECT RAISE(ABORT,'operation material rollback'); END",
+    );
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
+    assert.equal(f.store.db.prepare('SELECT COUNT(*) n FROM node_dispatches').get()!.n, 1);
+    assert.equal(f.read(op.id).runId, null);
+    assert.equal(
+      f.as(() => f.store.projectMaterials.get(f.task.id, op.materialBundleId!)).runId,
+      null,
+    );
+    f.store.db.exec('DROP TRIGGER material_bind_failure');
+    f.operations.tick();
+    assert.equal(f.as(() => f.store.runs(f.task.id)).length, 1);
   } finally {
     f.close();
   }

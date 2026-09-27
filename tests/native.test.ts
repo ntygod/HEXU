@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, chmod, symlink, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, chmod, symlink, rm, mkdir } from 'node:fs/promises';
+import { parseProjectMaterialRefs } from '../packages/contracts/src/project-materials.js';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -85,6 +86,136 @@ test('原生创建需要显式费用与目录授权，不接受未知工具', ()
     { timeoutSeconds: Infinity },
   ])
     assert.throws(() => parseNativeRunCreate({ ...input(), ...change }));
+});
+
+test('原生协议进程收到与固定快照一致的项目材料，实际 spawn 才记录启动且敏感格式被遮盖', async () => {
+  const f = await fixture(),
+    store = new Store();
+  const app = await createApp({
+    store,
+    native: {
+      enabled: true,
+      roots: [f.repo],
+      claudeExecutable: f.executable,
+      apiKey: fakeKey,
+      codexExecutable: '/missing-codex-protocol-fixture',
+      codexApiKey: fakeKey,
+    },
+  });
+  try {
+    const task = store.getTask('task-24'),
+      source = store.projectSources.create(
+        task.projectId!,
+        {
+          kind: 'text',
+          title: '进程输入参考',
+          content: `PROJECT_MATERIAL_NATIVE_BODY\n${fakeKey}\n`,
+        },
+        'source',
+      );
+    const items = parseProjectMaterialRefs([
+      { kind: 'source', id: source.id, revision: 1, contentHash: source.contentHash },
+    ]);
+    const preview = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/tasks/${task.id}/project-materials/preview`,
+        headers: headers(),
+        payload: { items },
+      })
+    ).json();
+    assert.ok(preview.text.includes('[REDACTED]'));
+    assert.ok(!preview.text.includes(fakeKey));
+    const workspace = (await app.inject('/api/v1/native')).json().workspaces[0].id,
+      context = (await app.inject(`/api/v1/tasks/${task.id}/native-context`)).json();
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/tasks/${task.id}/runs`,
+      headers: headers(),
+      payload: {
+        ...input(workspace),
+        prompt: 'FIXTURE_CAPTURE_INPUT',
+        projectMaterials: { items, expectedHash: preview.hash },
+        expectedTaskContextHash: context.taskContextHash,
+      },
+    });
+    assert.equal(response.statusCode, 201, response.body);
+    const runId = response.json().id;
+    await waitUntil(
+      () => store.run(runId),
+      (run) => run.state === 'succeeded',
+    );
+    const view = (await app.inject(`/api/v1/runs/${runId}/materials`)).json();
+    assert.equal(view.state, 'started');
+    assert.ok(view.bundle.startedAt);
+    const received = await readFile(join(f.repo, 'received-context.txt'), 'utf8');
+    assert.equal(received, view.bundle.contextText);
+    assert.ok(received.includes(preview.text));
+    assert.ok(!received.includes(fakeKey));
+    assert.equal(store.run(runId).native?.contextText, received);
+  } finally {
+    await app.close();
+    await f.cleanup();
+  }
+});
+test('原生异步准备后所选资料变化不启动进程，保留固定材料并正常释放未启动占用', async () => {
+  const f = await fixture(),
+    store = new Store(),
+    runtime = new NativeRuntime(store, {
+      enabled: true,
+      roots: [f.repo],
+      claudeExecutable: f.executable,
+      apiKey: fakeKey,
+      codexExecutable: '/missing-codex-protocol-fixture',
+      codexApiKey: fakeKey,
+    });
+  try {
+    await runtime.initialize();
+    const task = store.getTask('task-24'),
+      source = store.projectSources.create(
+        task.projectId!,
+        { kind: 'text', title: '启动前核对', content: 'BEFORE_ASYNC_PREPARATION' },
+        'source',
+      );
+    const items = parseProjectMaterialRefs([
+        { kind: 'source', id: source.id, revision: 1, contentHash: source.contentHash },
+      ]),
+      snapshot = store.projectMaterials.preview(task.id, items, (value) => runtime.clean(value));
+    const original = runtime.workspaces.get.bind(runtime.workspaces);
+    let calls = 0;
+    runtime.workspaces.get = async (id) => {
+      const result = await original(id);
+      if (++calls === 2)
+        store.projectSources.edit(
+          task.projectId!,
+          source.id,
+          { expectedRevision: 1, title: source.title, content: 'CHANGED_BEFORE_SPAWN', url: null },
+          'edit-during-preparation',
+        );
+      return result;
+    };
+    const run = await runtime.create(
+      task.id,
+      parseNativeRunCreate({
+        ...input(runtime.overview().workspaces[0]!.id),
+        prompt: 'FIXTURE_CAPTURE_INPUT',
+        projectMaterials: { items, expectedHash: snapshot.hash },
+      }),
+      'prepared',
+    );
+    await waitUntil(
+      () => store.run(run.id),
+      (current) => current.state === 'failed',
+    );
+    assert.equal(store.projectMaterials.runView(run.id).bundle!.startedAt, null);
+    assert.equal(store.projectMaterials.runView(run.id).bundle!.snapshot.hash, snapshot.hash);
+    assert.equal(store.nativeLock(run.native!.workingCopyId), null);
+    await assert.rejects(() => readFile(join(f.repo, 'received-context.txt')), /ENOENT/);
+  } finally {
+    await runtime.close();
+    store.close();
+    await f.cleanup();
+  }
 });
 test('Claude 使用 bare/restricted；不提供 Bash、MCP 或 bypass', () => {
   const args = claudeArguments(config);

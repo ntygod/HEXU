@@ -19,6 +19,8 @@ import { NODE_LEASE_MS, type DirectoryGrant } from '../../contracts/src/nodes.js
 import { assertRevision, canonicalJson, isActiveRun } from '../../domain/src/index.js';
 import { redact } from '../../adapters/claude-code/src/index.js';
 import type { Store } from './store.js';
+import type { IdentityUser } from '../../contracts/src/identity.js';
+import { appendProjectMaterials } from '../../contracts/src/project-materials.js';
 import type { NodeRegistry } from './nodes.js';
 
 export const executionHash = (v: unknown) =>
@@ -192,11 +194,24 @@ export class NodeExecution {
     taskId: string,
     allowedSourceRunId?: string,
     allowedOperationId?: string,
-  ): { items: NodeExecutionOption[]; contextText: string } {
+  ): {
+    items: NodeExecutionOption[];
+    contextText: string;
+    taskContextHash: string;
+    taskRevision: number;
+    taskStatus: Task['status'];
+  } {
     const task = this.store.getTask(taskId);
-    if (!task.projectId) return { items: [], contextText: this.humanContext(task) };
+    const contextText = this.humanContext(task),
+      metadata = {
+        contextText,
+        taskContextHash: executionHash(contextText),
+        taskRevision: task.revision,
+        taskStatus: task.status,
+      };
+    if (!task.projectId) return { items: [], ...metadata };
     return {
-      contextText: this.humanContext(task),
+      ...metadata,
       items: this.nodes
         .list()
         .filter((n) => n.canRevoke && n.projectId === task.projectId && !n.revokedAt)
@@ -337,6 +352,7 @@ export class NodeExecution {
       workingCopyName: source.node.workingCopyName,
       contextText,
       contextHash: executionHash(contextText),
+      taskContextHash: executionHash(this.humanContext(task)),
       ready: blockers.length === 0,
       blockers,
     };
@@ -381,8 +397,20 @@ export class NodeExecution {
     const node = this.nodes.ownedExecutionNode(input.nodeId); // Always before replay.
     if (task.projectId !== node.project_id)
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务与节点不属于同一项目', 409);
+    this.store.projectMaterials.assertAccess(taskId, input.projectMaterials);
     const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
-      this.store.projectLifecycle.assertExecution(taskId);
+      const task = this.store.projectLifecycle.assertExecution(taskId);
+      if (task.projectId !== node.project_id)
+        throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务项目已变化', 409);
+      if (
+        input.expectedTaskContextHash &&
+        executionHash(this.humanContext(task)) !== input.expectedTaskContextHash
+      )
+        throw new DomainError('CONTEXT_CHANGED', '任务说明或人工讨论已变化，请重新查看材料', 409);
+      const materialSnapshot = operation
+        ? this.store.projectMaterials.forOperation(taskId, operation.operationId)?.snapshot
+        : this.store.projectMaterials.prepare(taskId, input.projectMaterials);
+      this.store.projectMaterials.verify(taskId, input.projectMaterials, materialSnapshot);
       assertNoPendingNodeContinuation(this.store, taskId, input.nodeId, operation?.operationId);
       assertRevision(task.revision, input.expectedRevision);
       if (input.sessionMode && operation)
@@ -439,6 +467,9 @@ export class NodeExecution {
         runId = randomUUID(),
         now = stamp();
       const context = this.humanContext(task);
+      const baseContext =
+        continuationContext ??
+        `${context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
       const command: DispatchCommand = {
         ...(session ? { session } : {}),
         id,
@@ -450,9 +481,7 @@ export class NodeExecution {
         policyHash: input.policyHash,
         policy: option.policy,
         mode: input.mode,
-        context:
-          continuationContext ??
-          `${context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`,
+        context: operation ? baseContext : appendProjectMaterials(baseContext, materialSnapshot),
         expiresAt: new Date(Date.now() + 60000).toISOString(),
       };
       const run: Run = {
@@ -491,6 +520,16 @@ export class NodeExecution {
       this.store.db
         .prepare('INSERT INTO runs VALUES(?,?,?)')
         .run(runId, taskId, JSON.stringify(run));
+      if (materialSnapshot) {
+        run.materialBundleId = this.store.projectMaterials.bindRun(
+          taskId,
+          runId,
+          materialSnapshot,
+          command.context,
+          operation?.operationId,
+        );
+        this.store.db.prepare('UPDATE runs SET body=? WHERE id=?').run(JSON.stringify(run), runId);
+      }
       this.store.db
         .prepare(
           'INSERT INTO node_dispatches(id,run_id,task_id,node_id,space_id,workspace_id,owner_id,command,context_hash,task_revision,stage,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -601,7 +640,23 @@ export class NodeExecution {
       const p = this.policy(node.id),
         task = this.task(d),
         r = this.run(d);
+      let materialsCurrent = true;
+      if (r.materialBundleId) {
+        try {
+          const user = this.store.db
+            .prepare('SELECT id,name,email FROM collab_people WHERE id=?')
+            .get(d.owner_id) as unknown as IdentityUser | undefined;
+          if (!user) materialsCurrent = false;
+          else
+            this.store.as({ user, spaceId: d.space_id }, () =>
+              this.store.projectMaterials.validateRun(r.id),
+            );
+        } catch {
+          materialsCurrent = false;
+        }
+      }
       const valid =
+        materialsCurrent &&
         d.stage === 'accepted' &&
         !this.store.projectLifecycle.isArchived(task.projectId) &&
         r.state !== 'stopping' &&
@@ -662,6 +717,7 @@ export class NodeExecution {
           'running',
         );
         new NextInputs(this.store).started(r.id);
+        this.store.projectMaterials.started(r.id);
         const task = this.task(d);
         if (task.status === 'todo')
           this.store.db.prepare('UPDATE tasks SET body=? WHERE id=?').run(

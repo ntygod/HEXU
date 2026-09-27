@@ -1,0 +1,127 @@
+.project-material-picker,
+.run-project-materials {
+  margin-block: var(--hx-space-4);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-panel);
+}
+.project-material-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--hx-space-3);
+}
+.project-material-heading > div {
+  flex: 1;
+  min-width: 160px;
+}
+.project-material-heading p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  line-height: 1.6;
+  margin-top: var(--hx-space-2);
+}
+.project-material-options {
+  margin-top: var(--hx-space-3);
+}
+.project-material-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) 0;
+  border-bottom: 1px solid var(--hx-border-muted);
+}
+.project-material-option > input {
+  width: auto;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.project-material-option > span {
+  min-width: 0;
+}
+.project-material-option strong,
+.project-material-selected-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.project-material-option small,
+.project-material-selected-row small {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--hx-font-secondary);
+  color: var(--hx-text-secondary);
+}
+.project-material-option p {
+  font-size: var(--hx-font-secondary);
+  color: var(--hx-text-secondary);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  margin-top: var(--hx-space-2);
+}
+.project-material-selected {
+  margin-top: var(--hx-space-4);
+}
+.project-material-selected-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  padding-block: var(--hx-space-2);
+}
+.project-material-selected-row > div {
+  flex: 1;
+  min-width: 120px;
+}
+.project-material-selected-row > select {
+  width: 140px;
+}
+.project-material-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-block: var(--hx-space-3);
+}
+.project-material-preview {
+  margin-top: var(--hx-space-3);
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-3);
+}
+.project-material-picker summary,
+.run-project-materials summary {
+  cursor: pointer;
+  font-size: var(--hx-font-secondary);
+}
+.project-material-preview pre,
+.run-project-materials pre {
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--hx-font-code-size);
+  line-height: 1.7;
+}
+.project-material-warning {
+  background: var(--hx-pending-soft);
+  color: var(--hx-pending-text);
+  border-radius: var(--hx-radius-control);
+  padding: var(--hx-space-2);
+  margin-block: var(--hx-space-2);
+  font-size: var(--hx-font-secondary);
+}
+.run-project-materials details {
+  margin-top: var(--hx-space-3);
+}
+.run-project-materials > p {
+  margin-top: var(--hx-space-2);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .project-material-selected-row > div {
+    flex-basis: 100%;
+  }
+  .project-material-selected-row > select {
+    flex: 1;
+  }
+}

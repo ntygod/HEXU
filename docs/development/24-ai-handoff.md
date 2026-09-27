@@ -14,11 +14,12 @@
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-05-05/06：资料/约定上下文选材与发送状态**。资料与从讨论保存约定已经接入，不重复实施。先确定权限、版本/哈希、预算和实际快照，再绑定既有 Run/派发/Operation；保存不等于送达，范围以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-05-04：AI 草稿与局部采用**。资料、讨论约定、明确选材与 Run/Operation 快照绑定已接入，不重复实施。先从已有共享 AI 输出建立有版本的草稿，再明确采用到有权限的目标；草稿不自动成为约定或付费执行，范围以 [22](22-next-delivery.md) 为准。
 
 | 工作 | 先查看 |
 | --- | --- |
-| 下一项上下文选材 | [05 工作包](05-context-discussion.md)、[节点材料/事务](../../packages/db/src/node-execution.ts)、[preview 材料](../../apps/runner/src/runtime.ts)、[节点接续](../../packages/db/src/node-continuations.ts)；权限和版本在启动前复核，固定快照不被编辑反向改写 |
+| 下一项 AI 草稿 | [05 工作包](05-context-discussion.md)、[讨论](../../apps/web/src/discussion.tsx)、[Task 修订事务](../../packages/db/src/store.ts)、[资料修订](../../packages/db/src/project-sources.ts)；来源和目标版本分别核对，私有内容不因采用而公开 |
+| 已交付的项目选材 | [契约](../../packages/contracts/src/project-materials.ts)、[快照事务](../../packages/db/src/project-materials.ts)、[面板/记录](../../apps/web/src/project-materials.tsx)、[用法](../engineering/project-materials.md)；Node 完整输入冻结，preview 保留原代码摘录重建语义，启动不等于模型收到 |
 | 已交付的讨论约定 | [约定契约](../../packages/contracts/src/project-agreements.ts)、[原子事务](../../packages/db/src/project-agreements.ts)、[发布入口](../../apps/web/src/agreement-create.tsx)、[用法与边界](../engineering/project-agreements.md)；私有讨论不能直接公开，发布与模型发送独立 |
 | 已交付的项目资料 | [资料契约](../../packages/contracts/src/project-sources.ts)、[原子事务](../../packages/db/src/project-sources.ts)、[W1 页面/抽屉](../../apps/web/src/project-sources.tsx)、[用法与边界](../engineering/project-sources.md)；文本/链接不等于文件上传或网络导入 |
 | 已交付的参与者/筛选 | [参与事务](../../packages/db/src/task-participants.ts)、[抽屉](../../apps/web/src/task-participants.tsx)、[URL 筛选](../../apps/web/src/project-task-filters.tsx)、[使用说明](../engineering/task-participants.md)；参与独立修订，不改变当前模型材料或执行授权 |

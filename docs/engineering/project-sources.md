@@ -33,4 +33,4 @@ SQLite 迁移 13 增加 `project_sources` 和 `project_source_revisions`。旧�
 
 ## 后续边界
 
-附件上传/存储、仓库连接、从讨论生成约定、任务选材、模型发送、全局资料搜索和正式远程部署仍未接入。不能将链接引用叫作文件上传、已读取网页或已同步模型；将来选材需要按权限检查稳定 ID、修订、哈希和当前删除状态。实际检查见 [21](../development/21-implementation-status.md)，下一项见 [22](../development/22-next-delivery.md)。
+讨论约定见 [项目约定](project-agreements.md)，明确执行选材见 [材料快照](project-materials.md)；保存资料本身不发送模型。选材复核当前权限、稳定 ID、修订、哈希和删除状态。附件上传/存储、仓库连接、全局资料搜索和正式远程部署仍未接入；链接引用不代表文件上传或已读取网页。实际检查见 [21](../development/21-implementation-status.md)，下一项见 [22](../development/22-next-delivery.md)。

@@ -62,6 +62,7 @@ export interface Message {
   resultId: string | null;
 }
 export interface Run {
+  materialBundleId?: string;
   /** Original requester, independent of later task reassignment. */
   createdByUserId?: string | null;
   id: string;

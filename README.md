@@ -13,7 +13,7 @@
 
 ## 继续开发与 AI 接手
 
-从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、资料与讨论约定已接入。下一主线是资料/约定的上下文选材与发送状态。原 102 项工作清单及历史继续保留。
+从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、资料/约定与执行选材已接入。下一主线是 AI 草稿与局部采用。原 102 项工作清单及历史继续保留。
 
 ## 启动
 
@@ -75,7 +75,9 @@ npm start
 
 在项目“项目资料”中保存文本或 HTTP/HTTPS 链接，查看修订、搜索与来源；有项目编辑权限的成员可以维护资料，只读成员可以查阅。删除移入已删除范围，保留历史并可明确恢复；分享资料链接不会扩大项目权限。
 
-编辑冲突保留草稿，回执丢失可以确认原请求。资料按原文显示，不自动抓取网页，也不自动发送给模型或改变现有运行。附件上传和上下文选材待后续交付；详见 [项目资料与修订](docs/engineering/project-sources.md)。
+编辑冲突保留草稿，回执丢失可以确认原请求。资料按原文显示，不自动抓取网页，也不自动发送给模型或改变现有运行。附件上传仍待交付；详见 [项目资料与修订](docs/engineering/project-sources.md)。
+
+原生与本人节点执行面板可明确选择项目资料/有效约定，查看版本、摘录和预算。提交后材料随 Run 或等待安排固定，变更已选材料会阻止未启动工作；执行器启动与模型收到分别描述。运行记录可查看固定输入，原生恢复仍会继承原会话历史。详见 [项目选材与执行快照](docs/engineering/project-materials.md)。
 
 ## 项目归档与恢复
 
