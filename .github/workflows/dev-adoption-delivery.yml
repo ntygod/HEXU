@@ -1,0 +1,27 @@
+name: Publish verified adoption documentation
+on:
+  push:
+    branches: [codex/adoption-review-dev]
+    paths: [.github/workflows/dev-adoption-delivery.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact documentation-only results
+        shell: bash
+        run: |
+          git show "$GITHUB_SHA:dev/adoption-delivery.patch" > "$RUNNER_TEMP/adoption-delivery.patch"
+          echo "223b1096b4332ab66c24b83edb0e3de041a7518b7d08ada3cf61a40b83624fcb  $RUNNER_TEMP/adoption-delivery.patch" | sha256sum --check
+          git checkout --detach afd6c8257e87810a1bdfb061dfd74310a9afaac1
+          git apply --check "$RUNNER_TEMP/adoption-delivery.patch"
+          git apply --index "$RUNNER_TEMP/adoption-delivery.patch"
+          test "$(git write-tree)" = a7518561c71a5b46db4cb0144e078787af847ea8
+          git config user.name 'HEXU Development'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -m 'docs: record verified assistance adoption and checkpoint handoff'
+          git push origin HEAD:refs/heads/codex/assistance-adoption-reviewed
