@@ -1,0 +1,101 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 74d178a..42ed130 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -185,7 +185,7 @@ Assistance shares one explicitly selected existing human/agent message excerpt w
+ 
+ Keep independent revisions, replies, snapshot-bound grants, events and ID-only receipts atomic. Source/space/project access is checked before old receipt replay and inside writes. Membership revocation permanently cancels grants in the same transaction; rejoining cannot revive them. Close keeps recipient reading but prevents new replies; cancel revokes recipient access and retains parent-task history. Never rewrite Task/Run/Operation/materials, owners, directory locks or paid work from human assistance actions. SSE exposes only permitted assistance IDs, never parent metadata; polling also clears revoked readers. Preserve unsent input on transient reads and require explicit conflict comparison; uncertain writes confirm the same frozen body/key.
+ 
+-Human-assistance browser workflows use their own process, database and fictional identity on port 4313. Keep normal authentication limits; do not exhaust the node fixture's sign-in bucket or reuse the team fixture's first-run setup. The separately authorized AI text path is below. Files/diff/results material, adoption, cross-space/remote transmission and notifications remain pending; follow the same 19/21/22/24 documents.
++Human-assistance browser workflows use their own process, database and fictional identity on port 4313. Keep normal authentication limits; do not exhaust the node fixture's sign-in bucket or reuse the team fixture's first-run setup. The separately authorized AI text path is below. Files/diff/results material, adoption into additional targets, cross-space/remote transmission and notifications remain pending; explicit adoption into the original task is implemented below. Follow the same 19/21/22/24 documents.
+ 
+ ## Finite-text AI assistance (11-04/05/06)
+ 
+diff --git a/docs/development/19-work-items.md b/docs/development/19-work-items.md
+index 034678d..e0fa407 100644
+--- a/docs/development/19-work-items.md
++++ b/docs/development/19-work-items.md
+@@ -18,13 +18,13 @@
+ 
+ “已完成”仅指对应条目的窄范围；“部分实现”必须同时阅读剩余内容。原生流程检查仍使用协议替身，真实模型生成未联调。M0—M4 是完整产品阶段，E0/E1a/E1b/E1c/E2a/E2b1/E2b2/E2b3/E2b4/E2c1/E2c2 是实际代码批次，二者不互相替代。
+ 
+-上一批推进 **05-04**：已有 AI 回复保存为有版本草稿，局部编辑/选择、任务说明或同项目资料采用、双版本冲突和不可变采用记录已接入。独立需求/成果目标、自动生成和批量采用仍缺；随后真人有限材料协助与 Claude 纯文本 AI 协助已接入，下一步按 [22](22-next-delivery.md) 推进协助建议的明确局部采用。05-05/06 自动推荐/总结、持久偏好和完整 provider receipt 仍缺。
++上一批推进 **05-04**：已有 AI 回复保存为有版本草稿，局部编辑/选择、任务说明或同项目资料采用、双版本冲突和不可变采用记录已接入。独立需求/成果目标、自动生成和批量采用仍缺；随后真人有限材料协助与 Claude 纯文本 AI 协助已接入，协助建议到原任务说明的明确局部采用亦已接入；下一步按 [22](22-next-delivery.md) 推进本机不可变提交检查点。05-05/06 自动推荐/总结、持久偏好和完整 provider receipt 仍缺。
+ 
+ 设计补充：已确认 [Workbench W1](../design/README.md) 和[客户端形态](../engineering/adr-0008-client-surfaces.md)。W1 全套新页面已接入真实应用并删除旧呈现层，整套回归通过；桌面尚未交付。原工作项完整范围未全部收口，当前 **2 完成 / 67 部分实现 / 33 未实现**；历史批次统计保留在下方。
+ 
+ 执行拆分见 [23｜W1 前端重建](23-workbench-rebuild.md)：W1-01—09 映射到原 02／03／04／07／09／10／11／14／15 项，状态按各子任务实际交付记录。旧 UI 的已完成历史保留，接管后清理呈现代码；已有接口、权限、执行器和原生能力不归零。原表是唯一总账，W1 标签不另计为新增全局工作项。
+ 
+-本批推进 **11-06 协助建议局部采用**，原任务说明目标、不可变来源/前后记录、当前权限与修订复核、共享任务采用事务和 W1 冲突/回执处理已接入；统计不变。原 291/83 基线保留，本批实际平台、成功与失败记录见 21，不能从源码存在推断整套 CI 已通过。
++本批推进 **11-06 协助建议局部采用**，原任务说明目标、不可变来源/前后记录、当前权限与修订复核、共享任务采用事务和 W1 冲突/回执处理已接入；统计不变。原 291/83 基线全部保留，功能头 `afd6c825` 已通过完整只读 Linux CI：300/300 工程检查、88/88 Chromium 流程，零失败、跳过或重试；本批新增 9 项工程检查与 5 项浏览器流程。采用历史补齐原问题与材料作者，撤销后旧回执确认亦有端到端覆盖。详细成功与中断记录见 21，真实模型与检查点恢复仍未验证。
+ 
+ ## 2. 工作项索引
+ 
+diff --git a/docs/development/21-implementation-status.md b/docs/development/21-implementation-status.md
+index 8051f93..f7b4e59 100644
+--- a/docs/development/21-implementation-status.md
++++ b/docs/development/21-implementation-status.md
+@@ -15,6 +15,16 @@
+ 
+ 新增 4 项浏览器流程，原 AI 协助成功流程追加采用及不重复执行检查，预计全套 87 项。容器 Chromium 在打开 4315 页面前被 `ERR_BLOCKED_BY_ADMINISTRATOR` 拦截，该次尝试不计产品通过；完整 Linux CI 待本批 PR 执行并补录。原 291/83 通过基线保留。用法见 [协助建议采用](../engineering/assistance-adoption.md)；没有真实模型、跨电脑或文件恢复联调。
+ 
++首轮 [只读 Linux CI 36327245583](https://github.com/ntygod/HEXU/actions/runs/36327245583) 检查 `fdffcb17b91ee372daf02fa977ead45d4366ba44`（合并预览 `7d06b682c3cbdae8ebba618c9121f60e50dad04b`）：格式、双端类型、生产构建、**300/300 工程测试及 87/87 Chromium 流程全部通过**，零失败、取消、跳过或重试。中断前的 PR #13 和通过结果已保留，本次接手没有重建同一功能。已下载产物 `10934348240` 并核对完整报告及 73—75 深浅色和手机截图。
++
++接手复查补齐采用历史中的原问题、材料作者/时间、协助版本和可展开的两类指纹；同时增加一个真实浏览器场景：采用已保存但回执丢失，随后撤销分享且人工修改任务，仍在有效 Task 编辑/来源读取权限内确认原记录，不重写后来的说明。旧来源和目标记录均保留，不放宽撤权后的新采用。截图在回到页顶后采集，避免固定顶栏位于整页截图中段。
++
++本次本地隔离 Linux / Node 24.21.0 的全量复查日志被中断，收尾为 **290 通过 / 1 取消（291 项已报告）**；`node-executor.test.js` 报告待决 Promise 且事件循环已结束，没有记作完整 300 项通过，也未据此断言根因或放宽原检查。采用/草稿/真人协助的 **26/26 定向检查通过**；界面修正后格式、双端类型和生产构建再次通过。完整功能结果以本轮仓库 CI 为准。
++
++最终 [只读 Linux CI 36330046140](https://github.com/ntygod/HEXU/actions/runs/36330046140) 检查功能头 `afd6c8257e87810a1bdfb061dfd74310a9afaac1`（合并预览 `ec1c9575a9c7fe207de99fcd44b99ade2a094823`）：安装、格式、前后端类型、生产构建、**300/300 工程测试与 88/88 Chromium 流程全部通过**，零失败、取消、跳过或重试。原 291/83 基线全部保留，本切片累计新增 9 项工程检查和 5 项浏览器流程；原 AI 协助成功流程另扩展建议采用与不重复调用断言。新加的“采用回执丢失后撤销分享并修改任务”流程通过，确认原请求不覆盖后来的说明。已下载产物 `10935821530`（SHA-256 `8375308d9832ad5becb3a2f741ac55c111f1cbec2db1d3dfe0466c38f66c3de9`），核对完整报告并复查 73—75 深色采用、浅色完整来源历史及 390px 手机截图。
++
++随后仅补录 AGENTS、19/21/22/24 与协助建议采用用法六份文档，功能源码、测试、配置和依赖保持通过回归的版本。临时传输/导出/发布文件不进入 PR #13，当前复查分支的临时文件亦清理；既有中断分支保留。原 102 项仍为 **2 完成 / 67 部分 / 33 未实现**；下一项为 12-01 本机不可变提交检查点。没有真实模型生成/费用、跨电脑或文件恢复联调。
++
+ ## 11-04/05/06 Claude 纯文本 AI 协助历史增量
+ 
+ 从 PR #11 合并基线 `4851699` 继续；推进已有部分项，原 102 项保持 **2 完成 / 67 部分 / 33 未实现**。已中断的 `codex/text-assistance-dev` 临时片段保留，不覆盖其他工作；本批独立提交。
+diff --git a/docs/development/22-next-delivery.md b/docs/development/22-next-delivery.md
+index d6d8ffb..c4abc32 100644
+--- a/docs/development/22-next-delivery.md
++++ b/docs/development/22-next-delivery.md
+@@ -28,7 +28,7 @@ W1-01—09 已完成，不重启 UI 重建。`HX-DEV-08-03` 的有界 Claude 显
+ 
+ 11-04/05 已接入 team-local 项目任务的 Claude 纯文本 AI 协助：单消息固定摘录、本人本机 opt-in、网页材料/费用同意、独立 Run 与无工具临时环境，结果只回到同一 Assistance。主编程状态/目录占用不变，取消需实际停止证据。节点仍串行；Codex、私有任务 AI、会话恢复、真实模型与跨电脑未交付。功能头 `f49921f` 已通过完整只读 Linux CI：291 项工程检查、83 项 Chromium 流程全部通过，原 279/80 基线保留，实际证据见 21。协议替身不代表真实模型生成/费用已验证；不重复当前文本执行切片。
+ 
+-11-06 已接入真人/AI 已保存建议到原任务说明的明确多片段采用。当前任务编辑与来源读取权限、协助/目标版本、快照/回复哈希同事务复核，采用前后记录与共享任务说明修改/等待接续暂停原子保存。有限回复授权不会提升为任务写权；撤销禁止新采用，已有记录与成功回执按当前权限保留。W1 保留冲突选区、明确新基线、同请求确认及来源历史，实际回归见 21；不要重复这批原任务目标切片。
++11-06 已接入真人/AI 已保存建议到原任务说明的明确多片段采用。当前任务编辑与来源读取权限、协助/目标版本、快照/回复哈希同事务复核，采用前后记录与共享任务说明修改/等待接续暂停原子保存。有限回复授权不会提升为任务写权；撤销禁止新采用，已有记录与成功回执按当前权限保留。W1 保留冲突选区、明确新基线、同请求确认及完整来源历史。功能头 `afd6c825` 的完整 Linux 回归已通过 300 项工程检查和 88 项 Chromium 流程，包含撤销分享后的原成功回执确认；证据和边界见 21，不重复这批原任务目标切片。
+ 
+ 下一切片进入原 [12 工作包](12-handoff-sharing.md) 的 **12-01 本机不可变提交检查点**：优先把本人已授权仓库中的一个明确 Git 提交记录为任务关联的检查点，保存仓库身份、完整 commit、树身份、来源节点和可用范围，展示哪些未提交内容未包含。必须真正核对对象存在及边界，不能让浏览器路径、分支名或一段摘要冒充可恢复快照。只读取不可变提交；不自动 commit/stash/reset/push，不移动主任务或停止已有执行。执行节点仍需单独本机授权，不能将已有数量摘要配对扩成任意文件读取。
+ 
+diff --git a/docs/development/24-ai-handoff.md b/docs/development/24-ai-handoff.md
+index cb8e849..110fd18 100644
+--- a/docs/development/24-ai-handoff.md
++++ b/docs/development/24-ai-handoff.md
+@@ -16,7 +16,7 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
+ 
+ ## 2. 下一项的具体入口
+ 
+-默认继续 **HX-DEV-12-01：本机不可变提交检查点**，先核对 21 的本批采用回归。原任务说明的协助建议采用已接入，来源/目标版本、权限与不可变记录复用任务采用事务；不重复该切片。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
++默认继续 **HX-DEV-12-01：本机不可变提交检查点**。原任务说明的协助建议采用已通过完整回归：功能头 `afd6c8257e87810a1bdfb061dfd74310a9afaac1` 的 [只读 Linux CI 36330046140](https://github.com/ntygod/HEXU/actions/runs/36330046140) 为 300/300 工程检查与 88/88 Chromium 流程通过，零失败、跳过或重试；文档补录不改动该功能/测试树。来源/目标版本、权限与不可变记录复用任务采用事务，包含原问题/材料作者和撤销后的原回执确认；不重复该切片。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
+ 
+ 真人协助入口为 `packages/contracts/src/assistance.ts`、`packages/db/src/assistance.ts`、`apps/control/src/assistance.ts` 与 `apps/web/src/assistance*.tsx/css`。读取/旧回执检查当前范围；撤权钩子在 collaboration.ts，SSE 只发送独立协助 ID；独立受限详情不包含不可访问的 Task 信息。
+ 
+diff --git a/docs/engineering/assistance-adoption.md b/docs/engineering/assistance-adoption.md
+index fff4c79..73de00f 100644
+--- a/docs/engineering/assistance-adoption.md
++++ b/docs/engineering/assistance-adoption.md
+@@ -8,7 +8,7 @@
+ 
+ 鼠标拖选和 Shift/方向键可选局部文本，沿用文字簇移动与 LF 到原始 CRLF/CR 的偏移映射。最多 16 个有序不重叠片段，每段上限 6000 UTF-16 单位，目标说明总长不超过 12000；片段间插入两个换行。字符限制不是 token/模型预算，不静默截断。原建议及未选文字不被删除或改写。
+ 
+-采用前后与来源记录在当前协助的“查看建议采用记录”中查看，含作者、操作者、时间、固定材料、建议全文/哈希、所选范围、任务修订及修改前后正文。分页稳定，不会因为后来修改任务而重算历史。记录仅在原任务和来源仍有读取权限时开放，不能凭协助链接读取其他任务。
++采用前后与来源记录在当前协助的“查看建议采用记录”中查看，含当时的协助问题、材料作者/时间、建议作者、操作者、固定材料、建议全文/哈希、所选范围、任务修订及修改前后正文。来源指纹可按需展开，不以当前任务内容替代已保存的来源。分页稳定，不会因为后来修改任务而重算历史。记录仅在原任务和来源仍有读取权限时开放，不能凭协助链接读取其他任务。
+ 
+ ## 冲突、权限与撤销
+ 
+@@ -43,3 +43,7 @@
+ ## 尚未交付
+ 
+ 更多目标（项目资料/成果）、文件/代码选择性整合、撤回已经采用的任务变更、批量回复采用、重新分享和 AI 连续追问未纳入本批。当前任务内原文可选采用不构成建议正确性的自动验证，也不恢复提供方历史。平台/回归实测见 [21](../development/21-implementation-status.md)，下一项见 [22](../development/22-next-delivery.md)。
++
++## 验证记录
++
++功能头 `afd6c8257e87810a1bdfb061dfd74310a9afaac1` 通过 [只读 Linux CI 36330046140](https://github.com/ntygod/HEXU/actions/runs/36330046140)：格式、双端类型、生产构建、300/300 工程测试与 88/88 Chromium 流程，零失败、取消、跳过或重试。原 291/83 基线保留，新增 9 项工程检查和 5 项浏览器流程；包含真人/AI 建议、多个片段、表情/CRLF 原文、有限受邀权限、原子回滚、目标/来源冲突、读取故障、降权清理、回执丢失及撤销后的已提交请求确认。采用历史显示当时的问题、作者与完整来源。实际产物 `10935821530` 的完整报告及 73—75 深浅色和手机截图已复查；中断与历史结果见 21。测试不调用真实模型，不证明跨电脑传输或文件恢复。
