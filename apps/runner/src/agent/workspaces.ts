@@ -137,6 +137,14 @@ async function isolatedStatus(w: LocalDirectory): Promise<string> {
   try {
     if (inside(w.root, shadow)) throw new Error('Temporary metadata must be outside workspace');
     await mkdir(join(shadow, 'refs'));
+    // Storage format is repository-local; -c alone does not select SHA-256 objects.
+    await writeFile(
+      join(shadow, 'config'),
+      objectFormat === 'sha256'
+        ? '[core]\nrepositoryformatversion = 1\n[extensions]\nobjectformat = sha256\n'
+        : '[core]\nrepositoryformatversion = 0\n',
+      { mode: 0o600 },
+    );
     await mkdir(join(shadow, 'info'));
     await symlink(objects, join(shadow, 'objects'), 'dir');
     await writeFile(join(shadow, 'HEAD'), head + '\n', { mode: 0o600 });

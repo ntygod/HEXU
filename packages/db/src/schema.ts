@@ -317,4 +317,19 @@ CREATE INDEX assistance_adoptions_scope ON assistance_adoptions(assistance_id,ta
 -- Only explicit adoption writes history. Never infer adoption from an existing reply or grant.
 `,
   },
+  {
+    version: 20,
+    sql: `
+CREATE TABLE checkpoint_requests (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ owner_id TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('pending','recorded','cancelled')), body TEXT NOT NULL,
+ manifest_hash TEXT, checkpoint_id TEXT UNIQUE
+);
+CREATE INDEX checkpoint_requests_task ON checkpoint_requests(task_id);
+CREATE TABLE commit_checkpoints (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), request_id TEXT NOT NULL UNIQUE REFERENCES checkpoint_requests(id), body TEXT NOT NULL
+);
+-- No old summary, Run or message implies consent to publish a checkpoint.
+`,
+  },
 ];
