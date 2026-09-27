@@ -270,3 +270,9 @@ GET /tasks/:id/node-continuation-preview?sourceRunId=... 仅供节点所有者�
 ## E2c1：Codex 原生恢复子集
 
 本机 ExecutionPolicy 可选 retainSessions:true（仅 Codex）。节点 DispatchCommand 可携带由服务端根据已验证来源构造的 session:{ref,sourceDispatchId}，不接受浏览器原生 threadId、history 或路径。POST /tasks/:id/runs 允许 sessionMode=resume，必须提供最新成功来源、材料哈希和明确执行授权；POST continuations 拒绝该模式，自动等待仍新会话。成功终态节点事件可带 nativeSession:{ref,action,expiresAt}，服务端核查来源及策略。原生 thread/turn/model 和 Key HMAC 只在节点私有 SQLite/文件保存；任务权限不提供原生文件访问。
+
+## 05-02 实现子集：项目文本资料与链接
+
+`GET/POST /projects/:projectId/sources` 读取分页列表或创建文本/链接；`GET/PATCH /projects/:projectId/sources/:sourceId` 读取当前资料或按 expectedRevision 完整修改内容；`POST .../:sourceId/lifecycle` 明确 delete/restore；`GET .../:sourceId/revisions` 按不可变修订分页。完整字段及限制见 [项目资料契约](../../packages/contracts/src/project-sources.ts) 和 [使用说明](../engineering/project-sources.md)。
+
+SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独立 ID、revision、contentHash、创建/更新者和删除标记，不修改父项目/任务修订或模型材料。当前项目 view 可读、edit/manage 可写，历史/搜索/回执/SSE 同范围；重放前及事务内复核当前权限，记录、历史、项目 outbox 和回执原子提交。删除可恢复且保留历史；不允许请求改变类型/归属/作者或永久清除。链接不触发网络抓取，附件上传、项目约定和资料模型发送尚未交付。

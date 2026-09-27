@@ -1,5 +1,9 @@
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
+import {
+  parseSourceListQuery,
+  parseSourceRevisionQuery,
+} from '../../../packages/contracts/src/project-sources.js';
 import { parseNodeContinuationOperation } from '../../../packages/contracts/src/node-continuation.js';
 import {
   parseParticipantHistoryQuery,
@@ -245,6 +249,49 @@ export async function createApp(
     store.project(id);
     return store.projectSettings.history(id, parseProjectRevisionQuery(request.query));
   });
+  app.get('/api/v1/projects/:projectId/sources', async (request) =>
+    store.projectSources.list(
+      param(request.params, 'projectId'),
+      parseSourceListQuery(request.query),
+    ),
+  );
+  app.post('/api/v1/projects/:projectId/sources', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        store.projectSources.create(
+          param(request.params, 'projectId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
+  app.get('/api/v1/projects/:projectId/sources/:sourceId', async (request) =>
+    store.projectSources.get(param(request.params, 'projectId'), param(request.params, 'sourceId')),
+  );
+  app.patch('/api/v1/projects/:projectId/sources/:sourceId', async (request) =>
+    store.projectSources.edit(
+      param(request.params, 'projectId'),
+      param(request.params, 'sourceId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.post('/api/v1/projects/:projectId/sources/:sourceId/lifecycle', async (request) =>
+    store.projectSources.lifecycle(
+      param(request.params, 'projectId'),
+      param(request.params, 'sourceId'),
+      request.body,
+      key(request.headers),
+    ),
+  );
+  app.get('/api/v1/projects/:projectId/sources/:sourceId/revisions', async (request) =>
+    store.projectSources.history(
+      param(request.params, 'projectId'),
+      param(request.params, 'sourceId'),
+      parseSourceRevisionQuery(request.query),
+    ),
+  );
   app.get('/api/v1/spaces/:spaceId/tasks', async (request) => {
     if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
