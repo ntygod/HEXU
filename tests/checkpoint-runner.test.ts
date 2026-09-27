@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, rename } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  rename,
+} from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -300,5 +309,34 @@ test('linked worktree 的 commondir 被改向另一仓库时拒绝，不借同�
   } finally {
     await f.close();
     await other.close();
+  }
+});
+
+// A name beginning with two dots is still a child, not a parent-path traversal.
+test('双点前缀子目录仍在仓库内，状态或临时目录重叠在写入前拒绝', async () => {
+  const f = await repo();
+  const original = process.env.TMPDIR;
+  try {
+    const child = join(f.root, '..local');
+    await mkdir(child, { mode: 0o700 });
+    await assert.rejects(
+      () => captureCommitReference(f.w, f.oid, 'client', child),
+      code('CHECKPOINT_UNAVAILABLE'),
+    );
+    await assert.rejects(
+      () => captureCommitReference(f.w, f.oid, 'client', f.dir),
+      code('CHECKPOINT_UNAVAILABLE'),
+    );
+    process.env.TMPDIR = child;
+    await assert.rejects(
+      () => captureCommitReference(f.w, f.oid, 'client', f.home),
+      code('CHECKPOINT_UNAVAILABLE'),
+    );
+    assert.deepEqual(await readdir(child), []);
+    assert.equal(git(f.root, 'rev-parse', 'HEAD'), f.oid);
+  } finally {
+    if (original === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = original;
+    await f.close();
   }
 });

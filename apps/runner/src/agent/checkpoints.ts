@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, writeFile, symlink, rm, realpath, lstat, readdir } from 'node:fs/promises';
-import { join, relative, isAbsolute, dirname, basename } from 'node:path';
+import { join, relative, isAbsolute, dirname, basename, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { createInterface } from 'node:readline';
@@ -34,7 +34,7 @@ const identity = async (p: string) => {
 };
 const inside = (a: string, b: string) => {
   const r = relative(a, b);
-  return !r || (!r.startsWith('..') && !isAbsolute(r));
+  return !r || (!r.startsWith('..' + sep) && r !== '..' && !isAbsolute(r));
 };
 async function git(root: string, args: string[], home: string, limit = 1024 * 1024) {
   return (
@@ -113,10 +113,14 @@ export async function captureCommitReference(
       (await identity(w.root)) !== w.rootIdentity ||
       (await realpath(w.gitDir)) !== w.gitDir ||
       (await identity(w.gitDir)) !== w.gitIdentity ||
-      inside(w.root, stateHome)
+      inside(w.root, resolve(stateHome)) ||
+      inside(resolve(stateHome), w.root)
     )
       throw new Error('Authorization changed');
-    shadow = await mkdtemp(join(tmpdir(), 'hexu-checkpoint-'));
+    // Reject an in-repository temporary parent before creating any scratch directory.
+    const temporaryRoot = await realpath(tmpdir());
+    if (inside(w.root, temporaryRoot)) throw new Error('Temporary parent inside workspace');
+    shadow = await mkdtemp(join(temporaryRoot, 'hexu-checkpoint-'));
     if (inside(w.root, shadow)) throw new Error('Temporary metadata inside workspace');
     const text = async (args: string[]) =>
       (await git(w.root, args, shadow!)).toString('utf8').trim();
