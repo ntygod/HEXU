@@ -1,0 +1,66 @@
+name: PR10 selection diagnostic
+on:
+  push:
+    branches: [codex/ai-drafts-repro]
+    paths: [.github/workflows/dev-draft-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: f8f8e5855a81175ed9864fb03dc67bc7ba270458
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Instrument the isolated test only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/e2e/ai-drafts.spec.ts')
+          s = p.read_text()
+          a = s.index('async function selectRange(')
+          b = s.index('\ntest(', a)
+          s = s[:a] + '''async function selectRange(page: Page, start: number, end: number) {
+            const field = page.getByLabel('选择草稿片段', { exact: true });
+            await page.evaluate(() => {
+              (window as any).selectionEvents = [];
+              for (const type of ['focusin', 'focusout', 'keydown', 'keyup', 'select', 'selectionchange', 'mousedown', 'mouseup'])
+                document.addEventListener(type, (event) => {
+                  const t = document.querySelector('textarea[aria-label="选择草稿片段"]') as HTMLTextAreaElement;
+                  (window as any).selectionEvents.push({ type, target: (event.target as HTMLElement)?.tagName, key: (event as KeyboardEvent).key, start: t?.selectionStart, end: t?.selectionEnd, focused: document.activeElement === t });
+                });
+            });
+            const report = async (label: string) => console.log('SELECTION_DIAGNOSTIC', label, await field.evaluate((t: HTMLTextAreaElement) => ({ start: t.selectionStart, end: t.selectionEnd, value: t.value, focused: document.activeElement === t, disabled: t.disabled, readOnly: t.readOnly, events: (window as any).selectionEvents })));
+            await field.focus();
+            await report('focused');
+            await field.press('Control+Home');
+            await report('home');
+            for (let i = 0; i < start; i++) await field.press('ArrowRight');
+            for (let i = start; i < end; i++) {
+              await field.press('Shift+ArrowRight');
+              await report('shift-right-' + i);
+            }
+            await page.getByRole('button', { name: '添加所选片段', exact: true }).click();
+          }
+          ''' + s[b:]
+          p.write_text(s)
+          PY
+      - run: npm run test:e2e -- tests/e2e/ai-drafts.spec.ts -g '采用回执丢失'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-pr10-selection-diagnostic
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 1
