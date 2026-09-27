@@ -1,3 +1,10 @@
+import {
+  parseAiAssistanceCreate,
+  renderAiAssistance,
+  type AiAssistanceCreate,
+} from '../../contracts/src/ai-assistance.js';
+import { isActiveRun } from '../../domain/src/index.js';
+import type { Run } from '../../contracts/src/index.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { DomainError, type Message, type Task } from '../../contracts/src/index.js';
 import {
@@ -25,7 +32,9 @@ import type { Store } from './store.js';
 
 const hash = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
 const now = () => new Date().toISOString();
-interface AssistanceRecord {
+export interface AssistanceRecord {
+  recipientKind?: 'ai';
+  ai?: { runId: string; inputText: string; inputHash: string };
   id: string;
   taskId: string;
   spaceId: string;
@@ -104,9 +113,13 @@ export class AssistanceStore {
     const grant = this.store.db
       .prepare(
         `SELECT snapshot_hash,revoked_at FROM assistance_grants
-      WHERE assistance_id=? AND recipient_id=? AND scope='snapshot_reply'`,
+      WHERE assistance_id=? AND recipient_id=? AND scope=?`,
       )
-      .get(item.id, item.recipient.id) as Grant | undefined;
+      .get(
+        item.id,
+        item.recipient.id,
+        item.recipientKind === 'ai' ? 'model_text' : 'snapshot_reply',
+      ) as Grant | undefined;
     if (
       !grant ||
       grant.snapshot_hash !== item.snapshotHash ||
@@ -122,7 +135,7 @@ export class AssistanceStore {
       grant = this.grant(item);
     const actor = this.store.actorId;
     // A named recipient's revoked grant cannot be revived by a later project invitation.
-    if (actor === item.recipient.id) {
+    if (item.recipientKind !== 'ai' && actor === item.recipient.id) {
       this.member(actor);
       if (grant.revoked_at || !this.sourceReadable(item, task))
         throw new DomainError('NOT_FOUND', '协助不存在或访问已撤销', 404);
@@ -199,13 +212,13 @@ export class AssistanceStore {
     const items = people.slice(0, query.limit);
     return { items, nextCursor: people.length > query.limit ? items.at(-1)!.id : null };
   }
-  private event(item: AssistanceRecord, action: string) {
+  private event(item: AssistanceRecord, action: string, actorId?: string) {
     this.store.db
       .prepare(
         `INSERT INTO assistance_events(assistance_id,revision,actor_id,action,created_at)
       VALUES(?,?,?,?,?)`,
       )
-      .run(item.id, item.revision, this.store.actorId, action, item.updatedAt);
+      .run(item.id, item.revision, actorId ?? this.store.actorId, action, item.updatedAt);
     // No task, project, question or excerpt is sent on the recipient's event channel.
     this.store.db
       .prepare(
@@ -214,11 +227,11 @@ export class AssistanceStore {
       )
       .run(item.updatedAt, item.spaceId, item.id);
   }
-  private write(item: AssistanceRecord, action: string) {
+  private write(item: AssistanceRecord, action: string, actorId?: string) {
     this.store.db
       .prepare('UPDATE assistances SET state=?,body=? WHERE id=?')
       .run(item.state, JSON.stringify(item), item.id);
-    this.event(item, action);
+    this.event(item, action, actorId);
   }
   create(taskId: string, input: unknown, key: string): AssistanceDetail {
     this.team();
@@ -311,6 +324,7 @@ export class AssistanceStore {
     const accessEnded = !!grant.revoked_at || !this.sourceReadable(item, task);
     const canManage = item.requester.id === this.store.actorId && writer;
     const canReply =
+      item.recipientKind !== 'ai' &&
       !accessEnded &&
       ['open', 'responded'].includes(item.state) &&
       (canManage || item.recipient.id === this.store.actorId);
@@ -332,6 +346,16 @@ export class AssistanceStore {
     const page = replies.slice(0, query.limit);
     return {
       assistance: {
+        ...(item.ai
+          ? {
+              recipientKind: 'ai' as const,
+              ai: {
+                run: this.store.run(item.ai.runId),
+                inputText: item.ai.inputText,
+                inputHash: item.ai.inputHash,
+              },
+            }
+          : {}),
         id: item.id,
         question: item.question,
         requester: item.requester,
@@ -378,6 +402,12 @@ export class AssistanceStore {
   }
   private replyActor(id: string) {
     const { item, task, grant } = this.read(id);
+    if (item.recipientKind === 'ai')
+      throw new DomainError(
+        'AI_FOLLOWUP_REQUIRES_CONSENT',
+        'AI 协助下一次执行必须重新明确选材与费用；不能通过真人回复接口派发',
+        422,
+      );
     if (grant.revoked_at || !this.sourceReadable(item, task))
       throw new DomainError('FORBIDDEN', '协助分享已撤销', 403);
     if (item.requester.id === this.store.actorId) this.store.permissions.task(task, true);
@@ -439,6 +469,9 @@ export class AssistanceStore {
       assertRevision(item.revision, data.expectedRevision);
       if (item.state === 'cancelled' || (data.action === 'close' && item.state === 'closed'))
         return { id };
+      if (item.ai && data.action === 'close' && isActiveRun(this.store.run(item.ai.runId).state))
+        throw new DomainError('ASSISTANCE_RUNNING', 'AI 执行尚未确认结束，请先取消本次协助', 409);
+      if (data.action === 'cancel') this.stopAi(item);
       const next = {
         ...item,
         state: data.action === 'cancel' ? ('cancelled' as const) : ('closed' as const),
@@ -454,6 +487,167 @@ export class AssistanceStore {
     });
     return this.get(id);
   }
+
+  /** Invoked by the fixed node dispatcher; its callback writes the Run and dispatch
+   * within this same idempotent transaction, before any process may launch. */
+  createAi(
+    taskId: string,
+    input: unknown,
+    key: string,
+    dispatch: (item: AssistanceRecord, data: AiAssistanceCreate) => Run,
+  ): AssistanceDetail {
+    this.team();
+    this.store.getTask(taskId, true);
+    const data = parseAiAssistanceCreate(input);
+    this.source(taskId, data.sourceMessageId); // Also required before receipt replay.
+    const receipt = this.store.mutate(`assistance.ai.create:${taskId}`, key, data, () => {
+      const task = this.store.getTask(taskId, true),
+        source = this.source(taskId, data.sourceMessageId);
+      assertRevision(task.revision, data.expectedTaskRevision);
+      if (hash(source) !== data.expectedSourceHash)
+        throw new DomainError(
+          'ASSISTANCE_SOURCE_CHANGED',
+          '来源消息已变化，请重新核对模型材料',
+          409,
+        );
+      const count = this.store.db
+        .prepare(
+          "SELECT count(*) AS n FROM assistances WHERE space_id=? AND requester_id=? AND state IN ('open','responded')",
+        )
+        .get(this.store.spaceId, this.store.actorId) as { n: number };
+      if (count.n >= 50) throw new DomainError('ASSISTANCE_LIMIT', '请先处理已有未结束协助', 422);
+      const snapshot: AssistanceSnapshot = {
+        text: selectedAssistanceText(source.body, data.range),
+        actorName: source.actorName,
+        actorType: source.actorType as 'human' | 'agent',
+        createdAt: source.createdAt,
+        sourceHash: data.expectedSourceHash,
+      };
+      const inputText = renderAiAssistance(data.question, snapshot.text),
+        at = now();
+      const item: AssistanceRecord = {
+        id: randomUUID(),
+        taskId,
+        spaceId: task.spaceId,
+        question: data.question,
+        requester: this.member(this.store.actorId),
+        recipient: { id: 'tool:claude-code', name: 'Claude Code' },
+        recipientKind: 'ai',
+        state: 'open',
+        revision: 1,
+        createdAt: at,
+        updatedAt: at,
+        sourceMessageId: source.id,
+        sourceRange: data.range,
+        taskRevision: task.revision,
+        snapshot,
+        snapshotHash: hash(snapshot),
+        ai: { runId: randomUUID(), inputText, inputHash: hash(inputText) },
+      };
+      this.store.db
+        .prepare(
+          'INSERT INTO assistances(id,space_id,task_id,requester_id,recipient_id,state,body) VALUES(?,?,?,?,?,?,?)',
+        )
+        .run(
+          item.id,
+          item.spaceId,
+          taskId,
+          item.requester.id,
+          item.recipient.id,
+          item.state,
+          JSON.stringify(item),
+        );
+      this.store.db
+        .prepare("INSERT INTO assistance_grants VALUES(?,?,?,'model_text',NULL)")
+        .run(item.id, item.recipient.id, item.snapshotHash);
+      dispatch(item, data);
+      this.event(item, 'ai_created');
+      return { id: item.id };
+    });
+    return this.get(receipt.id);
+  }
+  /** Internal proof of current model-output authority; does not depend on HTTP Cookie context. */
+  aiAuthorized(runId: string): boolean {
+    const row = this.store.db
+      .prepare(
+        "SELECT a.body,t.body AS task_body,g.revoked_at,g.snapshot_hash FROM assistances a JOIN tasks t ON t.id=a.task_id JOIN assistance_grants g ON g.assistance_id=a.id WHERE json_extract(a.body,'$.ai.runId')=? AND g.scope='model_text'",
+      )
+      .get(runId) as
+      | { body: string; task_body: string; revoked_at: string | null; snapshot_hash: string }
+      | undefined;
+    if (!row) return false;
+    const item = JSON.parse(row.body) as AssistanceRecord,
+      task = JSON.parse(row.task_body) as Task;
+    if (
+      item.recipientKind !== 'ai' ||
+      !item.ai ||
+      !['open', 'responded'].includes(item.state) ||
+      row.revoked_at ||
+      item.snapshotHash !== row.snapshot_hash ||
+      hash(item.snapshot) !== row.snapshot_hash ||
+      item.ai.inputHash !== hash(item.ai.inputText) ||
+      item.ai.inputText !== renderAiAssistance(item.question, item.snapshot.text)
+    )
+      return false;
+    if (!this.sourceReadable(item, task)) return false;
+    if (task.visibility === 'private') return task.ownerUserId === item.requester.id;
+    const role = this.store.db
+      .prepare('SELECT role FROM collab_project_members WHERE project_id=? AND user_id=?')
+      .get(task.projectId!, item.requester.id) as { role: string } | undefined;
+    return role?.role === 'edit' || role?.role === 'manage';
+  }
+  /** Only a terminal dispatch may produce this response. No user-facing route calls it. */
+  completeAi(run: Run, state: string, body: string) {
+    if (state !== 'succeeded' || !run.assistanceId || !this.aiAuthorized(run.id)) return;
+    const row = this.store.db
+      .prepare('SELECT body FROM assistances WHERE id=?')
+      .get(run.assistanceId) as { body: string };
+    const item = JSON.parse(row.body) as AssistanceRecord;
+    if (item.ai?.runId !== run.id || item.state !== 'open') return;
+    const next = {
+      ...item,
+      state: 'responded' as const,
+      revision: item.revision + 1,
+      updatedAt: now(),
+    };
+    const reply: AssistanceReply = {
+      id: randomUUID(),
+      revision: next.revision,
+      author: item.recipient,
+      actorType: 'agent',
+      runId: run.id,
+      body: body.slice(0, 6000),
+      createdAt: next.updatedAt,
+    };
+    this.store.db
+      .prepare('INSERT INTO assistance_replies VALUES(?,?,?)')
+      .run(item.id, next.revision, JSON.stringify(reply));
+    this.write(next, 'ai_replied', 'tool:claude-code');
+  }
+  /** Within the same cancellation/revocation transaction. Never confirms process exit. */
+  private stopAi(item: AssistanceRecord) {
+    if (!item.ai) return;
+    const row = this.store.db.prepare('SELECT body FROM runs WHERE id=?').get(item.ai.runId) as
+      | { body: string }
+      | undefined;
+    if (!row) return;
+    const run = JSON.parse(row.body) as Run;
+    if (isActiveRun(run.state) && run.state !== 'stopping') {
+      this.store.db.prepare('UPDATE runs SET body=? WHERE id=?').run(
+        JSON.stringify({
+          ...run,
+          state: 'stopping',
+          revision: run.revision + 1,
+          updatedAt: now(),
+        }),
+        run.id,
+      );
+      this.store.db
+        .prepare("INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,'run.updated',?,?)")
+        .run(item.taskId, now(), item.spaceId);
+    }
+  }
+
   /** Called inside the membership transaction; rejoining cannot revive this grant. */
   revokeMember(spaceId: string, userId: string, projectId?: string) {
     const rows = this.store.db
@@ -477,6 +671,7 @@ export class AssistanceStore {
       this.store.db
         .prepare('UPDATE assistance_grants SET revoked_at=? WHERE assistance_id=?')
         .run(next.updatedAt, item.id);
+      this.stopAi(item);
       this.write(next, 'access_revoked');
     }
   }

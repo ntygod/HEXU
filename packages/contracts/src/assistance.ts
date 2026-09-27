@@ -29,6 +29,8 @@ export interface AssistancePreview {
   createdAt: string;
 }
 export interface Assistance {
+  recipientKind?: 'ai';
+  ai?: { run: import('./index.js').Run; inputText: string; inputHash: string };
   id: string;
   question: string;
   requester: AssistancePerson;
@@ -46,6 +48,8 @@ export interface Assistance {
   accessEnded: boolean;
 }
 export interface AssistanceReply {
+  actorType?: 'agent';
+  runId?: string;
   id: string;
   revision: number;
   author: AssistancePerson;

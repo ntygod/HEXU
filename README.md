@@ -244,3 +244,7 @@ tests                    单元、存储、API 与浏览器测试
 本仓库自主实现产品和领域，合理复用基础依赖。原有规划文档保留；代码许可证尚未由仓库所有者确定，本次未添加 LICENSE。依赖使用其各自许可证，见 [依赖说明](docs/engineering/dependencies.md)。
 
 仓库不得提交真实员工评价、客户数据、模型凭证或生产配置。`.hexu/`、`.env`、构建产物和测试临时文件被忽略。质量、效果和上线评估见 [内部评估边界](docs/engineering/internal-evaluation.md)。
+
+### 当前增量：AI 文本协助
+
+team-local 项目任务可明确选择消息片段，请本人已单独授权的 Claude 节点分析。使用空临时目录并禁用工具，不接触主代码现场，结果回到任务协助记录；须另行确认材料和费用。真人协助保持原行为。用法见 [AI 文本协助](docs/engineering/ai-text-assistance.md)，实际回归与未完成范围仍以 [当前进度](docs/development/21-implementation-status.md) 为准，不表示真实模型或跨电脑已经联调。

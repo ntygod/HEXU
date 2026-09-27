@@ -4,7 +4,9 @@ import { Link, time, useApp } from './state.js';
 
 export function TaskRow({ task }: { task: Task }) {
   const { data } = useApp();
-  const run = data.runs.filter((item) => item.taskId === task.id).at(-1);
+  const run = data.runs
+    .filter((item) => item.taskId === task.id && item.purpose !== 'assist')
+    .at(-1);
   return (
     <Link to={`/tasks/${task.id}`} className="work-task-row">
       <span className="work-task-id">{task.shortId}</span>

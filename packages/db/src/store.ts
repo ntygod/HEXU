@@ -470,6 +470,9 @@ export class Store {
       .all(taskId)
       .map((row) => decode<Run>(row)!);
   }
+  codingRuns(taskId: string): Run[] {
+    return this.runs(taskId).filter((run) => run.purpose !== 'assist');
+  }
   run(id: string): Run {
     const run = decode<Run>(this.db.prepare('SELECT body FROM runs WHERE id=?').get(id));
     if (!run) throw new DomainError('NOT_FOUND', '执行不存在', 404);
@@ -504,7 +507,7 @@ export class Store {
       assertRevision(task.revision, input.expectedRevision);
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
         throw new DomainError('TASK_REOPEN_REQUIRED', '请先重新打开任务', 409);
-      if (this.runs(taskId).some((run) => isActiveRun(run.state)))
+      if (this.codingRuns(taskId).some((run) => isActiveRun(run.state)))
         throw new DomainError('WORKING_COPY_BUSY', '当前任务还有模拟执行，请先结束或停止', 409);
       if (task.status !== 'in_progress') {
         const next = this.saveTask({
@@ -516,7 +519,7 @@ export class Store {
         if (task.status === 'done') this.recordCompletion(next, 'reopen');
       }
       const at = now();
-      const previous = this.runs(taskId).at(-1);
+      const previous = this.codingRuns(taskId).at(-1);
       const run: Run = {
         createdByUserId: this.actorId,
         id: randomUUID(),
@@ -723,7 +726,7 @@ export class Store {
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
         throw new DomainError('TASK_REOPEN_REQUIRED', '请先重新打开任务', 409);
       if (
-        this.runs(taskId).some((run) => isActiveRun(run.state)) ||
+        this.codingRuns(taskId).some((run) => isActiveRun(run.state)) ||
         this.nativeLock(input.workingCopyId)
       )
         throw new DomainError(
@@ -752,7 +755,7 @@ export class Store {
         state: 'queued',
         observation: 'fresh',
         native: config,
-        previousRunId: input.sourceRunId ?? this.runs(taskId).at(-1)?.id ?? null,
+        previousRunId: input.sourceRunId ?? this.codingRuns(taskId).at(-1)?.id ?? null,
         revision: 1,
         createdAt: at,
         updatedAt: at,

@@ -293,4 +293,17 @@ ALTER TABLE outbox ADD COLUMN assistance_id TEXT REFERENCES assistances(id);
 -- Existing messages and task memberships never imply consent to share an excerpt.
 `,
   },
+  {
+    version: 18,
+    sql: `
+ALTER TABLE assistance_grants RENAME TO assistance_grants_v17;
+CREATE TABLE assistance_grants (
+ assistance_id TEXT PRIMARY KEY REFERENCES assistances(id), recipient_id TEXT NOT NULL,
+ snapshot_hash TEXT NOT NULL, scope TEXT NOT NULL CHECK(scope IN ('snapshot_reply','model_text')), revoked_at TEXT
+);
+INSERT INTO assistance_grants SELECT * FROM assistance_grants_v17;
+DROP TABLE assistance_grants_v17;
+-- No existing human consent is upgraded to model sending permission.
+`,
+  },
 ];

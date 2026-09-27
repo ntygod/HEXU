@@ -36,7 +36,9 @@ export function Workbench() {
       ),
   );
   const current = active[0] ?? tasks.find((task) => task.status === 'todo');
-  const latest = data.runs.filter((run) => run.taskId === current?.id).at(-1);
+  const latest = data.runs
+    .filter((run) => run.taskId === current?.id && run.purpose !== 'assist')
+    .at(-1);
   const attention = tasks.filter((task) => !!task.attention && task.status !== 'done');
   const recent = data.results
     .filter((result) => tasks.some((task) => task.id === result.taskId))

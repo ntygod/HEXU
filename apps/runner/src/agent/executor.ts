@@ -1,3 +1,4 @@
+import { openTextClaude, TextSpawnUncertain } from '../text-claude.js';
 import { ClaudeSessions, type ClaudeSessionLease } from './claude-sessions.js';
 import { CodexSessions, type CodexSessionLease } from './codex-sessions.js';
 import type { CodexSummary } from '../../../../packages/adapters/codex/src/index.js';
@@ -64,6 +65,7 @@ export class NodeExecutor {
     // A confirmed terminal journal is enough to release its own stale local claim.
     for (const row of this.journal.commands().filter((r) => r.phase === 'terminal')) {
       const command = JSON.parse(row.body) as DispatchCommand;
+      if (command.purpose === 'assist') continue;
       const directory = connection.credentials.directories.find(
         (w) => w.id === command.workspaceId,
       );
@@ -97,14 +99,28 @@ export class NodeExecutor {
       'context',
       'expiresAt',
       'session',
+      'purpose',
+      'assistanceId',
     ]);
     const policy = parsePolicy(b.policy);
+    const assist = b.purpose === 'assist';
+    if (
+      (b.purpose !== undefined && !assist) ||
+      (assist &&
+        (!policy.textAssistance ||
+          policy.tool !== 'claude-code' ||
+          b.mode !== 'read-only' ||
+          b.session !== undefined ||
+          b.workspaceId !== b.assistanceId)) ||
+      (!assist && b.assistanceId !== undefined)
+    )
+      throw new DomainError('TEXT_ASSISTANCE_SCOPE_MISMATCH', '纯文本协助授权或材料类型不匹配');
     if (
       !this.local ||
       hash(policy) !== hash(this.local.policy) ||
       b.policyHash !== hash(policy) ||
       b.projectId !== this.connection.credentials.projectId ||
-      !policy.workspaceIds.includes(String(b.workspaceId)) ||
+      (!assist && !policy.workspaceIds.includes(String(b.workspaceId))) ||
       (b.mode !== 'read-only' && b.mode !== policy.mode) ||
       !Number.isFinite(Date.parse(String(b.expiresAt)))
     )
@@ -116,6 +132,7 @@ export class NodeExecutor {
       throw new DomainError('SESSION_NOT_ENABLED', '本机未授权保留或恢复会话');
     return {
       ...(b.session === undefined ? {} : { session: parseSessionRequest(b.session) }),
+      ...(assist ? { purpose: 'assist' as const, assistanceId: nodeId(b.assistanceId) } : {}),
       id: nodeId(b.id),
       generation: nodeId(b.generation),
       runId: nodeId(b.runId),
@@ -181,7 +198,8 @@ export class NodeExecutor {
           throw new DomainError('COMMAND_CHANGED', '同一派发内容改变');
         return; // accepted/preparing/running/unknown/terminal records ALL prevent another spawn.
       }
-      if (this.active) throw new DomainError('LOCAL_EXECUTION_BUSY', '节点已有活动执行');
+      if (this.active || this.journal.commands().some((row) => row.phase !== 'terminal'))
+        throw new DomainError('LOCAL_EXECUTION_BUSY', '节点仍有活动或未知执行；请先在本机核对');
       this.journal.accept(command);
       await this.flush(signal); // accepted is durable before the control service sees it.
       await this.start(command, signal);
@@ -197,6 +215,7 @@ export class NodeExecutor {
     this.publishedConnection = null;
   }
   private async start(command: DispatchCommand, signal?: AbortSignal) {
+    if (command.purpose === 'assist') return this.startText(command, signal);
     let lease: WorkspaceLease | null = null;
     const directory = this.connection.credentials.directories.find(
       (w) => w.id === command.workspaceId,
@@ -449,6 +468,122 @@ export class NodeExecutor {
         await rm(home, { recursive: true, force: true });
     }
   }
+
+  private async startText(command: DispatchCommand, signal?: AbortSignal) {
+    try {
+      if (signal?.aborted || this.closed || Date.parse(command.expiresAt) <= Date.now())
+        throw new DomainError('DISPATCH_EXPIRED', '派发已过期，未调用模型');
+      this.journal.phase(command.id, 'preparing');
+      const permit = await this.request<{ allowed: boolean }>(
+        'execution-permit',
+        {
+          connectionId: this.connection.connectionId,
+          dispatchId: command.id,
+          generation: command.generation,
+        },
+        signal,
+      );
+      if (!permit.allowed || signal?.aborted || this.closed) {
+        this.journal.settle(command.id, 'cancelled', '启动前已取消，没有调用模型。');
+        return;
+      }
+      // Reread the owner-controlled file after the permit round-trip. Old authorization
+      // cannot silently survive local disablement, including before an async temp-dir prepare.
+      const local = readExecutionPolicy(this.connection.storage.home);
+      if (!local || hash(local) !== hash(this.local) || !keyFor(local.policy))
+        throw new DomainError('POLICY_CHANGED', '本机授权已变化，未调用模型');
+      const active = {
+        command,
+        handle: null as ProcessHandle | null,
+        stopRequested: false,
+        job: null as Promise<void> | null,
+      };
+      this.active = active;
+      active.job = this.executeText(command, local)
+        .catch(() => {
+          this.fatal = new DomainError(
+            'LOCAL_JOURNAL_FAILED',
+            '文本执行证据未可靠保存；已请求停止，请在本机核对',
+          );
+          this.transportLost();
+        })
+        .finally(() => {
+          if (this.active === active) this.active = null;
+        });
+    } catch (cause) {
+      this.journal.settle(
+        command.id,
+        'failed',
+        cause instanceof DomainError ? cause.message : '文本执行准备失败，没有启动模型',
+      );
+    }
+  }
+  private async executeText(command: DispatchCommand, local: LocalExecution) {
+    let handle: Awaited<ReturnType<typeof openTextClaude>> | null = null;
+    const apiKey = keyFor(local.policy)!;
+    const clean = (s: string) =>
+      redact(s, [apiKey, this.connection.credentials.nodeToken, this.connection.storage.home]);
+    const cancelled = () =>
+      this.closed ||
+      !!this.active?.stopRequested ||
+      hash(readExecutionPolicy(this.connection.storage.home)) !== hash(local);
+    try {
+      handle = await openTextClaude({
+        executable: local.executable,
+        policy: local.policy,
+        apiKey,
+        input: command.context,
+        cancelled,
+        onSpawn: () => {
+          this.journal.phase(command.id, 'running');
+          this.journal.append(command.id, 'running');
+        },
+      });
+      this.active!.handle = handle;
+      if (cancelled()) handle.stop();
+      const outcome = await handle.done;
+      if (!outcome.terminationConfirmed) {
+        this.journal.phase(command.id, 'unknown');
+        this.journal.append(command.id, 'unknown');
+        return;
+      }
+      const success =
+        !outcome.stopped &&
+        !outcome.error &&
+        handle.summary.resultReceived &&
+        handle.summary.success;
+      this.journal.settle(
+        command.id,
+        success ? 'succeeded' : outcome.stopped && !outcome.error ? 'cancelled' : 'failed',
+        clean(
+          success
+            ? handle.resultText().slice(0, 5500) +
+                (handle.resultText().length > 5500 ? '\n[本次结果较长，仅保留前 5500 字符]' : '')
+            : outcome.stopped && !outcome.error
+              ? '节点已确认本次文本协助停止；已发生费用不能撤回。'
+              : '文本协助未取得有效结果，进程已结束；没有自动重试或降级。',
+        ),
+      );
+    } catch (cause) {
+      handle?.stop();
+      const outcome = handle ? await handle.done : null;
+      if ((!handle && !(cause instanceof TextSpawnUncertain)) || outcome?.terminationConfirmed)
+        this.journal.settle(
+          command.id,
+          cause instanceof DomainError && cause.code === 'EXECUTION_CANCELLED'
+            ? 'cancelled'
+            : 'failed',
+          cause instanceof DomainError ? clean(cause.message) : '文本执行失败，未自动重试。',
+        );
+      else {
+        this.journal.phase(command.id, 'unknown');
+        this.journal.append(command.id, 'unknown');
+      }
+    } finally {
+      await handle?.cleanup();
+    }
+  }
+
   async close() {
     this.closed = true;
     this.active?.handle?.stop();

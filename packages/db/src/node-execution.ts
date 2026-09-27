@@ -1,3 +1,4 @@
+import { parseAiAssistanceCreate } from '../../contracts/src/ai-assistance.js';
 import { PROJECT_ARCHIVED } from './project-lifecycle.js';
 import { assertNoPendingNodeContinuation } from './node-continuations.js';
 import type { NodeContinuationCommit } from '../../contracts/src/node-continuation.js';
@@ -95,6 +96,7 @@ export class NodeExecution {
   private message(d: Row, body: string, actorType: Message['actorType'] = 'system') {
     if (!body) return;
     const run = this.run(d);
+    if (run.purpose === 'assist') return; // Assistant text belongs only to its bounded thread.
     const m: Message = {
       id: randomUUID(),
       taskId: d.task_id,
@@ -144,6 +146,7 @@ export class NodeExecution {
     // A permit without a running event is an ambiguous launch, not proof of no launch.
     // Keep attached notes for explicit review rather than silently queuing them again.
     this.message(d, body);
+    if (r.purpose === 'assist') this.store.assistance.completeAi(r, state, body);
   }
   humanContext(task: Task) {
     const messages = (
@@ -262,6 +265,109 @@ export class NodeExecution {
         }),
     };
   }
+
+  assistanceOptions(taskId: string) {
+    this.store.getTask(taskId, true);
+    // Do not return the ordinary title/description/recent discussion context on this endpoint.
+    return {
+      items: this.options(taskId)
+        .items.filter((n) => n.policy.textAssistance && n.policy.tool === 'claude-code')
+        .map(({ workspaces: _workspaces, ...option }) => option),
+    };
+  }
+  createAssistance(taskId: string, value: unknown, key: string) {
+    const data = parseAiAssistanceCreate(value);
+    const task = this.store.projectLifecycle.assertExecution(taskId),
+      node = this.nodes.ownedExecutionNode(data.nodeId);
+    if (!task.projectId || task.projectId !== node.project_id)
+      throw new DomainError('PROJECT_SCOPE_MISMATCH', '本批 AI 协助需要同项目的本人授权节点', 409);
+    return this.store.assistance.createAi(taskId, data, key, (item, input) => {
+      const task = this.store.projectLifecycle.assertExecution(taskId),
+        node = this.nodes.ownedExecutionNode(input.nodeId);
+      if (task.projectId !== node.project_id)
+        throw new DomainError('PROJECT_SCOPE_MISMATCH', '节点项目已变化', 409);
+      const option = this.assistanceOptions(taskId).items.find((n) => n.nodeId === input.nodeId);
+      if (!option?.available || option.policyHash !== input.policyHash)
+        throw new DomainError(
+          'EXECUTION_UNAVAILABLE',
+          option?.reason ?? '节点未单独授权纯文本协助',
+          409,
+        );
+      const at = stamp(),
+        id = randomUUID(),
+        ai = item.ai!;
+      const command: DispatchCommand = {
+        id,
+        generation: randomUUID(),
+        runId: ai.runId,
+        taskId,
+        projectId: node.project_id,
+        workspaceId: item.id,
+        purpose: 'assist',
+        assistanceId: item.id,
+        policyHash: input.policyHash,
+        policy: option.policy,
+        mode: 'read-only',
+        context: ai.inputText,
+        expiresAt: new Date(Date.now() + 60000).toISOString(),
+      };
+      const run: Run = {
+        id: ai.runId,
+        taskId,
+        purpose: 'assist',
+        assistanceId: item.id,
+        createdByUserId: this.store.actorId,
+        state: 'queued',
+        observation: 'fresh',
+        provider: 'node',
+        requestedTool: 'claude-code',
+        scenario: 'success',
+        previousRunId: null,
+        prompt: item.question,
+        createdAt: at,
+        updatedAt: at,
+        revision: 1,
+        node: {
+          nodeId: node.id,
+          nodeName: node.name,
+          workingCopyId: item.id,
+          workingCopyName: '临时文本环境（无项目目录）',
+          dispatchId: id,
+          policyHash: input.policyHash,
+          mode: 'read-only',
+          model: option.policy.model,
+          timeoutSeconds: option.policy.timeoutSeconds,
+          maxBudgetUsd: option.policy.maxBudgetUsd,
+          phase: 'queued',
+          terminationConfirmed: false,
+        },
+      };
+      this.store.db
+        .prepare('INSERT INTO runs VALUES(?,?,?)')
+        .run(run.id, taskId, JSON.stringify(run));
+      this.store.db
+        .prepare(
+          'INSERT INTO node_dispatches(id,run_id,task_id,node_id,space_id,workspace_id,owner_id,command,context_hash,task_revision,stage,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          id,
+          run.id,
+          taskId,
+          node.id,
+          node.space_id,
+          item.id,
+          node.owner_id,
+          JSON.stringify(command),
+          executionHash(command.context),
+          task.revision,
+          'queued',
+          at,
+        );
+      this.event(this.row(id), 'run.created');
+      return run;
+    });
+  }
+
   continuationPreview(
     taskId: string,
     sourceRunId: string,
@@ -269,14 +375,19 @@ export class NodeExecution {
   ): NodeContinuationPreview {
     const task = this.store.getTask(taskId, true);
     const source = this.store.run(sourceRunId);
-    if (source.taskId !== taskId || source.provider !== 'node' || !source.node)
+    if (
+      source.taskId !== taskId ||
+      source.purpose === 'assist' ||
+      source.provider !== 'node' ||
+      !source.node
+    )
       throw new DomainError('INVALID_CONTINUATION', '来源不是当前任务的独立节点执行', 409);
     const owner = this.nodes.ownedExecutionNode(source.node.nodeId);
     if (owner.project_id !== task.projectId)
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '来源项目范围已变化', 409);
     const blockers: NodeContinuationPreview['blockers'] = [];
     if (this.store.projectLifecycle.isArchived(task.projectId)) blockers.push(PROJECT_ARCHIVED);
-    if (this.store.runs(taskId).at(-1)?.id !== source.id)
+    if (this.store.codingRuns(taskId).at(-1)?.id !== source.id)
       blockers.push({ code: 'SOURCE_CHANGED', message: '已有更新执行，请从最新执行继续' });
     const d = this.row(source.node.dispatchId);
     if (
@@ -330,7 +441,7 @@ export class NodeExecution {
       source.state === 'succeeded' &&
       source.node.terminationConfirmed &&
       d.stage === 'terminal' &&
-      this.store.runs(taskId).at(-1)?.id === source.id &&
+      this.store.codingRuns(taskId).at(-1)?.id === source.id &&
       p?.policy_hash === source.node.policyHash &&
       JSON.parse(p.body).retainSessions === true &&
       Date.parse(retained.expiresAt) > Date.now()
@@ -369,7 +480,7 @@ export class NodeExecution {
       !source.node?.terminationConfirmed ||
       source.observation === 'unknown' ||
       this.row(source.node.dispatchId).stage !== 'terminal' ||
-      this.store.runs(taskId).at(-1)?.id !== source.id ||
+      this.store.codingRuns(taskId).at(-1)?.id !== source.id ||
       !source.node.nativeSession ||
       source.node.nodeId !== input.nodeId ||
       source.node.workingCopyId !== input.workingCopyId ||
@@ -451,7 +562,7 @@ export class NodeExecution {
         throw new DomainError('WORKSPACE_SCOPE_MISMATCH', '目录或编辑能力超出本机授权', 409);
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
         throw new DomainError('TASK_REOPEN_REQUIRED', '请明确重新打开任务后执行', 409);
-      if (this.store.runs(taskId).some((r) => isActiveRun(r.state)))
+      if (this.store.codingRuns(taskId).some((r) => isActiveRun(r.state)))
         throw new DomainError('TASK_BUSY', '任务还有未结束执行', 409);
       let taskRevision = task.revision;
       if (task.status === 'done') {
@@ -592,6 +703,7 @@ export class NodeExecution {
           c = JSON.parse(d.command) as DispatchCommand;
         if (
           n.revoked_at ||
+          (c.purpose === 'assist' && !this.store.assistance.aiAuthorized(r.id)) ||
           (['queued', 'accepted'].includes(d.stage) &&
             this.store.projectLifecycle.isArchived(this.task(d).projectId)) ||
           r.state === 'stopping' ||
@@ -663,9 +775,11 @@ export class NodeExecution {
         p?.connection_id === connectionId &&
         p.policy_hash === c.policyHash &&
         Date.parse(c.expiresAt) > Date.now() &&
-        task.revision === d.task_revision &&
-        !['done', 'cancelled'].includes(task.status) &&
-        executionHash(this.humanContext(task)) === d.context_hash;
+        (c.purpose === 'assist'
+          ? this.store.assistance.aiAuthorized(r.id) && executionHash(c.context) === d.context_hash
+          : task.revision === d.task_revision &&
+            !['done', 'cancelled'].includes(task.status) &&
+            executionHash(this.humanContext(task)) === d.context_hash);
       if (!valid) {
         if (['queued', 'accepted'].includes(d.stage))
           this.finish(d, 'cancelled', '启动前授权、任务或上下文已变化，没有发出启动许可。');
@@ -694,10 +808,13 @@ export class NodeExecution {
       if (input.sequence !== d.last_sequence + 1 || input.sequence > 128)
         throw new DomainError('SEQUENCE_GAP', '执行事件序号不连续或超限', 409);
       let r = this.run(d);
-      const body = node.settlementOnly
+      const discard =
+        node.settlementOnly ||
+        (c.purpose === 'assist' && !this.store.assistance.aiAuthorized(r.id));
+      const body = discard
         ? '节点权限已撤销；仅接收停止确认，输出不再共享。'
         : redact(input.text, [token]);
-      if (node.settlementOnly && !['terminal', 'unknown'].includes(input.kind)) {
+      if (discard && !['terminal', 'unknown'].includes(input.kind)) {
         // Discard late output while retaining sequence integrity for terminal settlement.
       } else if (d.stage === 'terminal') {
         // Drain late, validated evidence without reviving or replacing a terminal Run.
@@ -719,7 +836,7 @@ export class NodeExecution {
         new NextInputs(this.store).started(r.id);
         this.store.projectMaterials.started(r.id);
         const task = this.task(d);
-        if (task.status === 'todo')
+        if (r.purpose !== 'assist' && task.status === 'todo')
           this.store.db.prepare('UPDATE tasks SET body=? WHERE id=?').run(
             JSON.stringify({
               ...task,
@@ -735,7 +852,9 @@ export class NodeExecution {
       } else if (input.kind === 'terminal') {
         if (input.result === 'succeeded' && !['running', 'unknown'].includes(d.stage))
           throw new DomainError('INVALID_TRANSITION', '未确认运行的执行不能报告成功', 409);
-        if (input.nativeSession && !node.settlementOnly) {
+        if (input.nativeSession && c.purpose === 'assist')
+          throw new DomainError('SESSION_EVIDENCE_MISMATCH', '文本协助不得保留原生历史', 409);
+        if (input.nativeSession && !discard) {
           const command = JSON.parse(d.command) as DispatchCommand;
           const info = input.nativeSession;
           if (
@@ -762,7 +881,7 @@ export class NodeExecution {
         JSON.stringify({
           ...input,
           text: body,
-          ...(node.settlementOnly ? { nativeSession: undefined } : {}),
+          ...(discard ? { nativeSession: undefined } : {}),
         }),
       );
       this.store.db

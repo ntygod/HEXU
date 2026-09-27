@@ -590,7 +590,7 @@ test('已结束/归档协作与稳定分页；SQLite 重开保留快照、回复
       });
       assert.equal(
         reopened.db.prepare('SELECT max(version) AS version FROM schema_migrations').get()!.version,
-        17,
+        18,
       );
     } finally {
       reopened.close();

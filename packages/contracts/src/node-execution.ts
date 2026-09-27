@@ -19,6 +19,8 @@ export interface ExecutionPolicy {
   maxBudgetUsd: number | null;
   toolVersion: string;
   retainSessions?: true;
+  /** Separate local opt-in. Does not grant text mode to existing policies. */
+  textAssistance?: true;
 }
 export interface NativeSessionInfo {
   ref: string;
@@ -65,6 +67,8 @@ export interface NodeRunInput {
   sessionMode?: 'resume';
 }
 export interface DispatchCommand {
+  purpose?: 'assist';
+  assistanceId?: string;
   id: string;
   generation: string;
   runId: string;
@@ -107,8 +111,11 @@ export function parsePolicy(value: unknown): ExecutionPolicy {
     'maxBudgetUsd',
     'toolVersion',
     'retainSessions',
+    'textAssistance',
   ]);
   const tool = enumValue(b.tool, ['claude-code', 'codex'] as const, '工具');
+  if (b.textAssistance !== undefined && (b.textAssistance !== true || tool !== 'claude-code'))
+    throw new DomainError('INVALID_POLICY', '纯文本协助需要明确本机授权，目前仅支持 Claude Code');
   if (b.retainSessions !== undefined && b.retainSessions !== true)
     throw new DomainError('INVALID_POLICY', '原生会话保留需要在本机明确设置为 true');
   const integer = (n: unknown, min: number, max: number) => {
@@ -144,6 +151,7 @@ export function parsePolicy(value: unknown): ExecutionPolicy {
     maxBudgetUsd: b.maxBudgetUsd as number | null,
     toolVersion: text(b.toolVersion, '工具版本', 200),
     ...(b.retainSessions === true ? { retainSessions: true as const } : {}),
+    ...(b.textAssistance === true ? { textAssistance: true as const } : {}),
   };
 }
 export function parseNodeRun(value: unknown): NodeRunInput {

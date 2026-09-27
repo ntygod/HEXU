@@ -24,7 +24,7 @@
 
 执行拆分见 [23｜W1 前端重建](23-workbench-rebuild.md)：W1-01—09 映射到原 02／03／04／07／09／10／11／14／15 项，状态按各子任务实际交付记录。旧 UI 的已完成历史保留，接管后清理呈现代码；已有接口、权限、执行器和原生能力不归零。原表是唯一总账，W1 标签不另计为新增全局工作项。
 
-本批推进 **11-03/04/05/06 真人有限协助**；03/04/06 从未实现推进为部分实现，不增加原工作项。单消息快照/真人回复不是 AI assist 或远程共享；本批回归见 21。
+本批推进 **11-04/05/06 Claude 纯文本 AI 协助**；仅推进已有部分项，统计不变。固定文本辅助执行不是完整代码协助、Codex 或远程共享；实际回归见 21。
 
 ## 2. 工作项索引
 
@@ -93,9 +93,9 @@
 | HX-DEV-11-01 | 继续命令与针对性预检 | BE/RN | 部分实现 | preview 与 node 均有 202 持久化 Operation、显式 wait/request_stop、查询/取消和幂等；节点固定本次材料与授权。完整 ContextBundle、跨节点和有限协助权限未实现。 | [节点接续](../../packages/db/src/node-execution.ts) / [契约](../../packages/contracts/src/next-input.ts) |
 | HX-DEV-11-02 | 同机接续、停止后继续与重开 | RN/BE | 部分实现 | E2b4 自动等待仍新会话；E2c1/E2c2 Codex 与 Claude 可在成功终态后显式恢复私有原生会话，保留来源与原目录。自动等待原生恢复、跨成员/机器接手与真实模型联调仍缺。 | [节点执行](../../packages/db/src/node-execution.ts) / [进程](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-11-03 | Assistance、所选快照与有限访问 | BE | 部分实现 | 已接入同空间真人 Assistance、单条消息固定摘录、明确分享与 snapshot_reply 有限授权；接收者不获得 Task/Project 权限，撤权同事务永久失效。文件/diff/成果材料、跨空间与远程共享仍缺。 | [协助事务](../../packages/db/src/assistance.ts) / [契约](../../packages/contracts/src/assistance.ts) |
-| HX-DEV-11-04 | 真人回应与 AI 协助 Run | BE/RN | 部分实现 | 真人回复/追问、修订冲突、结束/撤销和原任务关联已接入，不修改负责人/运行或模型材料。AI assist Run、可靠只读/隔离副本尚未交付。 | [协助](../../packages/db/src/assistance.ts) / [界面](../../apps/web/src/assistance.tsx) |
-| HX-DEV-11-05 | 继续/协助抽屉与就地回复 | FE | 部分实现 | 保留原接续面板；新增 W1 消息选材与真人邀请抽屉、收发件、有限独立详情、原任务回复记录、原回执确认及权限清理。AI 协助配置、文件材料与远程入口仍缺。 | [邀请](../../apps/web/src/assistance-create.tsx) / [协助](../../apps/web/src/assistance.tsx) |
-| HX-DEV-11-06 | 采纳、追问、取消与恢复 | FE/BE | 部分实现 | 真人协助追问、明确结束/撤销、过期来源提示和网络/并发保留已接入，旧回执不重复回复或复活授权。建议局部采用、AI Run 取消/恢复与重新分享仍缺。 | [事务](../../packages/db/src/assistance.ts) / [回归](../../tests/assistance.test.ts) |
+| HX-DEV-11-04 | 真人回应与 AI 协助 Run | BE/RN | 部分实现 | 真人回复/追问、修订冲突、结束/撤销和原任务关联已接入，不修改负责人/运行或模型材料。另接入本人明确授权的 Claude 纯文本 assist Run、独立临时环境及最终建议回写；文件/代码协助、Codex 文本边界与真实模型联调未交付。 | [协助](../../packages/db/src/assistance.ts) / [界面](../../apps/web/src/assistance.tsx) |
+| HX-DEV-11-05 | 继续/协助抽屉与就地回复 | FE | 部分实现 | 保留原接续面板；新增 W1 消息选材与真人邀请抽屉、收发件、有限独立详情、原任务回复记录、原回执确认及权限清理。增加 AI 固定文本、节点与材料/费用确认、原请求确认和独立执行状态；文件材料、AI 追问与远程入口仍缺。 | [邀请](../../apps/web/src/assistance-create.tsx) / [协助](../../apps/web/src/assistance.tsx) |
+| HX-DEV-11-06 | 采纳、追问、取消与恢复 | FE/BE | 部分实现 | 真人协助追问、明确结束/撤销、过期来源提示和网络/并发保留已接入，旧回执不重复回复或复活授权。AI 取消/实际停止及未知本机确认已接入，不影响主运行或目录锁；建议局部采用、AI 会话恢复与重新分享仍缺。 | [事务](../../packages/db/src/assistance.ts) / [回归](../../tests/assistance.test.ts) |
 | HX-DEV-12-01 | 多仓库提交/补丁检查点 | RN | 未实现 | 多仓库不可变检查点与补丁封装未实现；当前 Git 摘录不是可恢复检查点。 | —（尚无可用实现） |
 | HX-DEV-12-02 | 检查点传输与目标恢复 | RN/BE | 未实现 | 检查点传输和目标机器恢复未实现。 | —（尚无可用实现） |
 | HX-DEV-12-03 | Handoff 发布、接受与状态 | BE | 未实现 | Handoff 发布、接受与生命周期未实现。 | —（尚无可用实现） |
