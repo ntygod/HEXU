@@ -1,3 +1,4 @@
+import { checkpointCommand } from './agent/checkpoints.js';
 import { listNativeSessions } from './agent/execution-commands.js';
 import { forgetNativeSession } from './agent/execution-commands.js';
 import { ExecutionJournal } from './agent/execution-journal.js';
@@ -49,6 +50,7 @@ function argumentsFor(args: string[]) {
       'pending-executions',
       'native-sessions',
       'forget-native-session',
+      'checkpoint',
     ].includes(command)
   )
     throw new DomainError(
@@ -59,7 +61,7 @@ function argumentsFor(args: string[]) {
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i]!;
     if (Object.hasOwn(options, flag)) throw new DomainError('USAGE', '参数不能重复');
-    if (['--state', '--config', '--dispatch', '--session'].includes(flag)) {
+    if (['--state', '--config', '--dispatch', '--session', '--request'].includes(flag)) {
       if (!rest[i + 1] || rest[i + 1]!.startsWith('--'))
         throw new DomainError('USAGE', '参数缺少路径');
       options[flag] = rest[++i]!;
@@ -72,7 +74,8 @@ function argumentsFor(args: string[]) {
     (options['--local-only'] && command !== 'disconnect') ||
     (options['--config'] && !['connect', 'enable-execution'].includes(command)) ||
     (options['--dispatch'] && command !== 'recover-execution') ||
-    (options['--session'] && command !== 'forget-native-session')
+    (options['--session'] && command !== 'forget-native-session') ||
+    (options['--request'] && command !== 'checkpoint')
   )
     throw new DomainError('USAGE', '此命令不支持该选项');
   return {
@@ -176,8 +179,13 @@ async function main() {
   const { command, options, home } = argumentsFor(process.argv.slice(2));
   if (command === 'help') {
     console.log(
-      'HEXU Runner E2c1 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n列出待处理执行：pending-executions [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]\n原生会话状态：native-sessions [--state ...]\n清理原生历史：forget-native-session --session ID [--state ...]\nClaude Code / Codex 可在本机 execution.json 明确设置 retainSessions:true；默认不保留。',
+      'HEXU Runner E2c1 · 默认摘要；可选本人授权执行\n\nconnect --config /path/runner.json [--state /path/private-state]\nstart [--state /path/private-state] [--once]\nstatus [--state /path/private-state]\ndisconnect [--state /path/private-state] [--local-only]\n\n配置：{"controlUrl":"http://127.0.0.1:4310","name":"我的电脑","workspaces":[{"name":"工作副本","path":"/absolute/git-root"}]}\n配对码在终端隐藏粘贴，不放入 argv 或环境变量。凭证目录须在代码仓库之外。\n启用执行：enable-execution --config /path/execution.json [--state ...]\n关闭执行：disable-execution [--state ...]\n列出待处理执行：pending-executions [--state ...]\n核对旧进程：recover-execution --dispatch ID [--state ...]\n提交检查点：checkpoint --request ID [--state ...]\n原生会话状态：native-sessions [--state ...]\n清理原生历史：forget-native-session --session ID [--state ...]\nClaude Code / Codex 可在本机 execution.json 明确设置 retainSessions:true；默认不保留。',
     );
+    return;
+  }
+  if (command === 'checkpoint') {
+    if (!options['--request']) throw new DomainError('USAGE', '需要网页创建的 --request 标识');
+    await checkpointCommand(home, String(options['--request']));
     return;
   }
   if (command === 'status') {

@@ -256,3 +256,8 @@ tests                    单元、存储、API 与浏览器测试
 本仓库自主实现产品和领域，合理复用基础依赖。原有规划文档保留；代码许可证尚未由仓库所有者确定，本次未添加 LICENSE。依赖使用其各自许可证，见 [依赖说明](docs/engineering/dependencies.md)。
 
 仓库不得提交真实员工评价、客户数据、模型凭证或生产配置。`.hexu/`、`.env`、构建产物和测试临时文件被忽略。质量、效果和上线评估见 [内部评估边界](docs/engineering/internal-evaluation.md)。
+
+
+### 本机提交检查点引用（12-01 部分实现）
+
+team-local 的项目任务可在“代码检查点”指定本人配对节点、目录别名和完整 Git 提交，创建请求后在该节点运行 `npm run runner -- checkpoint --request <id> --state <private-state>` 并逐次确认。核对提交与根树对象后保存引用、来源与未包含改动的数量；不提交或修改代码、不启动模型。支持 SHA-1／SHA-256 和标准 linked worktree。**当前仅本机引用，不复制或保留全部 Git 对象，不包含未提交内容，不是备份或跨电脑恢复。** 使用、权限与限制见 [本机提交引用](docs/engineering/commit-checkpoints.md)，实际回归见 [21](docs/development/21-implementation-status.md)。

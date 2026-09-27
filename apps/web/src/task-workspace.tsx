@@ -1,3 +1,4 @@
+import { TaskCheckpoints } from './checkpoints.js';
 import { TaskAssistances } from './assistance.js';
 import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
@@ -200,6 +201,7 @@ export function TaskPage({ id }: { id: string }) {
           <TaskAgreements task={task} />
           <TaskDrafts task={task} />
           <TaskAssistances task={task} />
+          <TaskCheckpoints task={task} />
           <span className="spacer" />
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明

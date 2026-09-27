@@ -1,0 +1,100 @@
+.checkpoint-panel {
+  overflow-y: auto;
+  min-width: 0;
+  padding: var(--hx-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-4);
+}
+.checkpoint-panel p {
+  line-height: 1.7;
+  margin: 0;
+}
+.checkpoint-panel h3 {
+  margin: 0;
+  font-size: var(--hx-font-body);
+}
+.checkpoint-panel pre,
+.checkpoint-panel code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--hx-font-secondary);
+}
+.checkpoint-panel pre {
+  margin: 0;
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-panel);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+}
+.checkpoint-heading {
+  display: flex;
+  gap: var(--hx-space-3);
+  align-items: flex-start;
+}
+.checkpoint-heading > svg {
+  flex-shrink: 0;
+  color: var(--hx-brand);
+}
+.checkpoint-heading p,
+.checkpoint-card > p {
+  color: var(--hx-text-secondary);
+}
+.checkpoint-notice,
+.checkpoint-card,
+.checkpoint-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  padding: var(--hx-space-4);
+}
+.checkpoint-notice {
+  border-left: 3px solid var(--hx-pending-marker);
+}
+.checkpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+.checkpoint-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
+.checkpoint-card header span {
+  color: var(--hx-text-secondary);
+}
+.checkpoint-card dd {
+  margin: var(--hx-space-2) 0 var(--hx-space-3);
+}
+.checkpoint-card dt {
+  color: var(--hx-text-secondary);
+}
+.checkpoint-editor fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+.checkpoint-consent {
+  display: flex;
+  gap: var(--hx-space-2);
+  align-items: flex-start;
+  line-height: 1.7;
+}
+.checkpoint-consent input {
+  width: auto;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.checkpoint-actions {
+  display: flex;
+  gap: var(--hx-space-2);
+  flex-wrap: wrap;
+}
