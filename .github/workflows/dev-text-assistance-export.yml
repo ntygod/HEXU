@@ -1,0 +1,21 @@
+name: Text assistance source export
+on:
+  push:
+    branches: [codex/text-assistance-dev]
+    paths: [.github/workflows/dev-text-assistance-export.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 48516995869884e342f6d72978e80672108345ed
+          persist-credentials: false
+      - run: git archive --format=tar.gz HEAD > /tmp/hexu-text-assistance-base.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-text-assistance-base
+          path: /tmp/hexu-text-assistance-base.tar.gz
+          retention-days: 1
