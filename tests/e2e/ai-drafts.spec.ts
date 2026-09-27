@@ -55,14 +55,11 @@ async function openDraft(page: Page, taskId: string, title = '可选择的建议
   await expect(page.getByLabel('草稿正文', { exact: true })).toHaveValue(content);
 }
 async function selectRange(page: Page, start: number, end: number) {
-  await page.getByLabel('选择草稿片段', { exact: true }).evaluate(
-    (field: HTMLTextAreaElement, range) => {
-      field.focus();
-      field.setSelectionRange(range.start, range.end);
-      field.dispatchEvent(new Event('select', { bubbles: true }));
-    },
-    { start, end },
-  );
+  const field = page.getByLabel('选择草稿片段', { exact: true });
+  await field.focus();
+  await field.press('Control+Home');
+  for (let i = 0; i < start; i++) await field.press('ArrowRight');
+  for (let i = start; i < end; i++) await field.press('Shift+ArrowRight');
   await page.getByRole('button', { name: '添加所选片段', exact: true }).click();
 }
 
