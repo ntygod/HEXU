@@ -22,7 +22,8 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 | 工作 | 先查看 |
 | --- | --- |
-| 下一项真人协助 | [11 工作包](11-continuation-assistance.md)、[当前权限](../../packages/db/src/permissions.ts)、[讨论](../../apps/web/src/discussion.tsx)、[身份与事件](../../apps/control/src/app.ts)；快照/回复授权与完整 Task 访问分开，不发模型调用或迁移负责人 |
+| 下一项有限文本 AI 协助 | [11 工作包](11-continuation-assistance.md)、[协助事务](../../packages/db/src/assistance.ts)、[节点执行](../../packages/db/src/node-execution.ts)、[执行器](../../apps/runner/src/agent/executor.ts)；另行绑定模型材料与费用同意，不能默认访问活动代码目录或借用他人账户 |
+| 已交付的真人协助 | [契约](../../packages/contracts/src/assistance.ts)、[权限事务](../../packages/db/src/assistance.ts)、[邀请](../../apps/web/src/assistance-create.tsx)、[收发件与回复](../../apps/web/src/assistance.tsx)、[用法](../engineering/human-assistance.md)；快照/回复授权与完整 Task 访问分开，历史分页不清空输入，撤权不复活 |
 | 已交付的 AI 草稿 | [契约](../../packages/contracts/src/ai-drafts.ts)、[事务](../../packages/db/src/ai-drafts.ts)、[编辑/记录](../../apps/web/src/ai-drafts.tsx)、[采用界面](../../apps/web/src/draft-adoption.tsx)、[用法](../engineering/ai-drafts.md)；两个版本分别核对，私有内容不因采用而公开 |
 | 已交付的项目选材 | [契约](../../packages/contracts/src/project-materials.ts)、[快照事务](../../packages/db/src/project-materials.ts)、[面板/记录](../../apps/web/src/project-materials.tsx)、[用法](../engineering/project-materials.md)；Node 完整输入冻结，preview 保留原代码摘录重建语义，启动不等于模型收到 |
 | 已交付的讨论约定 | [约定契约](../../packages/contracts/src/project-agreements.ts)、[原子事务](../../packages/db/src/project-agreements.ts)、[发布入口](../../apps/web/src/agreement-create.tsx)、[用法与边界](../engineering/project-agreements.md)；私有讨论不能直接公开，发布与模型发送独立 |
