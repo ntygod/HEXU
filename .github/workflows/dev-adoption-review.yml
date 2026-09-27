@@ -1,0 +1,21 @@
+name: Export adoption review source
+on:
+  push:
+    branches: [codex/adoption-review-dev]
+    paths: [.github/workflows/dev-adoption-review.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fdffcb17b91ee372daf02fa977ead45d4366ba44
+          persist-credentials: false
+      - run: git archive --format=tar.gz --output=adoption-review-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-adoption-review-source
+          path: adoption-review-source.tar.gz
+          retention-days: 1
