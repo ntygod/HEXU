@@ -94,6 +94,8 @@ test('实际文本进程拒绝工具启用、工具调用、错会话、无结�
     for (const scenario of [
       'TOOLS_ENABLED',
       'TOOL_USE',
+      'PERMISSION_DENIED',
+      'RESULT_DENIAL',
       'WRONG_SESSION',
       'NO_RESULT',
       'FAIL_TEXT',
@@ -107,7 +109,7 @@ test('实际文本进程拒绝工具启用、工具调用、错会话、无结�
         0,
       );
     }
-    assert.equal((await captures(f)).length, 5);
+    assert.equal((await captures(f)).length, 7);
   } finally {
     await f.close();
   }

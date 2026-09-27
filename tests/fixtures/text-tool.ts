@@ -61,6 +61,8 @@ export async function textFixture(capture: string) {
     });
     return;
   }
+  if (input.includes('PERMISSION_DENIED'))
+    emit({ type: 'system', subtype: 'permission_denied', session_id });
   if (input.includes('NO_RESULT')) return;
   if (input.includes('WRONG_SESSION')) {
     emit({ type: 'result', session_id: 'foreign', subtype: 'success', result: 'wrong' });
@@ -84,5 +86,6 @@ export async function textFixture(capture: string) {
     session_id,
     subtype: input.includes('FAIL_TEXT') ? 'error_during_execution' : 'success',
     result,
+    ...(input.includes('RESULT_DENIAL') ? { permission_denials: [{ tool_name: 'Read' }] } : {}),
   });
 }

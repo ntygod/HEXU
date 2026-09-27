@@ -54,6 +54,13 @@ export class TextClaudeStream {
     if (!e || typeof e !== 'object' || !('type' in e)) throw new Error('Invalid text protocol');
     const m = e as Record<string, unknown>;
     if (this.summary.resultReceived) throw new Error('Event after terminal result');
+    if (
+      (m.type === 'system' && m.subtype === 'permission_denied') ||
+      (m.type === 'result' &&
+        m.permission_denials !== undefined &&
+        (!Array.isArray(m.permission_denials) || m.permission_denials.length > 0))
+    )
+      throw new Error('Text-only execution reported a tool permission request');
     if (m.type === 'system' && m.subtype === 'init') {
       if (
         this.initialized ||

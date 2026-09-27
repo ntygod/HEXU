@@ -319,6 +319,21 @@ test('纯文本 CLI 明确关闭全部工具与历史，初始化不符/工具�
     const stream = new TextClaudeStream('/temporary');
     stream.line(JSON.stringify(init));
     assert.equal(stream.summary.resultReceived, false);
+    for (const event of [
+      { type: 'system', subtype: 'permission_denied', session_id: 'fixture' },
+      {
+        type: 'result',
+        session_id: 'fixture',
+        subtype: 'success',
+        result: 'x',
+        permission_denials: [{ tool_name: 'Read' }],
+      },
+    ]) {
+      const denied = new TextClaudeStream('/temporary');
+      denied.line(JSON.stringify(init));
+      assert.throws(() => denied.line(JSON.stringify(event)));
+      assert.equal(denied.summary.resultReceived, false);
+    }
     assert.throws(() =>
       stream.line(
         JSON.stringify({
