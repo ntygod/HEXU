@@ -247,4 +247,22 @@ CREATE INDEX context_bundles_task ON context_bundles(task_id);
 -- Existing runs and operations have no invented project-material snapshot or delivery receipt.
 `,
   },
+  {
+    version: 16,
+    sql: `
+CREATE TABLE ai_drafts (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), body TEXT NOT NULL
+);
+CREATE INDEX ai_drafts_task ON ai_drafts(task_id);
+CREATE TABLE ai_draft_revisions (
+ draft_id TEXT NOT NULL REFERENCES ai_drafts(id), revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL,
+ PRIMARY KEY(draft_id,revision)
+);
+CREATE TABLE ai_draft_adoptions (
+ id TEXT PRIMARY KEY, draft_id TEXT NOT NULL REFERENCES ai_drafts(id), task_id TEXT NOT NULL REFERENCES tasks(id), body TEXT NOT NULL
+);
+CREATE INDEX ai_draft_adoptions_draft ON ai_draft_adoptions(draft_id,task_id);
+-- Existing AI replies are not silently converted to saved drafts or adopted content.
+`,
+  },
 ];

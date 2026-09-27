@@ -288,3 +288,9 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 `GET /tasks/:taskId/project-materials` 返回当前可读的同项目有效资料/约定目录，支持 q/kind/cursor/limit；`POST .../project-materials/preview` 接受最多 16 个 kind/id/revision/contentHash/maxChars，返回有界补充文本、hash、遗漏及遮盖标记，不持久化。`GET /runs/:runId/materials` 返回固定材料与启动事实；`GET /tasks/:taskId/material-bundles/:bundleId` 用父任务/项目的当前权限读取历史快照。
 
 原生/节点 `/runs` 与 `/continuations` 可带 `projectMaterials:{items,expectedHash}` 和 `expectedTaskContextHash`。模拟运行拒绝选材。迁移 15 新增 context_bundles，和 Run/Operation、派发、回执同事务；等待节点 Run 复用 bundle 和完整输入，原生等待在停止后补齐原有代码摘要。版本变化在停止或启动前复核，暂停保留材料和未知锁。只有真实 spawn/running 记录启动，ACK/许可不是 provider receipt。完整契约与预算见 [项目选材](../engineering/project-materials.md)。
+
+## 05-04 实现子集：AI 草稿与局部采用
+
+`GET /tasks/:taskId/messages/:messageId/draft-preview` 读取当前任务 AI 回复的源指纹/节选；`GET/POST /tasks/:taskId/ai-drafts` 列表/保存，`GET/PATCH .../:draftId` 读取/修订。`GET .../:draftId/target?kind=task|source&id=...` 返回有权限目标的当前正文/版本；`POST .../:draftId/adoptions` 接受 expectedRevision、ranges:[{start,end}]、mode:append|replace 与 target:{kind,id,expectedRevision}，实际采用文本由服务端从已保存草稿计算。
+
+迁移 16 新增 ai_drafts、ai_draft_revisions、ai_draft_adoptions。目标、采用前后记录、资料修订、任务待接续暂停、事件及回执同事务。当前权限在读取、写入和旧回执前重查；私有草稿不能借目标参数公开。`GET .../:draftId/revisions` 和 `/adoptions` 提供分页历史。原输出不自动变草稿，采用不启动执行或发布约定；详情见 [用法](../engineering/ai-drafts.md)。

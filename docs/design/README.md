@@ -145,5 +145,6 @@ Figma 参考只决定信息组织，不自动批准示例模型、隐藏会话�
 - `project-sources.tsx/css`：项目资料列表、原文/链接阅读、修订、冲突与删除/恢复抽屉；资料状态与模型送达状态保持区别，来源信息按需展开。
 - `agreement-create`、`project-agreements`、`agreement-common`／`project-agreements.css`：讨论的明确发布、项目约定列表/历史/替代及任务内变化提示；不把 AI 原始建议当作已生效约定。
 - `project-materials.tsx/css`：执行面板内的明确选材、预算/版本预览和 Run/Operation 固定记录；`execution-request.tsx`：原生/节点执行的原请求确认。复用当前执行抽屉，不另建任务或上下文工作台。
+- `ai-drafts.tsx/css`、`draft-adoption`、`draft-common`：任务内 AI 草稿、修订、片段选择、目标前后比较与采用记录；未保存编辑仍只在抽屉内存中，明确保存的草稿是独立业务内容。
 
 面板宽度使用原生滑杆提供拖动与键盘操作，布局按身份／空间保存；手机在讨论和代码／成果之间切换。输入草稿只在当前身份／空间的内存中保留，刷新会清空；不把账号凭证或任务文本写入外观偏好。

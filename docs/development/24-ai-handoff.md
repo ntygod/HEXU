@@ -12,13 +12,16 @@
 
 业务底座为 E2c2：preview 是明确的示例身份；team-local 使用真实账号／项目权限和可选本人授权节点。两者都只支持回环地址。SSH 能登录一台测试机，不等于产品已交付跨电脑节点或公开部署。桌面宿主尚未选定，不能因为前端完成就添加 Electron／Tauri 或宣称客户端已交付。
 
+AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection.ts)：只读键盘按文字簇移动，浏览器 LF 范围映射到保存的 CRLF/CR 原文，不能直接把 DOM 偏移当成原文偏移。该修复的完整 Linux 回归已通过，实际证据见 21；后续保持这些选区及原文边界，不重复已交付切片。
+
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-05-04：AI 草稿与局部采用**。资料、讨论约定、明确选材与 Run/Operation 快照绑定已接入，不重复实施。先从已有共享 AI 输出建立有版本的草稿，再明确采用到有权限的目标；草稿不自动成为约定或付费执行，范围以 [22](22-next-delivery.md) 为准。
+默认继续 **HX-DEV-11-03/04/05：有限材料的真人协助**。资料、约定、明确选材与 AI 草稿的当前本机切片已接入，不重复实施。先做选择快照、明确接收者、有限授权及回复，不把邀请解释为完整任务或执行权限；范围以 [22](22-next-delivery.md) 为准。
 
 | 工作 | 先查看 |
 | --- | --- |
-| 下一项 AI 草稿 | [05 工作包](05-context-discussion.md)、[讨论](../../apps/web/src/discussion.tsx)、[Task 修订事务](../../packages/db/src/store.ts)、[资料修订](../../packages/db/src/project-sources.ts)；来源和目标版本分别核对，私有内容不因采用而公开 |
+| 下一项真人协助 | [11 工作包](11-continuation-assistance.md)、[当前权限](../../packages/db/src/permissions.ts)、[讨论](../../apps/web/src/discussion.tsx)、[身份与事件](../../apps/control/src/app.ts)；快照/回复授权与完整 Task 访问分开，不发模型调用或迁移负责人 |
+| 已交付的 AI 草稿 | [契约](../../packages/contracts/src/ai-drafts.ts)、[事务](../../packages/db/src/ai-drafts.ts)、[编辑/记录](../../apps/web/src/ai-drafts.tsx)、[采用界面](../../apps/web/src/draft-adoption.tsx)、[用法](../engineering/ai-drafts.md)；两个版本分别核对，私有内容不因采用而公开 |
 | 已交付的项目选材 | [契约](../../packages/contracts/src/project-materials.ts)、[快照事务](../../packages/db/src/project-materials.ts)、[面板/记录](../../apps/web/src/project-materials.tsx)、[用法](../engineering/project-materials.md)；Node 完整输入冻结，preview 保留原代码摘录重建语义，启动不等于模型收到 |
 | 已交付的讨论约定 | [约定契约](../../packages/contracts/src/project-agreements.ts)、[原子事务](../../packages/db/src/project-agreements.ts)、[发布入口](../../apps/web/src/agreement-create.tsx)、[用法与边界](../engineering/project-agreements.md)；私有讨论不能直接公开，发布与模型发送独立 |
 | 已交付的项目资料 | [资料契约](../../packages/contracts/src/project-sources.ts)、[原子事务](../../packages/db/src/project-sources.ts)、[W1 页面/抽屉](../../apps/web/src/project-sources.tsx)、[用法与边界](../engineering/project-sources.md)；文本/链接不等于文件上传或网络导入 |

@@ -141,6 +141,20 @@ export class ProjectSourcesStore {
       );
     });
   }
+  /** Called only inside the draft-adoption transaction; preserve source identity, title and URL. */
+  adoptContent(projectId: string, id: string, expectedRevision: number, content: string) {
+    const current = this.get(projectId, id, true);
+    assertRevision(current.revision, expectedRevision);
+    if (current.deletedAt)
+      throw new DomainError('SOURCE_DELETED', '资料已删除，请选择有效目标', 409);
+    const data = parseSourceEdit(
+      { expectedRevision, title: current.title, content, url: current.url },
+      current.kind,
+    );
+    const nextHash = contentHash(current.kind, data);
+    if (nextHash === current.contentHash) return current;
+    return this.save({ ...current, content: data.content, contentHash: nextHash }, 'updated');
+  }
   private save(previous: ProjectSource, action: SourceRevision['action']): ProjectSource {
     const source = {
       ...previous,
