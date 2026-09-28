@@ -130,7 +130,10 @@ export async function buildRestorePlan(
   const fresh = () => {
     checkAbort(signal);
     if (Date.parse(manifest.expiresAt) <= Date.now())
-      throw new DomainError('RESTORE_RETENTION_EXPIRED', '对象副本已到期，不续期或生成可用恢复计划');
+      throw new DomainError(
+        'RESTORE_RETENTION_EXPIRED',
+        '对象副本已到期，不续期或生成可用恢复计划',
+      );
   };
   fresh();
   const observed = inspectRestoreTarget(target, protectedPaths);
@@ -153,7 +156,10 @@ export async function buildRestorePlan(
     snapshot.snapshotHash !== manifest.snapshotHash ||
     canonicalJson(snapshot.coverage) !== canonicalJson(manifest.coverage)
   )
-    throw new DomainError('RESTORE_SNAPSHOT_MISMATCH', '持久对象与原保留清单不一致，未生成恢复计划');
+    throw new DomainError(
+      'RESTORE_SNAPSHOT_MISMATCH',
+      '持久对象与原保留清单不一致，未生成恢复计划',
+    );
   if (snapshot.coverage.symlinks || snapshot.coverage.gitlinks || snapshot.coverage.lfsPointers)
     throw new DomainError(
       'RESTORE_EXTERNAL_CONTENT',

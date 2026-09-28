@@ -18,7 +18,10 @@ async function main() {
     options.set(key, value);
   }
   if (options.size !== 3)
-    throw new DomainError('INVALID_INPUT', '用法：npm run runner:restore-plan -- --request ID --state HOME --target /绝对路径/全新目录');
+    throw new DomainError(
+      'INVALID_INPUT',
+      '用法：npm run runner:restore-plan -- --request ID --state HOME --target /绝对路径/全新目录',
+    );
   const lines = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -56,6 +59,10 @@ async function main() {
   }
 }
 main().catch((cause: unknown) => {
-  console.error(cause instanceof DomainError ? `${cause.code}: ${cause.message}` : '恢复预检失败；未创建目标目录，请核对本机状态与服务连接。');
+  console.error(
+    cause instanceof DomainError
+      ? `${cause.code}: ${cause.message}`
+      : '恢复预检失败；未创建目标目录，请核对本机状态与服务连接。',
+  );
   process.exitCode = 1;
 });

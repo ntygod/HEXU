@@ -103,7 +103,10 @@ export async function localRestorePreflight(
     if (row.binding !== binding)
       throw new DomainError('CHECKPOINT_SCOPE_CHANGED', '不能借当前新身份读取原绑定的对象副本');
     if (row.status !== 'retained' || row.published !== 1 || row.pending)
-      throw new DomainError('RESTORE_NOT_AVAILABLE', '副本不可用或存在未确认回执，请先核对原保留记录');
+      throw new DomainError(
+        'RESTORE_NOT_AVAILABLE',
+        '副本不可用或存在未确认回执，请先核对原保留记录',
+      );
     const ticket = JSON.parse(row.ticket) as RetentionTicket;
     const manifest = parseRetentionManifest(JSON.parse(row.manifest));
     if (
@@ -134,23 +137,32 @@ export async function localRestorePreflight(
         canonicalJson(current.request) !== canonicalJson(ticket) ||
         canonicalJson(current.manifest) !== canonicalJson(manifest)
       )
-        throw new DomainError('RESTORE_NOT_AVAILABLE', '当前权限或原保留记录已变化，未生成恢复计划');
+        throw new DomainError(
+          'RESTORE_NOT_AVAILABLE',
+          '当前权限或原保留记录已变化，未生成恢复计划',
+        );
       if (Date.parse(manifest.expiresAt) <= Date.now())
         throw new DomainError('RESTORE_RETENTION_EXPIRED', '副本已到期，不续期或读取恢复材料');
     };
     await authorized();
     log(`保留请求 ${id} · 提交 ${manifest.commit} · 到期 ${manifest.expiresAt}`);
     log(`目标：${target}`);
-    log('仅生成本机恢复预检和文件清单；可能含已提交的敏感文件名。不会创建目录、恢复文件或授权模型执行。');
+    log(
+      '仅生成本机恢复预检和文件清单；可能含已提交的敏感文件名。不会创建目录、恢复文件或授权模型执行。',
+    );
     if ((await ask(`输入 PLAN ${id}：`)) !== `PLAN ${id}`)
       throw new DomainError('CONFIRMATION_REQUIRED', '已取消恢复预检，没有创建目标目录');
     await authorized();
     // Do not hold a SQLite read lock while waiting for the user's confirmation.
     db.exec('BEGIN');
-    if (canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row))
+    if (
+      canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
+    )
       throw new DomainError('RESTORE_NOT_AVAILABLE', '确认期间本机副本状态已变化');
     const count = db
-      .prepare('SELECT COUNT(*) AS n,COALESCE(SUM(length(data)),0) AS bytes FROM objects WHERE bundle_id=?')
+      .prepare(
+        'SELECT COUNT(*) AS n,COALESCE(SUM(length(data)),0) AS bytes FROM objects WHERE bundle_id=?',
+      )
       .get(id) as { n: number; bytes: number };
     if (count.n !== manifest.coverage.objects || count.bytes !== manifest.coverage.bytes)
       throw new DomainError('SNAPSHOT_INCOMPLETE', '持久副本对象缺失或大小不符，不从原仓库修补');
@@ -168,7 +180,9 @@ export async function localRestorePreflight(
           .prepare('SELECT type,length(data) AS size FROM objects WHERE bundle_id=? AND oid=?')
           .get(id, oid) as { type: string; size: number } | undefined;
         if (!meta || meta.type !== type || meta.size > max) throw new Error('Object unavailable');
-        const value = db.prepare('SELECT data FROM objects WHERE bundle_id=? AND oid=?').get(id, oid) as {
+        const value = db
+          .prepare('SELECT data FROM objects WHERE bundle_id=? AND oid=?')
+          .get(id, oid) as {
           data: Uint8Array;
         };
         return Buffer.from(value.data);
@@ -180,7 +194,9 @@ export async function localRestorePreflight(
     db.exec('ROLLBACK');
     // Snapshot availability is not authority. Recheck after traversal before exposing names.
     await authorized();
-    if (canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row))
+    if (
+      canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
+    )
       throw new DomainError('RESTORE_NOT_AVAILABLE', '核验后本机副本状态已变化');
     if (canonicalJson(inspectRestoreTarget(target, protectedPaths)) !== canonicalJson(targetBefore))
       throw new DomainError('RESTORE_TARGET_CHANGED', '确认或预检期间目标父目录已变化');

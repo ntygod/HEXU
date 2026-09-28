@@ -94,7 +94,10 @@ for (const format of ['sha1', 'sha256'] as const)
     await temporary(async (dir) => {
       const f = await snapshot(
         [
-          { name: '中文目录', children: [{ name: 'binary.dat', data: Buffer.from([0, 255, 128]) }] },
+          {
+            name: '中文目录',
+            children: [{ name: 'binary.dat', data: Buffer.from([0, 255, 128]) }],
+          },
           { name: 'run.sh', mode: '100755' },
           { name: 'copy.txt' },
           { name: 'empty', children: [] },
@@ -136,38 +139,73 @@ test('拒绝现有文件/目录/悬空链接、符号链接祖先、重叠与非
     for (const target of [file, folder, link])
       assert.throws(() => inspectRestoreTarget(target, []), code('RESTORE_TARGET_EXISTS'));
     await symlink(folder, join(dir, 'alias'));
-    assert.throws(() => inspectRestoreTarget(join(dir, 'alias', 'new'), []), code('RESTORE_PATH_UNSUPPORTED'));
-    assert.throws(() => inspectRestoreTarget(join(folder, 'new'), [folder]), code('RESTORE_TARGET_OVERLAP'));
-    assert.throws(() => inspectRestoreTarget(join(dir, 'new'), [join(dir, 'new', 'source')]), code('RESTORE_TARGET_OVERLAP'));
+    assert.throws(
+      () => inspectRestoreTarget(join(dir, 'alias', 'new'), []),
+      code('RESTORE_PATH_UNSUPPORTED'),
+    );
+    assert.throws(
+      () => inspectRestoreTarget(join(folder, 'new'), [folder]),
+      code('RESTORE_TARGET_OVERLAP'),
+    );
+    assert.throws(
+      () => inspectRestoreTarget(join(dir, 'new'), [join(dir, 'new', 'source')]),
+      code('RESTORE_TARGET_OVERLAP'),
+    );
     for (const target of ['relative/path', `${dir}/folder/../new`, `${dir}/new/`, `${dir}/new\n`])
       assert.throws(() => inspectRestoreTarget(target, []), code('RESTORE_PATH_UNSUPPORTED'));
     assert.throws(() => inspectRestoreTarget(join(dir, 'missing', 'new'), []), { code: 'ENOENT' });
     assert.equal(await readFile(file, 'utf8'), 'keep');
   });
 });
-for (const name of ['trailing.', 'trailing ', 'file:stream', '.git ', 'CON.txt', 'bad\u202ename', Buffer.from([0xc0, 0xaf]), 'x'.repeat(256)])
+for (const name of [
+  'trailing.',
+  'trailing ',
+  'file:stream',
+  '.git ',
+  'CON.txt',
+  'bad\u202ename',
+  Buffer.from([0xc0, 0xaf]),
+  'x'.repeat(256),
+])
   test(`拒绝不支持的文件名字节 ${JSON.stringify(name)}`, async () => {
     await temporary(async (dir) => {
       const f = await snapshot([{ name }]);
-      await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('RESTORE_PATH_UNSUPPORTED'));
+      await assert.rejects(
+        buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+        code('RESTORE_PATH_UNSUPPORTED'),
+      );
     });
   });
-for (const names of [['README', 'readme'], ['é.txt', 'e\u0301.txt']])
+for (const names of [
+  ['README', 'readme'],
+  ['é.txt', 'e\u0301.txt'],
+])
   test(`拒绝大小写或 Unicode 规范化冲突 ${JSON.stringify(names)}`, async () => {
     await temporary(async (dir) => {
       const f = await snapshot(names.map((name) => ({ name })));
-      await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('RESTORE_PATH_UNSUPPORTED'));
+      await assert.rejects(
+        buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+        code('RESTORE_PATH_UNSUPPORTED'),
+      );
     });
   });
 for (const item of [
   { name: 'link', mode: '120000', data: Buffer.from('/outside') },
   { name: 'module', mode: '160000' },
-  { name: 'large', data: Buffer.from(`version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 100\n`) },
+  {
+    name: 'large',
+    data: Buffer.from(
+      `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 100\n`,
+    ),
+  },
 ])
   test(`拒绝外部内容，不跳过后伪造成功 ${item.name}`, async () => {
     await temporary(async (dir) => {
       const f = await snapshot([item]);
-      await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('RESTORE_EXTERNAL_CONTENT'));
+      await assert.rejects(
+        buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+        code('RESTORE_EXTERNAL_CONTENT'),
+      );
     });
   });
 test('逐对象重验哈希，拒绝损坏及与原保留清单不符的覆盖率', async () => {
@@ -176,10 +214,16 @@ test('逐对象重验哈希，拒绝损坏及与原保留清单不符的覆盖�
     const blob = [...f.objects.values()].find((o) => o.type === 'blob')!;
     const original = blob.data;
     blob.data = Buffer.alloc(original.length);
-    await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('SNAPSHOT_INCOMPLETE'));
+    await assert.rejects(
+      buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+      code('SNAPSHOT_INCOMPLETE'),
+    );
     blob.data = original;
     f.source.manifest.coverage.files++;
-    await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('RESTORE_SNAPSHOT_MISMATCH'));
+    await assert.rejects(
+      buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+      code('RESTORE_SNAPSHOT_MISMATCH'),
+    );
   });
 });
 test('到期和取消不生成计划；读取期间取消保持明确错误', async () => {
@@ -187,15 +231,30 @@ test('到期和取消不生成计划；读取期间取消保持明确错误', as
     const f = await snapshot([{ name: 'file' }]);
     const signal = new AbortController();
     signal.abort();
-    await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), [], signal.signal), code('RESTORE_PLAN_CANCELLED'));
+    await assert.rejects(
+      buildRestorePlan(f.source, f.read, join(dir, 'new'), [], signal.signal),
+      code('RESTORE_PLAN_CANCELLED'),
+    );
     const during = new AbortController();
-    await assert.rejects(buildRestorePlan(f.source, async (id) => {
-      during.abort();
-      return f.read(id);
-    }, join(dir, 'new'), [], during.signal), code('RESTORE_PLAN_CANCELLED'));
+    await assert.rejects(
+      buildRestorePlan(
+        f.source,
+        async (id) => {
+          during.abort();
+          return f.read(id);
+        },
+        join(dir, 'new'),
+        [],
+        during.signal,
+      ),
+      code('RESTORE_PLAN_CANCELLED'),
+    );
     f.source.manifest.retainedAt = new Date(Date.now() - 86400000).toISOString();
     f.source.manifest.expiresAt = new Date(Date.now() - 1).toISOString();
-    await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('RESTORE_RETENTION_EXPIRED'));
+    await assert.rejects(
+      buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+      code('RESTORE_RETENTION_EXPIRED'),
+    );
   });
 });
 test('展开体积按每个文件路径计费，不因对象去重绕过 64 MiB', async () => {
@@ -203,7 +262,10 @@ test('展开体积按每个文件路径计费，不因对象去重绕过 64 MiB'
     const data = Buffer.alloc(8 * 1024 * 1024, 65);
     const f = await snapshot(Array.from({ length: 9 }, (_, i) => ({ name: `copy-${i}`, data })));
     assert(f.source.manifest.coverage.bytes < 9 * 1024 * 1024);
-    await assert.rejects(buildRestorePlan(f.source, f.read, join(dir, 'new'), []), code('RESTORE_EXPANSION_LIMIT'));
+    await assert.rejects(
+      buildRestorePlan(f.source, f.read, join(dir, 'new'), []),
+      code('RESTORE_EXPANSION_LIMIT'),
+    );
   });
 });
 test('预检期间父目录被换位即拒绝，不把旧父目录观察当作写入许可', async () => {
@@ -212,13 +274,21 @@ test('预检期间父目录被换位即拒绝，不把旧父目录观察当作�
     await mkdir(parent);
     const f = await snapshot([{ name: 'file' }]);
     let changed = false;
-    await assert.rejects(buildRestorePlan(f.source, async (id) => {
-      if (!changed) {
-        changed = true;
-        await rename(parent, parent + '-old');
-        await mkdir(parent);
-      }
-      return f.read(id);
-    }, join(parent, 'new'), []), code('RESTORE_TARGET_CHANGED'));
+    await assert.rejects(
+      buildRestorePlan(
+        f.source,
+        async (id) => {
+          if (!changed) {
+            changed = true;
+            await rename(parent, parent + '-old');
+            await mkdir(parent);
+          }
+          return f.read(id);
+        },
+        join(parent, 'new'),
+        [],
+      ),
+      code('RESTORE_TARGET_CHANGED'),
+    );
   });
 });
