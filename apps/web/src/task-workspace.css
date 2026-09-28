@@ -22,7 +22,7 @@
   flex: 1;
 }
 .task-title h1 {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -61,7 +61,7 @@
 .w1-run-bar > .toolmark {
   width: 24px;
   height: 24px;
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
 }
 .w1-code-location {
   display: flex;
@@ -93,7 +93,7 @@
   font-size: var(--hx-font-secondary);
 }
 .text-button:hover {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .w1-layout-options {
   font-size: var(--hx-font-secondary);
@@ -104,7 +104,7 @@
 }
 .w1-layout-options label {
   position: absolute;
-  z-index: 3;
+  z-index: var(--hx-z-sticky);
   right: 36px;
   top: 44px;
   width: 220px;
@@ -112,17 +112,18 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
-  box-shadow: 0 12px 32px var(--hx-shadow);
+  box-shadow: var(--hx-shadow-overlay) var(--hx-shadow);
+  animation: hx-rise var(--hx-motion-fast) var(--hx-ease-enter) both;
 }
 .w1-layout-options output {
   float: right;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .w1-layout-options input {
   display: block;
   width: 100%;
   margin-top: var(--hx-space-3);
-  accent-color: var(--hx-brand);
+  accent-color: var(--hx-brand-text);
 }
 .task-grid {
   display: grid;
@@ -186,8 +187,8 @@
   color: var(--hx-text-secondary);
 }
 .output-panel .workspace-tabs button.selected {
-  border-bottom-color: var(--hx-brand);
-  color: var(--hx-brand);
+  border-bottom-color: var(--hx-brand-text);
+  color: var(--hx-brand-text);
 }
 .task-surface > .workbench-footer {
   display: none;
@@ -256,7 +257,7 @@
   margin-bottom: var(--hx-space-3);
 }
 .w1-task-result h2 {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   margin: var(--hx-space-3) 0;
 }
 .w1-task-result .button {
@@ -303,7 +304,7 @@
   }
   .task-title h1 {
     flex-basis: 100%;
-    font-size: 19px;
+    font-size: var(--hx-font-task-title);
   }
   .task-actions {
     width: 100%;
@@ -357,7 +358,7 @@
   }
   .task-mobile-tabs button[aria-pressed='true'] {
     background: var(--hx-brand-soft);
-    color: var(--hx-brand);
+    color: var(--hx-brand-text);
   }
   .w1-workspace-toolbar > .icon-button {
     display: none;

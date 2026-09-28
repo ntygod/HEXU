@@ -14,7 +14,7 @@
 .workbench-topbar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--hx-z-topbar);
   display: flex;
   align-items: center;
   gap: var(--hx-space-3);
@@ -29,7 +29,7 @@
   border-right: 1px solid var(--hx-border-subtle);
 }
 .workbench-brand .brand strong {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
   letter-spacing: 1px;
 }
 .workbench-brand .brand > span {
@@ -45,7 +45,7 @@
 }
 .space-grid {
   color: var(--hx-text-muted);
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
 }
 .space-demo {
   color: var(--hx-text-muted);
@@ -104,10 +104,15 @@
   border-radius: 50%;
   background: var(--hx-pending-marker);
   flex-shrink: 0;
+  color: var(--hx-pending-marker);
+  animation: hx-blink 1.6s var(--hx-ease-standard) infinite;
 }
 .connection-dot.online {
   background: var(--hx-running-marker);
+  color: var(--hx-running-marker);
+  animation: none;
 }
+
 .workbench-profile {
   display: inline-flex;
 }
@@ -130,7 +135,7 @@
   height: calc(100dvh - var(--shell-topbar-height));
   border-right: 1px solid var(--hx-border-subtle);
   background: var(--hx-bg-app);
-  z-index: 20;
+  z-index: var(--hx-z-sticky);
 }
 .rail-link {
   position: relative;
@@ -143,6 +148,14 @@
   border-radius: var(--hx-radius-control);
   background: transparent;
   color: var(--hx-text-secondary);
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    color var(--hx-motion-fast) var(--hx-ease-standard),
+    transform var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.rail-link:active {
+  transform: scale(0.92);
+  transition-duration: 0ms;
 }
 .rail-link:hover {
   background: var(--hx-surface-hover);
@@ -150,7 +163,7 @@
 }
 .rail-link.active {
   background: var(--hx-brand-soft);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .rail-link.active::before {
   content: '';
@@ -160,6 +173,16 @@
   height: 16px;
   border-radius: 2px;
   background: var(--hx-brand);
+  animation: hx-rail-in var(--hx-motion-normal) var(--hx-ease-spring) both;
+  transform-origin: center;
+}
+@keyframes hx-rail-in {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 .rail-command {
   margin-top: auto;
@@ -217,6 +240,9 @@
   margin: 2px 0;
   font-size: var(--hx-font-secondary);
   color: var(--hx-text-secondary);
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    color var(--hx-motion-fast) var(--hx-ease-standard);
 }
 .context-link span {
   min-width: 0;
@@ -228,7 +254,7 @@
   background: var(--hx-surface-hover);
 }
 .context-link.selected {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
 }
 .context-more {
@@ -309,7 +335,7 @@
   text-overflow: ellipsis;
 }
 .workbench-breadcrumbs a:hover {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .workbench-breadcrumbs > span {
   color: var(--hx-text-muted);
@@ -361,9 +387,10 @@
 .guide-backdrop {
   position: fixed;
   inset: var(--shell-topbar-height) 0 0 var(--hx-navigation-width);
-  z-index: 21;
+  z-index: var(--hx-z-sticky);
   background: var(--hx-backdrop);
   border: 0;
+  animation: hx-fade-in var(--hx-motion-fast) var(--hx-ease-standard) both;
 }
 @media (max-width: 1250px) {
   .preview-label {
@@ -388,7 +415,8 @@
     height: auto;
     width: min(280px, calc(100vw - 64px));
     box-shadow: 10px 0 30px var(--hx-shadow);
-    z-index: 22;
+    animation: hx-slide-in-right var(--hx-motion-normal) var(--hx-ease-enter) both;
+    z-index: var(--hx-z-guide-overlay);
   }
   .workbench-brand .brand strong {
     display: none;
@@ -456,4 +484,9 @@
   .navigation-rail {
     padding-inline: 2px;
   }
+}
+
+/* Focus outline is for interactive elements; main receives programmatic focus on route change. */
+#main-content:focus {
+  outline: none;
 }

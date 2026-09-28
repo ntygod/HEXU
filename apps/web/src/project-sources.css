@@ -107,7 +107,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--hx-space-2);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   overflow-wrap: anywhere;
 }
 .source-link svg {

@@ -51,7 +51,7 @@
   border-bottom: 1px solid var(--hx-border-subtle);
 }
 .assistance-tabs [aria-pressed='true'] {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
 }
 .assistance-snapshot,
@@ -97,7 +97,7 @@
   overflow-wrap: anywhere;
 }
 .assistance-list-item:hover {
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
   background: var(--hx-surface-raised);
 }
 .assistance-list-item > strong {
@@ -141,7 +141,7 @@
 }
 .assistance-entry > svg {
   flex-shrink: 0;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .assistance-entry p {
   color: var(--hx-text-secondary);

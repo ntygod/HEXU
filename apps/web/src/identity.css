@@ -64,7 +64,7 @@
   margin-top: var(--hx-space-5);
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   font-size: var(--hx-font-secondary);
 }
 .account-form-panel {
@@ -75,7 +75,7 @@
   background: var(--hx-surface-panel);
 }
 .account-form-header h2 {
-  font-size: 22px;
+  font-size: var(--hx-font-display);
   margin-top: var(--hx-space-3);
 }
 .account-form-header p {
@@ -113,7 +113,7 @@
   display: block;
   border: 0;
   background: transparent;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   padding: var(--hx-space-3) 0 0;
   text-align: left;
 }
@@ -140,7 +140,7 @@
     max-width: 520px;
   }
   .account-context h2 {
-    font-size: 26px;
+    font-size: var(--hx-font-hero);
   }
   .account-context dl,
   .account-path {

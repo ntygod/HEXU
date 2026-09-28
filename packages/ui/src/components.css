@@ -47,6 +47,13 @@ select:disabled {
     background var(--hx-motion-fast),
     border-color var(--hx-motion-fast);
 }
+.button {
+  transition-property: background, border-color, transform, box-shadow;
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0ms;
+}
 .button:hover:not(:disabled) {
   background: var(--hx-surface-hover);
   border-color: var(--hx-text-muted);
@@ -187,11 +194,11 @@ select:disabled {
   border-radius: var(--hx-radius-control);
   background: var(--hx-ai-soft);
   color: var(--hx-ai-text);
-  font-size: 21px;
+  font-size: var(--hx-font-display);
   line-height: 1;
 }
 .toolmark.codex {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
 }
 .system-avatar {
   display: inline-flex;
@@ -211,7 +218,7 @@ select:disabled {
   white-space: nowrap;
 }
 .brand strong {
-  font-size: 21px;
+  font-size: var(--hx-font-display);
   line-height: 1;
   font-weight: 600;
   letter-spacing: -0.5px;
@@ -219,6 +226,16 @@ select:disabled {
 .brand span {
   font-size: var(--hx-font-secondary);
   color: var(--hx-text-secondary);
+}
+.icon-button {
+  transition:
+    background var(--hx-motion-fast),
+    color var(--hx-motion-fast),
+    transform var(--hx-motion-fast);
+}
+.icon-button:active:not(:disabled) {
+  transform: scale(0.92);
+  transition-duration: 0ms;
 }
 .spinner {
   display: inline-block;
@@ -249,7 +266,7 @@ select:disabled {
   color: var(--hx-text-muted);
 }
 .empty h3 {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
   font-weight: 500;
 }
 .empty p {
@@ -258,13 +275,23 @@ select:disabled {
   font-size: var(--hx-font-body);
   line-height: 1.8;
 }
+.dialog[open] {
+  animation: hx-pop var(--hx-motion-normal) var(--hx-ease-enter) both;
+}
+.dialog[open]::backdrop {
+  animation: hx-fade-in var(--hx-motion-fast) var(--hx-ease-standard) both;
+}
+.dialog.drawer[open] {
+  animation-name: hx-slide-in-right;
+  animation-duration: var(--hx-motion-slow);
+}
 .dialog {
   padding: 0;
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-dialog);
   background: var(--hx-surface-panel);
   color: var(--hx-text-primary);
-  box-shadow: 0 20px 80px var(--hx-shadow);
+  box-shadow: var(--hx-shadow-dialog) var(--hx-shadow);
   width: 520px;
   max-width: calc(100vw - 28px);
   max-height: calc(100dvh - 40px);
@@ -371,8 +398,9 @@ select:disabled {
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-raised);
   color: var(--hx-text-primary);
-  box-shadow: 0 8px 30px var(--hx-shadow);
-  z-index: 200;
+  box-shadow: var(--hx-shadow-overlay) var(--hx-shadow);
+  z-index: var(--hx-z-toast);
+  animation: hx-toast-in var(--hx-motion-normal) var(--hx-ease-spring) both;
   font-size: var(--hx-font-secondary);
 }
 .toast.error {
@@ -401,6 +429,6 @@ select:disabled {
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: var(--hx-font-subtitle);
   }
 }

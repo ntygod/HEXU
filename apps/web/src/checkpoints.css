@@ -34,7 +34,7 @@
 }
 .checkpoint-heading > svg {
   flex-shrink: 0;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .checkpoint-heading p,
 .checkpoint-card > p {

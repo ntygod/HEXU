@@ -33,7 +33,7 @@
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  font-size: 22px;
+  font-size: var(--hx-font-display);
 }
 .composer-wrap {
   padding: var(--hx-space-3);

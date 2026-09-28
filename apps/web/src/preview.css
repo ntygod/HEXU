@@ -32,7 +32,7 @@
   gap: var(--hx-space-3);
 }
 .preview-heading h3 {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
 }
 .preview-heading p {
   color: var(--hx-text-secondary);
@@ -118,5 +118,5 @@
   padding: 5px 10px;
   border-radius: var(--hx-radius-control);
   background: var(--hx-brand-soft);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }

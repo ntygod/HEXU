@@ -52,9 +52,9 @@
   text-align: left;
 }
 .native-tool-choice button.selected {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .native-tool-choice small {
   flex-basis: 100%;
@@ -85,7 +85,7 @@
 .node-context-preview summary,
 .continuation-records summary {
   cursor: pointer;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   font-size: var(--hx-font-secondary);
   padding-block: var(--hx-space-2);
 }
@@ -330,13 +330,13 @@
 }
 .native-changes button.selected {
   background: var(--hx-brand-soft);
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .native-changes button span {
   overflow-wrap: anywhere;
 }
 .native-changes code {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   min-width: 2ch;
 }
 .native-event {

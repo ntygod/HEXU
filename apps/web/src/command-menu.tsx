@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
-import { Dialog, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
+import { Dialog, Icon, StatusBadge, type IconName } from '../../../packages/ui/src/index.js';
 import { go, useApp } from './state.js';
 import './command-menu.css';
 export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
   const { data } = useApp();
-  const commands = [
+  const commands: { name: string; icon: IconName; action: () => void }[] = [
     { name: '新建任务', icon: 'plus', action: onNewTask },
     {
       name: '打开工作台',

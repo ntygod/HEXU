@@ -26,7 +26,7 @@
 }
 .settings-navigation a:hover {
   background: var(--hx-brand-soft);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .settings-content {
   min-width: 0;
@@ -55,7 +55,7 @@
 }
 .resource-notice > svg,
 .node-boundary > svg {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   flex-shrink: 0;
 }
 .resource-notice p,
@@ -71,7 +71,7 @@
   background: var(--hx-surface-panel);
 }
 .preferences-surface h2 {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   margin-bottom: var(--hx-space-3);
 }
 .preference-row {
@@ -91,7 +91,7 @@
   flex-shrink: 0;
 }
 .settings-heading {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   font-weight: 600;
   margin-bottom: var(--hx-space-4);
 }
@@ -120,7 +120,7 @@
 }
 .tool-resource h3,
 .resource-row h3 {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
 }
 .tool-resource p,
 .resource-row p,
@@ -175,7 +175,7 @@
   min-width: 180px;
 }
 .node-section-heading h2 {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
   margin: 4px 0 6px;
 }
 .node-section-heading p {
@@ -206,7 +206,7 @@
   overflow-wrap: anywhere;
 }
 .node-card-heading h3 {
-  font-size: 16px;
+  font-size: var(--hx-font-subtitle);
 }
 .node-card-heading p {
   color: var(--hx-text-secondary);
@@ -248,7 +248,7 @@
   font-size: var(--hx-font-secondary);
 }
 .node-counts dd {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
   font-variant-numeric: tabular-nums;
   margin: 4px 0 0;
 }
@@ -277,7 +277,7 @@
   text-align: center;
 }
 .node-empty > svg {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .node-empty h3 {
   margin: var(--hx-space-3) 0;
@@ -304,7 +304,7 @@
 }
 .node-help summary {
   cursor: pointer;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .node-help p {
   font-size: var(--hx-font-secondary);

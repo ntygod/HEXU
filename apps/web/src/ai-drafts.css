@@ -38,7 +38,7 @@
   border-bottom: 1px solid var(--hx-border-subtle);
 }
 .draft-tabs [aria-pressed='true'] {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
 }
 .draft-actions {
@@ -84,7 +84,7 @@
 }
 .draft-list-item:hover {
   background: var(--hx-surface-raised);
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .draft-selection-item {
   margin-top: var(--hx-space-3);

@@ -127,7 +127,7 @@
   overflow-wrap: anywhere;
 }
 .agreement-origin a {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .agreement-conflict,
 .agreement-compare {

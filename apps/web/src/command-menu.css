@@ -8,7 +8,7 @@
   background: var(--hx-bg-app);
 }
 .command-search-field:focus-within {
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .command-search-field input {
   border: 0;
@@ -38,6 +38,17 @@
   border-radius: var(--hx-radius-control);
   background: transparent;
   text-align: left;
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
+  animation: hx-rise var(--hx-motion-fast) var(--hx-ease-enter) both;
+}
+.command-results > button:nth-child(2) {
+  animation-delay: 25ms;
+}
+.command-results > button:nth-child(3) {
+  animation-delay: 50ms;
+}
+.command-results > button:nth-child(n + 4) {
+  animation-delay: 75ms;
 }
 .command-results > button:hover,
 .command-results > button:focus-visible {

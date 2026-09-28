@@ -14,6 +14,7 @@
   --hx-brand: #00f0ff;
   --hx-brand-foreground: #062126;
   --hx-brand-soft: #102a31;
+  --hx-brand-text: #4fd8e8;
   --hx-ai-marker: #a855f7;
   --hx-ai-text: #bc8cff;
   --hx-ai-soft: #281e3b;
@@ -28,6 +29,8 @@
   --hx-danger-soft: #341e27;
   --hx-code-text: #c9d6e5;
   --hx-shadow: #00000066;
+  --hx-skeleton-base: #1c222c;
+  --hx-skeleton-sheen: #2b3542;
   --hx-backdrop: #03070bcc;
   --hx-font-ui: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   --hx-font-code: 'JetBrains Mono', 'Fira Code', Consolas, ui-monospace, monospace;
@@ -35,6 +38,10 @@
   --hx-font-secondary: 12px;
   --hx-font-metadata: 11px;
   --hx-font-code-size: 12px;
+  --hx-font-subtitle: 16px;
+  --hx-font-heading: 17px;
+  --hx-font-display: 21px;
+  --hx-font-hero: 26px;
   --hx-font-task-title: 20px;
   --hx-font-page-title: 24px;
   --hx-line-height-body: 1.6;
@@ -56,6 +63,20 @@
   --hx-drawer-width: 350px;
   --hx-motion-fast: 120ms;
   --hx-motion-normal: 180ms;
+  --hx-motion-slow: 260ms;
+  --hx-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --hx-ease-enter: cubic-bezier(0, 0, 0, 1);
+  --hx-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --hx-ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
+  --hx-z-sticky: 20;
+  --hx-z-topbar: 30;
+  --hx-z-guide-overlay: 40;
+  --hx-z-command: 50;
+  --hx-z-dialog: 60;
+  --hx-z-toast: 70;
+  --hx-shadow-raised: 0 2px 10px;
+  --hx-shadow-overlay: 0 12px 40px;
+  --hx-shadow-dialog: 0 20px 80px;
 }
 
 :root[data-theme='light'],
@@ -73,6 +94,7 @@
   --hx-brand: #0369a1;
   --hx-brand-foreground: #ffffff;
   --hx-brand-soft: #e0f3fc;
+  --hx-brand-text: #0369a1;
   --hx-ai-marker: #9333ea;
   --hx-ai-text: #9333ea;
   --hx-ai-soft: #f2e8fc;
@@ -87,6 +109,8 @@
   --hx-danger-soft: #fff0f2;
   --hx-code-text: #293b50;
   --hx-shadow: #23354a24;
+  --hx-skeleton-base: #e8eef4;
+  --hx-skeleton-sheen: #f6f9fc;
   --hx-backdrop: #18253666;
 }
 
@@ -104,5 +128,6 @@
   .hexu-workbench {
     --hx-motion-fast: 0ms;
     --hx-motion-normal: 0ms;
+    --hx-motion-slow: 0ms;
   }
 }

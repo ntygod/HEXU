@@ -38,11 +38,11 @@
   margin-bottom: var(--hx-space-4);
 }
 .team-card-heading > svg {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   margin-top: 3px;
 }
 .team-card-heading h2 {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   font-weight: 600;
 }
 .team-card-heading p {

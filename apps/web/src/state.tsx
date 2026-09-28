@@ -22,10 +22,44 @@ export function canEditTask(data: Workbench, task: Task) {
         ))
   );
 }
-export const go = (path: string) => {
-  history.pushState({}, '', path);
+/** Per-history-entry key so back/forward restores scroll and push navigates fresh. */
+const entryKey =
+  (history.state as { hxKey?: string } | null)?.hxKey ??
+  (() => {
+    const key = Math.random().toString(36).slice(2);
+    history.replaceState({ hxKey: key }, '');
+    return key;
+  })();
+const scrollMemory = new Map<string, { x: number; y: number }>();
+const TITLES: [RegExp, string][] = [
+  [/^\/projects\/[^/]+/, '项目'],
+  [/^\/projects/, '项目'],
+  [/^\/tasks\/[^/]+/, '任务'],
+  [/^\/results\/[^/]+/, '成果'],
+  [/^\/results/, '成果'],
+  [/^\/settings/, '资源与设置'],
+];
+export function go(path: string) {
+  scrollMemory.set(entryKey, { x: scrollX, y: scrollY });
+  history.pushState({ hxKey: Math.random().toString(36).slice(2) }, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
-};
+}
+/** Route chrome that belongs to the document, not a page component: title, scroll, focus. */
+export function useRouteChrome(path: string) {
+  useEffect(() => {
+    const title = TITLES.find(([pattern]) => pattern.test(path))?.[1] ?? '工作台';
+    document.title = `${title} · HEXU 合序`;
+    const key = (history.state as { hxKey?: string } | null)?.hxKey;
+    const saved = key ? scrollMemory.get(key) : undefined;
+    if (saved) scrollTo(saved.x, saved.y);
+    else scrollTo(0, 0);
+    const main = document.getElementById('main-content');
+    if (main && !main.contains(document.activeElement)) {
+      main.setAttribute('tabindex', '-1');
+      main.focus({ preventScroll: true });
+    }
+  }, [path]);
+}
 export function Link({
   to,
   children,

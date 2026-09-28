@@ -22,7 +22,7 @@
   color: var(--hx-text-secondary);
 }
 .prompt-intents button[aria-pressed='true'] {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
 }
 .prompt-delivery {
@@ -61,7 +61,7 @@
   outline: none;
 }
 .next-input-compose:focus-within {
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .next-input-toolbar {
   display: flex;
