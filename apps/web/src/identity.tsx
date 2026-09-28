@@ -162,7 +162,7 @@ function AccountEntry() {
         <button
           className="icon-button"
           aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
-          onClick={toggleTheme}
+          onClick={(event) => toggleTheme({ x: event.clientX, y: event.clientY })}
         >
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
         </button>

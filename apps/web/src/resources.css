@@ -26,7 +26,7 @@
 }
 .settings-navigation a:hover {
   background: var(--hx-brand-soft);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .settings-content {
   min-width: 0;
@@ -52,10 +52,12 @@
   border: 1px solid var(--hx-border-subtle);
   background: var(--hx-surface-panel);
   border-radius: var(--hx-radius-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
 }
 .resource-notice > svg,
 .node-boundary > svg {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   flex-shrink: 0;
 }
 .resource-notice p,
@@ -69,9 +71,10 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .preferences-surface h2 {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   margin-bottom: var(--hx-space-3);
 }
 .preference-row {
@@ -91,7 +94,7 @@
   flex-shrink: 0;
 }
 .settings-heading {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   font-weight: 600;
   margin-bottom: var(--hx-space-4);
 }
@@ -111,6 +114,11 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    border-color var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .tool-resource > div,
 .resource-row > div,
@@ -120,7 +128,7 @@
 }
 .tool-resource h3,
 .resource-row h3 {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
 }
 .tool-resource p,
 .resource-row p,
@@ -175,7 +183,7 @@
   min-width: 180px;
 }
 .node-section-heading h2 {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
   margin: 4px 0 6px;
 }
 .node-section-heading p {
@@ -193,6 +201,7 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .node-card-heading {
   display: flex;
@@ -206,7 +215,7 @@
   overflow-wrap: anywhere;
 }
 .node-card-heading h3 {
-  font-size: 16px;
+  font-size: var(--hx-font-subtitle);
 }
 .node-card-heading p {
   color: var(--hx-text-secondary);
@@ -248,7 +257,7 @@
   font-size: var(--hx-font-secondary);
 }
 .node-counts dd {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
   font-variant-numeric: tabular-nums;
   margin: 4px 0 0;
 }
@@ -277,7 +286,7 @@
   text-align: center;
 }
 .node-empty > svg {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .node-empty h3 {
   margin: var(--hx-space-3) 0;
@@ -304,7 +313,7 @@
 }
 .node-help summary {
   cursor: pointer;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .node-help p {
   font-size: var(--hx-font-secondary);
@@ -344,4 +353,17 @@
   .preference-row {
     flex-wrap: wrap;
   }
+}
+
+/* Settings/resources surfaces: quiet rows lift on hover, focus glow on inputs. */
+.resource-row,
+.preference-row,
+.tool-resource {
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    border-color var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.resource-row:hover,
+.tool-resource:hover {
+  border-color: var(--hx-text-muted);
 }

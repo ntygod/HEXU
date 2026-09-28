@@ -9,12 +9,19 @@ select {
   min-height: var(--hx-control-height);
   padding: calc(var(--hx-density-unit) / 2) var(--hx-space-3);
   min-width: 0;
-  transition: border-color var(--hx-motion-fast);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    border-color var(--hx-motion-fast),
+    box-shadow var(--hx-motion-fast);
 }
 input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--hx-brand);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 0 0 3px var(--hx-ring);
+  outline: none;
 }
 input[type='checkbox'],
 input[type='radio'] {
@@ -43,9 +50,19 @@ select:disabled {
   line-height: var(--hx-line-height-body);
   font-weight: 500;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
   transition:
     background var(--hx-motion-fast),
-    border-color var(--hx-motion-fast);
+    border-color var(--hx-motion-fast),
+    box-shadow var(--hx-motion-fast),
+    transform var(--hx-motion-fast);
+}
+.button {
+  transition-property: background, border-color, transform, box-shadow;
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0ms;
 }
 .button:hover:not(:disabled) {
   background: var(--hx-surface-hover);
@@ -151,6 +168,20 @@ select:disabled {
   font-size: var(--hx-font-secondary);
   font-weight: 500;
   flex-shrink: 0;
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    transform var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.avatar:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 4px 16px color-mix(in srgb, var(--hx-brand) 28%, transparent);
+}
+.avatar:active {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0ms;
 }
 .avatar.small {
   width: 24px;
@@ -187,11 +218,11 @@ select:disabled {
   border-radius: var(--hx-radius-control);
   background: var(--hx-ai-soft);
   color: var(--hx-ai-text);
-  font-size: 21px;
+  font-size: var(--hx-font-display);
   line-height: 1;
 }
 .toolmark.codex {
-  font-size: 20px;
+  font-size: var(--hx-font-task-title);
 }
 .system-avatar {
   display: inline-flex;
@@ -211,7 +242,7 @@ select:disabled {
   white-space: nowrap;
 }
 .brand strong {
-  font-size: 21px;
+  font-size: var(--hx-font-display);
   line-height: 1;
   font-weight: 600;
   letter-spacing: -0.5px;
@@ -219,6 +250,16 @@ select:disabled {
 .brand span {
   font-size: var(--hx-font-secondary);
   color: var(--hx-text-secondary);
+}
+.icon-button {
+  transition:
+    background var(--hx-motion-fast),
+    color var(--hx-motion-fast),
+    transform var(--hx-motion-fast);
+}
+.icon-button:active:not(:disabled) {
+  transform: scale(0.92);
+  transition-duration: 0ms;
 }
 .spinner {
   display: inline-block;
@@ -249,8 +290,14 @@ select:disabled {
   color: var(--hx-text-muted);
 }
 .empty h3 {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
   font-weight: 500;
+}
+.empty-action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--hx-space-2);
 }
 .empty p {
   max-width: 360px;
@@ -258,13 +305,26 @@ select:disabled {
   font-size: var(--hx-font-body);
   line-height: 1.8;
 }
+.dialog[open] {
+  animation: hx-pop var(--hx-motion-normal) var(--hx-ease-enter) both;
+}
+.dialog[open]::backdrop {
+  animation: hx-fade-in var(--hx-motion-fast) var(--hx-ease-standard) both;
+}
+.dialog.drawer[open] {
+  animation-name: hx-slide-in-right;
+  animation-duration: var(--hx-motion-slow);
+}
 .dialog {
   padding: 0;
+  box-shadow:
+    var(--hx-shadow-dialog) var(--hx-shadow),
+    inset 0 1px 0 var(--hx-edge-light);
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-dialog);
-  background: var(--hx-surface-panel);
+  background: var(--hx-glass);
+  backdrop-filter: blur(24px) saturate(1.4);
   color: var(--hx-text-primary);
-  box-shadow: 0 20px 80px var(--hx-shadow);
   width: 520px;
   max-width: calc(100vw - 28px);
   max-height: calc(100dvh - 40px);
@@ -272,7 +332,7 @@ select:disabled {
 }
 .dialog::backdrop {
   background: var(--hx-backdrop);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(8px) saturate(1.25);
 }
 .dialog.wide {
   width: 640px;
@@ -369,10 +429,12 @@ select:disabled {
   padding: 12px 16px;
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
-  background: var(--hx-surface-raised);
+  background: var(--hx-glass);
+  backdrop-filter: blur(16px) saturate(1.3);
   color: var(--hx-text-primary);
-  box-shadow: 0 8px 30px var(--hx-shadow);
-  z-index: 200;
+  box-shadow: var(--hx-shadow-overlay) var(--hx-shadow);
+  z-index: var(--hx-z-toast);
+  animation: hx-toast-in var(--hx-motion-normal) var(--hx-ease-spring) both;
   font-size: var(--hx-font-secondary);
 }
 .toast.error {
@@ -401,6 +463,104 @@ select:disabled {
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: var(--hx-font-subtitle);
   }
+}
+
+/* Live states breathe: a small pulsing dot makes queued/preparing/running runs
+   readable at a glance without reading the label. */
+.run-queued::before,
+.run-preparing::before,
+.run-running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: hx-live-pulse 1.5s var(--hx-ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .run-queued::before,
+  .run-preparing::before,
+  .run-running::before {
+    animation: none;
+  }
+}
+
+/* ---- Universal surface recipes: page CSS opts in with these classes instead of
+   rebuilding panel chrome per feature. ---- */
+
+/* Lit-top panel with hover lift; pair with .spotlight for cursor tracking. */
+.panel {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    border-color var(--hx-motion-normal) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-normal) var(--hx-ease-standard),
+    transform var(--hx-motion-normal) var(--hx-ease-standard);
+}
+.panel.interactive:hover {
+  border-color: var(--hx-border-subtle);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    var(--hx-shadow-overlay) var(--hx-shadow);
+}
+
+/* Row with quiet hover background; for list items that navigate or open detail. */
+.row {
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    border-color var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.row:hover {
+  background: var(--hx-surface-hover);
+}
+
+/* Tabs: the active marker slides instead of snapping. */
+.tabs {
+  position: relative;
+  display: flex;
+  gap: var(--hx-space-2);
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+.tabs > button,
+.tabs > a {
+  position: relative;
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 0;
+  background: transparent;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-body);
+  transition: color var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.tabs > button::after,
+.tabs > a::after {
+  content: '';
+  position: absolute;
+  left: var(--hx-space-3);
+  right: var(--hx-space-3);
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hx-brand);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--hx-motion-normal) var(--hx-ease-spring);
+}
+.tabs > button:hover,
+.tabs > a:hover {
+  color: var(--hx-text-primary);
+}
+.tabs > button[aria-pressed='true'],
+.tabs > button[aria-selected='true'],
+.tabs > a[aria-current='page'] {
+  color: var(--hx-brand-text);
+}
+.tabs > button[aria-pressed='true']::after,
+.tabs > button[aria-selected='true']::after,
+.tabs > a[aria-current='page']::after {
+  transform: scaleX(1);
 }

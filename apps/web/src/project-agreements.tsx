@@ -132,9 +132,9 @@ function AgreementCollection({
           正在读取项目约定…
         </p>
       )}
-      <div className="agreement-grid">
+      <div className="agreement-grid stagger">
         {items.map((item) => (
-          <article className="agreement-card" key={item.id}>
+          <article className="agreement-card spotlight" key={item.id}>
             <button aria-label={`查看约定 ${item.title}`} onClick={() => onSelect(item.id)}>
               <span className="agreement-kicker">
                 {agreementStateText[item.state]} · 修订 {item.revision}

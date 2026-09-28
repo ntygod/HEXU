@@ -5,7 +5,8 @@ type Density = 'compact' | 'comfortable';
 interface Appearance {
   theme: Theme;
   density: Density;
-  toggleTheme(): void;
+  /** Coordinates make the reveal bloom from the toggle; without them it centers. */
+  toggleTheme(at?: { x: number; y: number }): void;
   toggleDensity(): void;
 }
 const AppearanceContext = createContext<Appearance | null>(null);
@@ -45,7 +46,38 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       value={{
         theme,
         density,
-        toggleTheme: () => setTheme((value) => (value === 'dark' ? 'light' : 'dark')),
+        toggleTheme: (at) => {
+          const next = theme === 'dark' ? 'light' : 'dark';
+          const apply = () => setTheme(next);
+          if (
+            !document.startViewTransition ||
+            matchMedia('(prefers-reduced-motion: reduce)').matches
+          ) {
+            apply();
+            return;
+          }
+          const x = at?.x ?? innerWidth / 2;
+          const y = at?.y ?? 0;
+          const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+          const transition = document.startViewTransition(apply);
+          transition.ready
+            .then(() => {
+              document.documentElement.animate(
+                {
+                  clipPath: [
+                    `circle(0px at ${x}px ${y}px)`,
+                    `circle(${radius}px at ${x}px ${y}px)`,
+                  ],
+                },
+                {
+                  duration: 420,
+                  easing: 'cubic-bezier(0.2, 0, 0, 1)',
+                  pseudoElement: '::view-transition-new(root)',
+                },
+              );
+            })
+            .catch(() => {});
+        },
         toggleDensity: () =>
           setDensity((value) => (value === 'compact' ? 'comfortable' : 'compact')),
       }}

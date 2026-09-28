@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Avatar, Brand, Icon } from '../../../packages/ui/src/index.js';
+import { Avatar, Brand, Icon, type IconName } from '../../../packages/ui/src/index.js';
 import { SpaceSwitcher } from './identity.js';
 import { Link, useApp, usePath } from './state.js';
 import { useAppearance } from './appearance.js';
@@ -86,7 +86,7 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
           : true,
     )
     .slice(0, 3);
-  const navigation = [
+  const navigation: { to: string; icon: IconName; label: string; key: string }[] = [
     { to: '/', icon: 'home', label: '工作台', key: 'workbench' },
     { to: '/projects', icon: 'folder', label: '项目', key: 'projects' },
     { to: '/results', icon: 'box', label: '成果', key: 'results' },
@@ -121,7 +121,7 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
         </button>
         <button
           className="icon-button"
-          onClick={toggleTheme}
+          onClick={(event) => toggleTheme({ x: event.clientX, y: event.clientY })}
           aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
           title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
         >
@@ -168,8 +168,9 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
           className="context-guide"
           ref={guideRef}
           id="project-guide"
-          hidden={!guideOpen}
+          data-collapsed={!guideOpen || undefined}
           aria-label="项目导引栏"
+          aria-hidden={!guideOpen}
         >
           <div className="context-guide-heading">
             <strong>{project?.name ?? '项目与工作'}</strong>
@@ -308,7 +309,9 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
                 : '本地开发预览 · 执行模式明确标识'}
             </span>
           </div>
-          <main id="main-content">{children}</main>
+          <main id="main-content" tabIndex={-1} className="page-enter">
+            {children}
+          </main>
           <footer className="workbench-footer">
             <span>HEXU · 让人和 AI，一起交付。</span>
             <span>{data.mode === 'team-local' ? '本机团队模式' : '示例数据 · 本地预览'}</span>

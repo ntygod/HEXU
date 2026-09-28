@@ -52,9 +52,9 @@
   text-align: left;
 }
 .native-tool-choice button.selected {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .native-tool-choice small {
   flex-basis: 100%;
@@ -85,7 +85,7 @@
 .node-context-preview summary,
 .continuation-records summary {
   cursor: pointer;
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   font-size: var(--hx-font-secondary);
   padding-block: var(--hx-space-2);
 }
@@ -160,6 +160,7 @@
   padding: var(--hx-space-3);
   background: var(--hx-ai-soft);
   border-radius: var(--hx-radius-control);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .native-session-choice p,
 .native-session-record p {
@@ -179,6 +180,8 @@
   border-left: 3px solid var(--hx-brand);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-bg-app);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
 }
 .continuation-status.needs-attention {
   border-left-color: var(--hx-pending-text);
@@ -211,6 +214,7 @@
 .continuation-steps li,
 .node-run-steps li {
   color: var(--hx-text-secondary);
+  transition: color var(--hx-motion-normal) var(--hx-ease-standard);
 }
 .continuation-steps li::before,
 .node-run-steps li::before {
@@ -220,6 +224,17 @@
 .continuation-steps .current {
   color: var(--hx-pending-text);
   font-weight: 600;
+}
+.continuation-steps .current::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--hx-space-2);
+  border-radius: 50%;
+  background: var(--hx-pending-marker);
+  animation: hx-live-pulse 1.5s var(--hx-ease-standard) infinite;
+  vertical-align: 1px;
 }
 .continuation-steps .passed,
 .node-run-steps li.reached {
@@ -269,6 +284,7 @@
   border-radius: var(--hx-radius-panel);
   padding: var(--hx-space-3);
   margin-bottom: var(--hx-space-4);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .node-policy-summary {
   display: flex;
@@ -330,18 +346,38 @@
 }
 .native-changes button.selected {
   background: var(--hx-brand-soft);
-  border-color: var(--hx-brand);
+  border-color: var(--hx-brand-text);
 }
 .native-changes button span {
   overflow-wrap: anywhere;
 }
 .native-changes code {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   min-width: 2ch;
 }
 .native-event {
   padding: var(--hx-space-3) 0;
   border-bottom: 1px solid var(--hx-border-muted);
+  animation: hx-rise var(--hx-motion-fast) var(--hx-ease-enter) both;
+}
+.native-event.is-live::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--hx-space-2);
+  border-radius: 50%;
+  background: var(--hx-running-marker);
+  color: var(--hx-running-marker);
+  animation: hx-live-pulse 1.5s var(--hx-ease-standard) infinite;
+  vertical-align: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .native-event,
+  .native-event.is-live::before,
+  .continuation-steps .current::before {
+    animation: none;
+  }
 }
 .native-event p {
   white-space: pre-wrap;

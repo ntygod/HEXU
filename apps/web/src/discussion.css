@@ -3,6 +3,7 @@
   align-items: flex-start;
   gap: var(--hx-space-3);
   margin-bottom: var(--hx-space-5);
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
 }
 .message:last-child {
   margin-bottom: 4px;
@@ -33,7 +34,7 @@
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  font-size: 22px;
+  font-size: var(--hx-font-display);
 }
 .composer-wrap {
   padding: var(--hx-space-3);
@@ -45,9 +46,16 @@
   border-radius: var(--hx-radius-panel);
   background: var(--hx-bg-app);
 }
+.composer {
+  transition:
+    border-color var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard);
+}
 .composer:focus-within {
   border-color: var(--hx-brand);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hx-brand) 20%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hx-brand) 18%, transparent),
+    0 0 24px color-mix(in srgb, var(--hx-brand) 12%, transparent);
 }
 .composer textarea {
   width: 100%;

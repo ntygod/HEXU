@@ -14,14 +14,29 @@
 .workbench-topbar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--hx-z-topbar);
+  background: var(--hx-glass);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid var(--hx-border-subtle);
+  z-index: var(--hx-z-topbar);
   display: flex;
   align-items: center;
   gap: var(--hx-space-3);
   min-height: var(--shell-topbar-height);
   padding: var(--hx-space-2) var(--hx-space-4);
-  border-bottom: 1px solid var(--hx-border-subtle);
-  background: var(--hx-surface-panel);
+  border-bottom: 1px solid transparent;
+  background: color-mix(in srgb, var(--hx-surface-panel) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hx-brand) 24%, transparent) 38%,
+    color-mix(in srgb, var(--hx-ai-marker) 20%, transparent) 68%,
+    transparent
+  );
+  background-size: 100% 1px;
+  background-position: bottom;
+  background-repeat: no-repeat;
 }
 .workbench-brand {
   flex-shrink: 0;
@@ -29,7 +44,7 @@
   border-right: 1px solid var(--hx-border-subtle);
 }
 .workbench-brand .brand strong {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
   letter-spacing: 1px;
 }
 .workbench-brand .brand > span {
@@ -45,7 +60,7 @@
 }
 .space-grid {
   color: var(--hx-text-muted);
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
 }
 .space-demo {
   color: var(--hx-text-muted);
@@ -104,20 +119,33 @@
   border-radius: 50%;
   background: var(--hx-pending-marker);
   flex-shrink: 0;
+  color: var(--hx-pending-marker);
+  animation: hx-blink 1.6s var(--hx-ease-standard) infinite;
 }
 .connection-dot.online {
   background: var(--hx-running-marker);
+  color: var(--hx-running-marker);
+  animation: none;
 }
+@media (prefers-reduced-motion: reduce) {
+  .connection-dot {
+    animation: none;
+  }
+}
+
 .workbench-profile {
   display: inline-flex;
 }
 .workbench-frame {
   display: grid;
-  grid-template-columns: var(--hx-navigation-width) var(--hx-guide-width) minmax(0, 1fr);
+  grid-template-columns:
+    var(--hx-navigation-width) var(--guide-col-width, var(--hx-guide-width))
+    minmax(0, 1fr);
   min-height: calc(100dvh - var(--shell-topbar-height));
+  transition: grid-template-columns var(--hx-motion-slow) var(--hx-ease-standard);
 }
 .app-shell[data-guide='closed'] .workbench-frame {
-  grid-template-columns: var(--hx-navigation-width) minmax(0, 1fr);
+  --guide-col-width: 0px;
 }
 .navigation-rail {
   position: sticky;
@@ -130,7 +158,7 @@
   height: calc(100dvh - var(--shell-topbar-height));
   border-right: 1px solid var(--hx-border-subtle);
   background: var(--hx-bg-app);
-  z-index: 20;
+  z-index: var(--hx-z-sticky);
 }
 .rail-link {
   position: relative;
@@ -143,6 +171,14 @@
   border-radius: var(--hx-radius-control);
   background: transparent;
   color: var(--hx-text-secondary);
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    color var(--hx-motion-fast) var(--hx-ease-standard),
+    transform var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.rail-link:active {
+  transform: scale(0.92);
+  transition-duration: 0ms;
 }
 .rail-link:hover {
   background: var(--hx-surface-hover);
@@ -150,7 +186,10 @@
 }
 .rail-link.active {
   background: var(--hx-brand-soft);
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 0 18px color-mix(in srgb, var(--hx-brand) 18%, transparent);
 }
 .rail-link.active::before {
   content: '';
@@ -160,6 +199,16 @@
   height: 16px;
   border-radius: 2px;
   background: var(--hx-brand);
+  animation: hx-rail-in var(--hx-motion-normal) var(--hx-ease-spring) both;
+  transform-origin: center;
+}
+@keyframes hx-rail-in {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 .rail-command {
   margin-top: auto;
@@ -170,12 +219,31 @@
   height: calc(100dvh - var(--shell-topbar-height));
   display: flex;
   flex-direction: column;
+  width: var(--hx-guide-width);
   min-width: 0;
   border-right: 1px solid var(--hx-border-subtle);
   background: var(--hx-surface-panel);
+  opacity: 1;
+  overflow: hidden;
+  transition:
+    width var(--hx-motion-slow) var(--hx-ease-standard),
+    opacity var(--hx-motion-normal) var(--hx-ease-standard),
+    visibility var(--hx-motion-slow),
+    border-color var(--hx-motion-slow);
 }
-.context-guide[hidden] {
-  display: none;
+.app-shell[data-guide='closed'] .context-guide {
+  width: 0;
+  opacity: 0;
+  visibility: hidden;
+  border-right-color: transparent;
+  pointer-events: none;
+}
+
+.context-guide > * {
+  transition: opacity var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.app-shell[data-guide='closed'] .context-guide > * {
+  opacity: 0;
 }
 .context-guide-heading {
   display: flex;
@@ -217,6 +285,9 @@
   margin: 2px 0;
   font-size: var(--hx-font-secondary);
   color: var(--hx-text-secondary);
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    color var(--hx-motion-fast) var(--hx-ease-standard);
 }
 .context-link span {
   min-width: 0;
@@ -228,7 +299,7 @@
   background: var(--hx-surface-hover);
 }
 .context-link.selected {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
 }
 .context-more {
@@ -309,7 +380,7 @@
   text-overflow: ellipsis;
 }
 .workbench-breadcrumbs a:hover {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
 }
 .workbench-breadcrumbs > span {
   color: var(--hx-text-muted);
@@ -361,9 +432,10 @@
 .guide-backdrop {
   position: fixed;
   inset: var(--shell-topbar-height) 0 0 var(--hx-navigation-width);
-  z-index: 21;
+  z-index: var(--hx-z-sticky);
   background: var(--hx-backdrop);
   border: 0;
+  animation: hx-fade-in var(--hx-motion-fast) var(--hx-ease-standard) both;
 }
 @media (max-width: 1250px) {
   .preview-label {
@@ -388,7 +460,8 @@
     height: auto;
     width: min(280px, calc(100vw - 64px));
     box-shadow: 10px 0 30px var(--hx-shadow);
-    z-index: 22;
+    animation: hx-slide-in-right var(--hx-motion-normal) var(--hx-ease-enter) both;
+    z-index: var(--hx-z-guide-overlay);
   }
   .workbench-brand .brand strong {
     display: none;
@@ -456,4 +529,9 @@
   .navigation-rail {
     padding-inline: 2px;
   }
+}
+
+/* Focus outline is for interactive elements; main receives programmatic focus on route change. */
+#main-content:focus {
+  outline: none;
 }

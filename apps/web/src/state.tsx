@@ -22,10 +22,51 @@ export function canEditTask(data: Workbench, task: Task) {
         ))
   );
 }
-export const go = (path: string) => {
-  history.pushState({}, '', path);
+/** Per-history-entry key so back/forward restores scroll and push navigates fresh. */
+const entryKey =
+  (history.state as { hxKey?: string } | null)?.hxKey ??
+  (() => {
+    const key = Math.random().toString(36).slice(2);
+    history.replaceState({ hxKey: key }, '');
+    return key;
+  })();
+const scrollMemory = new Map<string, { x: number; y: number }>();
+const TITLES: [RegExp, string][] = [
+  [/^\/projects\/[^/]+/, '项目'],
+  [/^\/projects/, '项目'],
+  [/^\/tasks\/[^/]+/, '任务'],
+  [/^\/results\/[^/]+/, '成果'],
+  [/^\/results/, '成果'],
+  [/^\/settings/, '资源与设置'],
+];
+export function go(path: string) {
+  scrollMemory.set(entryKey, { x: scrollX, y: scrollY });
+  history.pushState({ hxKey: Math.random().toString(36).slice(2) }, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
-};
+}
+/** Route chrome that belongs to the document, not a page component: title, scroll, focus. */
+const hashJump = { current: false };
+export function useRouteChrome(path: string) {
+  useEffect(() => {
+    const title = TITLES.find(([pattern]) => pattern.test(path))?.[1] ?? '工作台';
+    document.title = `${title} · HEXU 合序`;
+    // Same path with only the hash changing is an in-page anchor jump: leave
+    // scroll and focus to the browser instead of yanking the view to the top.
+    if (hashJump.current) {
+      hashJump.current = false;
+      return;
+    }
+    const key = (history.state as { hxKey?: string } | null)?.hxKey;
+    const saved = key ? scrollMemory.get(key) : undefined;
+    if (saved) scrollTo(saved.x, saved.y);
+    else scrollTo(0, 0);
+    const main = document.getElementById('main-content');
+    if (main && !main.contains(document.activeElement)) {
+      main.setAttribute('tabindex', '-1');
+      main.focus({ preventScroll: true });
+    }
+  }, [path]);
+}
 export function Link({
   to,
   children,
@@ -47,6 +88,8 @@ export function Link({
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
           return;
         event.preventDefault();
+        const target = new URL(to, location.href);
+        if (target.pathname === location.pathname && target.hash) hashJump.current = true;
         go(to);
       }}
     >
@@ -300,9 +343,13 @@ export function useLoad<T>(path: string) {
     const controller = new AbortController();
     setError('');
     request<T>(path, { signal: controller.signal })
-      .then(setValue)
+      .then((next) => {
+        if (!controller.signal.aborted) setValue(next);
+      })
       .catch((error) => {
-        if (error.name !== 'AbortError') {
+        // Cancellation during response.json() may be surfaced as INVALID_RESPONSE.
+        // A superseded read must not clear the current task and its open editor.
+        if (!controller.signal.aborted && error.name !== 'AbortError') {
           setValue(null);
           setError(error.message);
         }

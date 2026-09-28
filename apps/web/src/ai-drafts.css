@@ -38,7 +38,7 @@
   border-bottom: 1px solid var(--hx-border-subtle);
 }
 .draft-tabs [aria-pressed='true'] {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   background: var(--hx-brand-soft);
 }
 .draft-actions {
@@ -54,6 +54,7 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .draft-origin pre,
 .draft-record pre {
@@ -81,10 +82,20 @@
   background: var(--hx-surface-panel);
   color: var(--hx-text-primary);
   overflow-wrap: anywhere;
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    border-color var(--hx-motion-fast) var(--hx-ease-standard),
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    transform var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard);
 }
 .draft-list-item:hover {
   background: var(--hx-surface-raised);
-  border-color: var(--hx-brand);
+  border-color: var(--hx-border-subtle);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    var(--hx-shadow-raised) var(--hx-shadow);
 }
 .draft-selection-item {
   margin-top: var(--hx-space-3);

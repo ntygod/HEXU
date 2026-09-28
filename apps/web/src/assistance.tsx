@@ -179,14 +179,18 @@ function AssistanceItems({ taskId, onSelect }: { taskId?: string; onSelect?(id: 
           );
           return onSelect ? (
             <button
-              className="assistance-list-item"
+              className="assistance-list-item spotlight"
               key={item.id}
               onClick={() => onSelect(item.id)}
             >
               {content}
             </button>
           ) : (
-            <Link className="assistance-list-item" key={item.id} to={`/assistances/${item.id}`}>
+            <Link
+              className="assistance-list-item spotlight"
+              key={item.id}
+              to={`/assistances/${item.id}`}
+            >
               {content}
             </Link>
           );

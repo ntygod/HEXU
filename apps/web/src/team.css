@@ -38,11 +38,11 @@
   margin-bottom: var(--hx-space-4);
 }
 .team-card-heading > svg {
-  color: var(--hx-brand);
+  color: var(--hx-brand-text);
   margin-top: 3px;
 }
 .team-card-heading h2 {
-  font-size: 17px;
+  font-size: var(--hx-font-heading);
   font-weight: 600;
 }
 .team-card-heading p {
@@ -196,4 +196,11 @@
   .project-access-member > span:first-child {
     flex-basis: 100%;
   }
+}
+
+.team-member {
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.team-member:hover {
+  background: var(--hx-surface-hover);
 }

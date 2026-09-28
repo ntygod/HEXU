@@ -255,7 +255,11 @@ function DraftList({ task, onSelect }: { task: Task; onSelect(id: string): void 
       <p>草稿保留 AI 来源和人工修订。采用哪些片段、放到哪里，由你决定。</p>
       {read.error && <ReadProblem read={read} />}
       {read.value?.items.map((draft) => (
-        <button className="draft-list-item" key={draft.id} onClick={() => onSelect(draft.id)}>
+        <button
+          className="draft-list-item spotlight"
+          key={draft.id}
+          onClick={() => onSelect(draft.id)}
+        >
           <strong>{draft.title}</strong>
           <span>
             r{draft.revision} · {draft.updatedByName} · {time(draft.updatedAt)}

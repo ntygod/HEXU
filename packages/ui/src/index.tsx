@@ -1,15 +1,49 @@
 import { useEffect, useId, useRef, type ReactNode, type ButtonHTMLAttributes } from 'react';
 import type { Run, TaskStatus, User } from '../../contracts/src/index.js';
+/** Union of every icon key defined in the registry below; typos fail at compile time. */
+export type IconName =
+  | 'home'
+  | 'folder'
+  | 'box'
+  | 'search'
+  | 'plus'
+  | 'arrow'
+  | 'back'
+  | 'chevron'
+  | 'down'
+  | 'check'
+  | 'close'
+  | 'people'
+  | 'play'
+  | 'stop'
+  | 'chat'
+  | 'file'
+  | 'code'
+  | 'branch'
+  | 'settings'
+  | 'bell'
+  | 'board'
+  | 'list'
+  | 'panel'
+  | 'density'
+  | 'external'
+  | 'upload'
+  | 'monitor'
+  | 'sun'
+  | 'moon'
+  | 'clock'
+  | 'spark'
+  | 'warning';
 export function Icon({
   name,
   size = 18,
   ...rest
 }: {
-  name: string;
+  name: IconName;
   size?: number;
   className?: string;
 }) {
-  const paths: Record<string, ReactNode> = {
+  const paths = {
     home: (
       <>
         <path d="m3 10 9-7 9 7v10H3z" />
@@ -279,20 +313,52 @@ export function Dialog({
 export function Empty({
   title,
   description,
+  icon = 'folder',
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  /** Override the default glyph, e.g. 'search' for "no results". */
+  icon?: IconName;
+  /** Primary next step; every empty state should offer one when recovery is possible. */
+  action?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <div className="empty">
       <span className="empty-icon">
-        <Icon name="folder" size={28} />
+        <Icon name={icon} size={28} />
       </span>
       <h3>{title}</h3>
       <p>{description}</p>
+      {action ? <div className="empty-action">{action}</div> : null}
       {children}
     </div>
+  );
+}
+/** Loading placeholder with the shimmer defined in foundation.css. */
+export function Skeleton({
+  lines = 1,
+  width,
+  text = true,
+}: {
+  lines?: number;
+  /** CSS width of the block, e.g. '60%'. */
+  width?: string;
+  /** Text-line height (true) or a free-form block (false, size via className/style). */
+  text?: boolean;
+}) {
+  return (
+    <>
+      {Array.from({ length: lines }, (_, index) => (
+        <div
+          key={index}
+          className={`skeleton ${text ? 'skeleton-text' : ''}`}
+          style={width ? { width } : undefined}
+          aria-hidden="true"
+        />
+      ))}
+    </>
   );
 }

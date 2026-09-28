@@ -34,7 +34,7 @@ export function ResultCard({ result }: { result: Result }) {
   const { data } = useApp();
   const task = data.tasks.find((item) => item.id === result.taskId);
   return (
-    <Link to={`/results/${result.id}`} className="work-result-card">
+    <Link to={`/results/${result.id}`} className="work-result-card spotlight">
       <div className="work-card-kicker">
         <Icon name={result.kind === 'demo-preview' ? 'monitor' : 'file'} />
         <span>{result.kind === 'demo-preview' ? '示例预览' : '文字成果'}</span>

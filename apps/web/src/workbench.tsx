@@ -96,7 +96,15 @@ export function Workbench() {
                 </div>
               </>
             ) : (
-              <Empty title="从一项工作开始" description="只需一个标题，就能保存想法和展开讨论。" />
+              <Empty
+                title="从一项工作开始"
+                description="只需一个标题，就能保存想法和展开讨论。"
+                action={
+                  <Button variant="primary" onClick={() => setCreating(true)}>
+                    新建任务 <Icon name="plus" size={16} />
+                  </Button>
+                }
+              />
             )}
           </section>
           <section className="work-section">
@@ -157,7 +165,7 @@ export function Workbench() {
             全部成果 <Icon name="chevron" size={14} />
           </Link>
         </div>
-        <div className="work-result-grid">
+        <div className="work-result-grid stagger">
           {recent.map((result) => (
             <ResultCard key={result.id} result={result} />
           ))}

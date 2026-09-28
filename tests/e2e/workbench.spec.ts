@@ -26,8 +26,19 @@ test('项目看板和列表使用同一份持久化状态', async ({ page }) => 
   await expect(page.locator('.task-list').getByText('增加导出文件命名规则')).toBeVisible();
 });
 test('轻量新建、评论与刷新后恢复', async ({ page }) => {
+  await page.route('**/api/v1/workbench', async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: { ...data, projects: [], tasks: [], runs: [], results: [] },
+    });
+  });
   await page.goto('/');
-  await page.getByRole('button', { name: '新建任务', exact: true }).click();
+  await page.locator('.resume-work').getByRole('button', { name: '新建任务', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '开始一项工作', exact: true })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/');
+  await page.unroute('**/api/v1/workbench');
   await page.getByLabel('要做什么').fill('浏览器中创建的真实任务');
   await page.getByRole('button', { name: '创建任务', exact: true }).click();
   await expect(
@@ -129,9 +140,10 @@ test('窄屏没有整个页面的横向溢出', async ({ page }) => {
     await expect(page.getByRole('complementary', { name: '项目导引栏' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: '展开项目导航', exact: true })).toBeFocused();
+    expect((await page.locator('.workbench-main').boundingBox())?.width).toBeGreaterThan(300);
     if (path === '/tasks/task-24') {
       await page.getByRole('button', { name: '代码与成果', exact: true }).click();
-      await expect(page.getByRole('button', { name: '代码变更', exact: true })).toBeVisible();
+      await expect(page.getByRole('tab', { name: '代码变更', exact: true })).toBeVisible();
       await page.getByRole('button', { name: '讨论', exact: true }).click();
       await expect(page.getByRole('textbox', { name: '任务评论', exact: true })).toBeVisible();
     }
@@ -205,4 +217,67 @@ test('评论按文本呈现，不执行 HTML', async ({ page }) => {
   await page.getByRole('button', { name: '发送评论', exact: true }).click();
   await expect(page.getByText(payload, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => '__hexuXss' in window)).toBe(false);
+});
+
+test('被新快照取消的旧响应不卸载任务编辑器或丢失未保存内容', async ({ page }) => {
+  const headers = () => ({ 'x-hexu-client': 'web', 'idempotency-key': crypto.randomUUID() });
+  const created = await page.request.post('/api/v1/spaces/space-demo/tasks', {
+    headers: headers(),
+    data: { title: '读取取消的编辑保留检查' },
+  });
+  expect(created.ok()).toBe(true);
+  const task = await created.json();
+  await page.goto(`/tasks/${task.id}`);
+  await page.getByRole('button', { name: '编辑工作说明', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '编辑工作说明', exact: true });
+  await editor.getByRole('textbox').last().fill('不能被已取消的读取清掉的草稿');
+  await page.evaluate((path) => {
+    const state = { armed: true, pending: false, cancelled: false };
+    Object.assign(window, { __hexuCancelledRead: state });
+    const fetch = window.fetch.bind(window);
+    window.fetch = async (input, options) => {
+      const response = await fetch(input, options);
+      const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+      const signal = options?.signal;
+      if (state.armed && url.pathname === path && signal) {
+        state.armed = false;
+        // Model headers arriving before an abort while the JSON body is still pending.
+        response.json = () =>
+          new Promise((_, reject) => {
+            state.pending = true;
+            const cancel = () => {
+              state.cancelled = true;
+              reject(new DOMException('Read cancelled', 'AbortError'));
+            };
+            if (signal.aborted) cancel();
+            else signal.addEventListener('abort', cancel, { once: true });
+          });
+      }
+      return response;
+    };
+  }, `/api/v1/tasks/${task.id}`);
+  const update = async (body: string) => {
+    const response = await page.request.post(`/api/v1/tasks/${task.id}/messages`, {
+      headers: headers(),
+      data: { body },
+    });
+    expect(response.ok()).toBe(true);
+  };
+  await update('第一次快照更新');
+  await page.waitForFunction(
+    () =>
+      (window as Window & { __hexuCancelledRead?: { pending: boolean } }).__hexuCancelledRead
+        ?.pending,
+  );
+  await update('第二次快照更新');
+  await page.waitForFunction(
+    () =>
+      (window as Window & { __hexuCancelledRead?: { cancelled: boolean } }).__hexuCancelledRead
+        ?.cancelled,
+  );
+  await expect(
+    page.locator('.message-content').getByText('第二次快照更新', { exact: true }),
+  ).toBeAttached();
+  await expect(editor).toBeVisible();
+  await expect(editor.getByRole('textbox').last()).toHaveValue('不能被已取消的读取清掉的草稿');
 });

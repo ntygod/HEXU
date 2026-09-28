@@ -4,6 +4,14 @@
 * {
   box-sizing: border-box;
 }
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
 body {
   margin: 0;
   background: var(--hx-bg-app);
@@ -39,6 +47,7 @@ a {
 :focus-visible {
   outline: 2px solid var(--hx-brand);
   outline-offset: 2px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--hx-brand) 18%, transparent);
 }
 h1,
 h2,
@@ -58,7 +67,7 @@ h2 {
   line-height: 1.5;
 }
 h3 {
-  font-size: 15px;
+  font-size: var(--hx-font-subtitle);
   font-weight: 500;
 }
 small,
@@ -275,7 +284,7 @@ main {
   height: 52px;
   display: grid;
   place-items: center;
-  font-size: 30px;
+  font-size: var(--hx-font-hero);
   font-weight: 700;
   background: var(--hx-brand-soft);
   border: 1px solid var(--hx-brand);
@@ -309,5 +318,283 @@ main {
   .form-actions > .button {
     max-width: 100%;
     white-space: normal;
+  }
+}
+
+/* ---- Motion system: all durations flow through --hx-motion-* tokens, which
+   collapse to 0ms under prefers-reduced-motion, so every animation below is
+   automatically disabled for users who opt out. ---- */
+@keyframes hx-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hx-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hx-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hx-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes hx-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes hx-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+    opacity: 0.65;
+  }
+}
+@keyframes hx-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Page / region enter transitions. Pages opt in with .page-enter; AppShell adds
+   it to <main> so every route change replays once. */
+.page-enter {
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
+}
+.stagger > * {
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 30ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 60ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 90ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 120ms;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 150ms;
+}
+.stagger > *:nth-child(n + 7) {
+  animation-delay: 180ms;
+}
+
+.skeleton {
+  border-radius: var(--hx-radius-control);
+  background: linear-gradient(
+    90deg,
+    var(--hx-skeleton-base) 25%,
+    var(--hx-skeleton-sheen) 50%,
+    var(--hx-skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: hx-shimmer 1.4s linear infinite;
+}
+.skeleton-text {
+  height: calc(var(--hx-font-body) * 0.9);
+  margin: var(--hx-space-2) 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .stagger > * {
+    animation: none;
+  }
+  .skeleton {
+    animation: none;
+    background: var(--hx-skeleton-base);
+  }
+}
+
+/* ---- Atmosphere: ambient aurora + film grain. Sits behind all content, never
+   intercepts pointer events, and is intentionally near-imperceptible: it gives
+   flat panels a sense of place instead of a plain solid fill. ---- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 520px at 82% -12%, var(--hx-glow-brand), transparent 62%),
+    radial-gradient(900px 480px at 8% -16%, var(--hx-glow-ai), transparent 60%);
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--hx-brand) 24%, transparent);
+  color: var(--hx-text-primary);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hx-border-subtle) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hx-border-subtle);
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hx-text-muted);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ---- Spotlight surfaces (Linear-style): two stacked pseudo-elements driven by
+   --hx-mx/--hx-my, updated from motion.ts. ::before floods a soft brand glow,
+   ::after reveals a gradient border hugging the cursor. ---- */
+.spotlight {
+  position: relative;
+}
+.spotlight::before,
+.spotlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--hx-motion-normal) var(--hx-ease-standard);
+}
+.spotlight::before {
+  background: radial-gradient(
+    340px circle at var(--hx-mx, 50%) var(--hx-my, 50%),
+    var(--hx-spotlight),
+    transparent 70%
+  );
+}
+.spotlight::after {
+  inset: -1px;
+  padding: 1px;
+  background: radial-gradient(
+    220px circle at var(--hx-mx, 50%) var(--hx-my, 50%),
+    var(--hx-brand),
+    transparent 45%
+  );
+  -webkit-mask:
+    linear-gradient(currentColor 0 0) content-box,
+    linear-gradient(currentColor 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(currentColor 0 0) content-box,
+    linear-gradient(currentColor 0 0);
+  mask-composite: exclude;
+}
+.spotlight[data-lit]::before,
+.spotlight[data-lit]::after {
+  opacity: 1;
+}
+
+/* Elevation catch-light: a 1px lit top edge makes panels read as physical
+   surfaces instead of flat rectangles. */
+.edge-light {
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+}
+
+@keyframes hx-shine-sweep {
+  from {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(230%) skewX(-18deg);
+  }
+}
+@keyframes hx-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.78);
+  }
+}
+
+/* Theme transition (View Transitions API, see appearance.tsx): the old theme
+   stays put while the new one reveals in a circle from the toggle. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight::before,
+  .spotlight::after {
+    transition: none;
   }
 }

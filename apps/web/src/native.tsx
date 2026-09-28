@@ -637,7 +637,10 @@ export function NativeEvents({ run }: { run: Run }) {
       )}
       {error && <p role="alert">{error}</p>}
       {value?.items.map((e) => (
-        <div className={`native-event ${e.kind}`} key={e.sequence}>
+        <div
+          className={`native-event ${e.kind} ${run.state === 'running' ? 'is-live' : ''}`}
+          key={e.sequence}
+        >
           <small>
             {e.kind === 'tool'
               ? '工具'

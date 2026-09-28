@@ -74,7 +74,7 @@ export function Settings() {
               <strong>显示主题</strong>
               <p>当前为{theme === 'dark' ? '深色' : '浅色'}主题</p>
             </div>
-            <Button onClick={toggleTheme}>
+            <Button onClick={(event) => toggleTheme({ x: event.clientX, y: event.clientY })}>
               {theme === 'light' ? '使用深色主题' : '使用浅色主题'}
             </Button>
           </div>

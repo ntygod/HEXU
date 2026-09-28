@@ -1,7 +1,7 @@
 import { AssistancePage } from './assistance.js';
 import { useEffect, useState } from 'react';
 import { Empty } from '../../../packages/ui/src/index.js';
-import { Link, usePath } from './state.js';
+import { Link, usePath, useRouteChrome } from './state.js';
 import { Workbench } from './workbench.js';
 import { Projects, ProjectPage } from './projects.js';
 import { Results, ResultPage } from './results.js';
@@ -12,6 +12,7 @@ import { AppShell } from './shell.js';
 import { NewTask } from './forms.js';
 export function App() {
   const path = usePath();
+  useRouteChrome(path);
   const [searchOpen, setSearchOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   useEffect(() => {
@@ -28,7 +29,7 @@ export function App() {
   const active = segment[0] ?? 'workbench';
   return (
     <>
-      <AppShell onSearch={() => setSearchOpen(true)}>
+      <AppShell key={path} onSearch={() => setSearchOpen(true)}>
         {active === 'workbench' ? (
           <Workbench />
         ) : active === 'projects' ? (
