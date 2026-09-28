@@ -1,0 +1,40 @@
+name: Restore preflight validation
+on:
+  pull_request:
+    paths:
+      - 'apps/runner/src/**/checkpoint-restore*.ts'
+      - 'apps/runner/src/restore-plan.ts'
+      - 'tests/checkpoint-restore*.test.ts'
+      - '.github/workflows/restore-preflight-validation.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Format working copy and retain source-only evidence
+        run: |
+          mkdir -p artifacts/restore-preflight
+          npx prettier --write apps/runner/src/agent/checkpoint-restore-plan.ts apps/runner/src/agent/checkpoint-restore-preflight.ts apps/runner/src/restore-plan.ts tests/checkpoint-restore-plan.test.ts tests/checkpoint-restore-preflight.test.ts
+          git diff --binary > artifacts/restore-preflight/format.patch
+          git ls-files -z | tar --null -T - -czf artifacts/restore-preflight/source.tgz
+          tar -czf artifacts/restore-preflight/prettier.tgz -C node_modules prettier
+      - name: Types and focused restore tests
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee artifacts/restore-preflight/typecheck.log
+          npm run build:server 2>&1 | tee artifacts/restore-preflight/build.log
+          node --test dist/tests/checkpoint-restore*.test.js 2>&1 | tee artifacts/restore-preflight/tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: restore-preflight-evidence
+          path: artifacts/restore-preflight/
+          retention-days: 1
