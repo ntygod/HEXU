@@ -29,6 +29,7 @@
 | 将已保存建议采用到原任务 | [协助建议采用](assistance-adoption.md) |
 | 本机提交引用、另行确认的对象保留 | [提交检查点](commit-checkpoints.md)、[对象保留](checkpoint-retention.md) |
 | 只读检查新目录恢复材料，不实际写入 | [恢复预检](checkpoint-restore-plan.md) |
+| 本机暂存写入、不覆盖发布与明确清理 | [新目录恢复](checkpoint-restore.md) |
 
 ## 架构决策
 

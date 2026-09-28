@@ -17,7 +17,7 @@ HEXU 是面向**个人多工具/多模型 coding**与**团队 AI coding**的研�
 
 ## 快速启动
 
-使用 Node.js 24 与 npm，依赖由 `package-lock.json` 锁定：
+使用 Node.js 24 与 npm，依赖由 `package-lock.json` 锁定。Linux 源码构建还需 `cc` 与 libc 开发头文件，用于编译[检查点排他发布组件](docs/engineering/checkpoint-restore.md)；构建不会自动下载编译器：
 
 ```bash
 git clone https://github.com/ntygod/HEXU.git

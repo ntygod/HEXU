@@ -25,7 +25,7 @@
 
 ## 最少足够的验证
 
-Node 24 + npm；全新工作副本先 `npm ci`。命令以 [package.json](../../package.json) 为准。
+Node 24 + npm；Linux 源码构建还需本地 `cc` 与 libc 头文件，用于编译[恢复发布助手](../../apps/runner/src/native/restore-publish.c)，不自动下载编译器。全新工作副本先 `npm ci`。命令以 [package.json](../../package.json) 为准。
 
 | 改动 | 首选检查 |
 | --- | --- |
