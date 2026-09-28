@@ -7,6 +7,10 @@ import {
   RETENTION_LIMITS,
   type RetentionManifest,
 } from '../../../../packages/contracts/src/checkpoint-retention.js';
+import {
+  parseTransferTicket,
+  type TransferTicket,
+} from '../../../../packages/contracts/src/checkpoint-transfer.js';
 import { nodeId } from '../../../../packages/contracts/src/nodes.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import { verifySnapshot, type ObjectReader } from './checkpoint-objects.js';
@@ -15,8 +19,11 @@ export interface RestorePlanSource {
   requestId: string;
   checkpointId: string;
   nodeId: string;
-  workspaceId: string;
+  workspaceId: string | null;
   manifest: RetentionManifest;
+  /** Absent on the original retention-v1 plans; never relabel their provenance. */
+  kind?: 'transfer';
+  transfer?: TransferTicket;
 }
 export interface RestoreEntry {
   path: string;
@@ -120,13 +127,40 @@ export async function buildRestorePlan(
   signal?: AbortSignal,
 ) {
   checkAbort(signal);
-  const identity = {
-    requestId: nodeId(source.requestId),
-    checkpointId: nodeId(source.checkpointId),
-    nodeId: nodeId(source.nodeId),
-    workspaceId: nodeId(source.workspaceId),
-  };
   const manifest = parseRetentionManifest(source.manifest);
+  let identity: Omit<RestorePlanSource, 'manifest'>;
+  if (source.kind === 'transfer') {
+    const t = parseTransferTicket(source.transfer);
+    const hash = createHash('sha256')
+      .update(canonicalJson({ ...t, requestHash: '' }))
+      .digest('hex');
+    if (
+      hash !== t.requestHash ||
+      source.requestId !== t.id ||
+      source.checkpointId !== t.source.checkpointId ||
+      source.nodeId !== t.target.id ||
+      source.workspaceId !== null ||
+      canonicalJson(manifest) !== canonicalJson(t.manifest)
+    )
+      throw new DomainError('CHECKPOINT_MISMATCH', '接收恢复来源不一致，不借用发送者目录授权');
+    identity = {
+      kind: 'transfer',
+      transfer: t,
+      requestId: t.id,
+      checkpointId: t.source.checkpointId,
+      nodeId: t.target.id,
+      workspaceId: null,
+    };
+  } else {
+    if (source.kind !== undefined || source.transfer !== undefined)
+      throw new DomainError('CHECKPOINT_MISMATCH', '恢复来源种类不受支持');
+    identity = {
+      requestId: nodeId(source.requestId),
+      checkpointId: nodeId(source.checkpointId),
+      nodeId: nodeId(source.nodeId),
+      workspaceId: nodeId(source.workspaceId),
+    };
+  }
   const fresh = () => {
     checkAbort(signal);
     if (Date.parse(manifest.expiresAt) <= Date.now())

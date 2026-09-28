@@ -705,3 +705,167 @@ test('对象传输临时读取故障保留已知状态，权限失效清空记�
     await f.close();
   }
 });
+
+async function receiverRestoreCli(
+  home: string,
+  id: string,
+  mode: 'plan' | 'restore' | 'report' | 'cleanup',
+  publish = true,
+) {
+  const target = join(home, '..', 'receiver-restored-output');
+  const args =
+    mode === 'plan'
+      ? [resolve('dist/apps/runner/src/restore-plan.js')]
+      : [resolve('dist/apps/runner/src/restore-checkpoint.js'), mode];
+  args.push('--state', home, '--target', resolve(target));
+  if (mode === 'restore' || mode === 'plan') args.push('--transfer', id);
+  const child = spawn(process.execPath, args, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH, HOME: process.env.HOME },
+  });
+  let output = '';
+  const answered = new Set<string>();
+  child.stdout.on('data', (v) => {
+    output += v;
+    for (const match of output.matchAll(/(?:PLAN|RESTORE|PUBLISH|REPORT|CLEAN) [0-9a-f-]{36}/g)) {
+      if (answered.has(match[0])) continue;
+      answered.add(match[0]);
+      child.stdin.write((!publish && match[0].startsWith('PUBLISH') ? 'NO' : match[0]) + '\n');
+    }
+  });
+  child.stderr.on('data', (v) => (output += v));
+  const [code] = await once(child, 'close');
+  return { code, output, target: resolve(target) };
+}
+async function readyReceived(page: Page, f: Fixture) {
+  const t = await prepareTransfer(page, f);
+  await t.panel.getByRole('button', { name: '创建传输请求', exact: true }).click();
+  await expect(t.panel.getByLabel('对象传输记录')).toHaveCount(1);
+  const id = (await (await page.request.get(t.path, { headers: headers(f.space.id) })).json())
+    .items[0].ticket.id as string;
+  const accept = await transferCli(t.receiverHome, id, 'accept', `RECEIVE ${id}\n`);
+  expect(accept.code, accept.output).toBe(0);
+  const send = await transferCli(f.home, id, 'send', `SEND ${id}\n`);
+  expect(send.code, send.output).toBe(0);
+  const receive = await transferCli(t.receiverHome, id, 'receive');
+  expect(receive.code, receive.output).toBe(0);
+  const scope = t.panel.getByLabel('接收副本恢复', { exact: true });
+  await expect(scope).toContainText('收到对象不等于文件已恢复');
+  await scope.getByRole('button', { name: '查看恢复记录', exact: true }).click();
+  await expect(scope).toContainText('尚无已确认');
+  return { ...t, id, scope, resultPath: `${t.path}/${id}/restores` };
+}
+test('接收副本恢复经真实CLI回到传输卡，来源独立、刷新历史、深浅色及手机可读', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const t = await readyReceived(page, f);
+    await t.scope.getByText('在接收节点恢复到新目录', { exact: true }).click();
+    await expect(t.scope.getByLabel('接收副本恢复命令')).toContainText(`--transfer ${t.id}`);
+    const p = await receiverRestoreCli(t.receiverHome, t.id, 'plan');
+    expect(p.code, p.output).toBe(0);
+    const restored = await receiverRestoreCli(t.receiverHome, t.id, 'restore');
+    expect(restored.code, restored.output).toBe(0);
+    const reported = await receiverRestoreCli(t.receiverHome, t.id, 'report');
+    expect(reported.code, reported.output).toBe(0);
+    await expect(t.scope).toContainText('接收节点恢复 · 最后报告');
+    await expect(t.scope).toContainText('文件已发布（本机报告）');
+    await t.scope.getByText('恢复来源与指纹', { exact: true }).click();
+    await expect(t.scope).toContainText(t.receiver.nodeId);
+    await expect(t.scope).toContainText(f.node.nodeId);
+    await t.scope.getByRole('button', { name: '查看报告历史', exact: true }).click();
+    await expect(t.scope.getByLabel('恢复报告历史')).toContainText('报告 #1');
+    expect(await readFile(join(t.receiverRoot, 'private.txt'), 'utf8')).toBe(
+      'Not touched by transfer',
+    );
+    expect(await readFile(join(restored.target, 'src/binary.dat'))).toEqual(
+      Buffer.from([0, 1, 128, 255, 13, 10]),
+    );
+    await mkdir('artifacts', { recursive: true });
+    await t.scope.getByLabel('恢复结果记录').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'artifacts/91-receiver-restore-dark.png', fullPage: true });
+    await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await page.screenshot({ path: 'artifacts/92-receiver-restore-light.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/93-receiver-restore-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await rename(restored.target, restored.target + '-moved');
+    await page.reload();
+    await page.getByRole('button', { name: '代码检查点', exact: true }).click();
+    await page.getByRole('button', { name: '核验与本机保留', exact: true }).click();
+    await page.getByRole('button', { name: '查看对象传输', exact: true }).click();
+    const scope = page.getByLabel('接收副本恢复', { exact: true });
+    await scope.getByRole('button', { name: '查看恢复记录', exact: true }).click();
+    await expect(scope).toContainText('文件已发布（本机报告）');
+    await expect(scope).toContainText('不证明目录现在存在');
+  } finally {
+    await f.close();
+  }
+});
+test('接收副本拒绝发布与明确清理分别报告，历史保留且不完成原任务或重启模型', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const t = await readyReceived(page, f);
+    const cancelled = await receiverRestoreCli(t.receiverHome, t.id, 'restore', false);
+    expect(cancelled.code).toBe(1);
+    const reported = await receiverRestoreCli(t.receiverHome, t.id, 'report');
+    expect(reported.code, reported.output).toBe(0);
+    await expect(t.scope).toContainText('恢复已取消');
+    await expect(t.scope).toContainText('暂存仍保留');
+    const clean = await receiverRestoreCli(t.receiverHome, t.id, 'cleanup');
+    expect(clean.code, clean.output).toBe(0);
+    expect((await receiverRestoreCli(t.receiverHome, t.id, 'report')).code).toBe(0);
+    await expect(t.scope).toContainText('本次暂存已清理');
+    await t.scope.getByRole('button', { name: '查看报告历史', exact: true }).click();
+    await expect(t.scope.getByLabel('恢复报告历史')).toContainText('报告 #2');
+    await expect(t.scope.getByLabel('恢复报告历史')).toContainText('暂存仍保留');
+    const task = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(task.task.status).not.toBe('done');
+    expect(task.runs).toHaveLength(0);
+  } finally {
+    await f.close();
+  }
+});
+test('接收恢复记录临时读错保留内容，权限失效清空来源及历史且不提供路径输入', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const t = await readyReceived(page, f);
+    expect((await receiverRestoreCli(t.receiverHome, t.id, 'restore')).code).toBe(0);
+    expect((await receiverRestoreCli(t.receiverHome, t.id, 'report')).code).toBe(0);
+    await expect(t.scope).toContainText('文件已发布');
+    await t.scope.getByRole('button', { name: '查看报告历史', exact: true }).click();
+    await page.route(t.resultPath, (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: { code: 'READ_FAILURE', message: '接收恢复记录暂时不可读' },
+        }),
+      }),
+    );
+    await expect(t.scope).toContainText('接收恢复记录暂时不可读');
+    await expect(t.scope).toContainText('文件已发布');
+    await page.unroute(t.resultPath);
+    await t.scope.getByRole('button', { name: '重读恢复记录', exact: true }).click();
+    await expect(t.scope.getByRole('alert')).toHaveCount(0);
+    await page.route(t.resultPath, (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'FORBIDDEN', message: '权限失效' } }),
+      }),
+    );
+    await expect(t.scope).toContainText('恢复记录权限已失效，内容已清除');
+    await expect(t.scope.getByLabel('恢复结果记录')).toHaveCount(0);
+    await expect(t.scope.getByLabel('恢复报告历史')).toHaveCount(0);
+    await expect(t.scope.getByRole('textbox')).toHaveCount(0);
+  } finally {
+    await page.unrouteAll();
+    await f.close();
+  }
+});

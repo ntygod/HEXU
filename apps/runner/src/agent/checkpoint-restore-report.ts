@@ -7,6 +7,11 @@ import {
   type RestoreResultPacket,
   type RestoreResultReceipt,
 } from '../../../../packages/contracts/src/checkpoint-restore-results.js';
+import {
+  parseTransferTicket,
+  parseTransferView,
+  type TransferReply,
+} from '../../../../packages/contracts/src/checkpoint-transfer.js';
 import type { RetentionView } from '../../../../packages/contracts/src/checkpoint-retention.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import { nodeRequest } from './connection.js';
@@ -96,8 +101,47 @@ export async function reportRestoreCheckpoint(
       verifiedAt: p.verifiedAt ?? null,
       recordedAt: p.updatedAt,
     });
+    const transferred = plan.source.kind === 'transfer';
+    if (
+      (plan.source.kind !== undefined && plan.source.kind !== 'transfer') ||
+      (p.sourceKind !== undefined) !== transferred ||
+      (p.transferId !== undefined) !== transferred ||
+      (plan.source.transfer !== undefined) !== transferred ||
+      (transferred && (p.sourceKind !== 'transfer' || p.transferId !== p.requestId))
+    )
+      throw new DomainError('RESTORE_JOURNAL_INVALID', '恢复来源种类或传输身份不一致');
     const inspect = async () => {
       stillBound();
+      if (transferred) {
+        const t = parseTransferTicket(plan.source.transfer);
+        if (
+          hash({ ...t, requestHash: '' }) !== t.requestHash ||
+          t.id !== p.requestId ||
+          t.target.id !== c.nodeId ||
+          t.source.spaceId !== c.spaceId ||
+          t.source.projectId !== c.projectId ||
+          plan.source.workspaceId !== null ||
+          t.source.checkpointId !== plan.source.checkpointId ||
+          canonicalJson(t.manifest) !== canonicalJson(plan.source.manifest)
+        )
+          throw new DomainError('RESTORE_JOURNAL_INVALID', '接收恢复来源绑定损坏');
+        const response = await nodeRequest<TransferReply>(
+          c.controlUrl,
+          'checkpoint-transfer',
+          { action: 'inspect', transferId: t.id },
+          c.nodeToken,
+        );
+        stillBound();
+        const current = parseTransferView(response.view);
+        if (
+          !current.authorized ||
+          current.state !== 'received' ||
+          !current.receivedAt ||
+          canonicalJson(current.ticket) !== canonicalJson(t)
+        )
+          throw new DomainError('RESTORE_NOT_AVAILABLE', '当前接收权限或原传输接收记录已失效');
+        return { requestHash: t.requestHash, taskId: t.source.taskId };
+      }
       const v = await nodeRequest<RetentionView>(
         c.controlUrl,
         'checkpoint-retention-inspect',
@@ -117,7 +161,7 @@ export async function reportRestoreCheckpoint(
         canonicalJson(v.manifest) !== canonicalJson(plan.source.manifest)
       )
         throw new DomainError('CHECKPOINT_MISMATCH', '当前原任务、节点或材料与本机记录不一致');
-      return v;
+      return { requestHash: v.request.requestHash, taskId: v.request.taskId };
     };
     const source = await inspect();
     db.exec(
@@ -146,8 +190,9 @@ export async function reportRestoreCheckpoint(
         throw new DomainError('CONFIRMATION_REQUIRED', '未确认报告；原恢复文件和进度不变');
       await inspect();
       packet = parseRestoreResultPacket({
+        ...(transferred ? { sourceKind: 'transfer' as const } : {}),
         requestId: p.requestId,
-        requestHash: source.request.requestHash,
+        requestHash: source.requestHash,
         restoreId: p.id,
         sequence: (delivery?.sequence ?? 0) + 1,
         report: summary,
@@ -160,9 +205,10 @@ export async function reportRestoreCheckpoint(
       ).run(p.id, JSON.stringify(packet));
     }
     if (
+      packet.sourceKind !== (transferred ? 'transfer' : undefined) ||
       packet.restoreId !== p.id ||
       packet.requestId !== p.requestId ||
-      packet.requestHash !== source.request.requestHash ||
+      packet.requestHash !== source.requestHash ||
       packet.report.planHash !== planHash ||
       packet.report.snapshotHash !== summary.snapshotHash ||
       (delivery?.pending && packet.sequence !== delivery.sequence + 1)
@@ -174,7 +220,7 @@ export async function reportRestoreCheckpoint(
     stillBound();
     const receipt = await nodeRequest<RestoreResultReceipt>(
       c.controlUrl,
-      'checkpoint-restore-report',
+      transferred ? 'checkpoint-transfer-restore-report' : 'checkpoint-restore-report',
       packet,
       c.nodeToken,
     );
@@ -192,8 +238,13 @@ export async function reportRestoreCheckpoint(
       throw new DomainError('RESTORE_RECEIPT_MISMATCH', '未确认同一恢复报告，原待发结果仍保留');
     const latestReport = parseRestoreResult(receipt.latest.report);
     if (
+      receipt.latest.sourceKind !== (transferred ? 'transfer' : undefined) ||
+      (transferred &&
+        (receipt.latest.transferId !== p.requestId ||
+          receipt.latest.sourceRequestId !== plan.source.transfer!.source.id ||
+          receipt.latest.sourceNodeId !== plan.source.transfer!.source.nodeId)) ||
       receipt.latest.nodeId !== c.nodeId ||
-      receipt.latest.taskId !== source.request.taskId ||
+      receipt.latest.taskId !== source.taskId ||
       receipt.latest.checkpointId !== plan.source.checkpointId ||
       latestReport.planHash !== planHash ||
       latestReport.snapshotHash !== summary.snapshotHash

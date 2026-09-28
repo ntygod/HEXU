@@ -13,6 +13,7 @@ import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import { readCredentials, type NodeCredentials } from './storage.js';
 import { nodeRequest } from './connection.js';
 import { buildRestorePlan, inspectRestoreTarget } from './checkpoint-restore-plan.js';
+import type { RestorePlanSource } from './checkpoint-restore-plan.js';
 import type { ObjectReader } from './checkpoint-objects.js';
 
 // Must match the immutable retention-v1 binding; no source/model permission upgrade.
@@ -58,16 +59,20 @@ interface BundleRow {
   pending: string | null;
 }
 
-export interface RestoreSource {
+export interface RestoreMaterialSource {
   home: string;
   binding: string;
-  ticket: RetentionTicket;
+  planSource: RestorePlanSource;
   manifest: ReturnType<typeof parseRetentionManifest>;
   protectedPaths: string[];
   protectedIdentities: string[];
   stillBound(): void;
   authorized(): Promise<void>;
   snapshot<T>(consume: (read: ObjectReader) => Promise<T>): Promise<T>;
+}
+
+export interface RestoreSource extends RestoreMaterialSource {
+  ticket: RetentionTicket;
 }
 
 /** Shared owner/retention checks. A short read transaction is held only inside
@@ -204,6 +209,13 @@ export async function withRestoreSource<T>(
       home,
       binding,
       ticket,
+      planSource: {
+        requestId: id,
+        checkpointId: ticket.checkpointId,
+        nodeId: ticket.nodeId,
+        workspaceId: ticket.workspaceId,
+        manifest,
+      },
       manifest,
       protectedPaths,
       stillBound,
@@ -224,12 +236,19 @@ export async function localRestorePreflight(
   ask: (prompt: string) => Promise<string>,
   log: (message: string) => void = console.log,
   signal?: AbortSignal,
+  sourceKind: 'retention' | 'transfer' = 'retention',
 ) {
-  return withRestoreSource(home, id, signal, async (source) => {
-    const { manifest, ticket, protectedPaths } = source;
+  const openSource =
+    sourceKind === 'transfer'
+      ? (await import('./checkpoint-received-source.js')).withReceivedRestoreSource
+      : withRestoreSource;
+  return openSource(home, id, signal, async (source: RestoreMaterialSource) => {
+    const { manifest, protectedPaths } = source;
     const targetBefore = inspectRestoreTarget(target, protectedPaths);
     await source.authorized();
-    log(`保留请求 ${id} · 提交 ${manifest.commit} · 到期 ${manifest.expiresAt}`);
+    log(
+      `${sourceKind === 'transfer' ? '接收传输' : '保留请求'} ${id} · 提交 ${manifest.commit} · 到期 ${manifest.expiresAt}`,
+    );
     log(`目标：${target}`);
     log(
       '仅生成本机恢复预检和文件清单；可能含已提交的敏感文件名。不会创建目录、恢复文件或授权模型执行。',
@@ -237,19 +256,7 @@ export async function localRestorePreflight(
     if ((await ask(`输入 PLAN ${id}：`)) !== `PLAN ${id}`)
       throw new DomainError('CONFIRMATION_REQUIRED', '已取消恢复预检，没有创建目标目录');
     const plan = await source.snapshot((read) =>
-      buildRestorePlan(
-        {
-          requestId: id,
-          checkpointId: ticket.checkpointId,
-          nodeId: ticket.nodeId,
-          workspaceId: ticket.workspaceId,
-          manifest,
-        },
-        read,
-        target,
-        protectedPaths,
-        signal,
-      ),
+      buildRestorePlan(source.planSource, read, target, protectedPaths, signal),
     );
     if (canonicalJson(inspectRestoreTarget(target, protectedPaths)) !== canonicalJson(targetBefore))
       throw new DomainError('RESTORE_TARGET_CHANGED', '确认或预检期间目标父目录已变化');

@@ -278,6 +278,27 @@ export class CheckpointTransferStore {
       ).map((r) => this.view(r)),
     };
   }
+  get(taskId: string, checkpointId: string, sourceId: string, id: string): TransferView {
+    this.retained.get(taskId, checkpointId, sourceId);
+    const row = this.row(id);
+    if (row.source_id !== sourceId || row.task_id !== taskId)
+      throw new DomainError('NOT_FOUND', '传输不属于当前材料', 404);
+    return this.view(row);
+  }
+  /** Read-only authority for historical receiver evidence; safe inside the caller's
+   * transaction. Receipt history survives material expiry, but never revocation. */
+  inspectReceived(token: string, id: string): TransferView {
+    const node = this.retained.checkpoints.nodes.settlementIdentity(token);
+    if (node.settlementOnly) throw new DomainError('NODE_REVOKED', '节点授权已撤销', 401);
+    const row = this.row(id),
+      ticket = parseTransferTicket(JSON.parse(row.body));
+    if (node.id !== ticket.target.id)
+      throw new DomainError('NOT_FOUND', '只有原接收节点可以报告自己的恢复', 404);
+    this.sides(ticket);
+    if (row.state !== 'received' || !row.received_at)
+      throw new DomainError('RESTORE_NOT_AVAILABLE', '没有已确认的传输接收记录', 409);
+    return this.view(row);
+  }
   cancel(taskId: string, checkpointId: string, sourceId: string, id: string, key: string) {
     this.retained.get(taskId, checkpointId, sourceId);
     this.store.getTask(taskId, true);

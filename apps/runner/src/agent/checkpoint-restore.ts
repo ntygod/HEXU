@@ -20,6 +20,7 @@ import {
   withRestoreSource,
   restoreBinding,
   restorePrivatePath,
+  type RestoreMaterialSource,
 } from './checkpoint-restore-preflight.js';
 import { objectHash } from './checkpoint-objects.js';
 import {
@@ -43,6 +44,7 @@ import {
 
 type Ask = (prompt: string) => Promise<string>;
 export interface RestoreOptions {
+  sourceKind?: 'retention' | 'transfer';
   signal?: AbortSignal;
   log?: (message: string) => void;
   onProgress?: (progress: Readonly<RestoreProgress>) => void | Promise<void>;
@@ -93,7 +95,11 @@ export async function localRestoreCheckpoint(
   options: RestoreOptions = {},
 ): Promise<RestoreProgress> {
   const log = options.log ?? console.log;
-  return withRestoreSource(home, id, options.signal, async (source) => {
+  const openSource =
+    options.sourceKind === 'transfer'
+      ? (await import('./checkpoint-received-source.js')).withReceivedRestoreSource
+      : withRestoreSource;
+  return openSource(home, id, options.signal, async (source: RestoreMaterialSource) => {
     await source.authorized();
     outsideSources(source.home, source.protectedPaths.slice(1));
     checkRestoreHelper();
@@ -122,7 +128,8 @@ export async function localRestoreCheckpoint(
       if (existing) {
         if (
           existing.binding !== source.binding ||
-          restoreProgressFromRow(existing).requestId !== id
+          restoreProgressFromRow(existing).requestId !== id ||
+          (JSON.parse(existing.plan) as RestorePlan).source.kind !== source.planSource.kind
         )
           throw new DomainError(
             'RESTORE_TARGET_CLAIMED',
@@ -132,7 +139,9 @@ export async function localRestoreCheckpoint(
         return restoreProgressFromRow(existing);
       }
       const observation = inspectRestoreTarget(target, source.protectedPaths);
-      log(`保留请求 ${id} · 提交 ${source.manifest.commit} · 到期 ${source.manifest.expiresAt}`);
+      log(
+        `${source.planSource.kind === 'transfer' ? '接收传输' : '保留请求'} ${id} · 提交 ${source.manifest.commit} · 到期 ${source.manifest.expiresAt}`,
+      );
       log(`目标 ${target}`);
       log(
         '将写入私有暂存目录，核验后还需单独确认发布；只恢复该提交的普通文件/目录，可能包含已提交的敏感内容。失败/取消保留暂存供明确清理，不修改源仓库，不运行脚本/模型。',
@@ -141,19 +150,7 @@ export async function localRestoreCheckpoint(
         throw new DomainError('CONFIRMATION_REQUIRED', '未同意本次写入，没有创建恢复目录');
       const build = () =>
         source.snapshot((read) =>
-          buildRestorePlan(
-            {
-              requestId: id,
-              checkpointId: source.ticket.checkpointId,
-              nodeId: source.ticket.nodeId,
-              workspaceId: source.ticket.workspaceId,
-              manifest: source.manifest,
-            },
-            read,
-            target,
-            source.protectedPaths,
-            options.signal,
-          ),
+          buildRestorePlan(source.planSource, read, target, source.protectedPaths, options.signal),
         );
       const plan = await build();
       if (canonicalJson(plan.target) !== canonicalJson(observation))

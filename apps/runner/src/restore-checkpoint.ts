@@ -10,7 +10,9 @@ async function main() {
     throw new DomainError('INVALID_INPUT', '只接受 restore/status/cleanup/report');
   const options = new Map<string, string>();
   const allowed =
-    mode === 'restore' ? ['--state', '--request', '--target'] : ['--state', '--target'];
+    mode === 'restore'
+      ? ['--state', '--request', '--transfer', '--target']
+      : ['--state', '--target'];
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i]!,
       value = args[i + 1];
@@ -18,10 +20,16 @@ async function main() {
       throw new DomainError('INVALID_INPUT', '参数缺失、重复或不受支持；不接受网页计划或写入许可');
     options.set(key, value);
   }
-  if (options.size !== allowed.length)
+  if (
+    !options.has('--state') ||
+    !options.has('--target') ||
+    (mode === 'restore'
+      ? options.size !== 3 || options.has('--request') === options.has('--transfer')
+      : options.size !== 2)
+  )
     throw new DomainError(
       'INVALID_INPUT',
-      `需要 ${allowed.join('、')}；--target 为全新目录的规范绝对路径`,
+      '需要 --state、--target；restore 另需 --request 或 --transfer（二选一），不接受旧计划许可',
     );
   const home = options.get('--state')!,
     target = options.get('--target')!;
@@ -63,12 +71,19 @@ async function main() {
     const progress =
       mode === 'cleanup'
         ? await cleanupRestoreCheckpoint(home, target, ask)
-        : await localRestoreCheckpoint(home, options.get('--request')!, target, ask, {
-            signal: controller.signal,
-            onProgress: (p) => {
-              console.log(JSON.stringify({ progress: p }));
+        : await localRestoreCheckpoint(
+            home,
+            (options.get('--request') ?? options.get('--transfer'))!,
+            target,
+            ask,
+            {
+              sourceKind: options.has('--transfer') ? 'transfer' : 'retention',
+              signal: controller.signal,
+              onProgress: (p) => {
+                console.log(JSON.stringify({ progress: p }));
+              },
             },
-          });
+          );
     console.log(JSON.stringify({ lastRecorded: progress, modelExecutionAuthorized: false }));
     if (mode === 'restore' && progress.state !== 'restored') {
       console.error(

@@ -12,6 +12,8 @@ export type RestorePlan = Awaited<ReturnType<typeof buildRestorePlan>>;
 export interface RestoreProgress {
   id: string;
   requestId: string;
+  sourceKind?: 'transfer';
+  transferId?: string;
   target: string;
   state:
     | 'preparing'
@@ -98,6 +100,9 @@ export class RestoreJournal {
     const p: RestoreProgress = {
       id,
       requestId: plan.source.requestId,
+      ...(plan.source.kind === 'transfer'
+        ? { sourceKind: 'transfer' as const, transferId: plan.source.requestId }
+        : {}),
       target: plan.target.path,
       state: 'preparing',
       materialState: 'none',

@@ -382,4 +382,13 @@ CREATE TABLE checkpoint_transfer_chunks (
 -- Ciphertext only. Existing retention/restore records imply no material transfer consent.
 `,
   },
+  {
+    version: 24,
+    sql: `
+ALTER TABLE checkpoint_restore_results ADD COLUMN transfer_id TEXT REFERENCES checkpoint_transfers(id);
+CREATE INDEX checkpoint_restore_results_transfer ON checkpoint_restore_results(transfer_id);
+-- NULL preserves original retention restores. Receiver restores keep the original
+-- retention FK and an explicit transfer FK; no ticket/owner relabelling or old-data backfill.
+`,
+  },
 ];

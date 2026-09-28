@@ -9,15 +9,23 @@ async function main() {
     const key = args[i]!;
     const value = args[i + 1];
     if (
-      !['--request', '--state', '--target'].includes(key) ||
+      !['--request', '--transfer', '--state', '--target'].includes(key) ||
       options.has(key) ||
       !value ||
       value.startsWith('--')
     )
-      throw new DomainError('INVALID_INPUT', '只接受一次 --request、--state 和 --target 参数');
+      throw new DomainError(
+        'INVALID_INPUT',
+        '只接受 --request 或 --transfer，以及 --state 和 --target',
+      );
     options.set(key, value);
   }
-  if (options.size !== 3)
+  if (
+    options.size !== 3 ||
+    !options.has('--state') ||
+    !options.has('--target') ||
+    options.has('--request') === options.has('--transfer')
+  )
     throw new DomainError(
       'INVALID_INPUT',
       '用法：npm run runner:restore-plan -- --request ID --state HOME --target /绝对路径/全新目录',
@@ -39,7 +47,7 @@ async function main() {
   try {
     const result = await localRestorePreflight(
       options.get('--state')!,
-      options.get('--request')!,
+      (options.get('--request') ?? options.get('--transfer'))!,
       options.get('--target')!,
       async (prompt) => {
         process.stdout.write(prompt);
@@ -49,6 +57,7 @@ async function main() {
       },
       console.log,
       controller.signal,
+      options.has('--transfer') ? 'transfer' : 'retention',
     );
     console.log(JSON.stringify(result));
     console.log(
