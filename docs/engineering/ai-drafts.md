@@ -29,4 +29,4 @@
 - `POST .../:draftId/adoptions`：expectedRevision、ranges、mode、target:{kind,id,expectedRevision}。
 - `GET .../:draftId/revisions` 与 `GET .../:draftId/adoptions`：有界修订/采用历史。
 
-独立需求实体、成果/协助建议等更多来源和目标、自动生成草稿、富文本块编辑与批量采用尚未交付。当前草稿不是草稿偏好缓存，也不构成第二套任务/AI 会话系统。实际验证见 [21](../development/21-implementation-status.md)，下一步见 [22](../development/22-next-delivery.md)。
+本草稿入口只从当前任务的 AI 回复保存；协助建议到原任务的采用已由独立 [协助采用](assistance-adoption.md) 入口提供。独立需求/成果等更多目标、自动生成草稿、富文本块编辑与批量采用仍未交付。当前草稿不是草稿偏好缓存，也不构成第二套任务/AI 会话系统。实际验证见 [21](../development/21-implementation-status.md)，下一步见 [22](../development/22-next-delivery.md)。

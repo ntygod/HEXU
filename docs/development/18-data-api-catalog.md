@@ -3,6 +3,8 @@
 > D1 · 跨工作包契约草案，不是已上线 API。  
 > [计划入口](README.md) · [工程基础](01-foundation-contracts.md) · [产品领域规则](../product/05-domain-and-state.md)
 
+本页包括完整目标草案和按批次追加的实现子集。历史小节中的“当前/未实现”只指对应时期；实际请求 schema 以 [contracts](../../packages/contracts/src) 和 [控制 API](../../apps/control/src) 为准，交付范围看 [21](21-implementation-status.md)，不要从旧小节推导当前缺少已完成能力。
+
 ## 1. 本文权威范围
 
 01—17 中的接口名称、字段和事件以本草案统一。实现开始后以 packages/contracts 的版本化 schema 和生成文档同步维护。产品行为仍以 v1.1 为准，本表不重新引入 Evidence/Acceptance。

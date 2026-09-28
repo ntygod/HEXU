@@ -1,0 +1,48 @@
+# 使用与工程指南
+
+这里说明当前功能怎样使用、限制在哪里。最新交付事实和验证只在 [21](../development/21-implementation-status.md) 汇总；维护代码时另选 [harness](../harness/README.md)。
+
+## 启动与执行
+
+| 需要 | 指南 |
+| --- | --- |
+| 默认示例模式、数据、端口与排错 | [本地启动](local-preview.md) |
+| 本机真实账号、个人/团队空间、邀请 | [team-local](team-local.md) |
+| preview 配置 Claude/Codex | [原生执行](native-execution.md) |
+| 配对、摘要、连接与撤销 | [独立节点](runner-node.md) |
+| 单独授权本人节点执行/停止 | [节点执行](runner-execution.md) |
+| 下一轮要求、等待/停止后继续 | [节点接续](node-continuation.md) |
+| 私有历史保留与显式恢复 | [Claude](claude-sessions.md)、[Codex](codex-sessions.md) |
+
+## 项目、内容与协作
+
+| 需要 | 指南 |
+| --- | --- |
+| 项目名称/说明与角色 | [项目设置入口](team-local.md#项目基本设置与修订) |
+| 归档/恢复及运行影响 | [项目归档](project-archive.md) |
+| 改派与参与者/筛选 | [负责人](task-assignment.md)、[参与](task-participants.md) |
+| 文本/链接资料、版本与删除恢复 | [项目资料](project-sources.md) |
+| 从讨论明确发布/替代约定 | [项目约定](project-agreements.md) |
+| 执行选材、预算与固定输入 | [材料快照](project-materials.md) |
+| AI 回复整理与片段采用 | [AI 草稿](ai-drafts.md) |
+| 请同事或 AI 分析固定片段 | [真人协助](human-assistance.md)、[AI 文本协助](ai-text-assistance.md) |
+| 将已保存建议采用到原任务 | [协助建议采用](assistance-adoption.md) |
+| 本机提交引用、另行确认的对象保留 | [提交检查点](commit-checkpoints.md)、[对象保留](checkpoint-retention.md) |
+
+## 架构决策
+
+ADR 保存作出决定时的背景与约束；其中的阶段进度不覆盖 21。现行客户端形态由 ADR-0008 规定，桌面框架与安装分发仍未决定/交付。
+
+| 决策 | 主题 |
+| --- | --- |
+| [ADR-0001](adr-0001-local-preview.md) | 本地预览与阶段性存储 |
+| [ADR-0002](adr-0002-local-native-runtime.md) | 本机受限原生 runtime |
+| [ADR-0003](adr-0003-codex-continuation.md) | Codex 与同机接续 |
+| [ADR-0004](adr-0004-durable-continuation.md) | 持久化 Operation |
+| [ADR-0005](adr-0005-local-identities.md) | 本机真实身份 |
+| [ADR-0006：节点](adr-0006-node-metadata.md) | 摘要配对与节点凭证 |
+| [ADR-0006：会话](adr-0006-codex-session-retention.md) | Codex 私有历史；与同号节点文档独立，按文件名引用 |
+| [ADR-0007](adr-0007-node-execution.md) | 本人节点执行 |
+| [ADR-0008](adr-0008-client-surfaces.md) | 桌面优先、可选团队服务与 Web |
+
+依赖与许可证见 [dependencies](dependencies.md)；团队如何评估产品/质量见 [内部评估边界](internal-evaluation.md)，不把它变成用户完成任务的必经流程。

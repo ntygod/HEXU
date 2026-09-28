@@ -1,27 +1,23 @@
-<div align="center">
-
 # HEXU · 合序
-### 让人和 AI，一起交付。
-**面向人和 AI 的研发协作工作台**
 
-</div>
+让人和 AI，一起交付。
 
-不用反复解释，不用反复追问，不用四处找成果。
+HEXU 是面向**个人多工具/多模型 coding**与**团队 AI coding**的研发协作工作台。一个 Task 集中目标、讨论、上下文、执行记录和成果，支持持续工作与有边界的协助。
 
+## 当前能用到什么
 
-> **当前阶段：E2c2 双工具会话代码路径，Workbench W1 全套界面重建已完成。** 默认 preview 保留示例工作台与本机双工具；team-local 使用真实账号/项目权限，可配对独立节点，并由节点所有者在本机单独启用受限 Claude/Codex 执行。**摘要配对不自动开放代码执行；接单、实际启动与任务完成分别记录。** 仍只支持同一机器上的回环连接，跨电脑部署、PostgreSQL 与有效账户真实模型生成/恢复联调未完成；Claude Code / Codex 原生恢复均已接入实验性节点代码路径。
+现有工作台、项目/任务、资料与约定、草稿与建议采用、同机节点执行/接续等已接入。产品目标是桌面优先、团队服务可选、保留 Web 协作入口；当前仍是开发版本。
 
-## 继续开发与 AI 接手
+| 模式 | 适用范围 |
+| --- | --- |
+| 默认 `preview` | 虚构单用户工作台，默认使用不调用模型的模拟器；可另行显式配置实验性本机原生工具 |
+| 可选 `team-local` | 真实账号、空间与项目权限；执行由本人单独授权的独立节点承担 |
 
-从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、项目选材、AI 草稿、真人协助及 Claude 纯文本 AI 协助已接入。协助建议现可明确局部采用到原任务说明；本机提交引用与另行确认的单提交文件对象保留现已接入；下一主线是独立新目录恢复。原 102 项工作清单及历史继续保留。
+**两种模式都只支持同机回环访问。** 桌面安装包、Windows 原生执行、跨电脑部署与有效账户真实模型生成/恢复联调尚未交付或验证。示例订单预览不是用户项目的通用预览。当前能力、限制与实际验证统一看 [实现进度](docs/development/21-implementation-status.md)。
 
-## 本机提交对象保留
+## 快速启动
 
-已有提交检查点可以在原任务中选择“核验与本机保留”，单独请求1/7/30天，并由原节点本人在终端逐次确认。成功后将提交的树/文件对象独立复制到本机私有数据库，可重新核验或明确删除；代码、文件名和路径不上传，不改原工作区。LFS/子模块只保留指针/引用，不含祖先历史和未提交内容。到期不自动续期，也不自动删除字节；新目录恢复和远程传输尚未交付。用法、边界及实测见[对象保留](docs/engineering/checkpoint-retention.md)和[实际进度](docs/development/21-implementation-status.md)。
-
-## 启动
-
-使用 Node.js 24（team-local 需要 node:sqlite 支持）。依赖版本由 `package-lock.json` 固定。
+使用 Node.js 24 与 npm，依赖由 `package-lock.json` 锁定：
 
 ```bash
 git clone https://github.com/ntygod/HEXU.git
@@ -30,238 +26,55 @@ npm ci
 npm run dev
 ```
 
-打开 `http://127.0.0.1:5173`。开发命令会启动 TypeScript 监听、Fastify API 与 Vite 网页。
+开发网页：<http://127.0.0.1:5173>，本地 API 默认 4310。
 
-构建后可以只启动一个本地进程：
+构建后可用一个本地进程提供网页、API 与事件：
 
 ```bash
 npm run build
 npm start
 ```
 
-此时打开 `http://127.0.0.1:4310`。页面、API 和事件流使用同一来源。
+访问 <http://127.0.0.1:4310>。默认数据在 `.hexu/preview.sqlite`，首次填充虚构示例，重启保留记录。默认不启用原生执行，无需模型密钥，也不产生模型费用。
 
-默认 preview 数据保存在 `.hexu/preview.sqlite`，重启不会清空。仅首次启动填充虚构项目、成员与订单示例。默认不启用原生模式，无需模型密钥，也不会产生模型费用。显式启用原生模式后会按所配 API 账户计费。示例身份固定为“林舟”，不代表真正的登录系统。
+可复制 [.env.example](.env.example) 为未跟踪的 `.env`。配置、数据和排错见 [本地启动说明](docs/engineering/local-preview.md)。服务拒绝非回环地址，不通过隧道或反向代理将本版本公开到外网。
 
-可复制 `.env.example` 为 `.env` 配置本地端口与数据目录；常规开发使用默认 API 端口 4310 与网页端口 5173。**服务拒绝非回环地址。不要通过反向代理或隧道将本版本开放到外网。**
+## 按需要启用
 
-## 可选：真实账号与空间
-
-在本机 `.env` 设置 `HEXU_MODE=team-local`、`HEXU_NATIVE_ENABLED=0` 后启动。未指定数据目录时使用 `.hexu/team`，首次初始化代码在该目录的 `setup-code` 文件；已有 HEXU_DATA_DIR 设置优先。账号建立后可以创建团队、手动转交邀请，并在项目中配置只读/编辑/管理成员。
-
-旧 preview 数据不自动公开或导入。team-local 不调用控制服务宿主机工具；可派发到节点所有者在本机明确启用的独立节点；两个浏览器会话能协作数据，不代表已支持两台电脑。详见 [本机账号模式](docs/engineering/team-local.md)。
-
-## 修改项目基本信息
-
-进入项目，点击右上角“项目设置”。preview 可编辑示例项目；team-local 仅项目管理者可修改名称与说明，空间所有者不自动取得项目管理权。已有任务、成果、成员角色、节点目录和接续材料保持不变。
-
-多人同时编辑时会保留本页草稿并展示最新内容，明确选择比较后再保存，不静默覆盖。可展开修订记录；旧数据库只保留升级时已知的项目快照，不补造历史作者或时间。保存回执丢失时可用同一操作标识再次确认，关闭抽屉不撤回已发送请求。草稿只在当前抽屉内存中，关闭、刷新、切换身份/空间或撤权后清除。归档/恢复与运行处理见下节。
-
-## 更改任务负责人
-
-打开项目可见任务，在任务头部点击“更改负责人”，选择当前具有编辑或管理权限的项目成员并保存。改派保留原任务，记录改派前后的人、操作者和修订；创建者与执行发起者单独显示，旧记录没有依据时标为未记录。preview 的候选人仍是明确的示例成员。
-
-改派不转交目录、个人模型账户、节点权限或原生历史，不停止已经运行的工具，也不自动启动执行。已有等待接续安排会暂停并保留原材料；未许可派发的旧任务修订不能通过启动检查。私有任务本轮不能改派或因此公开。并发变化需明确核对，回执不确定可确认原请求；用法见 [任务改派](docs/engineering/task-assignment.md)。
-
-## 参与任务与筛选
-
-在项目任务头部点击“参与者”，可自行加入/退出；有编辑权的人可管理其他当前项目成员。只读成员可参与但不会获得编辑或执行权限。项目/空间撤权会结束参与，重新加入不会自动恢复；参与变化不会改动负责人、当前运行或已确认的接续材料。
-
-项目看板和列表共用负责人、参与者与标题/编号/说明搜索，筛选条件及视图保存在链接中，支持刷新和返回。已退出/只读负责人如实显示。用法、权限和 API 见 [参与者与项目人员筛选](docs/engineering/task-participants.md)。
-
-## 从讨论保存项目约定
-
-在项目任务的讨论下选择“设为项目约定”，编辑后明确保存。原讨论作者与发布者分开记录；私有讨论不能直接公开。可修改、停用/启用，或明确用新约定替代旧约定，历史和来源保留。
-
-项目标签页及任务头部都可查看约定；任务停留期间提示变化。保存不自动改变模型材料，完整用法见 [项目约定](docs/engineering/project-agreements.md)。
-
-## 请同事协助
-
-team-local 中，在任务的一条讨论或 AI 回复下点击“请同事协助”，填写问题、选中必要片段、指定当前空间的同事并核对分享预览。对方无须加入项目，可从工作台“同事协助”读取片段并回复；原任务“协助记录”保留双方讨论。私有任务只明确分享选中的部分，不公开整个任务或原生历史。
-
-结束协助保留历史阅读，撤销分享阻止接收者继续访问；成员撤权后重新加入也不恢复旧链接。本段真人协助不会改负责人、启动 AI 或变更正在执行的材料。当前仍同机回环，仅分享文本片段和真人回复，不是跨电脑共享；另行授权的 AI 路径见下节。详见 [真人有限协助](docs/engineering/human-assistance.md)。
-
-## 请 AI 分析片段
-
-team-local 项目任务可明确选择消息片段，请本人已单独授权的 Claude 节点分析。使用空临时目录并禁用工具，不接触主代码现场，结果回到任务协助记录；须另行确认材料和费用。真人协助保持原行为。用法见 [AI 文本协助](docs/engineering/ai-text-assistance.md)，实际回归与未完成范围仍以 [当前进度](docs/development/21-implementation-status.md) 为准，不表示真实模型或跨电脑已经联调。
-
-## 采用协助中的建议
-
-在原任务“协助记录”或有任务权限的协助详情中，对同事或 AI 已保存的建议点击“采用此条建议”。选中需要的一个或多个片段，比较采用前后，明确追加或替换原任务说明。保留建议来源、片段、操作者及前后版本，不自动改代码、发布约定或完成任务。
-
-仅当前任务编辑者可采用；对方只有协助回复授权时，没有采用入口，也看不到任务说明的修改历史。版本冲突保留片段，核对后再提交；回执丢失确认原请求，不重复追加。等待接续会暂停且保留原材料，主运行与未知目录锁不变。用法和当前限制见 [协助建议局部采用](docs/engineering/assistance-adoption.md)。
-
-## 项目资料
-
-在项目“项目资料”中保存文本或 HTTP/HTTPS 链接，查看修订、搜索与来源；有项目编辑权限的成员可以维护资料，只读成员可以查阅。删除移入已删除范围，保留历史并可明确恢复；分享资料链接不会扩大项目权限。
-
-编辑冲突保留草稿，回执丢失可以确认原请求。资料按原文显示，不自动抓取网页，也不自动发送给模型或改变现有运行。附件上传仍待交付；详见 [项目资料与修订](docs/engineering/project-sources.md)。
-
-原生与本人节点执行面板可明确选择项目资料/有效约定，查看版本、摘录和预算。提交后材料随 Run 或等待安排固定，变更已选材料会阻止未启动工作；执行器启动与模型收到分别描述。运行记录可查看固定输入，原生恢复仍会继承原会话历史。详见 [项目选材与执行快照](docs/engineering/project-materials.md)。
-
-已有 AI 回复可“整理为草稿”，编辑后选择片段，明确追加或替换当前任务说明/同项目资料正文。草稿与目标分别检查修订，冲突保留编辑和片段，采用记录保留前后内容；保存草稿不自动发布约定或执行。详见 [AI 草稿与局部采用](docs/engineering/ai-drafts.md)。
-
-## 项目归档与恢复
-
-在“项目设置 → 查看归档影响”选择保留已获许可/已启动执行，或同时请求停止有操作权的执行，再确认归档。待接续安排立即暂停；尚未获启动许可的派发取消。归档期间禁止新执行、原生会话恢复和新接续，已启动执行仍以实际运行/停止确认状态为准。
-
-归档不是删除或冻结全部协作，已有任务、代码和成果不清除；成员仍可按原权限讨论和手动完成任务。项目列表可切换“已归档”，任务页保留停止入口。恢复项目只恢复新执行入口，不重启旧派发、不恢复已撤销节点凭证、不解除未知进程占用。用法与 API 见 [项目归档说明](docs/engineering/project-archive.md)。
-
-## 可选：配对独立节点
-
-team-local 登录后，在“资源与设置 → 节点与目录”生成配对码。本机准备仓库外的 runner.json，执行 `npm run build`，再执行 `npm run runner -- connect --config /path/runner.json`，在终端确认账号、项目和目录；随后 `npm run runner -- start`。配对码不放入命令参数。本机目录路径不上传；节点令牌用于回环协议认证，服务端只持久化其哈希，不保存令牌原文。
-
-默认只同步目录别名和变更数量。Git 会在获授权的本机目录读取文件以计算状态，但代码、文件名和路径不会上传，也不调用模型；Windows 尚不支持。完整配置、重连、撤销和边界见 [独立节点使用说明](docs/engineering/runner-node.md)。
-
-## 可选：在本人节点执行任务
-
-完成配对后，在节点本机提供自己的 API key 环境配置，使用 `npm run runner -- enable-execution --config /absolute/path/execution.json --state /absolute/private-state` 查看并确认工具、目录、读写和限额。随后运行 `npm run runner -- start --state /absolute/private-state` 发布执行能力。网页登录节点所有者，在同项目任务中选择“在节点上执行”。
-
-执行可把模型输出共享到项目，区别于纯摘要模式；网页不能增加本机路径或代用别人的账户。重复派发不会重复启动，未知进程保留占用；完整配置和恢复见 [节点执行说明](docs/engineering/runner-execution.md)。
-
-## 继续处理一个节点任务
-
-在任务输入区选择“下一轮要求”并保存，不会影响活动执行；“要求与使用记录”抽屉可编辑/撤回本人待选要求，刷新保留已保存记录。结束后点击“沿原目录继续”，明确选择材料并创建同目录新会话。未选要求不会偷偷发送，状态未知不自动重跑。节点接续现可明确安排等待/停止后自动派发，Claude Code / Codex 可另外选择实验性原生恢复；自动等待接续仍使用新会话。用法见 [持续工作说明](docs/engineering/node-continuation.md)。
-
-## 运行中安排下一轮
-
-节点任务中点击“沿原目录继续”，明确选择材料，再选择等待自然结束或请求停止后继续。安排持久保存，关闭页面不取消；待原执行确认结束后沿同一节点和目录创建新会话。任务里的进度卡可取消和查看固定材料历史；服务重启或材料/权限变化会暂停，不自动重试。
-
-等待期间新的模型输出不会补入已经确认的材料；要带入最终结果，应结束后重新配置。仍是本人节点的新会话，不是原生 resume 或跨电脑执行。详见 [节点持续工作](docs/engineering/node-continuation.md)。
-
-## 可选：恢复 Claude Code / Codex 原生会话
-
-独立节点的本机执行配置可明确设置 `retainSessions: true`（支持 Claude Code / Codex，默认不保留）。这会在节点私有目录保存原生历史；后续在同一成功任务的“沿原目录继续”中选择相应工具的“恢复原生会话（实验性）”。仅本人节点、同目录/模式/授权版本和同一 Key 恢复，失败不会静默新建会话。
-
-原生历史不是本次材料预览的全部内容，取消本次勾选不会抹去已有历史。7 天是恢复期限，不是自动删除期限；本机有 `native-sessions` 和 `forget-native-session` 命令。有效账户下真实模型恢复尚未联调；用法和边界见 [Claude Code 会话](docs/engineering/claude-sessions.md) / [Codex 会话](docs/engineering/codex-sessions.md)。
-
-## 当前能操作什么
-
-| 能力 | 当前状态 |
+| 想做什么 | 入口 |
 | --- | --- |
-| 工作台、看板／列表、任务工作区、成果页、浅深色和窄屏 | 真实页面与本地 API |
-| 项目／任务、说明、讨论、完成／重开、文字成果及反馈 | SQLite 持久化，保留原有记录 |
-| 事件更新、修订冲突和重复请求去重 | 已实现基础机制 |
-| 无密钥体验执行、等待、回复和停止 | **模拟器**，不调用模型、不改代码 |
-| 本机 Claude Code / Codex | **实验性原生适配**；独立 API 配置、进程与 Git 已实现，真实模型联调待完成 |
-| 持久化接续 | 等待/请求停止后继续、刷新恢复、取消及需要处理提示；不把新执行创建当作任务完成 |
-| 同机跨工具继续 | 同任务、同目录、保留未提交代码；新 Run、新原生会话、显式来源和上下文 |
-| Codex 模型选择 | 手动指定或主动读取原生模型目录；目录不代表账户调用权限 |
-| 显式目录授权、实际 Git 变更、结果输出与停止 | 已实现；测试通过协议替身执行真实本地文件操作 |
-| 独立节点原生会话恢复 | Claude/Codex 已接入有界实验路径；默认不保留历史，真实账户恢复未联调 |
-| 运行中即时追加要求／Bash／MCP | 尚未接入；下一轮要求不是原生即时输入，文本协助禁用工具 |
-| 实际账号、空间、邀请、项目角色、会话/权限撤销 | team-local 本机模式已实现；邮件验证、找回密码、正式部署等仍缺 |
-| 独立节点 CLI、配对、心跳、目录摘要与撤销 | 已实现本机切片，默认不授予执行权 |
-| 本人节点任务执行、输出与停止 | E2b2 已实现受限新会话；本机明确授权，协议替身工程流程已检查，真实模型未联调 |
-| 真人与 AI 临时协助 | team-local 已接入固定消息片段、真人有限回复及另行授权的 Claude 纯文本执行；不开放活动目录 |
-| 并行分支、跨人代码接手与跨电脑部署 | 尚未实现 |
-| 示例订单预览 | 虚构业务示例，不是通用预览隧道 |
+| 使用真实账号、邀请成员和项目权限 | [本机账号模式](docs/engineering/team-local.md) |
+| 配对节点，再单独授权本人执行 | [节点配对](docs/engineering/runner-node.md) / [独立执行](docs/engineering/runner-execution.md) |
+| 在 preview 中配置 Claude Code / Codex | [原生执行](docs/engineering/native-execution.md) |
+| 学习资料、约定、草稿、协助、检查点等功能 | [使用与工程指南](docs/engineering/README.md) |
+| 了解完整目标、设计和客户端形态 | [文档导航](docs/README.md) |
+| 接手或继续开发 | [AI 接手指南](docs/development/24-ai-handoff.md) / [AGENTS.md](AGENTS.md) |
 
-模拟名称不代表原生工具已接通。设置页分别显示 Claude Code / Codex 的能力探测与各自的 API 配置；工具检测可用不代表凭证有效或真实模型已经测试。
+摘要配对不授予执行权；实际调用模型需要本机明确配置和授权。不要在任务、源码或截图中放置真实凭证。
 
-## 可选：preview 模式启用本机原生工具
-
-先准备一个不含敏感资料的独立 Git 工作目录，并在本机安装支持 `--bare`、`--restricted` 等必要参数的 Claude Code。缺少这些能力时不会降级到不受限调用。
-
-复制 `.env.example` 为未跟踪的 `.env`，修改：
-
-```dotenv
-HEXU_NATIVE_ENABLED=1
-HEXU_NATIVE_ROOTS=["/absolute/path/to/your/git-checkout"]
-```
-
-通过本机环境或未跟踪的 `.env` 设置自己的 `ANTHROPIC_API_KEY`，然后重启 HEXU。不要把真实密钥放入仓库、任务描述或截图。`--bare` 使用 API 认证，**不会复用订阅登录额度**。
-
-进入任务 → **继续 → 使用本机原生工具** → 选择目录与只读／文件修改 → 查看本次上下文 → 确认本次数据发送和费用范围 → 开始。新执行仍属于原任务，不自动标记任务完成。
-
-E1c 不开放 Bash、网络工具、MCP、仓库 Hooks，不能替你运行安装、构建或测试命令。CLI 调用模型本身仍需联网；文件工具约束不是操作系统沙箱。Linux 已做工程测试，macOS 的 POSIX 路径尚未经平台实测；Windows 原生执行暂不可用。详见 [原生使用说明](docs/engineering/native-execution.md)。
-
-
-### Codex 与跨工具继续
-
-在本机安装支持 App Server 的 Codex，单独提供 `OPENAI_API_KEY`；不在 PATH 时配置 `HEXU_CODEX_BIN=/absolute/path/to/codex`。只使用一个工具时只需它自己的密钥。
-
-Codex 每次执行使用独立临时 HOME/CODEX_HOME，先核对配置，再经本地 stdio 传入 API key；不读取个人订阅登录或旧 Codex 配置。默认关闭 Shell、MCP、插件和 Web 搜索，使用只读或工作区写入策略。它不是完整的 Codex 终端功能；请提供需要的任务材料，不要依赖 Shell 读取、安装或测试。
-
-已有原生任务点击 **继续** → 选择另一工具 → 查看沿用目录和接续材料 → 输入接下来要做什么 → 开始。默认新建原生会话，不要求先提交或推送代码。原执行仍活动时可选择“请求停止后继续”或“自然结束后继续”，安排会保存并可取消。只有确认停止且目录释放后才开始；任务说明变化、原进程未知或服务重启会提示处理，不会强行启动。不会把一个工具的凭证交给另一个工具。
-
-接续包含任务说明、近期工作记录、Git 基线及最多 6 个变更文件的摘录，**不是完整会话或全部仓库内容迁移**。可以保留未提交修改，但不能迁移到另一台电脑。Codex 界面默认 300 秒超时，不支持美元硬预算；模型目录和用量保留来源，不虚构精确费用。
-
-官方程序的无模型协议检查可运行：
+## 开发
 
 ```bash
-npm run check:codex-protocol -- /absolute/path/to/codex
+npm run typecheck       # 前后端类型
+npm run check:ui        # UI tokens
+npm test               # 服务端构建与工程测试
+npm run build          # API 与网页构建
+npm run format         # 格式化源代码
+npm run test:e2e       # Chromium 流程，独立可丢弃数据
 ```
 
-此命令只运行版本兼容的初始化与配置读取，不认证、不创建模型回合；使用临时目录，不读取用户凭证。完整限制见 [原生使用说明](docs/engineering/native-execution.md)。
+首次浏览器测试需要 `npx playwright install chromium`。按改动选检查，完整原生/节点回归使用 Linux 与协议替身；平台限制和验证方式见 [开发 harness](docs/harness/development.md)。
 
-## 开发命令
-
-```bash
-npm run typecheck       # TypeScript
-npm test                # 领域、存储与 API 测试
-npm run build           # API 和网页构建
-npm run format          # 格式化源代码
-npx playwright install chromium
-npm run test:e2e        # 浏览器流程，使用独立测试数据库
-```
-
-CI 执行类型、测试、构建和浏览器交互检查，并保留截图与失败追踪。运行结果以具体 CI 记录为准。生产安全、实际团队效果和质量评估由内部团队安排，不变成 HEXU 的业务审批模块。
-
-## 代码结构
-
-```text
-apps/web                 React + Vite 网页
-apps/control             Fastify 本地服务
-packages/contracts       DTO 与运行时输入验证
-packages/domain          任务、执行与幂等语义
-packages/db              SQLite 开发适配、迁移与事件
-packages/adapters/mock   明确标识的模拟执行器
-packages/adapters/claude-code  Claude JSONL 协议与受限文件工具配置
-packages/adapters/codex        Codex 双向 RPC、模型目录和受限策略
-apps/runner/src          preview 原生 runtime 与独立节点（摘要 / 可选本人授权执行）
-packages/ui              共用组件与设计变量
-packages/client          浏览器 HTTP 客户端
-tests                    单元、存储、API 与浏览器测试
-```
-
-当前采用 TypeScript 和 npm workspaces。SQLite 用于本地预览和本机账号模式，是阶段性选择，不替代规划中的 PostgreSQL 正式服务。背景与边界见 [工程决策](docs/engineering/adr-0001-local-preview.md)。
-
-## 产品与开发文档
-
-已确认的产品形态是**桌面优先、个人无需团队服务器、团队共享服务可选，并保留 Web 协作入口**。界面采用 **Workbench W1：暗色优先、青色强调、任务一体化工作台**。W1 的共享控件、壳层及全部现有页面已重建，旧页面布局／大样式表和配色别名已删除；最终回归结果见实现进度。当前业务范围仍以上述说明为准，桌面安装包尚未交付。
-
-| 入口 | 用途 |
+| 代码 | 职责 |
 | --- | --- |
-| [产品概要](docs/product/00-executive-brief.md) | 面向管理层的定位与完整目标 |
-| [总体产品规划](docs/product/01-product-plan.md) | 最终范围与边界 |
-| [人的工作旅程](docs/product/02-people-and-workflows.md) | 角色、继续、协助和接手 |
-| [功能规格](docs/product/03-functional-specification.md) | v1.1 功能要求 |
-| [UI/UX](docs/product/04-ux-and-design.md) | 工作台、任务与成果的页面规则 |
-| [设计语言 W1](docs/design/README.md) | 已确认的视觉、交互、tokens、Figma 采用范围和可交互参考 |
-| [客户端形态 ADR-0008](docs/engineering/adr-0008-client-surfaces.md) | 桌面／Web／团队服务／Runner 的职责和未决选型 |
-| [领域状态](docs/product/05-domain-and-state.md) | Task、Run、成果与真实状态的区别 |
-| [技术架构](docs/product/06-technical-architecture.md) | 最终执行与协作架构 |
-| [建设路线](docs/product/07-roadmap.md) | 完整目标的实施顺序 |
-| [决策与资料](docs/product/08-decisions-risks-and-sources.md) | 原始依据与取舍 |
-| [v1.1 修订](docs/product/09-planning-revision.md) | 已移除的强制流程 |
-| [详细开发计划](docs/development/README.md) | 17 个工作包、102 个原始工作项 |
-| [逐项任务状态](docs/development/19-work-items.md) | 原 102 项的真实状态、代码入口和剩余内容 |
-| [W1 前端重建任务](docs/development/23-workbench-rebuild.md) | 旧 UI 替换／删除范围、9 个子任务与原工作项映射 |
-| [下一步交付](docs/development/22-next-delivery.md) | 节点持续工作、接续与远程协作的前置边界 |
-| [当前实现进度](docs/development/21-implementation-status.md) | 本次完成、部分实现与后续工作 |
-| [接口总表](docs/development/18-data-api-catalog.md) | 完整契约草案；当前实现子集见代码与状态文档 |
-| [本地启动与问题处理](docs/engineering/local-preview.md) | 端口、数据库、模拟模式与已知限制 |
+| `apps/web` / `packages/ui` | React/Vite 工作台、共享控件与唯一运行 tokens |
+| `apps/control` / `packages/client` | 本地 API 与浏览器客户端 |
+| `apps/runner` / `packages/adapters` | 进程、工作目录、节点与工具协议 |
+| `packages/contracts` / `packages/domain` | 公共 DTO、校验与纯领域规则 |
+| `packages/db` / `packages/identity` | 分模式持久化、事务、权限与身份 |
 
-最终产品以“继续、协助、并行”组织不同人和 AI 的工作，保留工具选择和本地环境。当前首批代码没有改变这个目标，也没有把未实现的能力包装成现成功能。
+产品范围以 [v1.1](docs/product/03-functional-specification.md) 为准，原 102 项工作与剩余范围见 [工作清单](docs/development/19-work-items.md)，下一项只在 [交付计划](docs/development/22-next-delivery.md) 维护。
 
-## 自研与数据边界
+## 仓库与数据
 
-本仓库自主实现产品和领域，合理复用基础依赖。原有规划文档保留；代码许可证尚未由仓库所有者确定，本次未添加 LICENSE。依赖使用其各自许可证，见 [依赖说明](docs/engineering/dependencies.md)。
-
-仓库不得提交真实员工评价、客户数据、模型凭证或生产配置。`.hexu/`、`.env`、构建产物和测试临时文件被忽略。质量、效果和上线评估见 [内部评估边界](docs/engineering/internal-evaluation.md)。
-
-
-### 本机提交检查点引用（12-01 部分实现）
-
-team-local 的项目任务可在“代码检查点”指定本人配对节点、目录别名和完整 Git 提交，创建请求后在该节点运行 `npm run runner -- checkpoint --request <id> --state <private-state>` 并逐次确认。核对提交与根树对象后保存引用、来源与未包含改动的数量；不提交或修改代码、不启动模型。支持 SHA-1／SHA-256 和标准 linked worktree。**当前仅本机引用，不复制或保留全部 Git 对象，不包含未提交内容，不是备份或跨电脑恢复。** 使用、权限与限制见 [本机提交引用](docs/engineering/commit-checkpoints.md)，实际回归见 [21](docs/development/21-implementation-status.md)。
+不提交真实客户数据、模型凭证、生产配置、`.env` 或本地数据库。代码许可证尚未由仓库所有者确定；依赖许可证见 [依赖说明](docs/engineering/dependencies.md)。

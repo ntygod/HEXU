@@ -73,8 +73,8 @@ npm run runner -- start --state /absolute/private-node-state
 
 原生 CLI 的联网仅用于自身模型调用，未开放任意 Shell、MCP、仓库 Hooks、额外网络工具或自动账户兜底。文件策略不替代 OS 沙箱。Codex 不支持美元硬预算；此版本不提供完整用量账本、费用准确性或生产安全审计。
 
-本轮没有原生 resume/steer、运行中追加要求、节点跨工具继续、远程 diff/终端/通用预览、指定其他成员操作权限和跨电脑服务。Linux 工程测试使用协议替身；有效账户的真实模型生成仍未联调。macOS 未实测，Windows 明确拒绝。
+节点新会话接续、下一轮要求及 wait/request_stop 已接入，见 [节点接续](node-continuation.md)；下一轮要求不是原生即时输入。原生 steer、远程 diff/终端/通用预览、委托其他成员执行和跨电脑服务仍未交付。Linux 工程测试使用协议替身，真实模型生成仍未联调；macOS 未实测，Windows 原生执行不支持。
 
-## E2c1 可选 Codex 会话
+## 可选的私有原生会话
 
-本机配置可为 Codex 设置 retainSessions:true，显式保留私有历史并在最新成功任务后手动恢复。默认和自动等待接续不变；Key/策略/模式改变不可恢复，失败不自动新建。恢复期限不等于自动清理；详见 [会话说明](codex-sessions.md)。
+本机配置可分别为 Claude Code 或 Codex 设置 retainSessions:true，显式保留私有历史，并仅对最新成功且确认终止的来源手动恢复。默认和自动等待接续不变；Key/策略/模式改变、过期、未知进程或缺文件都拒绝恢复，失败不自动新建。恢复期限不等于自动清理；工具协议不同，见 [Claude 会话](claude-sessions.md) / [Codex 会话](codex-sessions.md)。

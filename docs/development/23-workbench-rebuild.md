@@ -4,6 +4,8 @@
 > 基于 `21110bd` 的现有应用与 E2c1 能力。原 102 项编号、定义和历史保留；本文件拆分其中的 UI 增量，不重建另一套功能清单。
 > [W1 设计](../design/README.md) · [客户端决定](../engineering/adr-0008-client-surfaces.md) · [原工作项](19-work-items.md) · [实际进度](21-implementation-status.md)
 
+本页保留当时的重建范围与实施命令，供追溯使用；**不是当前待执行计划**。后续 UI 修改按 [UI harness](../harness/ui.md) 和现有代码推进，当前下一项只看 [22](22-next-delivery.md)。
+
 ## 1. 重建范围
 
 旧仓库已经有真实页面、表单、身份恢复、权限反馈、事件更新、输入队列、等待接续与 Codex 恢复选择。它不是只有静态样式的空壳。

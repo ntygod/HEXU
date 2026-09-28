@@ -1,77 +1,38 @@
 # 24｜AI 接手开发指南
 
-更新：2026-09-28（UTC+8）。本页是接手入口，不另建功能清单或进度总账。
+本页负责接手步骤，不维护第二份状态清单、测试总数或下一步计划。
 
-## 1. 从哪里开始
+## 最短开工路径
 
-1. 先读根 [AGENTS.md](../../AGENTS.md)，检查 `git status`、当前分支和远端进度。保留其他人的改动；共享主分支同步使用 fast-forward，不强推、不自动 stash。
-2. 读 [21｜当前实现进度](21-implementation-status.md) 确认可用、模拟和待实现范围，再读 [22｜下一步交付](22-next-delivery.md) 选择下一项。原 102 个工作项及状态只在 [19](19-work-items.md) 维护。
-3. 修改行为前读 [产品 v1.1](../product/03-functional-specification.md) 及本次相关工作包；UI 同时读 [Workbench W1](../design/README.md)，客户端／部署边界同时读 [ADR-0008](../engineering/adr-0008-client-surfaces.md)。无需每次重读全部计划。
+1. 读根 [AGENTS.md](../../AGENTS.md)，检查 `git status`、当前分支和远端进度，保留其他人的修改。不要自动 stash、强推或重置现场。
+2. 根据用户本次任务定位范围。需要了解现状时看 [21](21-implementation-status.md)；只有继续既定开发计划时才用 [22](22-next-delivery.md) 选工作。原任务 ID 和剩余范围在 [19](19-work-items.md)。
+3. 从根路由打开本次相关 [harness](../harness/README.md)，需要细节再读其链接的产品章节、工作包、代码和测试。跨领域补读相邻指南，不要求先通读全仓文档。
+4. 做完整的小切片、运行适用检查、如实回写结果。小型文字修正无需读执行器协议或重跑完整业务测试。
 
-**W1-01—09 已完成。** 旧页面布局、大 `styles.css` 和旧配色别名已删除，不再重新启动 UI 重建。`App.tsx` 只组织路由和全局入口；组件及样式归属见设计文档第 9 节。参考 HTML 和 Figma 是设计资料，不能供给生产状态、模型列表或工具能力。
+## 不要重复开工
 
-业务底座为 E2c2：preview 是明确的示例身份；team-local 使用真实账号／项目权限和可选本人授权节点。两者都只支持回环地址。SSH 能登录一台测试机，不等于产品已交付跨电脑节点或公开部署。桌面宿主尚未选定，不能因为前端完成就添加 Electron／Tauri 或宣称客户端已交付。
+W1-01—09 已交付；[23](23-workbench-rebuild.md) 是迁移历史，旧样式/旧页面不是当前待重建目标。当前已实现的业务切片看 21 的能力表，不从旧批次的“下一项”继续，也不把完整工作包中的每句话当成已交付 API。
 
-AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection.ts)：只读键盘按文字簇移动，浏览器 LF 范围映射到保存的 CRLF/CR 原文，不能直接把 DOM 偏移当成原文偏移。该修复的完整 Linux 回归已通过，实际证据见 21；后续保持这些选区及原文边界，不重复已交付切片。
+任务始终复用 Task/Run/Operation。preview 虚构身份、team-local 当前权限、独立节点本人授权和同机回环边界仍有效。恢复、实际启动、模型成功与任务完成分别判断；详细约束按专题读取。
 
-## 2. 下一项的具体入口
+## 找到实现与证据
 
-默认继续 **HX-DEV-12-02：单提交对象副本的独立新目录恢复**。本批已接入单提交文件闭包核验与本人明确本机保留：私有数据库独立复制、固定清单、重新核验、到期和明确删除，顺序回执防重复；功能头 `920a08d` 的[只读 Linux CI 36367863414](https://github.com/ntygod/HEXU/actions/runs/36367863414)已通过 **336/336工程检查和94/94Chromium流程**，零失败/取消/跳过/重试；最终仅补录六份文档，完整证据见21。不含祖先历史/LFS/子模块实体，恢复与远程传输仍未实现；不要重复保留切片。12-01旧本机commit/root-tree引用保持不可变，原通过基线317工程/91浏览器。原任务说明的协助建议采用已通过完整回归：功能头 `afd6c8257e87810a1bdfb061dfd74310a9afaac1` 的 [只读 Linux CI 36330046140](https://github.com/ntygod/HEXU/actions/runs/36330046140) 为 300/300 工程检查与 88/88 Chromium 流程通过，零失败、跳过或重试；文档补录不改动该功能/测试树。来源/目标版本、权限与不可变记录复用任务采用事务，包含原问题/材料作者和撤销后的原回执确认；不重复该切片。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
-
-真人协助入口为 `packages/contracts/src/assistance.ts`、`packages/db/src/assistance.ts`、`apps/control/src/assistance.ts` 与 `apps/web/src/assistance*.tsx/css`。读取/旧回执检查当前范围；撤权钩子在 collaboration.ts，SSE 只发送独立协助 ID；独立受限详情不包含不可访问的 Task 信息。
-
-| 工作 | 先查看 |
+| 需要什么 | 入口 |
 | --- | --- |
-| 下一项独立新目录恢复 | [12 工作包](12-handoff-sharing.md)、[目录授权与 Git 读取](../../apps/runner/src/agent)、[节点边界](../engineering/runner-node.md)；先读22的新目录/原绑定/期限/路径及失败清理边界，不自动checkout或扩大摘要授权 |
-| 已接入的提交对象保留 | [契约](../../packages/contracts/src/checkpoint-retention.ts)、[事务](../../packages/db/src/checkpoint-retention.ts)、[对象遍历](../../apps/runner/src/agent/checkpoint-objects.ts)、[私有副本](../../apps/runner/src/agent/checkpoint-retention.ts)、[用法](../engineering/checkpoint-retention.md)；副本不含祖先和外部实体，核验不修补/续期，删除不动原仓库 |
-| 已接入的本机提交引用 | [契约](../../packages/contracts/src/checkpoints.ts)、[事务](../../packages/db/src/checkpoints.ts)、[CLI核对](../../apps/runner/src/agent/checkpoints.ts)、[页面](../../apps/web/src/checkpoints.tsx)、[用法](../engineering/commit-checkpoints.md)；不能将仅commit/root-tree的引用当作可恢复备份 |
-| 已接入的协助建议采用 | [契约](../../packages/contracts/src/assistance-adoption.ts)、[采用事务](../../packages/db/src/assistance-adoption.ts)、[共享任务写入](../../packages/db/src/task-description-adoption.ts)、[界面](../../apps/web/src/assistance-adoption.tsx)、[用法](../engineering/assistance-adoption.md)；有限接收者不能写任务或读取目标历史，撤销后不得新采用 |
-| 已接入的 Claude 纯文本 AI 协助 | [11 工作包](11-continuation-assistance.md)、[协助事务](../../packages/db/src/assistance.ts)、[节点执行](../../packages/db/src/node-execution.ts)、[执行器](../../apps/runner/src/agent/executor.ts)；另行绑定模型材料与费用同意，不能默认访问活动代码目录或借用他人账户 |
-| 已交付的真人协助 | [契约](../../packages/contracts/src/assistance.ts)、[权限事务](../../packages/db/src/assistance.ts)、[邀请](../../apps/web/src/assistance-create.tsx)、[收发件与回复](../../apps/web/src/assistance.tsx)、[用法](../engineering/human-assistance.md)；快照/回复授权与完整 Task 访问分开，历史分页不清空输入，撤权不复活 |
-| 已交付的 AI 草稿 | [契约](../../packages/contracts/src/ai-drafts.ts)、[事务](../../packages/db/src/ai-drafts.ts)、[编辑/记录](../../apps/web/src/ai-drafts.tsx)、[采用界面](../../apps/web/src/draft-adoption.tsx)、[用法](../engineering/ai-drafts.md)；两个版本分别核对，私有内容不因采用而公开 |
-| 已交付的项目选材 | [契约](../../packages/contracts/src/project-materials.ts)、[快照事务](../../packages/db/src/project-materials.ts)、[面板/记录](../../apps/web/src/project-materials.tsx)、[用法](../engineering/project-materials.md)；Node 完整输入冻结，preview 保留原代码摘录重建语义，启动不等于模型收到 |
-| 已交付的讨论约定 | [约定契约](../../packages/contracts/src/project-agreements.ts)、[原子事务](../../packages/db/src/project-agreements.ts)、[发布入口](../../apps/web/src/agreement-create.tsx)、[用法与边界](../engineering/project-agreements.md)；私有讨论不能直接公开，发布与模型发送独立 |
-| 已交付的项目资料 | [资料契约](../../packages/contracts/src/project-sources.ts)、[原子事务](../../packages/db/src/project-sources.ts)、[W1 页面/抽屉](../../apps/web/src/project-sources.tsx)、[用法与边界](../engineering/project-sources.md)；文本/链接不等于文件上传或网络导入 |
-| 已交付的参与者/筛选 | [参与事务](../../packages/db/src/task-participants.ts)、[抽屉](../../apps/web/src/task-participants.tsx)、[URL 筛选](../../apps/web/src/project-task-filters.tsx)、[使用说明](../engineering/task-participants.md)；参与独立修订，不改变当前模型材料或执行授权 |
-| 已交付的负责人改派 | [改派契约](../../packages/contracts/src/task-assignment.ts)、[原子事务](../../packages/db/src/task-assignment.ts)、[W1 抽屉](../../apps/web/src/task-assignment.tsx)、[使用说明](../engineering/task-assignment.md)；不转移代码/节点/个人账户 |
-| 任务归属、状态与界面 | [04 工作包](04-tasks-requirements.md)、[Task 契约](../../packages/contracts/src/index.ts)、[任务事务](../../packages/db/src/store.ts)、[任务工作区](../../apps/web/src/task-workspace.tsx) |
-| 已交付的项目基本设置 | [设置事务](../../packages/db/src/project-settings.ts)、[严格契约](../../packages/contracts/src/project.ts)、[W1 抽屉](../../apps/web/src/project-settings.tsx)、[回归](../../tests/project-settings.test.ts) |
-| 项目基础和成员管理 | [03 工作包](03-identity-projects.md)、[协作数据](../../packages/db/src/collaboration.ts)、[团队页面](../../apps/web/src/team.tsx)、[项目页面](../../apps/web/src/projects.tsx) |
-| 权限、持久化和事件 | [权限](../../packages/db/src/permissions.ts)、[迁移](../../packages/db/src/schema.ts)、[控制 API](../../apps/control/src/app.ts) |
-| 已交付的归档/恢复 | [生命周期事务](../../packages/db/src/project-lifecycle.ts)、[W1 控件](../../apps/web/src/project-lifecycle.tsx)、[使用说明](../engineering/project-archive.md)；恢复不重新派发 |
-| 归档和派发/接续联动 | [节点派发](../../packages/db/src/node-execution.ts)、[节点接续](../../packages/db/src/node-continuations.ts)、[节点执行器](../../apps/runner/src/agent/executor.ts)；归档不等于进程结束 |
-| 已补齐的双工具恢复路径 | [Claude 会话](../engineering/claude-sessions.md)、[Codex 会话](../engineering/codex-sessions.md)、[任务运行界面](../../apps/web/src/node-execution.tsx)；不要再次将 Claude resume 写为未实现 |
+| 用户如何启动/使用 | [根 README](../../README.md)、[工程指南](../engineering/README.md) |
+| 产品与状态语义 | [功能 v1.1](../product/03-functional-specification.md)、[领域状态](../product/05-domain-and-state.md) |
+| 服务分层、命令、提交与验证 | [开发 harness](../harness/development.md) |
+| 功能代码与对应检查 | [专题 harness 索引](../harness/README.md)；每份指南列实际代码/测试入口 |
+| 现有能力和最近验证 | [21](21-implementation-status.md) |
+| 过去失败、修正、版本及 CI 证据 | [实现历史](history/2026-09-28-implementation.md)；仅在追溯时加载 |
+| 文档应该改在哪里 | [文档治理](../harness/documentation.md) |
 
-双工具显式恢复仅是有界、实验性的节点代码路径。真实账户生成/成功恢复依旧未联调，不把协议替身或无模型兼容性检查计作模型验证。历史默认不保留、仅本机明确授权、同任务/节点/目录/工具/账户/策略绑定、恢复失败不静默新建和未知进程保锁等规则继续适用。
+文档里的官方工具探测、协议替身流程与真实账户互操作分开记录。代码存在或截图可见都不等于有效账户模型生成/恢复已验证。
 
-## 3. 代码查找图
+## 本机信息与交付
 
-| 范围 | 实现入口 |
-| --- | --- |
-| 页面与请求状态 | [前端入口](../../apps/web/src/App.tsx)、[身份边界](../../apps/web/src/identity.tsx)、[状态与内存草稿](../../apps/web/src/state.tsx)、[HTTP 客户端](../../packages/client/src/index.ts) |
-| 视觉与控件 | [唯一运行 tokens](../../packages/ui/src/tokens.css)、[共享控件](../../packages/ui/src/index.tsx)、[基础样式](../../apps/web/src/foundation.css)；页面样式随所属功能维护 |
-| 请求与领域规则 | [contracts](../../packages/contracts/src/index.ts)、[domain](../../packages/domain/src/index.ts)；纯领域规则不依赖 React、数据库或提供方 |
-| 持久化与访问权限 | [store](../../packages/db/src/store.ts)、[权限](../../packages/db/src/permissions.ts)、[迁移](../../packages/db/src/schema.ts)、[节点执行事务](../../packages/db/src/node-execution.ts) |
-| 本机 API 与执行 | [控制 API](../../apps/control/src/app.ts)、[Runner CLI](../../apps/runner/src/cli.ts)、[节点执行器](../../apps/runner/src/agent/executor.ts) |
+使用 Node 24 + npm；平台和命令选择见开发 harness。浏览器/节点测试使用独立可丢弃数据与虚构凭证，不能复用用户主库。
 
-模型执行、进程、密钥与工作目录继续由 Runner 负责，不迁入页面点击处理器。任务完成不等于执行结束；停止请求不等于已确认终止；Operation 成功仅表示 Run 创建。源码中的实际契约优先于早期计划里的接口草案。
+可选、被忽略的 `.hexu/local-environment.md` 记录这台机器的 Node 路径、预览端口和临时验证目录；它不是新机器开工前提，也不授权公开本地服务。操作旧 PID 或工作树之前重新核对实际进程与未入 Git 的资料。
 
-## 4. 环境与最少足够的验证
-
-使用 **Node 24 + npm**，先核对 `node --version`。新工作副本执行 `npm ci`。常规开发见根 README 的 `npm run dev`；构建后使用 `npm run build`、`npm start`，保持回环监听。
-
-- 提交前执行 `npm run format`，用 `git diff --check` 检查差异。
-- 按改动选择现有检查：`npm run typecheck`、`npm test`、`npm run build`；`npm run check` 已包含这三项。
-- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312/4313/4314/4315/4316/4317 端口（协助使用独立认证进程）；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
-- 原生／独立节点的完整回归以 Linux 为准；macOS 未验证，Windows 原生执行不支持。Windows 可以做页面、格式、类型与构建检查，不能据此宣称进程和凭证边界跨平台完成。
-- 测试必须使用明确协议替身和虚构 Key，不使用开发者或提供方凭证。`check:codex-protocol` / `check:claude-protocol` 是可选无模型检查，不使用真实账户或发起真实模型 turn。
-
-W1 功能提交 `43c066f` 已通过 [Linux CI 36238774668](https://github.com/ntygod/HEXU/actions/runs/36238774668)：175 条工程测试、35 条浏览器流程，均无失败、跳过。后续提交的实际结果仍看 [21](21-implementation-status.md) 和对应 CI；不因本页重复运行未受影响的整套测试。
-
-## 5. 协作与交付收尾
-
-开工从最新 `origin/main` 建立 `codex/` 分支，或核对已有工作树后复用。变更实现、必要界面和相关文档一起提交，更新 19 的原工作项状态／依据／剩余范围及 21 的实际结果；如下一步变化，更新同一份 22，不创建竞争路线。
-
-合并前确认目标提交与 CI、远端变化及未提交文件；保持原工作项 ID 和提交历史可追踪。清理工作树前检查仍在运行的预览／执行进程以及未入 Git 的需要保留文件。工作树仍承载预览时不要直接删除。
-
-`.env`、本地 SQLite、节点私有状态、凭证、实际数据截图和临时验证脚本不入 Git。本机可能有被忽略的 `.hexu/local-environment.md`，记录当前预览和可选测试环境；它不是仓库安装前提，也不改变产品部署边界。新机器没有该文件时仍可按 README 和 Linux CI 开发。
+能力变化写 21，原工作项写 19，下一项写 22；详细结果追加历史。稳定约束改所属 harness，不把新批次日志继续堆回根 AGENTS.md。交付说明变更、实际检查和未解限制，不因预算/环境限制虚构通过。
