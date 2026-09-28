@@ -56,7 +56,15 @@ function stopChildren() {
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, stopChildren);
 process.once('exit', stopChildren);
 try {
-  for (const fixture of ['team', 'node', 'assistance', 'ai-assistance', 'adoption', 'checkpoint']) {
+  for (const fixture of [
+    'team',
+    'node',
+    'assistance',
+    'ai-assistance',
+    'adoption',
+    'checkpoint',
+    'retention',
+  ]) {
     await new Promise((resolveReady, reject) => {
       const child = fork(new URL('./start-e2e-identity.mjs', import.meta.url), [fixture], {
         // No inherited provider keys, auth state or operator runtime configuration.

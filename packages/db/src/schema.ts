@@ -332,4 +332,21 @@ CREATE TABLE commit_checkpoints (
 -- No old summary, Run or message implies consent to publish a checkpoint.
 `,
   },
+  {
+    version: 21,
+    sql: `
+CREATE TABLE checkpoint_retentions (
+ id TEXT PRIMARY KEY, checkpoint_id TEXT NOT NULL REFERENCES commit_checkpoints(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ owner_id TEXT NOT NULL, body TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
+ manifest TEXT, sequence INTEGER NOT NULL DEFAULT 0, observed_at TEXT
+);
+CREATE INDEX checkpoint_retentions_scope ON checkpoint_retentions(checkpoint_id,task_id);
+CREATE TABLE checkpoint_retention_reports (
+ request_id TEXT NOT NULL REFERENCES checkpoint_retentions(id), sequence INTEGER NOT NULL,
+ body_hash TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(request_id,sequence)
+);
+-- Old references remain references; no fabricated object availability or retention consent.
+`,
+  },
 ];

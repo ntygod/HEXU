@@ -98,3 +98,19 @@
   gap: var(--hx-space-2);
   flex-wrap: wrap;
 }
+
+.checkpoint-retention,
+.retention-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.retention-card {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-4);
+}
+.retention-card details > p,
+.retention-card details > pre {
+  margin-top: var(--hx-space-2);
+}

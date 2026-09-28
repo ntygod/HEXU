@@ -13,7 +13,11 @@
 
 ## 继续开发与 AI 接手
 
-从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、项目选材、AI 草稿、真人协助及 Claude 纯文本 AI 协助已接入。协助建议现可明确局部采用到原任务说明；下一主线是本机不可变提交检查点。原 102 项工作清单及历史继续保留。
+从 [AI 接手开发指南](docs/development/24-ai-handoff.md) 进入，先核对当前代码、[实际进度](docs/development/21-implementation-status.md) 和[下一步交付](docs/development/22-next-delivery.md)。W1、双工具有界恢复、项目设置/归档、任务分工、项目选材、AI 草稿、真人协助及 Claude 纯文本 AI 协助已接入。协助建议现可明确局部采用到原任务说明；本机提交引用与另行确认的单提交文件对象保留现已接入；下一主线是独立新目录恢复。原 102 项工作清单及历史继续保留。
+
+## 本机提交对象保留
+
+已有提交检查点可以在原任务中选择“核验与本机保留”，单独请求1/7/30天，并由原节点本人在终端逐次确认。成功后将提交的树/文件对象独立复制到本机私有数据库，可重新核验或明确删除；代码、文件名和路径不上传，不改原工作区。LFS/子模块只保留指针/引用，不含祖先历史和未提交内容。到期不自动续期，也不自动删除字节；新目录恢复和远程传输尚未交付。用法、边界及实测见[对象保留](docs/engineering/checkpoint-retention.md)和[实际进度](docs/development/21-implementation-status.md)。
 
 ## 启动
 

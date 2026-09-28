@@ -16,13 +16,14 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 ## 2. 下一项的具体入口
 
-默认继续 **HX-DEV-12-02：本机完整对象核验与明确保留**。12-01 单仓库本机引用已接入：网页指定请求，CLI 本机逐次同意，真正核对 commit/root tree，任务关联不可变记录及独立持久回执。它不保存完整对象、不恢复文件，也不是远端备份。功能头 `4db6ea6c1ba3a3259c4fe0f23fb32a0ee5d2667b` 的只读 Linux CI `36336051094` 已通过317项工程检查与91项Chromium流程，零失败、取消、跳过或重试；之后仅补录五份文档，完整记录见21。不重复本机引用切片；下一项12-02尚未实现。原任务说明的协助建议采用已通过完整回归：功能头 `afd6c8257e87810a1bdfb061dfd74310a9afaac1` 的 [只读 Linux CI 36330046140](https://github.com/ntygod/HEXU/actions/runs/36330046140) 为 300/300 工程检查与 88/88 Chromium 流程通过，零失败、跳过或重试；文档补录不改动该功能/测试树。来源/目标版本、权限与不可变记录复用任务采用事务，包含原问题/材料作者和撤销后的原回执确认；不重复该切片。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
+默认继续 **HX-DEV-12-02：单提交对象副本的独立新目录恢复**。本批已接入单提交文件闭包核验与本人明确本机保留：私有数据库独立复制、固定清单、重新核验、到期和明确删除，顺序回执防重复；功能头 `920a08d` 的[只读 Linux CI 36367863414](https://github.com/ntygod/HEXU/actions/runs/36367863414)已通过 **336/336工程检查和94/94Chromium流程**，零失败/取消/跳过/重试；最终仅补录六份文档，完整证据见21。不含祖先历史/LFS/子模块实体，恢复与远程传输仍未实现；不要重复保留切片。12-01旧本机commit/root-tree引用保持不可变，原通过基线317工程/91浏览器。原任务说明的协助建议采用已通过完整回归：功能头 `afd6c8257e87810a1bdfb061dfd74310a9afaac1` 的 [只读 Linux CI 36330046140](https://github.com/ntygod/HEXU/actions/runs/36330046140) 为 300/300 工程检查与 88/88 Chromium 流程通过，零失败、跳过或重试；文档补录不改动该功能/测试树。来源/目标版本、权限与不可变记录复用任务采用事务，包含原问题/材料作者和撤销后的原回执确认；不重复该切片。Claude 纯文本 AI 代码已接入，功能头 `f49921f330238f89e601f79abfd68b6429291787` 已通过 [完整只读 Linux CI 36320009916](https://github.com/ntygod/HEXU/actions/runs/36320009916)：291/291 工程检查、83/83 Chromium 流程，零失败、跳过或重试。后续七份交付文档补录不改变功能/测试树；见 [用法](../engineering/ai-text-assistance.md)，不重复已交付文本执行。真人协助已接入同空间固定消息摘录、有限授权、回复/追问与结束/撤销，不重复实现或扩成第二套 Task。AI 路径须单独明确材料和费用授权，不能赋予活动目录写入权，详见 22。
 
 真人协助入口为 `packages/contracts/src/assistance.ts`、`packages/db/src/assistance.ts`、`apps/control/src/assistance.ts` 与 `apps/web/src/assistance*.tsx/css`。读取/旧回执检查当前范围；撤权钩子在 collaboration.ts，SSE 只发送独立协助 ID；独立受限详情不包含不可访问的 Task 信息。
 
 | 工作 | 先查看 |
 | --- | --- |
-| 下一项完整对象核验与保留 | [12 工作包](12-handoff-sharing.md)、[目录授权与 Git 读取](../../apps/runner/src/agent)、[节点边界](../engineering/runner-node.md)；先核对不可变对象与本机范围，不自动 commit/reset 或把摘要授权变成文件读取 |
+| 下一项独立新目录恢复 | [12 工作包](12-handoff-sharing.md)、[目录授权与 Git 读取](../../apps/runner/src/agent)、[节点边界](../engineering/runner-node.md)；先读22的新目录/原绑定/期限/路径及失败清理边界，不自动checkout或扩大摘要授权 |
+| 已接入的提交对象保留 | [契约](../../packages/contracts/src/checkpoint-retention.ts)、[事务](../../packages/db/src/checkpoint-retention.ts)、[对象遍历](../../apps/runner/src/agent/checkpoint-objects.ts)、[私有副本](../../apps/runner/src/agent/checkpoint-retention.ts)、[用法](../engineering/checkpoint-retention.md)；副本不含祖先和外部实体，核验不修补/续期，删除不动原仓库 |
 | 已接入的本机提交引用 | [契约](../../packages/contracts/src/checkpoints.ts)、[事务](../../packages/db/src/checkpoints.ts)、[CLI核对](../../apps/runner/src/agent/checkpoints.ts)、[页面](../../apps/web/src/checkpoints.tsx)、[用法](../engineering/commit-checkpoints.md)；不能将仅commit/root-tree的引用当作可恢复备份 |
 | 已接入的协助建议采用 | [契约](../../packages/contracts/src/assistance-adoption.ts)、[采用事务](../../packages/db/src/assistance-adoption.ts)、[共享任务写入](../../packages/db/src/task-description-adoption.ts)、[界面](../../apps/web/src/assistance-adoption.tsx)、[用法](../engineering/assistance-adoption.md)；有限接收者不能写任务或读取目标历史，撤销后不得新采用 |
 | 已接入的 Claude 纯文本 AI 协助 | [11 工作包](11-continuation-assistance.md)、[协助事务](../../packages/db/src/assistance.ts)、[节点执行](../../packages/db/src/node-execution.ts)、[执行器](../../apps/runner/src/agent/executor.ts)；另行绑定模型材料与费用同意，不能默认访问活动代码目录或借用他人账户 |
@@ -61,7 +62,7 @@ AI 草稿选区规则在 [draft-selection.ts](../../apps/web/src/draft-selection
 
 - 提交前执行 `npm run format`，用 `git diff --check` 检查差异。
 - 按改动选择现有检查：`npm run typecheck`、`npm test`、`npm run build`；`npm run check` 已包含这三项。
-- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312/4313/4314/4315/4316 端口（协助使用独立认证进程）；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
+- 行为或布局改动复用 `npm run test:e2e`。浏览器用例使用当前工作副本的可丢弃 `.hexu/e2e` 数据及 4310/4311/4312/4313/4314/4315/4316/4317 端口（协助使用独立认证进程）；不复用用户主库或已占用的真实服务。浏览器运行环境未准备好时，可使用仓库 Linux CI 并明确实际验证平台。
 - 原生／独立节点的完整回归以 Linux 为准；macOS 未验证，Windows 原生执行不支持。Windows 可以做页面、格式、类型与构建检查，不能据此宣称进程和凭证边界跨平台完成。
 - 测试必须使用明确协议替身和虚构 Key，不使用开发者或提供方凭证。`check:codex-protocol` / `check:claude-protocol` 是可选无模型检查，不使用真实账户或发起真实模型 turn。
 
