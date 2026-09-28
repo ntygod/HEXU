@@ -52,6 +52,7 @@ export async function nodeRequest<T>(
       'checkpoint-retention-inspect',
       'checkpoint-retention-report',
       'checkpoint-restore-report',
+      'checkpoint-transfer',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');
@@ -78,7 +79,9 @@ export async function nodeRequest<T>(
       const { value, done } = await reader.read();
       if (done) break;
       length += value.length;
-      if (length > (path.startsWith('execution-') ? 131072 : 32768)) {
+      if (
+        length > (path.startsWith('execution-') || path === 'checkpoint-transfer' ? 131072 : 32768)
+      ) {
         await reader.cancel();
         throw new DomainError('INVALID_RESPONSE', '节点响应超出上限');
       }

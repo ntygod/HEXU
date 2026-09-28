@@ -511,3 +511,197 @@ test('恢复列表暂时读错保留已有结果，权限拒绝清空内容与�
     await f.close();
   }
 });
+
+async function prepareTransfer(page: Page, f: Awaited<ReturnType<typeof setup>>) {
+  const result = await prepareRestoreResult(page, f);
+  const receiverHome = join(f.dir, 'transfer-receiver-state'),
+    receiverRoot = join(f.dir, 'transfer-receiver-root');
+  await mkdir(receiverHome, { mode: 0o700 });
+  await mkdir(receiverRoot);
+  execFileSync('git', ['init', '-q', receiverRoot]);
+  await writeFile(join(receiverRoot, 'private.txt'), 'Not touched by transfer');
+  const [workspace] = await authorizeDirectories(
+    [{ name: '独立接收现场', path: receiverRoot }],
+    receiverHome,
+  );
+  const projectId = f.task.projectId;
+  const pairing = await post(page, 'nodes/pairings', { projectId }, f.space.id);
+  const token = randomBytes(32).toString('base64url'),
+    clientId = randomUUID();
+  const response = await fetch(origin + '/runner/v1/pair', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-hexu-runner': '1' },
+    body: JSON.stringify({
+      protocol: 1,
+      code: pairing.code,
+      nodeToken: token,
+      clientId,
+      projectId,
+      name: '同机接收节点',
+      platform: 'linux',
+      arch: 'x64',
+      workspaces: [{ id: workspace!.id, name: workspace!.name }],
+    }),
+  });
+  expect(response.ok).toBe(true);
+  const receiver = (await response.json()) as { nodeId: string };
+  writeCredentials(receiverHome, {
+    version: 1,
+    controlUrl: origin,
+    clientId,
+    nodeToken: token,
+    name: '同机接收节点',
+    projectId,
+    spaceId: f.space.id,
+    nodeId: receiver.nodeId,
+    directories: [workspace!],
+  });
+  await page.getByRole('button', { name: '查看对象传输', exact: true }).click();
+  const panel = page.getByLabel('受控对象传输');
+  await panel.getByRole('button', { name: '向另一节点传输', exact: true }).click();
+  await panel.getByLabel('接收节点', { exact: true }).selectOption(receiver.nodeId);
+  await panel.getByRole('checkbox').check();
+  return {
+    ...result,
+    receiverHome,
+    receiverRoot,
+    receiver,
+    path: `${result.path}/${result.requestId}/transfers`,
+    panel,
+  };
+}
+async function transferCli(home: string, id: string, mode: string, input = '') {
+  const child = spawn(
+    process.execPath,
+    [
+      resolve('dist/apps/runner/src/transfer-checkpoint.js'),
+      mode,
+      '--transfer',
+      id,
+      '--state',
+      home,
+    ],
+    { stdio: ['pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH, HOME: process.env.HOME } },
+  );
+  let output = '';
+  child.stdout.on('data', (v) => (output += v));
+  child.stderr.on('data', (v) => (output += v));
+  child.stdin.end(input);
+  const [code] = await once(child, 'close');
+  return { code, output };
+}
+test('真实双节点对象传输从网页创建到独立接收，深浅色和手机展示不混淆接手与恢复', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  try {
+    const t = await prepareTransfer(page, f);
+    await t.panel.getByRole('button', { name: '创建传输请求', exact: true }).click();
+    await expect(t.panel).toContainText('等待接收端本机同意');
+    const list = await (await page.request.get(t.path, { headers: headers(f.space.id) })).json(),
+      id = list.items[0].ticket.id;
+    const accept = await transferCli(t.receiverHome, id, 'accept', `RECEIVE ${id}\n`);
+    expect(accept.code, accept.output).toBe(0);
+    await expect(t.panel).toContainText('接收端已同意，等待源节点发送');
+    const send = await transferCli(f.home, id, 'send', `SEND ${id}\n`);
+    expect(send.code, send.output).toBe(0);
+    await expect(t.panel).toContainText('密文已就绪，等待接收端核验');
+    const receive = await transferCli(t.receiverHome, id, 'receive');
+    expect(receive.code, receive.output).toBe(0);
+    await expect(t.panel).toContainText('接收端已核验独立副本（最后报告）');
+    await expect(t.panel).toContainText('不保证对象现在仍存在');
+    expect(await readFile(join(t.receiverRoot, 'private.txt'), 'utf8')).toBe(
+      'Not touched by transfer',
+    );
+    await t.panel.getByLabel('对象传输记录').scrollIntoViewIfNeeded();
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/88-transfer-dark.png', fullPage: true });
+    await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await page.screenshot({ path: 'artifacts/89-transfer-light.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/90-transfer-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: '代码检查点', exact: true }).click();
+    await page.getByRole('button', { name: '核验与本机保留', exact: true }).click();
+    await page.getByRole('button', { name: '查看对象传输', exact: true }).click();
+    await expect(page.getByLabel('受控对象传输')).toContainText('接收端已核验独立副本');
+  } finally {
+    await f.close();
+  }
+});
+test('对象传输创建回执丢失复用同一节点与请求，取消阻止本机继续收发且不删除源对象', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  try {
+    const t = await prepareTransfer(page, f);
+    let drop = true;
+    await page.route(t.path, async (route) => {
+      if (route.request().method() === 'POST' && drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await t.panel.getByRole('button', { name: '创建传输请求', exact: true }).click();
+    await expect(t.panel).toContainText('传输操作回执未确认');
+    await expect(t.panel.getByLabel('接收节点', { exact: true })).toHaveValue(t.receiver.nodeId);
+    await t.panel.getByRole('button', { name: '确认上次传输操作', exact: true }).click();
+    await expect(t.panel.getByLabel('对象传输记录')).toHaveCount(1);
+    const items = (await (await page.request.get(t.path, { headers: headers(f.space.id) })).json())
+      .items;
+    expect(items).toHaveLength(1);
+    await t.panel.getByRole('button', { name: '取消对象传输', exact: true }).click();
+    await expect(t.panel).toContainText('传输已取消');
+    const accept = await transferCli(t.receiverHome, items[0].ticket.id, 'accept');
+    expect(accept.code).toBe(1);
+    await expect(page.getByLabel('对象保留记录').first()).toContainText('本机已保留');
+  } finally {
+    await f.close();
+  }
+});
+test('对象传输临时读取故障保留已知状态，权限失效清空记录，不提供网页任意路径入口', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  try {
+    const t = await prepareTransfer(page, f);
+    await t.panel.getByRole('button', { name: '创建传输请求', exact: true }).click();
+    await expect(t.panel.getByLabel('对象传输记录')).toHaveCount(1);
+    await page.route(t.path, async (route) => {
+      if (route.request().method() === 'GET')
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'TEMPORARY_FAILURE', message: '传输读取暂时失败' },
+          }),
+        });
+      else await route.continue();
+    });
+    await expect(t.panel).toContainText('传输读取暂时失败');
+    await expect(t.panel.getByLabel('对象传输记录')).toHaveCount(1);
+    await page.unroute(t.path);
+    await t.panel.getByRole('button', { name: '重读对象传输', exact: true }).click();
+    await expect(t.panel.getByRole('alert')).toHaveCount(0);
+    await page.route(t.path, async (route) => {
+      if (route.request().method() === 'GET')
+        await route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'FORBIDDEN', message: '当前权限失效' } }),
+        });
+      else await route.continue();
+    });
+    await expect(
+      page.getByText('对象传输读取权限已失效，内容已清除。', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('对象传输记录')).toHaveCount(0);
+    await expect(page.getByLabel('目标路径', { exact: true })).toHaveCount(0);
+  } finally {
+    await f.close();
+  }
+});

@@ -366,4 +366,20 @@ CREATE TABLE checkpoint_restore_reports (
 -- Existing retentions never imply a file restore; only explicit node reports create observations.
 `,
   },
+  {
+    version: 23,
+    sql: `
+CREATE TABLE checkpoint_transfers (
+ id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES checkpoint_retentions(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), body TEXT NOT NULL, state TEXT NOT NULL,
+ recipient_key TEXT, envelope TEXT, uploaded INTEGER NOT NULL DEFAULT 0, received_at TEXT
+);
+CREATE INDEX checkpoint_transfers_source ON checkpoint_transfers(source_id);
+CREATE TABLE checkpoint_transfer_chunks (
+ transfer_id TEXT NOT NULL REFERENCES checkpoint_transfers(id), sequence INTEGER NOT NULL,
+ hash TEXT NOT NULL, data BLOB NOT NULL, PRIMARY KEY(transfer_id,sequence)
+);
+-- Ciphertext only. Existing retention/restore records imply no material transfer consent.
+`,
+  },
 ];
