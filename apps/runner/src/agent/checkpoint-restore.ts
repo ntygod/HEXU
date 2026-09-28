@@ -241,6 +241,7 @@ export async function localRestoreCheckpoint(
       stageUnchanged();
       verifyStage(stage, plan, journal, progress);
       progress.state = 'verified';
+      progress.verifiedAt = new Date().toISOString();
       await update();
       log(
         `暂存已核验：${progress.completedFiles} 个文件 / ${progress.writtenBytes} 字节；目标尚未创建。计划 ${plan.planHash}`,

@@ -1,0 +1,21 @@
+.restore-results {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.restore-result-card {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  padding: var(--hx-space-3);
+  min-width: 0;
+}
+.restore-result-card code,
+.restore-results pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.restore-result-card article {
+  border-top: 1px solid var(--hx-border-subtle);
+  margin-top: var(--hx-space-3);
+  padding-top: var(--hx-space-3);
+}

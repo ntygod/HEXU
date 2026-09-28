@@ -51,6 +51,7 @@ export async function nodeRequest<T>(
       'checkpoint-publish',
       'checkpoint-retention-inspect',
       'checkpoint-retention-report',
+      'checkpoint-restore-report',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');

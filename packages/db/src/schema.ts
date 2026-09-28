@@ -349,4 +349,21 @@ CREATE TABLE checkpoint_retention_reports (
 -- Old references remain references; no fabricated object availability or retention consent.
 `,
   },
+  {
+    version: 22,
+    sql: `
+CREATE TABLE checkpoint_restore_results (
+ id TEXT PRIMARY KEY, request_id TEXT NOT NULL REFERENCES checkpoint_retentions(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), sequence INTEGER NOT NULL,
+ body TEXT NOT NULL, body_hash TEXT NOT NULL, received_at TEXT NOT NULL
+);
+CREATE INDEX checkpoint_restore_results_scope ON checkpoint_restore_results(request_id,task_id);
+CREATE TABLE checkpoint_restore_reports (
+ restore_id TEXT NOT NULL REFERENCES checkpoint_restore_results(id), sequence INTEGER NOT NULL,
+ body_hash TEXT NOT NULL, body TEXT NOT NULL, received_at TEXT NOT NULL,
+ PRIMARY KEY(restore_id,sequence)
+);
+-- Existing retentions never imply a file restore; only explicit node reports create observations.
+`,
+  },
 ];

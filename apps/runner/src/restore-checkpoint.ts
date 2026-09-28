@@ -1,3 +1,4 @@
+import { reportRestoreCheckpoint } from './agent/checkpoint-restore-report.js';
 import { createInterface } from 'node:readline';
 import { DomainError } from '../../../packages/contracts/src/index.js';
 import { localRestoreCheckpoint, cleanupRestoreCheckpoint } from './agent/checkpoint-restore.js';
@@ -5,8 +6,8 @@ import { readRestoreProgress } from './agent/checkpoint-restore-journal.js';
 
 async function main() {
   const [mode, ...args] = process.argv.slice(2);
-  if (!['restore', 'status', 'cleanup'].includes(mode ?? ''))
-    throw new DomainError('INVALID_INPUT', '只接受 restore/status/cleanup');
+  if (!['restore', 'status', 'cleanup', 'report'].includes(mode ?? ''))
+    throw new DomainError('INVALID_INPUT', '只接受 restore/status/cleanup/report');
   const options = new Map<string, string>();
   const allowed =
     mode === 'restore' ? ['--state', '--request', '--target'] : ['--state', '--target'];
@@ -55,6 +56,10 @@ async function main() {
     return next.done || controller.signal.aborted ? '' : next.value;
   };
   try {
+    if (mode === 'report') {
+      console.log(JSON.stringify(await reportRestoreCheckpoint(home, target, ask)));
+      return;
+    }
     const progress =
       mode === 'cleanup'
         ? await cleanupRestoreCheckpoint(home, target, ask)

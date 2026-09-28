@@ -1,3 +1,4 @@
+import { CheckpointRestoreResults } from './checkpoint-restore-results.js';
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import type { CommitCheckpoint } from '../../../packages/contracts/src/checkpoints.js';
@@ -68,7 +69,8 @@ function RetentionPanel({ record, task }: { record: CommitCheckpoint; task: Task
           树和文件；不上传代码，不改变原仓库。
         </p>
         <p>
-          祖先历史、未提交内容不包含。LFS 只保留指针，子模块只保留引用；没有文件恢复或跨电脑传输。
+          祖先历史、未提交内容不包含。LFS
+          只保留指针，子模块只保留引用。普通文件的新目录恢复需本机另行确认，不支持跨电脑传输。
         </p>
       </div>
       {read.error && (
@@ -140,6 +142,10 @@ function RetentionPanel({ record, task }: { record: CommitCheckpoint; task: Task
                   <code>{r.manifest.snapshotHash}</code>
                   <p>原始对象只在节点私有数据库中，不公开文件名、路径或作者邮箱。</p>
                 </details>
+                <CheckpointRestoreResults
+                  retentionPath={`${path}/${encodeURIComponent(r.request.id)}`}
+                  editable={editable && r.nodeAuthorized}
+                />
                 {editable && r.state !== 'deleted' && (
                   <details>
                     <summary>重新核验或删除本机副本</summary>

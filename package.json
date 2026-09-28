@@ -35,6 +35,7 @@
     "check:claude-protocol": "npm run build:server && node scripts/check-claude-protocol.mjs",
     "runner:restore-plan": "node dist/apps/runner/src/restore-plan.js",
     "runner:restore": "node dist/apps/runner/src/restore-checkpoint.js restore",
+    "runner:restore-report": "node dist/apps/runner/src/restore-checkpoint.js report",
     "runner:restore-status": "node dist/apps/runner/src/restore-checkpoint.js status",
     "runner:restore-cleanup": "node dist/apps/runner/src/restore-checkpoint.js cleanup"
   },
