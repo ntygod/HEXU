@@ -38,11 +38,15 @@ export function Projects() {
           已归档
         </button>
       </div>
-      <div className="work-project-grid">
+      <div className="work-project-grid stagger">
         {projects.map((project) => {
           const tasks = data.tasks.filter((task) => task.projectId === project.id);
           return (
-            <Link to={`/projects/${project.id}`} className="work-project-card" key={project.id}>
+            <Link
+              to={`/projects/${project.id}`}
+              className="work-project-card spotlight"
+              key={project.id}
+            >
               <div className="work-card-kicker">
                 <Icon name="folder" />
                 <span>
@@ -196,7 +200,7 @@ export function ProjectPage({ id }: { id: string }) {
           onSelect={(source) => setTab('sources', source)}
         />
       ) : tab === 'results' ? (
-        <div className="work-result-grid">
+        <div className="work-result-grid stagger">
           {results.map((result) => (
             <ResultCard key={result.id} result={result} />
           ))}

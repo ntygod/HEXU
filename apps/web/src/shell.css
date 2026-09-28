@@ -20,8 +20,19 @@
   gap: var(--hx-space-3);
   min-height: var(--shell-topbar-height);
   padding: var(--hx-space-2) var(--hx-space-4);
-  border-bottom: 1px solid var(--hx-border-subtle);
-  background: var(--hx-surface-panel);
+  border-bottom: 1px solid transparent;
+  background: color-mix(in srgb, var(--hx-surface-panel) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hx-brand) 24%, transparent) 38%,
+    color-mix(in srgb, var(--hx-ai-marker) 20%, transparent) 68%,
+    transparent
+  );
+  background-size: 100% 1px;
+  background-position: bottom;
+  background-repeat: no-repeat;
 }
 .workbench-brand {
   flex-shrink: 0;
@@ -164,6 +175,9 @@
 .rail-link.active {
   background: var(--hx-brand-soft);
   color: var(--hx-brand-text);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 0 18px color-mix(in srgb, var(--hx-brand) 18%, transparent);
 }
 .rail-link.active::before {
   content: '';

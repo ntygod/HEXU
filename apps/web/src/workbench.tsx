@@ -157,7 +157,7 @@ export function Workbench() {
             全部成果 <Icon name="chevron" size={14} />
           </Link>
         </div>
-        <div className="work-result-grid">
+        <div className="work-result-grid stagger">
           {recent.map((result) => (
             <ResultCard key={result.id} result={result} />
           ))}

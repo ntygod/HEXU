@@ -18,7 +18,7 @@ export function Results() {
         </div>
         <span className="badge neutral">{data.results.length} 项成果</span>
       </header>
-      <div className="work-result-grid">
+      <div className="work-result-grid stagger">
         {data.results.map((result) => (
           <ResultCard key={result.id} result={result} />
         ))}

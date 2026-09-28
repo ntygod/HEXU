@@ -121,7 +121,7 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
         </button>
         <button
           className="icon-button"
-          onClick={toggleTheme}
+          onClick={(event) => toggleTheme({ x: event.clientX, y: event.clientY })}
           aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
           title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
         >

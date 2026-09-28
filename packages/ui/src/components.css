@@ -287,11 +287,13 @@ select:disabled {
 }
 .dialog {
   padding: 0;
+  box-shadow:
+    var(--hx-shadow-dialog) var(--hx-shadow),
+    inset 0 1px 0 var(--hx-edge-light);
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-dialog);
   background: var(--hx-surface-panel);
   color: var(--hx-text-primary);
-  box-shadow: var(--hx-shadow-dialog) var(--hx-shadow);
   width: 520px;
   max-width: calc(100vw - 28px);
   max-height: calc(100dvh - 40px);
@@ -299,7 +301,7 @@ select:disabled {
 }
 .dialog::backdrop {
   background: var(--hx-backdrop);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(8px) saturate(1.25);
 }
 .dialog.wide {
   width: 640px;
@@ -430,5 +432,25 @@ select:disabled {
   textarea,
   select {
     font-size: var(--hx-font-subtitle);
+  }
+}
+
+/* Live states breathe: a small pulsing dot makes queued/preparing/running runs
+   readable at a glance without reading the label. */
+.run-queued::before,
+.run-preparing::before,
+.run-running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: hx-live-pulse 1.5s var(--hx-ease-standard) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .run-queued::before,
+  .run-preparing::before,
+  .run-running::before {
+    animation: none;
   }
 }
