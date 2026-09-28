@@ -87,7 +87,10 @@ test('真实账号建立、邀请同事、项目只读转编辑与个人隔离�
     });
     expect(denied.status()).toBe(404);
     await page.goto(origin + '/projects');
-    await page.getByRole('button', { name: '新建项目', exact: true }).click();
+    await page
+      .locator('.work-page-heading')
+      .getByRole('button', { name: '新建项目', exact: true })
+      .click();
     await page.getByLabel('项目名称', { exact: true }).fill('客户门户（测试）');
     await page.getByRole('button', { name: '创建项目', exact: true }).click();
     await expect(

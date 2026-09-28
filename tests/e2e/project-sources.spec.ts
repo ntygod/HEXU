@@ -28,7 +28,7 @@ test('文本资料创建、修订、删除恢复和深链接刷新，安全原�
   await page.goto(`/projects/${p.id}`);
   await page.getByRole('button', { name: '项目资料', exact: true }).click();
   await expect(page.getByRole('heading', { name: '还没有项目资料', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '新建资料', exact: true }).click();
+  await page.locator('.empty').getByRole('button', { name: '新建资料', exact: true }).click();
   await page.getByLabel('资料标题', { exact: true }).fill('订单接口字段说明');
   const original =
     '  保留缩进与换行\n<img src=x onerror="window.sourceExecuted=true">\n订单编号：order_id\n';
@@ -109,7 +109,7 @@ test('链接引用不自动访问外部站点；历史失败可重试，阅读�
     return route.abort();
   });
   await page.goto(`/projects/${p.id}?tab=sources`);
-  await page.getByRole('button', { name: '新建资料', exact: true }).click();
+  await page.getByTitle('保存文本或链接', { exact: true }).click();
   await page.getByLabel('资料类型', { exact: true }).selectOption('link');
   await page.getByLabel('资料标题', { exact: true }).fill('支付服务接口参考');
   await page.getByLabel('资料链接', { exact: true }).fill('https://example.invalid/payments');
@@ -235,7 +235,7 @@ test('创建和删除回执丢失时确认原请求，不重复资料或修订',
     } else await route.continue();
   });
   await page.goto(`/projects/${p.id}?tab=sources`);
-  await page.getByRole('button', { name: '新建资料', exact: true }).click();
+  await page.getByTitle('保存文本或链接', { exact: true }).click();
   await page.getByLabel('资料标题', { exact: true }).fill('需要确认回执的参考');
   await page.getByLabel('资料正文', { exact: true }).fill('保存一次即可');
   await page.getByRole('button', { name: '保存资料', exact: true }).click();

@@ -343,9 +343,13 @@ export function useLoad<T>(path: string) {
     const controller = new AbortController();
     setError('');
     request<T>(path, { signal: controller.signal })
-      .then(setValue)
+      .then((next) => {
+        if (!controller.signal.aborted) setValue(next);
+      })
       .catch((error) => {
-        if (error.name !== 'AbortError') {
+        // Cancellation during response.json() may be surfaced as INVALID_RESPONSE.
+        // A superseded read must not clear the current task and its open editor.
+        if (!controller.signal.aborted && error.name !== 'AbortError') {
           setValue(null);
           setError(error.message);
         }
