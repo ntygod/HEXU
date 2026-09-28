@@ -104,6 +104,11 @@ export async function captureCommitReference(
   oid: string,
   clientId: string,
   stateHome: string,
+  inspectSnapshot?: (
+    read: (id: string, type: 'commit' | 'tree' | 'blob', max: number) => Promise<Buffer>,
+    commit: Buffer,
+    tree: string,
+  ) => Promise<void>,
 ): Promise<CheckpointManifest> {
   commitOid(oid);
   let shadow: string | undefined;
@@ -162,7 +167,7 @@ export async function captureCommitReference(
         ? ['-c', 'core.repositoryformatversion=1', '-c', 'extensions.objectformat=sha256']
         : []),
     ];
-    const object = async (id: string, type: 'commit' | 'tree', max: number) => {
+    const object = async (id: string, type: 'commit' | 'tree' | 'blob', max: number) => {
       const actualType = (await git(shadow!, [...flags, 'cat-file', '-t', id], shadow!))
         .toString()
         .trim();
@@ -186,6 +191,7 @@ export async function captureCommitReference(
       throw new Error('Invalid commit tree');
     const tree = line.slice(5, -1);
     await object(tree, 'tree', 4 * 1024 * 1024);
+    if (inspectSnapshot) await inspectSnapshot(object, commit, tree);
     // A working-tree observation is deliberately NOT a snapshot of mutable contents.
     const workingCopy = await captureDirectory(w);
     if (
@@ -211,7 +217,11 @@ export async function captureCommitReference(
       workingCopy,
     });
   } catch (cause) {
-    if (cause instanceof DomainError && cause.code === 'INVALID_COMMIT') throw cause;
+    if (
+      cause instanceof DomainError &&
+      ['INVALID_COMMIT', 'RETENTION_LIMIT', 'SNAPSHOT_INCOMPLETE'].includes(cause.code)
+    )
+      throw cause;
     throw new DomainError(
       'CHECKPOINT_UNAVAILABLE',
       '提交或根树不存在、超出核对边界或目录授权变化；未记录检查点，没有修改仓库',

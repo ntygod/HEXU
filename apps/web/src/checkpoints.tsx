@@ -1,3 +1,4 @@
+import { CheckpointRetention } from './checkpoint-retention.js';
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import type {
@@ -83,11 +84,11 @@ function CheckpointPanel({ task }: { task: Task }) {
         <Icon name="code" />
         <div>
           <h3>保留明确的代码起点</h3>
-          <p>记录一个已存在的 Git 提交；不提交、不复制、不恢复代码，也不停止当前执行。</p>
+          <p>记录一个已存在的 Git 提交，可另行请求本机对象保留；不改变原代码或停止执行。</p>
         </div>
       </section>
       <section className="checkpoint-notice">
-        <strong>当前仅支持本机提交引用</strong>
+        <strong>提交引用与对象副本分开</strong>
         <p>
           核对提交和根树对象，不保证全部文件、LFS
           或子模块可恢复。暂存、未提交、未跟踪与忽略内容不包含；未核对远端，也不是代码备份。
@@ -137,7 +138,10 @@ function CheckpointPanel({ task }: { task: Task }) {
                 </p>
                 <code aria-label="检查点提交">{r.commit}</code>
                 {checkpoint ? (
-                  <CheckpointRecord record={checkpoint} />
+                  <>
+                    <CheckpointRecord record={checkpoint} />
+                    <CheckpointRetention record={checkpoint} task={task} />
+                  </>
                 ) : (
                   <>
                     <p>

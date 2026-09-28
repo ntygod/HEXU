@@ -3,6 +3,11 @@ import { createApp } from '../dist/apps/control/src/app.js';
 
 // Called only by start-e2e.mjs after it prepares the fixed disposable directory.
 const fixtures = {
+  retention: {
+    port: 4317,
+    secret: 'fictional-retention-browser-auth-secret-0123456789',
+    setupCode: 'fictional-retention-browser-setup-code-0123456789',
+  },
   checkpoint: {
     port: 4316,
     secret: 'fictional-checkpoint-browser-auth-secret-0123456789',

@@ -80,6 +80,18 @@ export class CheckpointStore {
     if (!r) throw new DomainError('NOT_FOUND', '检查点记录不存在', 404);
     return JSON.parse(r.body) as CommitCheckpoint;
   }
+  get(taskId: string, id: string, write = false): CommitCheckpoint {
+    this.task(taskId, write);
+    const record = this.record(id);
+    if (record.request.taskId !== taskId)
+      throw new DomainError('NOT_FOUND', '检查点不属于当前任务', 404);
+    return record;
+  }
+  inspectRecord(token: string, id: string): CommitCheckpoint {
+    const record = this.record(id);
+    this.inspect(token, record.request.id);
+    return record;
+  }
   private event(taskId: string, kind: string, spaceId: string) {
     this.store.db
       .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
