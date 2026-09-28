@@ -100,9 +100,9 @@ export function Workbench() {
                 title="从一项工作开始"
                 description="只需一个标题，就能保存想法和展开讨论。"
                 action={
-                  <Link className="button primary" to="/projects">
+                  <Button variant="primary" onClick={() => setCreating(true)}>
                     新建任务 <Icon name="plus" size={16} />
-                  </Link>
+                  </Button>
                 }
               />
             )}

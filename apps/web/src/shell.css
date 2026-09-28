@@ -127,6 +127,11 @@
   color: var(--hx-running-marker);
   animation: none;
 }
+@media (prefers-reduced-motion: reduce) {
+  .connection-dot {
+    animation: none;
+  }
+}
 
 .workbench-profile {
   display: inline-flex;

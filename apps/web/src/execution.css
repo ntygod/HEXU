@@ -373,7 +373,9 @@
   vertical-align: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .native-event {
+  .native-event,
+  .native-event.is-live::before,
+  .continuation-steps .current::before {
     animation: none;
   }
 }

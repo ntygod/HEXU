@@ -28,7 +28,7 @@ test('明确选择原生、确认费用，显示协议 fixture 的实际文件�
   await page.getByRole('button', { name: '开始原生执行', exact: true }).click();
   await expect(page.getByText('本次原生已结束', { exact: true })).toBeVisible();
   await expect(page.locator('.task-title .badge')).toHaveText('进行中');
-  await page.getByRole('button', { name: '代码变更', exact: true }).click();
+  await page.getByRole('tab', { name: '代码变更', exact: true }).click();
   await page.getByRole('button', { name: /native-output.txt/ }).click();
   await expect(page.locator('.native-diff')).toContainText('fixture edit');
   await page.screenshot({ path: 'artifacts/08-native-workspace.png', fullPage: true });
@@ -92,7 +92,7 @@ test('Claude 到 Codex：同任务继续、读取模型、保留未提交文件�
   ).toBeVisible();
   await expect(page.getByText('本次原生已结束', { exact: true })).toBeVisible();
   await expect(page.locator('.task-title .badge')).toHaveText('进行中');
-  await page.getByRole('button', { name: '代码变更', exact: true }).click();
+  await page.getByRole('tab', { name: '代码变更', exact: true }).click();
   await page.getByRole('button', { name: /codex-output.txt/ }).click();
   await expect(page.locator('.native-diff')).toContainText('fixture continued');
   await expect(page.locator('.native-diff')).toContainText('fixture edit');

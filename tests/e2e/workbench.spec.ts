@@ -26,8 +26,19 @@ test('项目看板和列表使用同一份持久化状态', async ({ page }) => 
   await expect(page.locator('.task-list').getByText('增加导出文件命名规则')).toBeVisible();
 });
 test('轻量新建、评论与刷新后恢复', async ({ page }) => {
+  await page.route('**/api/v1/workbench', async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: { ...data, projects: [], tasks: [], runs: [], results: [] },
+    });
+  });
   await page.goto('/');
-  await page.getByRole('button', { name: '新建任务', exact: true }).click();
+  await page.locator('.resume-work').getByRole('button', { name: '新建任务', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '开始一项工作', exact: true })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/');
+  await page.unroute('**/api/v1/workbench');
   await page.getByLabel('要做什么').fill('浏览器中创建的真实任务');
   await page.getByRole('button', { name: '创建任务', exact: true }).click();
   await expect(
@@ -129,9 +140,10 @@ test('窄屏没有整个页面的横向溢出', async ({ page }) => {
     await expect(page.getByRole('complementary', { name: '项目导引栏' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: '展开项目导航', exact: true })).toBeFocused();
+    expect((await page.locator('.workbench-main').boundingBox())?.width).toBeGreaterThan(300);
     if (path === '/tasks/task-24') {
       await page.getByRole('button', { name: '代码与成果', exact: true }).click();
-      await expect(page.getByRole('button', { name: '代码变更', exact: true })).toBeVisible();
+      await expect(page.getByRole('tab', { name: '代码变更', exact: true })).toBeVisible();
       await page.getByRole('button', { name: '讨论', exact: true }).click();
       await expect(page.getByRole('textbox', { name: '任务评论', exact: true })).toBeVisible();
     }
