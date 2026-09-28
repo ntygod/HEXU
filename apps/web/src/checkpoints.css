@@ -49,6 +49,21 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   padding: var(--hx-space-4);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
+}
+.checkpoint-card {
+  transition:
+    border-color var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard),
+    transform var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.checkpoint-card:hover {
+  border-color: var(--hx-text-muted);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    var(--hx-shadow-raised) var(--hx-shadow);
 }
 .checkpoint-notice {
   border-left: 3px solid var(--hx-pending-marker);

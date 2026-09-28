@@ -197,3 +197,10 @@
     flex-basis: 100%;
   }
 }
+
+.team-member {
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.team-member:hover {
+  background: var(--hx-surface-hover);
+}

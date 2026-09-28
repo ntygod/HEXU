@@ -31,6 +31,30 @@
   line-height: 1.45;
   letter-spacing: -0.6px;
   margin: var(--hx-space-4) 0;
+  background: linear-gradient(
+    100deg,
+    var(--hx-text-primary) 30%,
+    var(--hx-brand-text) 62%,
+    var(--hx-ai-text) 95%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: hx-rise var(--hx-motion-slow) var(--hx-ease-enter) both;
+}
+.account-context > p,
+.account-context dl,
+.account-context .account-path {
+  animation: hx-rise var(--hx-motion-slow) var(--hx-ease-enter) both;
+}
+.account-context > p {
+  animation-delay: 60ms;
+}
+.account-context dl {
+  animation-delay: 120ms;
+}
+.account-context .account-path {
+  animation-delay: 180ms;
 }
 .account-context > p {
   color: var(--hx-text-secondary);
@@ -73,6 +97,10 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-dialog);
   background: var(--hx-surface-panel);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 24px 80px color-mix(in srgb, var(--hx-brand) 8%, var(--hx-shadow));
+  animation: hx-pop var(--hx-motion-slow) var(--hx-ease-enter) both;
 }
 .account-form-header h2 {
   font-size: var(--hx-font-display);

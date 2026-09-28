@@ -5,6 +5,7 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .project-material-heading {
   display: flex;
@@ -30,8 +31,14 @@
   display: flex;
   align-items: flex-start;
   gap: var(--hx-space-3);
-  padding: var(--hx-space-3) 0;
+  padding: var(--hx-space-3) var(--hx-space-2);
   border-bottom: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-control);
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
+  cursor: pointer;
+}
+.project-material-option:hover {
+  background: var(--hx-surface-hover);
 }
 .project-material-option > input {
   width: auto;
@@ -68,7 +75,12 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--hx-space-2);
-  padding-block: var(--hx-space-2);
+  padding: var(--hx-space-2);
+  border-radius: var(--hx-radius-control);
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.project-material-selected-row:hover {
+  background: var(--hx-surface-hover);
 }
 .project-material-selected-row > div {
   flex: 1;

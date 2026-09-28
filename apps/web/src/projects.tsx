@@ -30,7 +30,7 @@ export function Projects() {
           新建项目
         </Button>
       </header>
-      <div className="work-tabs" aria-label="项目状态筛选">
+      <div className="tabs" aria-label="项目状态筛选">
         <button aria-pressed={!archived} onClick={() => setArchived(false)}>
           当前项目
         </button>
@@ -72,8 +72,23 @@ export function Projects() {
       </div>
       {!projects.length && (
         <Empty
+          icon={archived ? 'box' : 'folder'}
           title={archived ? '没有已归档项目' : '还没有当前项目'}
-          description="可切换项目状态查看历史，或新建项目开始工作。"
+          description={
+            archived
+              ? '归档的项目会留在这里，随时可以恢复。'
+              : '新建一个项目，把任务与成果归拢到同一处。'
+          }
+          action={
+            archived ? (
+              <Button onClick={() => setArchived(false)}>查看当前项目</Button>
+            ) : (
+              <Button variant="primary" onClick={() => setCreating(true)}>
+                <Icon name="plus" size={16} />
+                新建项目
+              </Button>
+            )
+          }
         />
       )}
       {creating && <NewProject onClose={() => setCreating(false)} />}
@@ -121,11 +136,16 @@ export function ProjectPage({ id }: { id: string }) {
   }, [manageable]);
   if (!project)
     return (
-      <Empty title="项目不存在或当前无权访问">
-        <Link className="button secondary" to="/projects">
-          返回项目
-        </Link>
-      </Empty>
+      <Empty
+        icon="folder"
+        title="项目不存在或当前无权访问"
+        description="链接可能已失效，或当前账号没有这个项目的权限。"
+        action={
+          <Link className="button secondary" to="/projects">
+            返回项目列表
+          </Link>
+        }
+      />
     );
   const members =
     data.mode === 'team-local'
@@ -172,7 +192,7 @@ export function ProjectPage({ id }: { id: string }) {
         </div>
       )}
       {data.mode === 'team-local' && <ProjectAccess project={project} />}
-      <div className="work-tabs">
+      <div className="tabs" role="tablist" aria-label="项目视图">
         {[
           ['tasks', '需求与任务'],
           ['overview', '总览'],
@@ -206,8 +226,20 @@ export function ProjectPage({ id }: { id: string }) {
           ))}
           {!results.length && (
             <Empty
+              icon="box"
               title="这个项目还没有成果"
-              description="在任务中分享当前进展，反馈会留在原任务。"
+              description="在任务里把进展分享出来，反馈会留在原任务上。"
+              action={
+                <Button
+                  variant="primary"
+                  disabled={!editable}
+                  onClick={() => {
+                    setTab('tasks');
+                  }}
+                >
+                  去任务里推进
+                </Button>
+              }
             />
           )}
         </div>
@@ -227,7 +259,7 @@ export function ProjectPage({ id }: { id: string }) {
           </section>
           <section className="work-section">
             <h2>项目成员{data.mode === 'local-preview' ? ' · 示例资料' : ''}</h2>
-            <div className="project-member-list">
+            <div className="project-member-list stagger">
               {members.map((member) => (
                 <div key={member.id}>
                   <Avatar user={member} />
@@ -259,7 +291,7 @@ export function ProjectPage({ id }: { id: string }) {
             <span className="muted">{tasks.length} 项任务</span>
           </div>
           {view === 'board' ? (
-            <div className="project-board">
+            <div className="project-board stagger">
               {(['todo', 'in_progress', 'done'] as const).map((status) => (
                 <section className="project-column" key={status}>
                   <header>
@@ -269,7 +301,7 @@ export function ProjectPage({ id }: { id: string }) {
                   {tasks
                     .filter((task) => task.status === status)
                     .map((task) => (
-                      <article className="project-task-card" key={task.id}>
+                      <article className="project-task-card spotlight" key={task.id}>
                         <Link to={`/tasks/${task.id}`}>
                           <span className="work-task-id">{task.shortId}</span>
                           <h3>{task.title}</h3>
@@ -308,7 +340,21 @@ export function ProjectPage({ id }: { id: string }) {
                 <TaskRow key={task.id} task={task} />
               ))}
               {!tasks.length && (
-                <Empty title="没有匹配的任务" description="试试其他关键词，或新建任务。" />
+                <Empty
+                  icon="list"
+                  title="没有匹配的任务"
+                  description="换一个筛选条件，或者直接新建一项任务。"
+                  action={
+                    <Button
+                      variant="primary"
+                      disabled={!editable}
+                      onClick={() => setCreating(true)}
+                    >
+                      <Icon name="plus" size={16} />
+                      新建任务
+                    </Button>
+                  }
+                />
               )}
             </div>
           )}

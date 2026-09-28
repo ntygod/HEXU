@@ -52,6 +52,8 @@
   border: 1px solid var(--hx-border-subtle);
   background: var(--hx-surface-panel);
   border-radius: var(--hx-radius-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  animation: hx-rise var(--hx-motion-normal) var(--hx-ease-enter) both;
 }
 .resource-notice > svg,
 .node-boundary > svg {
@@ -69,6 +71,7 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .preferences-surface h2 {
   font-size: var(--hx-font-heading);
@@ -111,6 +114,11 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    border-color var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .tool-resource > div,
 .resource-row > div,
@@ -193,6 +201,7 @@
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .node-card-heading {
   display: flex;
@@ -344,4 +353,17 @@
   .preference-row {
     flex-wrap: wrap;
   }
+}
+
+/* Settings/resources surfaces: quiet rows lift on hover, focus glow on inputs. */
+.resource-row,
+.preference-row,
+.tool-resource {
+  transition:
+    background var(--hx-motion-fast) var(--hx-ease-standard),
+    border-color var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.resource-row:hover,
+.tool-resource:hover {
+  border-color: var(--hx-text-muted);
 }

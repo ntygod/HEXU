@@ -289,9 +289,9 @@ export function ProjectSources({
           正在读取资料…
         </p>
       )}
-      <div className="source-grid">
+      <div className="source-grid stagger">
         {items.map((source) => (
-          <article className="source-card" key={source.id}>
+          <article className="source-card spotlight" key={source.id}>
             <button
               className="source-open"
               aria-label={`查看资料 ${source.title}`}
@@ -313,13 +313,26 @@ export function ProjectSources({
       </div>
       {!busy && !error && !items.length && (
         <Empty
+          icon={state === 'deleted' ? 'box' : query ? 'search' : 'file'}
           title={
             query ? '没有匹配的资料' : state === 'deleted' ? '没有已删除资料' : '还没有项目资料'
           }
           description={
             state === 'deleted'
               ? '删除仅移出当前列表，历史仍可查看和恢复。'
-              : '可以先保存一段项目说明或参考链接。'
+              : query
+                ? '换一个关键词，或者新建一条资料。'
+                : '可以先保存一段项目说明或参考链接。'
+          }
+          action={
+            !query && state !== 'deleted' && editable ? (
+              <Button variant="primary" onClick={() => setCreating(true)}>
+                <Icon name="plus" size={16} />
+                新建资料
+              </Button>
+            ) : query ? (
+              <Button onClick={() => setQuery('')}>清除关键词</Button>
+            ) : undefined
           }
         />
       )}

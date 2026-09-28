@@ -1,5 +1,5 @@
 import type { Message, Result, Task } from '../../../packages/contracts/src/index.js';
-import { Button, Empty, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
+import { Button, Empty, Icon, Skeleton, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp, useLoad, canEditTask } from './state.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { OrderPreview } from './preview.js';
@@ -24,7 +24,15 @@ export function Results() {
         ))}
       </div>
       {!data.results.length && (
-        <Empty title="还没有分享成果" description="在任务中保存一份成果说明，就会出现在这里。" />
+        <Empty
+          title="还没有分享成果"
+          description="在任务中保存一份成果说明，就会出现在这里。"
+          action={
+            <Link className="button soft" to="/projects">
+              去看项目 <Icon name="arrow" size={15} />
+            </Link>
+          }
+        />
       )}
     </div>
   );
@@ -37,8 +45,10 @@ export function ResultPage({ id }: { id: string }) {
   if (error) return <Empty title="无法打开成果" description={error} />;
   if (!value)
     return (
-      <div className="work-page" role="status">
-        正在打开成果…
+      <div className="work-page" role="status" aria-label="正在打开成果">
+        <Skeleton lines={2} width="42%" />
+        <Skeleton lines={3} />
+        <Skeleton lines={1} width="68%" />
       </div>
     );
   const { result, task, messages } = value;

@@ -30,6 +30,7 @@
 .work-page-heading .flex-line {
   flex-wrap: wrap;
 }
+/* Wide page-level tab strip: active marker springs in instead of snapping. */
 .work-tabs {
   display: flex;
   align-items: center;
@@ -40,15 +41,34 @@
   margin-bottom: var(--hx-space-5);
 }
 .work-tabs > button {
+  position: relative;
   border: 0;
-  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--hx-text-secondary);
   padding: 12px 0;
+  transition: color var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.work-tabs > button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hx-brand);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--hx-motion-normal) var(--hx-ease-spring);
+}
+.work-tabs > button:hover {
+  color: var(--hx-text-primary);
 }
 .work-tabs > button[aria-pressed='true'] {
-  border-bottom-color: var(--hx-brand-text);
   color: var(--hx-brand-text);
+}
+.work-tabs > button[aria-pressed='true']::after {
+  transform: scaleX(1);
 }
 .work-tabs > .muted {
   font-size: var(--hx-font-secondary);
@@ -355,6 +375,7 @@
   border-radius: var(--hx-radius-panel);
   background: var(--hx-bg-app);
   padding: var(--hx-space-3);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
 }
 .project-column > header {
   display: flex;
@@ -365,15 +386,29 @@
   font-size: var(--hx-font-secondary);
 }
 .project-task-card {
+  position: relative;
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
   background: var(--hx-surface-panel);
   margin-bottom: var(--hx-space-3);
   overflow: hidden;
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    transform var(--hx-motion-normal) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-normal) var(--hx-ease-standard),
+    border-color var(--hx-motion-normal) var(--hx-ease-standard);
+}
+.project-task-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    var(--hx-shadow-overlay) var(--hx-shadow);
 }
 .project-task-card > a {
   display: block;
   padding: var(--hx-space-3);
+  border-radius: inherit;
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
 }
 .project-task-card > a:hover {
   background: var(--hx-surface-hover);

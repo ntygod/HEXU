@@ -89,9 +89,16 @@ export function TaskPage({ id }: { id: string }) {
   }, [archived]);
   if (error)
     return (
-      <Empty title="暂时无法打开任务" description={error}>
-        <Button onClick={() => void refresh()}>重新加载</Button>
-      </Empty>
+      <Empty
+        icon="warning"
+        title="暂时无法打开任务"
+        description={error}
+        action={
+          <Button variant="primary" onClick={() => void refresh()}>
+            重新加载
+          </Button>
+        }
+      />
     );
   if (!value)
     return (
@@ -251,7 +258,7 @@ export function TaskPage({ id }: { id: string }) {
         <span>
           <Icon name="chat" size={15} /> 过程与讨论
         </span>
-        <div className="task-mobile-tabs" aria-label="任务面板">
+        <div className="tabs task-mobile-tabs" aria-label="任务面板">
           <button
             aria-pressed={mobilePane === 'discussion'}
             onClick={() => setMobilePane('discussion')}
@@ -425,7 +432,7 @@ export function TaskPage({ id }: { id: string }) {
           </>
         </section>
         <section className="output-panel" aria-label="代码与成果">
-          <div className="workspace-tabs">
+          <div className="tabs workspace-tabs" role="tablist" aria-label="代码与成果">
             {[
               ['preview', '预览'],
               ['code', '代码变更'],
@@ -433,7 +440,8 @@ export function TaskPage({ id }: { id: string }) {
             ].map(([key, label]) => (
               <button
                 key={key}
-                className={rightTab === key ? 'selected' : ''}
+                role="tab"
+                aria-selected={rightTab === key}
                 onClick={() => setRightTab(key!)}
               >
                 {label}
@@ -445,13 +453,15 @@ export function TaskPage({ id }: { id: string }) {
               <OrderPreview />
             ) : (
               <Empty
+                icon="monitor"
                 title="成果会出现在这里"
                 description="当前任务没有示例预览。可以先分享一份文字成果。"
-              >
-                <Button disabled={!editable} onClick={() => setModal('share')}>
-                  分享成果
-                </Button>
-              </Empty>
+                action={
+                  <Button variant="primary" disabled={!editable} onClick={() => setModal('share')}>
+                    分享成果
+                  </Button>
+                }
+              />
             )
           ) : rightTab === 'code' ? (
             lastRun?.provider === 'node' ? (
@@ -478,11 +488,20 @@ export function TaskPage({ id }: { id: string }) {
                 </article>
               ))}
               {!results.length && (
-                <Empty title="还没有分享成果">
-                  <Button disabled={!editable} onClick={() => setModal('share')}>
-                    写一份成果说明
-                  </Button>
-                </Empty>
+                <Empty
+                  icon="box"
+                  title="还没有分享成果"
+                  description="把这次推进记录下来，成果会保留在任务上。"
+                  action={
+                    <Button
+                      variant="primary"
+                      disabled={!editable}
+                      onClick={() => setModal('share')}
+                    >
+                      写一份成果说明
+                    </Button>
+                  }
+                />
               )}
             </div>
           )}
@@ -555,11 +574,24 @@ export function TaskPage({ id }: { id: string }) {
             ))}
             {!runs.length && (
               <Empty
+                icon="play"
                 title="还没有执行记录"
                 description={
                   team
                     ? '可在本人已授权节点执行；配对本身不授予执行权限。'
                     : '可以用模拟适配器体验执行过程。'
+                }
+                action={
+                  <Button
+                    variant="primary"
+                    disabled={!editable || archived}
+                    onClick={() => {
+                      setDrawer(null);
+                      setModal('continue');
+                    }}
+                  >
+                    开始一次执行
+                  </Button>
                 }
               />
             )}

@@ -30,8 +30,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--hx-space-3);
-  padding: var(--hx-space-3) 0;
+  padding: var(--hx-space-3) var(--hx-space-2);
   border-bottom: 1px solid var(--hx-border-muted);
+  border-radius: var(--hx-radius-control);
+  transition: background var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.participant-row:hover {
+  background: var(--hx-surface-hover);
 }
 .participant-row > div {
   min-width: 0;

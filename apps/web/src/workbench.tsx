@@ -96,7 +96,15 @@ export function Workbench() {
                 </div>
               </>
             ) : (
-              <Empty title="从一项工作开始" description="只需一个标题，就能保存想法和展开讨论。" />
+              <Empty
+                title="从一项工作开始"
+                description="只需一个标题，就能保存想法和展开讨论。"
+                action={
+                  <Link className="button primary" to="/projects">
+                    新建任务 <Icon name="plus" size={16} />
+                  </Link>
+                }
+              />
             )}
           </section>
           <section className="work-section">
