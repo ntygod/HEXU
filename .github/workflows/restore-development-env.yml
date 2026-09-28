@@ -1,0 +1,32 @@
+name: Restore development environment
+on:
+  push:
+    branches: [codex/checkpoint-restore-write]
+    paths: [.github/workflows/restore-development-env.yml]
+permissions:
+  contents: read
+jobs:
+  environment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Package public source and locked runtime for offline development
+        run: |
+          mkdir -p /tmp/hexu-offline/bin
+          cp "$(command -v node)" /tmp/hexu-offline/bin/node
+          git archive HEAD -o /tmp/hexu-offline/source.tar
+          tar -czf /tmp/hexu-offline/dependencies.tgz node_modules
+          tar -czf /tmp/hexu-offline.tgz -C /tmp hexu-offline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexu-restore-offline
+          path: /tmp/hexu-offline.tgz
+          retention-days: 1
