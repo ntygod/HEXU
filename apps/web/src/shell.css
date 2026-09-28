@@ -129,11 +129,8 @@
 }
 .workbench-frame {
   display: grid;
-  grid-template-columns: var(--hx-navigation-width) var(--hx-guide-width) minmax(0, 1fr);
+  grid-template-columns: var(--hx-navigation-width) auto minmax(0, 1fr);
   min-height: calc(100dvh - var(--shell-topbar-height));
-}
-.app-shell[data-guide='closed'] .workbench-frame {
-  grid-template-columns: var(--hx-navigation-width) minmax(0, 1fr);
 }
 .navigation-rail {
   position: sticky;
@@ -207,12 +204,29 @@
   height: calc(100dvh - var(--shell-topbar-height));
   display: flex;
   flex-direction: column;
+  width: var(--hx-guide-width);
   min-width: 0;
   border-right: 1px solid var(--hx-border-subtle);
   background: var(--hx-surface-panel);
+  transform: translateX(0);
+  opacity: 1;
+  transition:
+    transform var(--hx-motion-slow) var(--hx-ease-standard),
+    opacity var(--hx-motion-normal) var(--hx-ease-standard),
+    visibility var(--hx-motion-slow);
 }
-.context-guide[hidden] {
-  display: none;
+.app-shell[data-guide='closed'] .context-guide {
+  transform: translateX(-100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.context-guide > * {
+  transition: opacity var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.app-shell[data-guide='closed'] .context-guide > * {
+  opacity: 0;
 }
 .context-guide-heading {
   display: flex;

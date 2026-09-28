@@ -168,8 +168,9 @@ export function AppShell({ children, onSearch }: { children: ReactNode; onSearch
           className="context-guide"
           ref={guideRef}
           id="project-guide"
-          hidden={!guideOpen}
+          data-collapsed={!guideOpen || undefined}
           aria-label="项目导引栏"
+          aria-hidden={!guideOpen}
         >
           <div className="context-guide-heading">
             <strong>{project?.name ?? '项目与工作'}</strong>

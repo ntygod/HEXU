@@ -4,6 +4,14 @@
 * {
   box-sizing: border-box;
 }
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
 body {
   margin: 0;
   background: var(--hx-bg-app);
@@ -475,7 +483,7 @@ body::after {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--hx-brand) 32%, transparent);
+  background: color-mix(in srgb, var(--hx-brand) 24%, transparent);
   color: var(--hx-text-primary);
 }
 

@@ -45,10 +45,17 @@ export function go(path: string) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 /** Route chrome that belongs to the document, not a page component: title, scroll, focus. */
+const hashJump = { current: false };
 export function useRouteChrome(path: string) {
   useEffect(() => {
     const title = TITLES.find(([pattern]) => pattern.test(path))?.[1] ?? '工作台';
     document.title = `${title} · HEXU 合序`;
+    // Same path with only the hash changing is an in-page anchor jump: leave
+    // scroll and focus to the browser instead of yanking the view to the top.
+    if (hashJump.current) {
+      hashJump.current = false;
+      return;
+    }
     const key = (history.state as { hxKey?: string } | null)?.hxKey;
     const saved = key ? scrollMemory.get(key) : undefined;
     if (saved) scrollTo(saved.x, saved.y);
@@ -81,6 +88,8 @@ export function Link({
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
           return;
         event.preventDefault();
+        const target = new URL(to, location.href);
+        if (target.pathname === location.pathname && target.hash) hashJump.current = true;
         go(to);
       }}
     >

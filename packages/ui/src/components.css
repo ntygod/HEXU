@@ -9,12 +9,19 @@ select {
   min-height: var(--hx-control-height);
   padding: calc(var(--hx-density-unit) / 2) var(--hx-space-3);
   min-width: 0;
-  transition: border-color var(--hx-motion-fast);
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
+  transition:
+    border-color var(--hx-motion-fast),
+    box-shadow var(--hx-motion-fast);
 }
 input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--hx-brand);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 0 0 3px var(--hx-ring);
+  outline: none;
 }
 input[type='checkbox'],
 input[type='radio'] {
@@ -43,9 +50,12 @@ select:disabled {
   line-height: var(--hx-line-height-body);
   font-weight: 500;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 var(--hx-edge-light);
   transition:
     background var(--hx-motion-fast),
-    border-color var(--hx-motion-fast);
+    border-color var(--hx-motion-fast),
+    box-shadow var(--hx-motion-fast),
+    transform var(--hx-motion-fast);
 }
 .button {
   transition-property: background, border-color, transform, box-shadow;
@@ -158,6 +168,23 @@ select:disabled {
   font-size: var(--hx-font-secondary);
   font-weight: 500;
   flex-shrink: 0;
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 0 0 1px var(--hx-border-subtle);
+  transition:
+    transform var(--hx-motion-fast) var(--hx-ease-standard),
+    box-shadow var(--hx-motion-fast) var(--hx-ease-standard);
+}
+.avatar:hover {
+  transform: scale(1.06);
+  box-shadow:
+    inset 0 1px 0 var(--hx-edge-light),
+    0 0 0 2px var(--hx-brand),
+    0 2px 12px color-mix(in srgb, var(--hx-brand) 24%, transparent);
+}
+.avatar:active {
+  transform: scale(0.96);
+  transition-duration: 0ms;
 }
 .avatar.small {
   width: 24px;
@@ -298,7 +325,8 @@ select:disabled {
     inset 0 1px 0 var(--hx-edge-light);
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-dialog);
-  background: var(--hx-surface-panel);
+  background: var(--hx-glass);
+  backdrop-filter: blur(24px) saturate(1.4);
   color: var(--hx-text-primary);
   width: 520px;
   max-width: calc(100vw - 28px);
@@ -404,7 +432,8 @@ select:disabled {
   padding: 12px 16px;
   border: 1px solid var(--hx-border-subtle);
   border-radius: var(--hx-radius-panel);
-  background: var(--hx-surface-raised);
+  background: var(--hx-glass);
+  backdrop-filter: blur(16px) saturate(1.3);
   color: var(--hx-text-primary);
   box-shadow: var(--hx-shadow-overlay) var(--hx-shadow);
   z-index: var(--hx-z-toast);
