@@ -13,9 +13,10 @@ import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import { readCredentials, type NodeCredentials } from './storage.js';
 import { nodeRequest } from './connection.js';
 import { buildRestorePlan, inspectRestoreTarget } from './checkpoint-restore-plan.js';
+import type { ObjectReader } from './checkpoint-objects.js';
 
 // Must match the immutable retention-v1 binding; no source/model permission upgrade.
-const bindingFor = (c: NodeCredentials) =>
+export const restoreBinding = (c: NodeCredentials) =>
   createHash('sha256')
     .update(
       canonicalJson([
@@ -30,13 +31,13 @@ const bindingFor = (c: NodeCredentials) =>
       ]),
     )
     .digest('hex');
-function privatePath(path: string, directory: boolean) {
-  const s = lstatSync(path);
+export function restorePrivatePath(path: string, directory: boolean) {
+  const s = lstatSync(path, { bigint: true });
   if (
     s.isSymbolicLink() ||
     (directory ? !s.isDirectory() : !s.isFile()) ||
-    s.mode & 0o077 ||
-    (process.getuid && s.uid !== process.getuid())
+    s.mode & 0o077n ||
+    (process.getuid && s.uid !== BigInt(process.getuid()))
   )
     throw new DomainError('INSECURE_STATE_DIRECTORY', '恢复预检只读取当前用户独占的原本机状态');
   for (let p = dirname(path); ; p = dirname(p)) {
@@ -57,16 +58,26 @@ interface BundleRow {
   pending: string | null;
 }
 
-/** Owner-only local preflight. Reads the existing vault in a read-only SQLite
- * snapshot; no creation/retention report, renewal, replay, repair or filesystem write. */
-export async function localRestorePreflight(
+export interface RestoreSource {
+  home: string;
+  binding: string;
+  ticket: RetentionTicket;
+  manifest: ReturnType<typeof parseRetentionManifest>;
+  protectedPaths: string[];
+  protectedIdentities: string[];
+  stillBound(): void;
+  authorized(): Promise<void>;
+  snapshot<T>(consume: (read: ObjectReader) => Promise<T>): Promise<T>;
+}
+
+/** Shared owner/retention checks. A short read transaction is held only inside
+ * snapshot(), never across a user prompt. The caller cannot import an old plan as authority. */
+export async function withRestoreSource<T>(
   home: string,
   id: string,
-  target: string,
-  ask: (prompt: string) => Promise<string>,
-  log: (message: string) => void = console.log,
-  signal?: AbortSignal,
-) {
+  signal: AbortSignal | undefined,
+  visit: (source: RestoreSource) => Promise<T>,
+): Promise<T> {
   nodeId(id);
   if (process.platform !== 'linux')
     throw new DomainError('PLATFORM_UNSUPPORTED', '当前恢复预检仅支持 Linux 普通文件/目录');
@@ -80,17 +91,16 @@ export async function localRestorePreflight(
   const database = join(vaultHome, 'journal.sqlite');
   // Unlike ensurePrivateHome/RetentionVault, this command must not initialize state.
   const paths = [home, vaultHome, database];
-  const identities = paths.map((path, i) => privatePath(path, i !== 2));
+  const identities = paths.map((path, i) => restorePrivatePath(path, i !== 2));
   const credentials = readCredentials(home);
   if (!credentials.nodeId) throw new DomainError('NOT_PAIRED', '请先完成本机配对');
-  const binding = bindingFor(credentials);
+  const binding = restoreBinding(credentials);
   const protectedPaths = [home, ...credentials.directories.flatMap((w) => [w.root, w.gitDir])];
-  const targetBefore = inspectRestoreTarget(target, protectedPaths);
   const stillBound = () => {
     live();
     if (
-      bindingFor(readCredentials(home)) !== binding ||
-      paths.some((path, i) => privatePath(path, i !== 2) !== identities[i])
+      restoreBinding(readCredentials(home)) !== binding ||
+      paths.some((path, i) => restorePrivatePath(path, i !== 2) !== identities[i])
     )
       throw new DomainError('CHECKPOINT_SCOPE_CHANGED', '本机身份、目录绑定或副本状态位置发生变化');
   };
@@ -131,6 +141,10 @@ export async function localRestorePreflight(
       );
       stillBound();
       if (
+        canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
+      )
+        throw new DomainError('RESTORE_NOT_AVAILABLE', '本机副本状态已变化');
+      if (
         current?.state !== 'retained' ||
         current.nodeAuthorized !== true ||
         current.sequence !== row.sequence ||
@@ -144,37 +158,22 @@ export async function localRestorePreflight(
       if (Date.parse(manifest.expiresAt) <= Date.now())
         throw new DomainError('RESTORE_RETENTION_EXPIRED', '副本已到期，不续期或读取恢复材料');
     };
-    await authorized();
-    log(`保留请求 ${id} · 提交 ${manifest.commit} · 到期 ${manifest.expiresAt}`);
-    log(`目标：${target}`);
-    log(
-      '仅生成本机恢复预检和文件清单；可能含已提交的敏感文件名。不会创建目录、恢复文件或授权模型执行。',
-    );
-    if ((await ask(`输入 PLAN ${id}：`)) !== `PLAN ${id}`)
-      throw new DomainError('CONFIRMATION_REQUIRED', '已取消恢复预检，没有创建目标目录');
-    await authorized();
-    // Do not hold a SQLite read lock while waiting for the user's confirmation.
-    db.exec('BEGIN');
-    if (
-      canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
-    )
-      throw new DomainError('RESTORE_NOT_AVAILABLE', '确认期间本机副本状态已变化');
-    const count = db
-      .prepare(
-        'SELECT COUNT(*) AS n,COALESCE(SUM(length(data)),0) AS bytes FROM objects WHERE bundle_id=?',
+    const snapshot = async <T>(consume: (read: ObjectReader) => Promise<T>): Promise<T> => {
+      await authorized();
+      // Do not hold a SQLite read lock while waiting for the user's confirmation.
+      db.exec('BEGIN');
+      if (
+        canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
       )
-      .get(id) as { n: number; bytes: number };
-    if (count.n !== manifest.coverage.objects || count.bytes !== manifest.coverage.bytes)
-      throw new DomainError('SNAPSHOT_INCOMPLETE', '持久副本对象缺失或大小不符，不从原仓库修补');
-    const plan = await buildRestorePlan(
-      {
-        requestId: id,
-        checkpointId: ticket.checkpointId,
-        nodeId: ticket.nodeId,
-        workspaceId: ticket.workspaceId,
-        manifest,
-      },
-      async (oid, type, max) => {
+        throw new DomainError('RESTORE_NOT_AVAILABLE', '确认期间本机副本状态已变化');
+      const count = db
+        .prepare(
+          'SELECT COUNT(*) AS n,COALESCE(SUM(length(data)),0) AS bytes FROM objects WHERE bundle_id=?',
+        )
+        .get(id) as { n: number; bytes: number };
+      if (count.n !== manifest.coverage.objects || count.bytes !== manifest.coverage.bytes)
+        throw new DomainError('SNAPSHOT_INCOMPLETE', '持久副本对象缺失或大小不符，不从原仓库修补');
+      const read: ObjectReader = async (oid, type, max) => {
         stillBound();
         const meta = db
           .prepare('SELECT type,length(data) AS size FROM objects WHERE bundle_id=? AND oid=?')
@@ -186,22 +185,74 @@ export async function localRestorePreflight(
           data: Uint8Array;
         };
         return Buffer.from(value.data);
-      },
-      target,
+      };
+      let result: T;
+      try {
+        result = await consume(read);
+      } finally {
+        db.exec('ROLLBACK');
+      }
+      // Snapshot availability is not authority. Recheck after traversal before exposing names.
+      await authorized();
+      if (
+        canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
+      )
+        throw new DomainError('RESTORE_NOT_AVAILABLE', '核验后本机副本状态已变化');
+      return result;
+    };
+    return await visit({
+      home,
+      binding,
+      ticket,
+      manifest,
       protectedPaths,
-      signal,
-    );
-    db.exec('ROLLBACK');
-    // Snapshot availability is not authority. Recheck after traversal before exposing names.
-    await authorized();
-    if (
-      canonicalJson(db.prepare('SELECT * FROM bundles WHERE id=?').get(id)) !== canonicalJson(row)
-    )
-      throw new DomainError('RESTORE_NOT_AVAILABLE', '核验后本机副本状态已变化');
-    if (canonicalJson(inspectRestoreTarget(target, protectedPaths)) !== canonicalJson(targetBefore))
-      throw new DomainError('RESTORE_TARGET_CHANGED', '确认或预检期间目标父目录已变化');
-    return plan;
+      stillBound,
+      authorized,
+      snapshot,
+      protectedIdentities: credentials.directories.flatMap((w) => [w.rootIdentity, w.gitIdentity]),
+    });
   } finally {
     db.close(); // Closing rolls back the read transaction, without changing lifecycle evidence.
   }
+}
+
+/** Owner-only read-only preflight: no local journal, directory or lifecycle mutation. */
+export async function localRestorePreflight(
+  home: string,
+  id: string,
+  target: string,
+  ask: (prompt: string) => Promise<string>,
+  log: (message: string) => void = console.log,
+  signal?: AbortSignal,
+) {
+  return withRestoreSource(home, id, signal, async (source) => {
+    const { manifest, ticket, protectedPaths } = source;
+    const targetBefore = inspectRestoreTarget(target, protectedPaths);
+    await source.authorized();
+    log(`保留请求 ${id} · 提交 ${manifest.commit} · 到期 ${manifest.expiresAt}`);
+    log(`目标：${target}`);
+    log(
+      '仅生成本机恢复预检和文件清单；可能含已提交的敏感文件名。不会创建目录、恢复文件或授权模型执行。',
+    );
+    if ((await ask(`输入 PLAN ${id}：`)) !== `PLAN ${id}`)
+      throw new DomainError('CONFIRMATION_REQUIRED', '已取消恢复预检，没有创建目标目录');
+    const plan = await source.snapshot((read) =>
+      buildRestorePlan(
+        {
+          requestId: id,
+          checkpointId: ticket.checkpointId,
+          nodeId: ticket.nodeId,
+          workspaceId: ticket.workspaceId,
+          manifest,
+        },
+        read,
+        target,
+        protectedPaths,
+        signal,
+      ),
+    );
+    if (canonicalJson(inspectRestoreTarget(target, protectedPaths)) !== canonicalJson(targetBefore))
+      throw new DomainError('RESTORE_TARGET_CHANGED', '确认或预检期间目标父目录已变化');
+    return plan;
+  });
 }

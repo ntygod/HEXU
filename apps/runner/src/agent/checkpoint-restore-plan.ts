@@ -95,7 +95,7 @@ export function inspectRestoreTarget(
   const parents: RestoreTargetObservation['parents'] = [];
   let current = dirname(target);
   for (;;) {
-    const s = lstatSync(current);
+    const s = lstatSync(current, { bigint: true });
     if (s.isSymbolicLink() || !s.isDirectory()) throw invalidPath();
     parents.push({ path: current, identity: `${s.dev}:${s.ino}` });
     const next = dirname(current);
