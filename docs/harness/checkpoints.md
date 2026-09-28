@@ -5,7 +5,7 @@
 ## 从哪里下手
 
 - 目标：[12 工作包](../development/12-handoff-sharing.md)；恢复的当前交付范围只在 [22](../development/22-next-delivery.md) 维护。
-- 使用：[提交引用](../engineering/commit-checkpoints.md)、[对象保留](../engineering/checkpoint-retention.md)。
+- 使用：[提交引用](../engineering/commit-checkpoints.md)、[对象保留](../engineering/checkpoint-retention.md)、[只读恢复预检](../engineering/checkpoint-restore-plan.md)。
 - 代码：[CLI 核对](../../apps/runner/src/agent/checkpoints.ts)、[对象遍历](../../apps/runner/src/agent/checkpoint-objects.ts)、[私有副本](../../apps/runner/src/agent/checkpoint-retention.ts)、[记录事务](../../packages/db/src/checkpoint-retention.ts)。
 
 ## 不可变提交引用
@@ -22,11 +22,17 @@ Keep commit references immutable. Retention needs a separate owner/task-authoriz
 
 Manifest and reports are immutable; local pending evidence is durable and exact-sequence replay cannot recapture, renew or revive deletion. Report sequence100 is reserved for deletion after99 lifecycle observations. Expiry invalidates material use, not an automatic disk wipe; explicit local deletion removes only that bundle. Uncertain/revoked publication stays honest. Read metadata under current parent permissions, never upload names/code/paths/key bindings. Local byte storage is private but not encrypted or an OS sandbox. New browser retention cases use a separate disposable4317 process without changing auth/test limits.
 
-Next is explicit independent-new-directory restoration per22, still unimplemented. Do not imply a local retained object snapshot proves live disk availability, complete external content, remote transfer or successful file restoration.
+## 只读恢复预检与未来写入边界
+
+[计划核心](../../apps/runner/src/agent/checkpoint-restore-plan.ts) 和[本机编排](../../apps/runner/src/agent/checkpoint-restore-preflight.ts) 仅生成 Linux 普通文件/目录计划。原本人逐次 PLAN 同意后，从现有私有 SQLite 的只读快照核验持久对象，不初始化状态、不重新采集、不续期/修补/重放或发布保留回执。等待用户输入期间不持有数据库读事务；开始读取与返回文件名之前重查当前节点权限、原绑定、原清单与期限。路径和文件名只输出在本机，不新增浏览器任意路径 RPC。
+
+名字不做静默改名：拒绝非 UTF-8、控制/格式字符、危险片段、大小写/规范化冲突、符号链接/LFS/子模块；展开体积按每个路径计数，不借重复对象绕过限制。已提交敏感文件仍可能包含在材料中，不能把排除节点凭证等外部状态说成过滤了所有秘密。
+
+计划明确 restored=false、writeAuthorized=false。目标和父目录身份只是当前观察，不是预留、授权或抗竞态写入实现；实际写入必须重新检查并以排他/不覆盖语义发布，详见22。不得把计划、哈希或副本核验作为成功恢复、远程传输、完整外部内容或 Task/Run/Operation 已接管的证据。暂存写入、持久进度、失败清理仍未实现。
 
 ## 如何验证与回写
 
-按改动复用 [引用事务](../../tests/checkpoints.test.ts)、[Git/CLI](../../tests/checkpoint-runner.test.ts)、[保留事务](../../tests/checkpoint-retention.test.ts)、[对象副本](../../tests/checkpoint-retention-runner.test.ts)。检查原仓库不变、链接/路径与绑定、损坏/缺失/到期、撤权和不确定回执，不通过真实用户目录测试删除。
+按改动复用 [引用事务](../../tests/checkpoints.test.ts)、[Git/CLI](../../tests/checkpoint-runner.test.ts)、[保留事务](../../tests/checkpoint-retention.test.ts)、[对象副本](../../tests/checkpoint-retention-runner.test.ts)、[恢复计划](../../tests/checkpoint-restore-plan.test.ts) 和[本机预检](../../tests/checkpoint-restore-preflight.test.ts)。检查原仓库不变、链接/路径与绑定、损坏/缺失/到期、撤权和不确定回执，不通过真实用户目录测试删除。
 
 只运行改动涉及的检查；平台限制、真实模型未验证和未完成范围要写清楚。能力或契约变化更新 [21](../development/21-implementation-status.md) 与 [19](../development/19-work-items.md) 的原工作项，不把测试数量当作功能完成度。
 
