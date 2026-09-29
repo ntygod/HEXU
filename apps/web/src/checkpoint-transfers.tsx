@@ -1,3 +1,4 @@
+import { CheckpointRestoreResults } from './checkpoint-restore-results.js';
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
 import type { RetentionView } from '../../../packages/contracts/src/checkpoint-retention.js';
@@ -243,6 +244,32 @@ function TransferCard({
           </p>
         </details>
       )}
+      {view.state === 'received' && (
+        <section className="receiver-restore" aria-label="接收副本恢复">
+          <p>
+            收到对象不等于文件已恢复。接收节点需以自己的原身份重新预检并确认写入与发布，不继承发送者目录权限。
+          </p>
+          {recipient &&
+            editable &&
+            view.authorized &&
+            t.manifest.expiresAt > new Date().toISOString() && (
+              <details>
+                <summary>在接收节点恢复到新目录</summary>
+                <p>
+                  以下路径仅在接收节点本机指定；每次分别输入 PLAN、RESTORE 和
+                  PUBLISH。不会使用发送者凭证，也不自动启动模型。
+                </p>
+                <pre aria-label="接收副本预检命令">{`npm run runner:restore-plan -- --transfer ${t.id} --state /path/to/receiver-state --target /existing/parent/new-directory`}</pre>
+                <pre aria-label="接收副本恢复命令">{`npm run runner:restore -- --transfer ${t.id} --state /path/to/receiver-state --target /existing/parent/new-directory`}</pre>
+              </details>
+            )}
+          <CheckpointRestoreResults
+            retentionPath={`${path}/${encodeURIComponent(t.id)}`}
+            editable={recipient && editable && view.authorized}
+            sourceKind="transfer"
+          />
+        </section>
+      )}
       <Feedback command={command} />
       {editable && active(view.state) && !command.denied && (
         <Button
@@ -277,7 +304,7 @@ function Panel({ path, task, retention }: { path: string; task: Task; retention:
           个对象；服务只暂存密文，接收端独立核验后才报告收到。
         </p>
         <p>
-          可能包含已提交的敏感内容。接收副本的目标恢复入口尚未接入；不要修改原节点绑定来绕过限制。
+          可能包含已提交的敏感内容。已确认接收的副本可由接收节点另行恢复；不修改原节点绑定或复制发送者账号。
         </p>
       </div>
       {read.error && (

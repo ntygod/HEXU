@@ -100,6 +100,22 @@ export function attachCheckpoints(app: FastifyInstance, store: Store) {
   app.post('/runner/v1/checkpoint-transfer', { bodyLimit: 131072 }, async (r) =>
     transfers.command(token(r), r.body),
   );
+  const transferRestorePath = transferPath + '/:transferId/restores';
+  const transferId = (r: FastifyRequest) => nodeId((r.params as { transferId: string }).transferId);
+  app.get(transferRestorePath, async (r) =>
+    results.listTransfer(...resultScope(r), transferId(r), parseCheckpointCursor(r.query)),
+  );
+  app.get(transferRestorePath + '/:restoreId/reports', async (r) =>
+    results.historyTransfer(
+      ...resultScope(r),
+      transferId(r),
+      nodeId((r.params as { restoreId: string }).restoreId),
+      parseCheckpointCursor(r.query),
+    ),
+  );
+  app.post('/runner/v1/checkpoint-transfer-restore-report', async (r, reply) =>
+    reply.code(201).send(results.reportTransfer(token(r), r.body)),
+  );
   const sweep = setInterval(() => {
     try {
       transfers.sweep();

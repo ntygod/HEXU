@@ -33,7 +33,11 @@ export interface RestoreResultView {
   checkpointId: string;
   taskId: string;
   nodeId: string;
-  workspaceId: string;
+  workspaceId: string | null;
+  sourceKind?: 'transfer';
+  transferId?: string;
+  sourceRequestId?: string;
+  sourceNodeId?: string;
   ownerId: string;
   commit: string;
   retentionExpiresAt: string;
@@ -126,7 +130,10 @@ export function parseRestoreResult(input: unknown): RestoreResultReport {
   return r;
 }
 export function parseRestoreResultPacket(input: unknown) {
+  const hasSource =
+    input !== null && typeof input === 'object' && Object.hasOwn(input, 'sourceKind');
   const b = exact(input, [
+    ...(hasSource ? ['sourceKind'] : []),
     'requestId',
     'requestHash',
     'restoreId',
@@ -134,6 +141,8 @@ export function parseRestoreResultPacket(input: unknown) {
     'report',
     'confirmPublication',
   ]);
+  if (hasSource && b.sourceKind !== 'transfer')
+    throw new DomainError('INVALID_INPUT', '恢复报告来源种类不受支持');
   if (b.confirmPublication !== true)
     throw new DomainError('CONFIRMATION_REQUIRED', '需明确同意发布本机恢复元数据');
   const sequence = revision(b.sequence),
@@ -147,6 +156,7 @@ export function parseRestoreResultPacket(input: unknown) {
       '报告次数已满；最后一个序号仅保留清理结果，本机清理不受此限额影响',
     );
   return {
+    ...(hasSource ? { sourceKind: 'transfer' as const } : {}),
     requestId: nodeId(b.requestId),
     requestHash: checkpointHash(b.requestHash),
     restoreId: nodeId(b.restoreId),

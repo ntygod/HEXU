@@ -52,6 +52,7 @@ export async function nodeRequest<T>(
       'checkpoint-retention-inspect',
       'checkpoint-retention-report',
       'checkpoint-restore-report',
+      'checkpoint-transfer-restore-report',
       'checkpoint-transfer',
     ].includes(path)
   )

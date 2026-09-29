@@ -91,6 +91,11 @@ function Result({ result, path }: { result: RestoreResultView; path: string }) {
   const [history, setHistory] = useState(false);
   return (
     <article className="restore-result-card" aria-label="恢复结果记录">
+      {result.sourceKind === 'transfer' && (
+        <p>
+          <strong>接收节点恢复 · 最后报告</strong>
+        </p>
+      )}
       <Summary report={result.report} />
       {!result.nodeAuthorized && (
         <p className="form-error">
@@ -112,8 +117,19 @@ function Result({ result, path }: { result: RestoreResultView; path: string }) {
           来源提交 <code>{result.commit}</code>
         </p>
         <p>
-          保留请求 <code>{result.requestId}</code>
+          {result.sourceKind === 'transfer' ? '接收传输' : '保留请求'}{' '}
+          <code>{result.requestId}</code>
         </p>
+        {result.sourceKind === 'transfer' && (
+          <>
+            <p>
+              原保留请求 <code>{result.sourceRequestId}</code>
+            </p>
+            <p>
+              发送节点 <code>{result.sourceNodeId}</code>；恢复使用的是接收节点自己的身份。
+            </p>
+          </>
+        )}
         <p>来源对象保留至 {time(result.retentionExpiresAt)}，这不是输出目录的有效期限。</p>
         <p>
           计划指纹 <code>{result.report.planHash}</code>
@@ -132,19 +148,31 @@ function Result({ result, path }: { result: RestoreResultView; path: string }) {
 export function CheckpointRestoreResults({
   retentionPath,
   editable,
+  sourceKind,
 }: {
   retentionPath: string;
   editable: boolean;
+  sourceKind?: 'transfer';
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button onClick={() => setOpen((v) => !v)}>{open ? '收起恢复记录' : '查看恢复记录'}</Button>
-      {open && <Results path={retentionPath + '/restores'} editable={editable} />}
+      {open && (
+        <Results path={retentionPath + '/restores'} editable={editable} sourceKind={sourceKind} />
+      )}
     </>
   );
 }
-function Results({ path, editable }: { path: string; editable: boolean }) {
+function Results({
+  path,
+  editable,
+  sourceKind,
+}: {
+  path: string;
+  editable: boolean;
+  sourceKind?: 'transfer';
+}) {
   const [cursor, setCursor] = useState<number | null>(null);
   const read = useAssistanceRead<Page<RestoreResultView>>(
     path + (cursor ? `?cursor=${cursor}` : ''),
@@ -162,7 +190,8 @@ function Results({ path, editable }: { path: string; editable: boolean }) {
         <details>
           <summary>在本机报告或确认丢失的回执</summary>
           <p>
-            原节点使用原状态目录及恢复时选择的目标；逐次确认
+            {sourceKind === 'transfer' ? '接收节点' : '原节点'}
+            使用原状态目录及恢复时选择的目标；逐次确认
             REPORT。待确认时只重发原报告，不恢复文件或清理目录。
           </p>
           <pre>
