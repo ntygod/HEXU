@@ -36,6 +36,7 @@
 | 发布、拒绝、撤回接手邀请 | [任务接手邀请](handoff-invitations.md) |
 | 本机新核验、接受接手与操作者/可选负责人 | [接受接手](handoff-acceptance.md) |
 | 接手目录准备 Git、本人配对与新 Run | [接手现场研发](handoff-workspace.md) |
+| 同一 Task 的共同起点、方案定义与放弃 | [方案分支](work-branches.md) |
 
 ## 架构决策
 

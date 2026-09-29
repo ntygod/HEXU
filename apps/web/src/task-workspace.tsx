@@ -1,5 +1,6 @@
 import { TaskCheckpoints } from './checkpoints.js';
 import { TaskHandoffs } from './handoffs.js';
+import { TaskWorkBranches } from './work-branches.js';
 import { TaskAssistances } from './assistance.js';
 import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
@@ -211,6 +212,7 @@ export function TaskPage({ id }: { id: string }) {
           <TaskAssistances task={task} />
           <TaskCheckpoints task={task} />
           <TaskHandoffs task={task} />
+          <TaskWorkBranches task={task} />
           {task.operatorUserId && (
             <span aria-label="当前操作者">当前操作者：{task.operatorName ?? '记录中的成员'}</span>
           )}

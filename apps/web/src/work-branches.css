@@ -1,0 +1,44 @@
+.work-branches-panel,
+.work-branch-editor,
+.work-branch-group,
+.work-branch-card,
+.work-branch-specs,
+.work-branch-editor fieldset {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.work-branches-panel {
+  padding: var(--hx-space-4);
+}
+.work-branch-editor,
+.work-branch-group {
+  padding: var(--hx-space-4);
+  background: var(--hx-surface-panel);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+}
+.work-branch-card,
+.work-branch-notice {
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+}
+.work-branch-card header,
+.work-branch-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.work-branch-card header {
+  justify-content: space-between;
+}
+.work-branch-text {
+  white-space: pre-wrap;
+}
+.work-branch-group code {
+  word-break: break-all;
+}

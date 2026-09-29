@@ -1466,3 +1466,137 @@ test('接手研发配对丢失回执不泄露或重复生成，关闭与降权�
     await f.close();
   }
 });
+
+async function branchEditor(page: Page, f: Fixture) {
+  await prepare(page, f);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '方案分支', exact: true }).click();
+  const panel = page.getByRole('dialog', { name: '任务方案分支', exact: true });
+  await panel.getByRole('button', { name: '定义一组方案', exact: true }).click();
+  const checkpointId = (await pending(page, f)).checkpointId;
+  await panel.getByLabel('共同提交引用', { exact: true }).selectOption(checkpointId);
+  await panel.getByLabel('方案 1 目标', { exact: true }).fill('分批同步读取订单');
+  await panel.getByLabel('方案 2 目标', { exact: true }).fill('采用后台异步任务');
+  return panel;
+}
+test('方案分支固定真实共同提交，未知回执不重复创建，刷新和放弃各自保留历史', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const panel = await branchEditor(page, f);
+    const path = `${origin}/api/v1/tasks/${f.task.id}/work-branches`;
+    const requests: { key: string; body: unknown }[] = [];
+    let drop = true;
+    await page.route(path, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      requests.push({
+        key: route.request().headers()['idempotency-key']!,
+        body: route.request().postDataJSON(),
+      });
+      if (drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await panel.getByRole('button', { name: '保存方案组', exact: true }).click();
+    await expect(panel.getByLabel('方案请求待确认', { exact: true })).toBeVisible();
+    await expect(panel.getByLabel('方案 1 目标', { exact: true })).toHaveValue('分批同步读取订单');
+    await panel.getByRole('button', { name: '确认上次方案请求', exact: true }).click();
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toEqual(requests[1]);
+    await expect(panel.getByLabel('共同起点方案组', { exact: true })).toHaveCount(1);
+    const a = panel.getByRole('article', { name: '方案：方案 A', exact: true });
+    const b = panel.getByRole('article', { name: '方案：方案 B', exact: true });
+    await expect(a).toContainText('待准备');
+    await expect(b).toContainText('尚无独立目录、Run 或结果');
+    await panel.getByText('共同起点与范围', { exact: true }).click();
+    await expect(panel).toContainText(f.oid);
+    await a.getByRole('button', { name: '放弃此方案', exact: true }).click();
+    await expect(a).toContainText('已放弃');
+    await expect(b).toContainText('待准备');
+    await a.getByRole('button', { name: '查看方案历史', exact: true }).click();
+    await expect(a.getByLabel('方案历史', { exact: true })).toContainText('定义方案');
+    await expect(a.getByLabel('方案历史', { exact: true })).toContainText('放弃方案');
+    await mkdir('artifacts', { recursive: true });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.screenshot({ path: 'artifacts/103-work-branches-dark.png', fullPage: true });
+    await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/104-work-branches-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: '方案分支', exact: true }).click();
+    await expect(a).toContainText('已放弃');
+    await expect(b).toContainText('采用后台异步任务');
+    const detail = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(detail.runs).toHaveLength(0);
+    expect(detail.task.revision).toBe(1);
+    expect(await readFile(join(f.root, 'README.md'), 'utf8')).toBe(
+      'Not included in the reference\n',
+    );
+  } finally {
+    await page.unrouteAll().catch(() => {});
+    await f.close();
+  }
+});
+
+test('方案编辑固定任务基线，暂时读错保留目标，明确失权清空编辑与只读历史', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const panel = await branchEditor(page, f);
+    const path = `${origin}/api/v1/tasks/${f.task.id}/work-branches`;
+    const changed = await page.request.patch(`${origin}/api/v1/tasks/${f.task.id}`, {
+      headers: headers(f.space.id),
+      data: { expectedRevision: 1, description: '导出必须包含新增的退款字段' },
+    });
+    expect(changed.ok(), await changed.text()).toBe(true);
+    await expect(panel.getByLabel('共同任务版本变化')).toContainText('退款字段');
+    await expect(panel.getByRole('button', { name: '保存方案组', exact: true })).toBeDisabled();
+    await expect(panel.getByLabel('方案 2 目标', { exact: true })).toHaveValue('采用后台异步任务');
+    await panel.getByRole('button', { name: '已核对共同任务说明', exact: true }).click();
+    await page.route(path + '/options', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'TEMPORARY', message: '方案起点暂时不可读' } }),
+      }),
+    );
+    await expect(panel).toContainText('方案起点暂时不可读');
+    await expect(panel.getByLabel('方案 1 目标', { exact: true })).toHaveValue('分批同步读取订单');
+    await page.unroute(path + '/options');
+    await panel.getByRole('button', { name: '重读共同起点', exact: true }).click();
+    await expect(panel.getByRole('button', { name: '保存方案组', exact: true })).toBeEnabled();
+    await panel.getByRole('button', { name: '保存方案组', exact: true }).click();
+    await expect(panel.getByLabel('共同起点方案组', { exact: true })).toHaveCount(1);
+    await panel.getByRole('button', { name: '定义一组方案', exact: true }).click();
+    await panel.getByLabel('方案 1 目标', { exact: true }).fill('临时私有目标');
+    await page.route(path + '/options', (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'FORBIDDEN', message: '编辑权限失效' } }),
+      }),
+    );
+    await expect(panel).toContainText('临时方案已清除');
+    await expect(panel.getByLabel('方案定义编辑', { exact: true })).toHaveCount(0);
+    await expect(panel.getByLabel('共同起点方案组', { exact: true })).toHaveCount(1);
+    await page.route(path, (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'NOT_FOUND', message: '任务不可访问' } }),
+      }),
+    );
+    await expect(panel).toContainText('方案读取权限已失效');
+    await expect(panel.getByLabel('共同起点方案组', { exact: true })).toHaveCount(0);
+  } finally {
+    await page.unrouteAll().catch(() => {});
+    await f.close();
+  }
+});
