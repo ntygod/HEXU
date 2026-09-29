@@ -2,17 +2,17 @@
 
 更新：2026-09-28。本页只维护**下一项工作及后续顺序**；当前能力/检查看 [21](21-implementation-status.md)，原 ID、状态/依据/剩余范围看 [19](19-work-items.md)。用户明确指定的任务优先于这里的默认顺序。
 
-## 下一项：HX-DEV-12-02 独立新目录恢复
+## 下一项：HX-DEV-12-02 独立新目录恢复的暂存写入与明确发布
 
 目标：从已明确保留的单提交对象副本，按本机本人同意，恢复到从未存在的新目录。让用户知道来源、排除项和实际文件状态；这仍不是跨电脑传输、Handoff 接受或模型执行授权。
 
-已有本机提交引用、对象闭包核验、私有独立副本、期限、重新核验和明确删除。不重复实现这些切片，也不重新启动 W1 或草稿/协助开发。恢复本身尚未实现。
+已有本机提交引用、对象闭包核验、私有独立副本、期限、重新核验和明确删除。PR #17 已增加本机只读恢复预检：逐次 PLAN 确认、当前身份/原绑定重查、持久对象哈希、普通文件/目录清单、全新目标观察、名字冲突与展开体积限制；使用见[恢复预检](../engineering/checkpoint-restore-plan.md)。预检返回 restored=false、writeAuthorized=false，不预留目标、不持久保存恢复进度，也不是写入许可。实际恢复仍未实现，不重做预检、W1 或草稿/协助开发。
 
 ## 本轮范围
 
-1. 给出明确恢复计划：引用/副本身份、有效期限、支持的对象与排除内容。
+1. 复用已有恢复计划，并在实际执行时重新生成/核对：引用/副本身份、期限、支持对象、排除内容及可能包含已提交敏感内容的警告。旧 planHash 或先前预检通过不能作为写入许可。
 2. 本机操作者选择新的目标目录并逐次确认；浏览器不能用任意路径直接落盘，也不能复用源目录的模型写权限。
-3. 重新校验当前身份/原绑定、期限和持久对象；拒绝已存在或重叠目标、父目录符号链接、冲突路径及不支持的平台/链接语义。
+3. 重新校验当前身份/原绑定、期限和持久对象；拒绝已存在或重叠目标、父目录符号链接、冲突路径及不支持的平台/链接语义。预检的路径/父目录观察不能替代写入阶段的目录身份固定、排他创建与发布前检查。
 4. 逐对象写入本次创建的独立暂存目录，核对完成后再明确发布目标。不执行仓库 hooks/filter、脚本、安装或网络，不 reset/stash，不修改源 HEAD/index。
 5. 保存真实进度及失败/取消后的文件状态。只清理本次明确创建的材料，不删除用户原有目录；失败不伪装为已恢复，也不自动重放。
 
@@ -26,7 +26,7 @@
 
 - [检查点 harness](../harness/checkpoints.md)；触及节点授权/证据时补读 [节点 harness](../harness/nodes.md)。
 - [12 工作包](12-handoff-sharing.md)、[对象保留用法](../engineering/checkpoint-retention.md)。
-- [对象遍历](../../apps/runner/src/agent/checkpoint-objects.ts)、[私有副本](../../apps/runner/src/agent/checkpoint-retention.ts)、[保留事务](../../packages/db/src/checkpoint-retention.ts) 和相关现有测试。
+- [恢复计划](../../apps/runner/src/agent/checkpoint-restore-plan.ts)、[只读本机预检](../../apps/runner/src/agent/checkpoint-restore-preflight.ts) 与对应测试；按需复用[对象遍历](../../apps/runner/src/agent/checkpoint-objects.ts)、[私有副本](../../apps/runner/src/agent/checkpoint-retention.ts) 和[保留事务](../../packages/db/src/checkpoint-retention.ts)。
 
 采用按风险最少足够的验证。涉及真实 Git/目录/权限/取消时使用独立临时材料与相关 Linux 测试；不触及真实用户仓库。交付后更新同一 19/21/22，保留明确未实现范围。
 

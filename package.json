@@ -32,7 +32,8 @@
     "check:ui": "node scripts/check-ui-tokens.mjs",
     "check:codex-protocol": "npm run build:server && node scripts/check-codex-protocol.mjs",
     "runner": "node dist/apps/runner/src/cli.js",
-    "check:claude-protocol": "npm run build:server && node scripts/check-claude-protocol.mjs"
+    "check:claude-protocol": "npm run build:server && node scripts/check-claude-protocol.mjs",
+    "runner:restore-plan": "node dist/apps/runner/src/restore-plan.js"
   },
   "dependencies": {
     "better-auth": "1.7.6",

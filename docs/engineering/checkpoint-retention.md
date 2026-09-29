@@ -77,7 +77,7 @@ npm run runner -- forget-checkpoint --request <保留请求ID> --state /path/to/
 
 ## 尚未交付与验证
 
-12-02 完整定义仍部分实现：目标新目录恢复、恢复失败清理、跨电脑对象传输、LFS/子模块实体、祖先历史、未提交补丁、多仓库、远端仓库身份及 Handoff 发布/接受尚未交付。后续先设计并实现明确的新目录恢复，不直接借普通 Git checkout 运行过滤器或覆盖原工作区；不自动启动模型或转移责任。实际检查及失败记录统一见 [21](../development/21-implementation-status.md)。
+12-02 完整定义仍部分实现：目标新目录恢复、恢复失败清理、跨电脑对象传输、LFS/子模块实体、祖先历史、未提交补丁、多仓库、远端仓库身份及 Handoff 发布/接受尚未交付。现已有独立的[只读恢复预检](checkpoint-restore-plan.md)，可列出本机普通文件/目录计划并核对目标，但不创建目录或授予写入权。实际新目录恢复仍需另行实现，不直接借普通 Git checkout 运行过滤器或覆盖原工作区；不自动启动模型或转移责任。实际检查及失败记录统一见 [21](../development/21-implementation-status.md)。
 
 
 ## 本批验证记录
