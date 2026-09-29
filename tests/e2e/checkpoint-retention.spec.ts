@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Browser } from '@playwright/test';
+import { test, expect, request as apiRequest, type Page, type Browser } from '@playwright/test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile, rm, rename, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -94,8 +94,9 @@ async function setup(page: Page) {
       workspaces: [{ id: w!.id, name: w!.name }],
     }),
   });
-  expect(response.ok).toBe(true);
-  const node = (await response.json()) as { nodeId: string };
+  const paired = await response.json();
+  expect(response.ok, JSON.stringify(paired)).toBe(true);
+  const node = paired as { nodeId: string };
   writeCredentials(home, {
     version: 1,
     controlUrl: origin,
@@ -110,6 +111,11 @@ async function setup(page: Page) {
   await page.goto(origin);
   await page.getByLabel('当前工作空间', { exact: true }).selectOption(space.id);
   await page.goto(`${origin}/tasks/${task.id}`);
+  // The shared fictional account has the same bounded node allowance as a real
+  // user. Revoke only this test's owned nodes, even if its page has already closed.
+  const cleanup = await apiRequest.newContext({
+    storageState: await page.context().storageState(),
+  });
   return {
     dir,
     root,
@@ -119,7 +125,33 @@ async function setup(page: Page) {
     space,
     node,
     workspace: w!.id,
-    close: () => rm(dir, { recursive: true, force: true }),
+    close: async () => {
+      try {
+        const response = await cleanup.get(origin + '/api/v1/nodes', {
+          headers: headers(space.id),
+        });
+        expect(response.ok(), await response.text()).toBe(true);
+        const items = (await response.json()).items as {
+          id: string;
+          projectId: string;
+          canRevoke: boolean;
+          revokedAt: string | null;
+          revision: number;
+        }[];
+        for (const node of items.filter(
+          (n) => n.projectId === project.id && n.canRevoke && !n.revokedAt,
+        )) {
+          const revoked = await cleanup.post(`${origin}/api/v1/nodes/${node.id}/revoke`, {
+            headers: headers(space.id),
+            data: { expectedRevision: node.revision },
+          });
+          expect(revoked.ok(), await revoked.text()).toBe(true);
+        }
+      } finally {
+        await cleanup.dispose();
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
   };
 }
 async function pending(page: Page, f: Awaited<ReturnType<typeof setup>>) {
