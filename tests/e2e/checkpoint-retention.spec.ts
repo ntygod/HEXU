@@ -1485,6 +1485,10 @@ test('方案分支固定真实共同提交，未知回执不重复创建，刷�
     const panel = await branchEditor(page, f);
     const path = `${origin}/api/v1/tasks/${f.task.id}/work-branches`;
     const requests: { key: string; body: unknown }[] = [];
+    await panel.getByLabel('方案 2 名称', { exact: true }).fill('方案 A');
+    await expect(panel).toContainText('同组方案名称不能重复');
+    await expect(panel.getByRole('button', { name: '保存方案组', exact: true })).toBeDisabled();
+    await panel.getByLabel('方案 2 名称', { exact: true }).fill('方案 B');
     let drop = true;
     await page.route(path, async (route) => {
       if (route.request().method() !== 'POST') return route.continue();

@@ -41,6 +41,17 @@ test('方案定义严格限制共同提交、数量、目标与名称，不接�
     ],
   };
   assert.equal(parseWorkBranchCreate(body).branches.length, 2);
+  assert.throws(
+    () =>
+      parseWorkBranchCreate({
+        ...body,
+        branches: Array.from({ length: 6 }, (_, i) => ({
+          name: String(i),
+          goal: '中'.repeat(3000),
+        })),
+      }),
+    /24 KiB/,
+  );
   for (const extra of [
     { runId: 'x' },
     { workingCopyId: 'x' },

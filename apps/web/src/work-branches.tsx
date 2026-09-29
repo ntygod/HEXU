@@ -7,6 +7,7 @@ import type {
   WorkBranchPage,
   WorkBranchView,
 } from '../../../packages/contracts/src/work-branches.js';
+import { parseWorkBranchCreate } from '../../../packages/contracts/src/work-branches.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
@@ -61,18 +62,26 @@ function Editor({
   const stale = !!baseline && !!read.value && baseline.taskRevision !== read.value.taskRevision;
   const locked = command.busy || !!command.uncertain || !!read.error || !baseline;
   const chosen = baseline?.checkpoints.find((c) => c.id === checkpointId);
+  let payload: ReturnType<typeof parseWorkBranchCreate> | null = null;
+  let validationError = '';
+  if (baseline && chosen && specs.every((s) => s.name.trim() && s.goal.trim())) {
+    try {
+      payload = parseWorkBranchCreate({
+        expectedTaskRevision: baseline.taskRevision,
+        checkpointId,
+        branches: specs,
+      });
+    } catch (cause) {
+      validationError = (cause as Error).message;
+    }
+  }
   return (
     <form
       className="work-branch-editor"
       aria-label="方案定义编辑"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!locked && !stale && chosen && baseline)
-          void command.send(path, {
-            expectedTaskRevision: baseline.taskRevision,
-            checkpointId,
-            branches: specs,
-          });
+        if (!locked && !stale && payload) void command.send(path, payload);
       }}
     >
       <h3>从同一起点定义方案</h3>
@@ -197,13 +206,18 @@ function Editor({
         </section>
       )}
       <Feedback command={command} />
+      {validationError && (
+        <p role="alert" className="form-error">
+          {validationError}
+        </p>
+      )}
       <p>保存后各方案为待准备。当前不会创建目录、启动模型或产生结果。</p>
       <div className="work-branch-actions">
         <Button
           type="submit"
           variant="primary"
           busy={command.busy}
-          disabled={locked || stale || !chosen}
+          disabled={locked || stale || !payload}
         >
           保存方案组
         </Button>

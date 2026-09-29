@@ -65,11 +65,16 @@ export function parseWorkBranchCreate(input: unknown) {
   });
   if (new Set(branches.map((v) => v.name.normalize('NFC').toLowerCase())).size !== branches.length)
     throw new DomainError('INVALID_INPUT', '同组方案名称不能重复');
-  return {
+  const result = {
     expectedTaskRevision: revision(b.expectedTaskRevision),
     checkpointId: nodeId(b.checkpointId),
     branches,
   };
+  // Six individually valid Chinese goals can exceed the control API's 32 KiB
+  // request boundary. Keep a byte budget, including JSON escaping, in the DTO.
+  if (new TextEncoder().encode(JSON.stringify(result)).byteLength > 24 * 1024)
+    throw new DomainError('INVALID_INPUT', '整组方案内容超过24 KiB，请缩短目标或减少方案');
+  return result;
 }
 export function parseWorkBranchDiscard(input: unknown) {
   const b = exact(input, ['expectedRevision']);
