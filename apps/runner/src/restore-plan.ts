@@ -51,7 +51,9 @@ async function main() {
       controller.signal,
     );
     console.log(JSON.stringify(result));
-    console.log('预检完成；实际文件恢复尚未实现，目标未创建，计划不是写入许可。');
+    console.log(
+      '只读预检完成；目标未创建，计划不是写入许可。实际恢复使用 runner:restore 另行确认。',
+    );
   } finally {
     process.removeListener('SIGINT', cancel);
     process.removeListener('SIGTERM', cancel);

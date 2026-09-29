@@ -19,7 +19,7 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "dev": "npm run build:server && node scripts/dev.mjs",
-    "build:server": "tsc -p tsconfig.server.json",
+    "build:server": "tsc -p tsconfig.server.json && node scripts/build-restore-helper.mjs",
     "build": "npm run build:server && vite build --config apps/web/vite.config.ts",
     "start": "node --env-file-if-exists=.env dist/apps/control/src/main.js",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
@@ -33,7 +33,10 @@
     "check:codex-protocol": "npm run build:server && node scripts/check-codex-protocol.mjs",
     "runner": "node dist/apps/runner/src/cli.js",
     "check:claude-protocol": "npm run build:server && node scripts/check-claude-protocol.mjs",
-    "runner:restore-plan": "node dist/apps/runner/src/restore-plan.js"
+    "runner:restore-plan": "node dist/apps/runner/src/restore-plan.js",
+    "runner:restore": "node dist/apps/runner/src/restore-checkpoint.js restore",
+    "runner:restore-status": "node dist/apps/runner/src/restore-checkpoint.js status",
+    "runner:restore-cleanup": "node dist/apps/runner/src/restore-checkpoint.js cleanup"
   },
   "dependencies": {
     "better-auth": "1.7.6",

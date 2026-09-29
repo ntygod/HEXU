@@ -39,6 +39,6 @@ npm run runner:restore-plan -- --request <保留请求ID> --state /path/to/priva
 
 命令不运行 Git checkout、hooks/filter、安装、仓库脚本或模型，不修改源 HEAD/index/工作文件，不改变 Task、Run、Operation、负责人或目录锁。控制请求只核对保留请求 ID，不把网页变成本机任意路径读写入口。
 
-## 尚未交付
+## 与实际恢复的区别
 
-实际暂存写入、排他发布、持久恢复进度、失败/取消后的文件清理、跨电脑传输、Handoff 发布/接受和恢复目录的模型执行均未实现。下一项以[22](../development/22-next-delivery.md)为准；本轮实际验证见[21](../development/21-implementation-status.md)，不将工程测试数量当作完整恢复能力。
+实际暂存写入、排他发布、本机进度和明确清理已由独立的[恢复命令](checkpoint-restore.md)提供；本预检命令本身仍只读、不授予写入权，不可拿旧计划跳过本机确认。跨电脑传输、Handoff 发布/接受、任务内恢复结果和恢复目录的模型执行仍未实现。下一项以[22](../development/22-next-delivery.md)为准，实际验证见[21](../development/21-implementation-status.md)。

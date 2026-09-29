@@ -103,7 +103,7 @@ test('真实 CLI 仅输出本机预检，明确 restored/writeAuthorized=false',
     assert.equal(status, 0, output);
     assert.match(output, /"restored":false/);
     assert.match(output, /"writeAuthorized":false/);
-    assert.match(output, /实际文件恢复尚未实现/);
+    assert.match(output, /实际恢复使用 runner:restore 另行确认/);
     assert(!output.includes(f.token));
     await assert.rejects(readFile(join(f.dir, 'new')), { code: 'ENOENT' });
   } finally {
