@@ -1,0 +1,50 @@
+.handoff-panel,
+.handoff-editor,
+.handoff-card,
+.handoff-material {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.handoff-editor,
+.handoff-card {
+  padding: var(--hx-space-4);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-panel);
+}
+.handoff-panel {
+  padding: var(--hx-space-4);
+}
+.handoff-editor fieldset {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.handoff-card header,
+.handoff-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.handoff-card header {
+  justify-content: space-between;
+}
+.handoff-card h4 {
+  margin: 0 0 var(--hx-space-2);
+}
+.handoff-material,
+.handoff-notice {
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-surface-raised);
+}
+.handoff-material code {
+  word-break: break-all;
+}
+.handoff-text {
+  white-space: pre-wrap;
+}

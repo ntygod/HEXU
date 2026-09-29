@@ -46,6 +46,12 @@ Manifest and reports are immutable; local pending evidence is durable and exact-
 
 报告不得读取输出目录或重新运行恢复，不能从文件存在推导 restored；旧日志缺失核验时间保持 null。活动日志锁不能被报告抢占，旧非终态只按原重启规则记中断/未知。路径、名称、原始内容、凭证、目录身份和错误正文不上传。页面区别最后观察、接收时间和实时可用性；临时读错保留已有结果，当前权限失效清除。
 
+## 双节点传输与接收副本恢复
+
+双节点传输使用 [传输协议](../../packages/contracts/src/checkpoint-transfer.ts)、[传输事务](../../packages/db/src/checkpoint-transfer.ts) 和 [本机收发](../../apps/runner/src/agent/checkpoint-transfer.ts)。原发送者与接收者逐次独立同意；固定票据和双方当前权限核对后才接收字节或回执。只中转有界密文，接收端完整核验自己的持久副本后才报告 received；撤销不能撤回已交付字节。命令、16 MiB / 2048 对象边界与加密信任范围见 [传输指南](../engineering/checkpoint-transfer.md)。
+
+接收端通过 [独立来源](../../apps/runner/src/agent/checkpoint-received-source.ts) 接入同一预检/恢复/报告。保留原 transfer FK 与接收身份，不改原 retention 绑定；只读现有接收库，每次和发布前重查双方权限、期限、对象及暂存。旧报告不能证明当前文件可用，传输窗口到期不等于接收副本删除；详见 [接收恢复](../engineering/checkpoint-received-restore.md)。正式邀请与后续接受另读 [接手 harness](handoffs.md)。
+
 ## 如何验证与回写
 
 按改动复用 [引用事务](../../tests/checkpoints.test.ts)、[Git/CLI](../../tests/checkpoint-runner.test.ts)、[保留事务](../../tests/checkpoint-retention.test.ts)、[对象副本](../../tests/checkpoint-retention-runner.test.ts)、[恢复计划](../../tests/checkpoint-restore-plan.test.ts)、[本机预检](../../tests/checkpoint-restore-preflight.test.ts)、[真实恢复](../../tests/checkpoint-restore-write.test.ts) 和[发布原语](../../tests/checkpoint-restore-files.test.ts)。检查原仓库不变、链接/路径与绑定、损坏/缺失/到期、撤权和不确定回执，不通过真实用户目录测试删除。恢复报告复用[事务与权限](../../tests/checkpoint-restore-results.test.ts)、[真实报告/回执](../../tests/checkpoint-restore-report-runner.test.ts)及[任务浏览器流程](../../tests/e2e/checkpoint-retention.spec.ts)，检查迟到回执、清理后再报告和撤权清空，不以端点替身代替真实文件恢复。

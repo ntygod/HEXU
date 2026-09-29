@@ -391,4 +391,23 @@ CREATE INDEX checkpoint_restore_results_transfer ON checkpoint_restore_results(t
 -- retention FK and an explicit transfer FK; no ticket/owner relabelling or old-data backfill.
 `,
   },
+  {
+    version: 25,
+    sql: `
+CREATE TABLE handoffs (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), space_id TEXT NOT NULL,
+ transfer_id TEXT NOT NULL REFERENCES checkpoint_transfers(id), sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('offered','rejected','withdrawn','expired')),
+ revision INTEGER NOT NULL CHECK(revision>=1), expires_at TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE INDEX handoffs_task ON handoffs(task_id);
+CREATE INDEX handoffs_expiry ON handoffs(state,expires_at);
+CREATE UNIQUE INDEX handoffs_active_transfer ON handoffs(transfer_id) WHERE state='offered';
+CREATE TABLE handoff_events (
+ handoff_id TEXT NOT NULL REFERENCES handoffs(id), revision INTEGER NOT NULL, body TEXT NOT NULL,
+ PRIMARY KEY(handoff_id,revision)
+);
+-- Received objects and historical restore reports never automatically become an invitation or acceptance.
+`,
+  },
 ];

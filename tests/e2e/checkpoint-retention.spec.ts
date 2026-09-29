@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Browser } from '@playwright/test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile, rm, rename, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -512,7 +512,11 @@ test('恢复列表暂时读错保留已有结果，权限拒绝清空内容与�
   }
 });
 
-async function prepareTransfer(page: Page, f: Awaited<ReturnType<typeof setup>>) {
+async function prepareTransfer(
+  page: Page,
+  f: Awaited<ReturnType<typeof setup>>,
+  recipientPage = page,
+) {
   const result = await prepareRestoreResult(page, f);
   const receiverHome = join(f.dir, 'transfer-receiver-state'),
     receiverRoot = join(f.dir, 'transfer-receiver-root');
@@ -525,7 +529,7 @@ async function prepareTransfer(page: Page, f: Awaited<ReturnType<typeof setup>>)
     receiverHome,
   );
   const projectId = f.task.projectId;
-  const pairing = await post(page, 'nodes/pairings', { projectId }, f.space.id);
+  const pairing = await post(recipientPage, 'nodes/pairings', { projectId }, f.space.id);
   const token = randomBytes(32).toString('base64url'),
     clientId = randomUUID();
   const response = await fetch(origin + '/runner/v1/pair', {
@@ -866,6 +870,183 @@ test('接收恢复记录临时读错保留内容，权限失效清空来源及�
     await expect(t.scope.getByRole('textbox')).toHaveCount(0);
   } finally {
     await page.unrouteAll();
+    await f.close();
+  }
+});
+
+async function prepareHandoff(page: Page, browser: Browser) {
+  const f = await setup(page),
+    receiverContext = await browser.newContext();
+  try {
+    const recipientPage = await receiverContext.newPage();
+    const invitation = await post(
+      page,
+      `spaces/${f.space.id}/invitations`,
+      { email: `handoff-${randomUUID()}@example.invalid` },
+      f.space.id,
+    );
+    await post(recipientPage, 'identity/join', {
+      token: invitation.token,
+      name: '接手同事',
+      password,
+    });
+    const joined = await (await recipientPage.request.get(origin + '/api/v1/identity')).json();
+    await post(
+      page,
+      `projects/${f.task.projectId}/members/${joined.user.id}`,
+      { role: 'edit' },
+      f.space.id,
+    );
+    const t = await prepareTransfer(page, f, recipientPage);
+    await t.panel.getByRole('button', { name: '创建传输请求', exact: true }).click();
+    await expect(t.panel).toContainText('等待接收端本机同意');
+    const transfer = (
+      await (await page.request.get(t.path, { headers: headers(f.space.id) })).json()
+    ).items[0];
+    const id = transfer.ticket.id;
+    for (const result of [
+      await transferCli(t.receiverHome, id, 'accept', `RECEIVE ${id}\n`),
+      await transferCli(f.home, id, 'send', `SEND ${id}\n`),
+      await transferCli(t.receiverHome, id, 'receive'),
+    ])
+      expect(result.code, result.output).toBe(0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '接手邀请', exact: true }).click();
+    const panel = page.getByRole('dialog', { name: '任务接手邀请' });
+    await panel.getByRole('button', { name: '准备接手邀请', exact: true }).click();
+    await panel.getByRole('combobox', { name: '接收者与已接收副本', exact: true }).selectOption(id);
+    return {
+      ...f,
+      panel,
+      recipientPage,
+      recipientId: joined.user.id,
+      transferId: id,
+      path: `${origin}/api/v1/tasks/${f.task.id}/handoffs`,
+      close: async () => {
+        await receiverContext.close().catch(() => {});
+        await f.close();
+      },
+    };
+  } catch (error) {
+    await receiverContext.close().catch(() => {});
+    await f.close();
+    throw error;
+  }
+}
+
+test('正式接手邀请固定工作说明，丢失回执只确认原请求，另一成员可拒绝而不改变运行与负责人', async ({
+  page,
+  browser,
+}) => {
+  const f = await prepareHandoff(page, browser);
+  try {
+    await f.panel
+      .getByRole('textbox', { name: '工作摘要', exact: true })
+      .fill('继续接口改造，保留幂等回执');
+    await f.panel.getByRole('textbox', { name: '剩余工作', exact: true }).fill('完成异常分支说明');
+    let drop = true;
+    await page.route(f.path, async (route) => {
+      if (route.request().method() === 'POST' && drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await f.panel.getByRole('button', { name: '发布邀请', exact: true }).click();
+    await expect(f.panel.getByLabel('接手邀请回执待确认')).toBeVisible();
+    await expect(f.panel.getByRole('textbox', { name: '工作摘要', exact: true })).toHaveValue(
+      '继续接口改造，保留幂等回执',
+    );
+    await f.panel.getByRole('button', { name: '确认上次邀请操作', exact: true }).click();
+    await expect(f.panel.getByLabel('接手邀请记录')).toHaveCount(1);
+    await expect(f.panel).toContainText('接受接手与操作者切换尚未开放');
+    await expect(f.panel.getByRole('button', { name: '接受接手', exact: true })).toHaveCount(0);
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/94-handoff-offer-dark.png', fullPage: true });
+    await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await page.screenshot({ path: 'artifacts/95-handoff-offer-light.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/96-handoff-offer-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await f.recipientPage.goto(origin);
+    await f.recipientPage.getByLabel('当前工作空间', { exact: true }).selectOption(f.space.id);
+    await f.recipientPage.goto(`${origin}/tasks/${f.task.id}`);
+    await f.recipientPage.getByRole('button', { name: '接手邀请', exact: true }).click();
+    const recipientPanel = f.recipientPage.getByRole('dialog', { name: '任务接手邀请' });
+    await expect(recipientPanel).toContainText('继续接口改造，保留幂等回执');
+    await recipientPanel.getByRole('button', { name: '拒绝邀请', exact: true }).click();
+    await expect(f.panel).toContainText('已拒绝');
+    await f.panel.getByRole('button', { name: '查看流转记录', exact: true }).click();
+    await expect(f.panel.getByLabel('邀请流转记录')).toContainText('拒绝邀请 · 接手同事');
+    const current = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(current.task.ownerUserId).toBe(f.task.ownerUserId);
+    expect(current.task.revision).toBe(f.task.revision);
+    expect(current.runs).toHaveLength(0);
+    const list = await (await page.request.get(f.path, { headers: headers(f.space.id) })).json();
+    expect(list.items).toHaveLength(1);
+  } finally {
+    await page.unrouteAll().catch(() => {});
+    await f.close();
+  }
+});
+
+test('接手邀请编辑保留暂时读错和版本冲突中的文字，确认撤权则清空草稿', async ({
+  page,
+  browser,
+}) => {
+  const f = await prepareHandoff(page, browser);
+  try {
+    await f.panel
+      .getByRole('textbox', { name: '工作摘要', exact: true })
+      .fill('编辑中的邀请，不应被轮询替换');
+    await page.route(f.path + '/options', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'TRANSIENT', message: '接手材料暂不可用' } }),
+      }),
+    );
+    await expect(f.panel).toContainText('接手材料暂不可用');
+    await expect(f.panel.getByRole('textbox', { name: '工作摘要', exact: true })).toHaveValue(
+      '编辑中的邀请，不应被轮询替换',
+    );
+    await expect(f.panel.getByRole('button', { name: '发布邀请', exact: true })).toBeDisabled();
+    await page.unroute(f.path + '/options');
+    await f.panel.getByRole('button', { name: '重读接手材料', exact: true }).click();
+    const update = await page.request.patch(`${origin}/api/v1/tasks/${f.task.id}`, {
+      headers: headers(f.space.id),
+      data: { expectedRevision: 1, title: '后续任务说明' },
+    });
+    expect(update.ok(), await update.text()).toBe(true);
+    await expect(f.panel.getByLabel('邀请任务版本变化')).toBeVisible();
+    await expect(f.panel.getByRole('button', { name: '发布邀请', exact: true })).toBeDisabled();
+    await f.panel.getByRole('button', { name: '已核对当前任务与邀请内容', exact: true }).click();
+    await expect(f.panel.getByRole('button', { name: '发布邀请', exact: true })).toBeEnabled();
+    await page.route(f.path + '/options', (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'FORBIDDEN', message: '当前权限失效' } }),
+      }),
+    );
+    await expect(f.panel).toContainText('未保存内容已清除');
+    await expect(f.panel.getByRole('textbox', { name: '工作摘要', exact: true })).toHaveCount(0);
+    await page.unroute(f.path + '/options');
+    await expect(f.panel.getByRole('button', { name: '准备接手邀请', exact: true })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '接手邀请', exact: true }).click();
+    await f.panel.getByRole('button', { name: '准备接手邀请', exact: true }).click();
+    await expect(f.panel.getByRole('textbox', { name: '工作摘要', exact: true })).toHaveValue(
+      '后续任务说明',
+    );
+  } finally {
+    await page.unrouteAll().catch(() => {});
     await f.close();
   }
 });
