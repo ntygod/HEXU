@@ -35,8 +35,9 @@ export class WorkBranchResultSourceStore {
     const branches = new WorkBranchStore(this.store);
     const branch = branches.branch(taskId, branchId);
     const group = branches.group(taskId, branch.groupId);
-    if (!branch.runId)
+    if (!branch.runId) {
       throw new DomainError('WORK_BRANCH_RESULT_NO_RUN', '此方案尚未关联执行', 409);
+    }
     const run = this.store.run(branch.runId);
     const node = run.node;
     const binding = node?.workBranch;
@@ -174,7 +175,9 @@ export class WorkBranchResultSourceStore {
         '这是来源预览，不是已保存的不可变成果版本，也不改变方案或任务状态。',
         '只读取服务已接收的共享输出，不保证包含工具的全部输出。',
         '共同提交只是输入起点；本轮代码尚未固定，不读取活动目录或示例预览。',
-        ...(bounded.truncated ? ['输出超过24 KiB，仅展示UTF-8完整前缀；摘要覆盖全部共享输出。'] : []),
+        ...(bounded.truncated
+          ? ['输出超过24 KiB，仅展示UTF-8完整前缀；摘要覆盖全部共享输出。']
+          : []),
         ...(state === 'succeeded' ? [] : ['执行未成功；已有内容可供查看，不代表工具成功。']),
       ],
     };

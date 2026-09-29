@@ -7,6 +7,7 @@ import type { WorkBranchResultSource } from '../packages/contracts/src/work-bran
 import { branchWorkspaceFixture } from './helpers/branch-workspace.js';
 
 const pause = () => new Promise((resolve) => setTimeout(resolve, 30));
+type EventRow = { dispatch_id: string; sequence: number; event_hash: string; body: string };
 
 test('真实节点方案的成果来源预览与记录边界', async (t) => {
   const f = await branchWorkspaceFixture();
@@ -42,6 +43,7 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
     const before = tables.map((name) => JSON.stringify(db.prepare(`SELECT * FROM ${name}`).all()));
     const response = await read();
     assert.equal(response.statusCode, 200, response.body);
+    assert.equal(response.headers['cache-control'], 'no-store');
     const source = response.json() as WorkBranchResultSource;
     assert.equal(source.run.id, created.run.id);
     assert.equal(source.branchId, branch.id);
@@ -82,16 +84,17 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
       assert.equal(missing.statusCode, 409);
       assert.equal(missing.json().error.code, 'WORK_BRANCH_RESULT_NO_RUN');
       const other = await f.api.task(f.alice, f.project.id);
-      assert.equal(
-        (
-          await f.api.call(`tasks/${other.id}/work-branches/${branch.id}/result-source`, f.alice)
-        ).statusCode,
-        404,
+      const otherReply = await f.api.call(
+        `tasks/${other.id}/work-branches/${branch.id}/result-source`,
+        f.alice,
       );
+      assert.equal(otherReply.statusCode, 404);
     });
 
-    const runBody = db.prepare('SELECT body FROM runs WHERE id=?').get(created.run.id)!
-      .body as string;
+    const savedRun = db.prepare('SELECT body FROM runs WHERE id=?').get(created.run.id) as {
+      body: string;
+    };
+    const runBody = savedRun.body;
     const run = JSON.parse(runBody) as Run;
     const dispatchId = run.node!.dispatchId;
     await t.test('活动、未知、未确认终止和其他方案来源均拒绝', async () => {
@@ -115,9 +118,11 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
       } finally {
         db.prepare('UPDATE runs SET body=? WHERE id=?').run(runBody, run.id);
       }
-      const row = db.prepare('SELECT command FROM node_dispatches WHERE id=?').get(dispatchId)!;
+      const row = db.prepare('SELECT command FROM node_dispatches WHERE id=?').get(dispatchId) as {
+        command: string;
+      };
       try {
-        const command = JSON.parse(row.command as string);
+        const command = JSON.parse(row.command);
         command.runId = randomUUID();
         db.prepare('UPDATE node_dispatches SET command=? WHERE id=?').run(
           JSON.stringify(command),
@@ -131,10 +136,11 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
 
     const originalEvents = db
       .prepare('SELECT * FROM node_run_events WHERE dispatch_id=? ORDER BY sequence')
-      .all(dispatchId);
-    const originalSequence = db
+      .all(dispatchId) as EventRow[];
+    const sequenceRow = db
       .prepare('SELECT last_sequence FROM node_dispatches WHERE id=?')
-      .get(dispatchId)!.last_sequence;
+      .get(dispatchId) as { last_sequence: number };
+    const originalSequence = sequenceRow.last_sequence;
     const replaceEvents = (events: ExecutionEvent[]) => {
       db.prepare('DELETE FROM node_run_events WHERE dispatch_id=?').run(dispatchId);
       for (const event of events)
@@ -224,9 +230,10 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
         assert.equal(failed.run.state, 'failed');
         assert.equal(failed.output.text, 'useful partial output');
         assert.equal(failed.evidence.toolReportedSuccess, false);
-        db.prepare('DELETE FROM node_run_events WHERE dispatch_id=? AND sequence=1').run(
-          dispatchId,
+        const deletion = db.prepare(
+          'DELETE FROM node_run_events WHERE dispatch_id=? AND sequence=1',
         );
+        deletion.run(dispatchId);
         assert.equal((await read()).statusCode, 409);
       } finally {
         restoreEvents();
