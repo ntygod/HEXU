@@ -1,4 +1,11 @@
-import { test, expect, request as apiRequest, type Page, type Browser } from '@playwright/test';
+import {
+  test,
+  expect,
+  request as apiRequest,
+  type Page,
+  type Browser,
+  type BrowserContext,
+} from '@playwright/test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile, rm, rename, readFile, chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -19,6 +26,9 @@ import { readBranchWorkspaceStatus } from '../../apps/runner/src/agent/branch-wo
 import { RetentionVault } from '../../apps/runner/src/agent/checkpoint-retention.js';
 const origin = 'http://127.0.0.1:4317';
 const password = 'Fictional Checkpoint Browser Password 2026!';
+// These cases share one fictional owner, but each page starts with a fresh cookie
+// jar. Reuse only its in-memory authenticated session, not repeated password sign-ins.
+let ownerCookies: Awaited<ReturnType<BrowserContext['cookies']>> | null = null;
 const headers = (spaceId?: string) => ({
   origin,
   'x-hexu-client': 'web',
@@ -34,6 +44,7 @@ async function post(page: Page, path: string, body: unknown, spaceId?: string) {
   return r.json();
 }
 async function setup(page: Page) {
+  if (ownerCookies) await page.context().addCookies(ownerCookies);
   const initial = await (await page.request.get(origin + '/api/v1/identity')).json();
   const account = { email: 'retention-browser-owner@example.invalid', password };
   if (initial.setupRequired)
@@ -42,7 +53,8 @@ async function setup(page: Page) {
       name: '林舟（对象保留测试）',
       code: 'fictional-retention-browser-setup-code-0123456789',
     });
-  else await post(page, 'identity/sign-in', account);
+  else if (initial.user?.email !== account.email) await post(page, 'identity/sign-in', account);
+  ownerCookies = await page.context().cookies(origin);
   const space = await post(page, 'spaces', { name: '检查点工作区 ' + randomUUID().slice(0, 4) });
   const project = await post(
     page,
