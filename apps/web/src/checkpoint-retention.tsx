@@ -1,3 +1,4 @@
+import { CheckpointTransfers } from './checkpoint-transfers.js';
 import { CheckpointRestoreResults } from './checkpoint-restore-results.js';
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
@@ -142,6 +143,11 @@ function RetentionPanel({ record, task }: { record: CommitCheckpoint; task: Task
                   <code>{r.manifest.snapshotHash}</code>
                   <p>原始对象只在节点私有数据库中，不公开文件名、路径或作者邮箱。</p>
                 </details>
+                <CheckpointTransfers
+                  retentionPath={`${path}/${encodeURIComponent(r.request.id)}`}
+                  task={task}
+                  retention={r}
+                />
                 <CheckpointRestoreResults
                   retentionPath={`${path}/${encodeURIComponent(r.request.id)}`}
                   editable={editable && r.nodeAuthorized}

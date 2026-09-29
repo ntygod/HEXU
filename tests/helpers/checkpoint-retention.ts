@@ -22,7 +22,11 @@ export const git = (root: string, ...args: string[]) =>
       GIT_TERMINAL_PROMPT: '0',
     },
   }).trim();
-export async function retentionFixture(format: 'sha1' | 'sha256' = 'sha1', external = false) {
+export async function retentionFixture(
+  format: 'sha1' | 'sha256' = 'sha1',
+  external = false,
+  blob = Buffer.from([0, 1, 255, 13, 10, 128]),
+) {
   const dir = await mkdtemp(join(tmpdir(), 'hexu-retention-test-')),
     root = join(dir, 'repo'),
     home = join(dir, 'state');
@@ -44,7 +48,7 @@ export async function retentionFixture(format: 'sha1' | 'sha256' = 'sha1', exter
   const parent = git(root, 'rev-parse', 'HEAD');
   await writeFile(join(root, 'README.md'), 'Retain only this committed snapshot\n');
   await mkdir(join(root, 'src'));
-  await writeFile(join(root, 'src', 'binary.dat'), Buffer.from([0, 1, 255, 13, 10, 128]));
+  await writeFile(join(root, 'src', 'binary.dat'), blob);
   if (external) {
     await writeFile(
       join(root, 'large.dat'),
@@ -72,8 +76,13 @@ export async function retentionFixture(format: 'sha1' | 'sha256' = 'sha1', exter
   const [w] = await authorizeDirectories([{ name: '保留来源', path: root }], home);
   const api = await teamFixture();
   let drop: string | null = null;
+  let dropAction: string | undefined;
   api.app.addHook('onSend', async (req, reply, payload) => {
-    if (drop && req.url === drop) {
+    if (
+      drop &&
+      req.url === drop &&
+      (!dropAction || (req.body as { action?: string } | null)?.action === dropAction)
+    ) {
       drop = null;
       reply.hijack();
       reply.raw.destroy();
@@ -162,8 +171,9 @@ export async function retentionFixture(format: 'sha1' | 'sha256' = 'sha1', exter
       create,
       read,
       retained: new CheckpointRetentionStore(api.store),
-      dropNext: (path = '/runner/v1/checkpoint-retention-report') => {
+      dropNext: (path = '/runner/v1/checkpoint-retention-report', action?: string) => {
         drop = path;
+        dropAction = action;
       },
       close: async () => {
         await api.close();

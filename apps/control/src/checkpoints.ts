@@ -1,3 +1,4 @@
+import { CheckpointTransferStore } from '../../../packages/db/src/checkpoint-transfer.js';
 import { CheckpointRestoreResultStore } from '../../../packages/db/src/checkpoint-restore-results.js';
 import { CheckpointRetentionStore } from '../../../packages/db/src/checkpoint-retention.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -79,4 +80,33 @@ export function attachCheckpoints(app: FastifyInstance, store: Store) {
   app.post('/runner/v1/checkpoint-restore-report', async (r, reply) =>
     reply.code(201).send(results.report(token(r), r.body)),
   );
+  const transfers = new CheckpointTransferStore(store);
+  const transferPath =
+    '/api/v1/tasks/:taskId/checkpoints/:checkpointId/retentions/:requestId/transfers';
+  app.get(transferPath, async (r) => transfers.list(...resultScope(r)));
+  app.get(transferPath + '/options', async (r) => transfers.options(...resultScope(r)));
+  app.post(transferPath, async (r, reply) =>
+    reply.code(201).send(transfers.create(...resultScope(r), r.body, key(r))),
+  );
+  app.post(transferPath + '/:transferId/cancel', async (r) => {
+    exact(r.body, []);
+    return transfers.cancel(
+      ...resultScope(r),
+      nodeId((r.params as { transferId: string }).transferId),
+      key(r),
+    );
+  });
+  // Only the new ciphertext protocol gets a bounded block allowance. Existing API limits stay unchanged.
+  app.post('/runner/v1/checkpoint-transfer', { bodyLimit: 131072 }, async (r) =>
+    transfers.command(token(r), r.body),
+  );
+  const sweep = setInterval(() => {
+    try {
+      transfers.sweep();
+    } catch {
+      /* Preserve failed cleanup for next explicit observation. */
+    }
+  }, 60000);
+  sweep.unref();
+  app.addHook('onClose', async () => clearInterval(sweep));
 }

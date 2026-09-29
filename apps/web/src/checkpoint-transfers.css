@@ -1,0 +1,22 @@
+.checkpoint-transfers {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.transfer-card {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  padding: var(--hx-space-3);
+  min-width: 0;
+}
+.transfer-card header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  justify-content: space-between;
+}
+.checkpoint-transfers code,
+.checkpoint-transfers pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
