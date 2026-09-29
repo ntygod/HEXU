@@ -12,6 +12,7 @@ import {
   type AssistanceDetail,
 } from '../packages/contracts/src/assistance.js';
 import { Store } from '../packages/db/src/store.js';
+import { migrations } from '../packages/db/src/schema.js';
 import { teamFixture, type Account } from './helpers/team.js';
 const code = (value: string) => (error: unknown) =>
   error instanceof DomainError && error.code === value;
@@ -590,7 +591,7 @@ test('已结束/归档协作与稳定分页；SQLite 重开保留快照、回复
       });
       assert.equal(
         reopened.db.prepare('SELECT max(version) AS version FROM schema_migrations').get()!.version,
-        21,
+        migrations.at(-1)!.version,
       );
     } finally {
       reopened.close();

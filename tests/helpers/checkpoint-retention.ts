@@ -71,10 +71,10 @@ export async function retentionFixture(format: 'sha1' | 'sha256' = 'sha1', exter
   await writeFile(join(root, 'private.txt'), 'Not retained');
   const [w] = await authorizeDirectories([{ name: '保留来源', path: root }], home);
   const api = await teamFixture();
-  let drop = false;
+  let drop: string | null = null;
   api.app.addHook('onSend', async (req, reply, payload) => {
-    if (drop && req.url === '/runner/v1/checkpoint-retention-report') {
-      drop = false;
+    if (drop && req.url === drop) {
+      drop = null;
       reply.hijack();
       reply.raw.destroy();
     }
@@ -162,8 +162,8 @@ export async function retentionFixture(format: 'sha1' | 'sha256' = 'sha1', exter
       create,
       read,
       retained: new CheckpointRetentionStore(api.store),
-      dropNext: () => {
-        drop = true;
+      dropNext: (path = '/runner/v1/checkpoint-retention-report') => {
+        drop = path;
       },
       close: async () => {
         await api.close();

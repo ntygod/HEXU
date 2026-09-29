@@ -134,6 +134,13 @@ export class CheckpointRetentionStore {
       .all(checkpointId, taskId) as unknown as Row[];
     return { items: rows.map((r) => this.view(r)) };
   }
+  get(taskId: string, checkpointId: string, id: string): RetentionView {
+    this.checkpoints.get(taskId, checkpointId);
+    const r = this.row(id);
+    if (r.task_id !== taskId || r.checkpoint_id !== checkpointId)
+      throw new DomainError('NOT_FOUND', '保留记录不存在或不可访问', 404);
+    return this.view(r);
+  }
   cancel(taskId: string, checkpointId: string, id: string, key: string) {
     this.checkpoints.get(taskId, checkpointId, true);
     const check = () => {

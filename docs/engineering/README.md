@@ -30,6 +30,7 @@
 | 本机提交引用、另行确认的对象保留 | [提交检查点](commit-checkpoints.md)、[对象保留](checkpoint-retention.md) |
 | 只读检查新目录恢复材料，不实际写入 | [恢复预检](checkpoint-restore-plan.md) |
 | 本机暂存写入、不覆盖发布与明确清理 | [新目录恢复](checkpoint-restore.md) |
+| 明确报告恢复结果、任务内历史与丢失回执对账 | [恢复结果](checkpoint-restore-results.md) |
 
 ## 架构决策
 

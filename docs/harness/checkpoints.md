@@ -36,11 +36,19 @@ Manifest and reports are immutable; local pending evidence is durable and exact-
 
 固定目录描述符、精确 inode 身份、排他新建与 `RENAME_NOREPLACE` 不能退化为普通 rename/copy 或覆盖。源目录移动后的原授权身份仍受保护。Linux 构建需要本地 C 编译器；仅支持明确允许的本地文件系统，其他平台或缺助手必须失败。
 
-意图先记日志，再创建材料；逐项记录所有权与实际进度。重启只记 interrupted/unknown，同目标重试只返回原记录，不重写或自动发布。同步/回执不确定不能借目标存在声称成功。清理需明确 CLEAN，只遍历本次完整所有权清单；用户新增/编辑、替换/链接或日志不完整时保留现场，永不递归删除用户目录或已发布目标。状态读取是本机最后记录，不是持续可用性保证；未来任务内报告不上传路径/文件名/字节或复用旧回执扩权。用法与限制见[恢复指南](../engineering/checkpoint-restore.md)。
+意图先记日志，再创建材料；逐项记录所有权与实际进度。重启只记 interrupted/unknown，同目标重试只返回原记录，不重写或自动发布。同步/回执不确定不能借目标存在声称成功。清理需明确 CLEAN，只遍历本次完整所有权清单；用户新增/编辑、替换/链接或日志不完整时保留现场，永不递归删除用户目录或已发布目标。状态读取是本机最后记录，不是持续可用性保证；任务内报告不上传路径/文件名/字节或复用旧回执扩权，约束见下节。用法与限制见[恢复指南](../engineering/checkpoint-restore.md)。
+
+## 恢复结果与回执
+
+[本机报告](../../apps/runner/src/agent/checkpoint-restore-report.ts)、[严格契约](../../packages/contracts/src/checkpoint-restore-results.ts)、[状态约束](../../packages/domain/src/checkpoint-restore-results.ts)、[结果事务](../../packages/db/src/checkpoint-restore-results.ts) 和[任务展示](../../apps/web/src/checkpoint-restore-results.tsx) 只公开原任务范围的有界观察，使用见[恢复结果](../engineering/checkpoint-restore-results.md)。新观察逐次 REPORT，待决回执只对账原包；它不是文件恢复/清理的审批或模型授权。
+
+先持久固定待发包再发送；结果、顺序报告与任务 outbox 原子保存。原节点/原任务当前权限在旧回执前复查，ACK 的 acceptedSequence/hash 与最新投影分开，不能回退后续清理。新凭证不能接管旧报告，报告限额不能阻止本机明确处置暂存。对象到期/删除不抹去历史恢复事实，也不授予新材料读取。
+
+报告不得读取输出目录或重新运行恢复，不能从文件存在推导 restored；旧日志缺失核验时间保持 null。活动日志锁不能被报告抢占，旧非终态只按原重启规则记中断/未知。路径、名称、原始内容、凭证、目录身份和错误正文不上传。页面区别最后观察、接收时间和实时可用性；临时读错保留已有结果，当前权限失效清除。
 
 ## 如何验证与回写
 
-按改动复用 [引用事务](../../tests/checkpoints.test.ts)、[Git/CLI](../../tests/checkpoint-runner.test.ts)、[保留事务](../../tests/checkpoint-retention.test.ts)、[对象副本](../../tests/checkpoint-retention-runner.test.ts)、[恢复计划](../../tests/checkpoint-restore-plan.test.ts)、[本机预检](../../tests/checkpoint-restore-preflight.test.ts)、[真实恢复](../../tests/checkpoint-restore-write.test.ts) 和[发布原语](../../tests/checkpoint-restore-files.test.ts)。检查原仓库不变、链接/路径与绑定、损坏/缺失/到期、撤权和不确定回执，不通过真实用户目录测试删除。
+按改动复用 [引用事务](../../tests/checkpoints.test.ts)、[Git/CLI](../../tests/checkpoint-runner.test.ts)、[保留事务](../../tests/checkpoint-retention.test.ts)、[对象副本](../../tests/checkpoint-retention-runner.test.ts)、[恢复计划](../../tests/checkpoint-restore-plan.test.ts)、[本机预检](../../tests/checkpoint-restore-preflight.test.ts)、[真实恢复](../../tests/checkpoint-restore-write.test.ts) 和[发布原语](../../tests/checkpoint-restore-files.test.ts)。检查原仓库不变、链接/路径与绑定、损坏/缺失/到期、撤权和不确定回执，不通过真实用户目录测试删除。恢复报告复用[事务与权限](../../tests/checkpoint-restore-results.test.ts)、[真实报告/回执](../../tests/checkpoint-restore-report-runner.test.ts)及[任务浏览器流程](../../tests/e2e/checkpoint-retention.spec.ts)，检查迟到回执、清理后再报告和撤权清空，不以端点替身代替真实文件恢复。
 
 只运行改动涉及的检查；平台限制、真实模型未验证和未完成范围要写清楚。能力或契约变化更新 [21](../development/21-implementation-status.md) 与 [19](../development/19-work-items.md) 的原工作项，不把测试数量当作功能完成度。
 

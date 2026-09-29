@@ -353,3 +353,161 @@ test('读取故障保留期限与同意，缺少深层对象不发布伪副本�
     await f.close();
   }
 });
+
+// Actual disk restore/report CLI, with prompts supplied only for this disposable fixture.
+async function restoreResultCli(
+  f: Fixture,
+  id: string,
+  mode: 'restore' | 'report' | 'cleanup',
+  publish = true,
+) {
+  const args = [
+    resolve('dist/apps/runner/src/restore-checkpoint.js'),
+    mode,
+    '--state',
+    f.home,
+    '--target',
+    join(f.dir, 'restored-output'),
+  ];
+  if (mode === 'restore') args.push('--request', id);
+  const child = spawn(process.execPath, args, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH, HOME: process.env.HOME },
+  });
+  let output = '';
+  const answered = new Set<string>();
+  child.stdout.on('data', (v) => {
+    output += v;
+    for (const match of output.matchAll(/(?:RESTORE|PUBLISH|REPORT|CLEAN) [0-9a-f-]{36}/g)) {
+      if (answered.has(match[0])) continue;
+      answered.add(match[0]);
+      child.stdin.write((!publish && match[0].startsWith('PUBLISH') ? 'NO' : match[0]) + '\n');
+    }
+  });
+  child.stderr.on('data', (v) => (output += v));
+  const [code] = await once(child, 'close');
+  return { code, output };
+}
+async function prepareRestoreResult(page: Page, f: Fixture) {
+  const state = await prepare(page, f);
+  const r = await post(
+    page,
+    state.path.replace(origin + '/api/v1/', ''),
+    { days: 7, expectedTaskRevision: 1, confirmLocalRetention: true },
+    f.space.id,
+  );
+  const retained = await cli(f, r.request.id, 'retain-checkpoint', `RETAIN ${f.oid} 7`);
+  expect(retained.code, retained.output).toBe(0);
+  await page.getByRole('button', { name: '查看恢复记录', exact: true }).click();
+  await expect(page.getByLabel('本机恢复结果')).toContainText('尚无已确认');
+  return {
+    ...state,
+    requestId: r.request.id,
+    resultPath: `${state.path}/${r.request.id}/restores`,
+  };
+}
+test('恢复结果经真实CLI回到原任务，刷新/历史/深浅色和窄屏区分发布与当前可用', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const result = await prepareRestoreResult(page, f);
+    const restored = await restoreResultCli(f, result.requestId, 'restore');
+    expect(restored.code, restored.output).toBe(0);
+    const report = await restoreResultCli(f, result.requestId, 'report');
+    expect(report.code, report.output).toBe(0);
+    const panel = page.getByLabel('本机恢复结果');
+    await expect(panel).toContainText('文件已发布（本机报告）');
+    await expect(panel).toContainText('不是实时文件检测');
+    const payload = await (
+      await page.request.get(result.resultPath, { headers: headers(f.space.id) })
+    ).text();
+    expect(payload).not.toContain(f.root);
+    expect(payload).not.toContain('binary.dat');
+    await panel.getByRole('button', { name: '查看报告历史' }).click();
+    await expect(panel.getByLabel('恢复报告历史')).toContainText('报告 #1');
+    await mkdir('artifacts', { recursive: true });
+    await panel.getByLabel('恢复结果记录').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'artifacts/85-restore-result-dark.png', fullPage: true });
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'light';
+    });
+    await page.screenshot({ path: 'artifacts/86-restore-result-light.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/87-restore-result-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await rename(join(f.dir, 'restored-output'), join(f.dir, 'user-moved-output'));
+    await page.reload();
+    await page.getByRole('button', { name: '代码检查点', exact: true }).click();
+    await page.getByRole('button', { name: '核验与本机保留', exact: true }).click();
+    await page.getByRole('button', { name: '查看恢复记录', exact: true }).click();
+    await expect(page.getByLabel('本机恢复结果')).toContainText('文件已发布（本机报告）');
+    await expect(page.getByLabel('本机恢复结果')).toContainText('不证明目录现在存在');
+  } finally {
+    await f.close();
+  }
+});
+test('取消后的已核验暂存和明确清理分别显示，原报告历史保留且不完成任务', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const result = await prepareRestoreResult(page, f);
+    const cancelled = await restoreResultCli(f, result.requestId, 'restore', false);
+    expect(cancelled.code).toBe(1);
+    expect((await restoreResultCli(f, result.requestId, 'report')).code).toBe(0);
+    const panel = page.getByLabel('本机恢复结果');
+    await expect(panel).toContainText('恢复已取消');
+    await expect(panel).toContainText('暂存仍保留');
+    expect((await restoreResultCli(f, result.requestId, 'cleanup')).code).toBe(0);
+    expect((await restoreResultCli(f, result.requestId, 'report')).code).toBe(0);
+    await expect(panel).toContainText('本次暂存已清理');
+    await panel.getByRole('button', { name: '查看报告历史' }).click();
+    await expect(panel.getByLabel('恢复报告历史')).toContainText('报告 #2');
+    await expect(panel.getByLabel('恢复报告历史')).toContainText('暂存仍保留');
+    const task = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(task.task.status).not.toBe('done');
+    expect(task.runs).toHaveLength(0);
+  } finally {
+    await f.close();
+  }
+});
+test('恢复列表暂时读错保留已有结果，权限拒绝清空内容与历史，不提供网页写路径入口', async ({
+  page,
+}) => {
+  const f = await setup(page);
+  try {
+    const result = await prepareRestoreResult(page, f);
+    expect((await restoreResultCli(f, result.requestId, 'restore')).code).toBe(0);
+    expect((await restoreResultCli(f, result.requestId, 'report')).code).toBe(0);
+    const panel = page.getByLabel('本机恢复结果');
+    await expect(panel).toContainText('文件已发布');
+    await page.route(result.resultPath, (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'READ_FAILED', message: '恢复报告暂时不可读' } }),
+      }),
+    );
+    await expect(panel).toContainText('恢复报告暂时不可读');
+    await expect(panel).toContainText('文件已发布');
+    await page.unroute(result.resultPath);
+    await panel.getByRole('button', { name: '重读恢复记录' }).click();
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    await page.route(result.resultPath, (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'FORBIDDEN', message: '无权读取' } }),
+      }),
+    );
+    await expect(page.getByText('恢复记录权限已失效，内容已清除。')).toBeVisible();
+    await expect(page.getByLabel('恢复结果记录')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: /恢复目标/ })).toHaveCount(0);
+  } finally {
+    await page.unrouteAll();
+    await f.close();
+  }
+});

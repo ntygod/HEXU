@@ -1,3 +1,4 @@
+import { CheckpointRestoreResultStore } from '../../../packages/db/src/checkpoint-restore-results.js';
 import { CheckpointRetentionStore } from '../../../packages/db/src/checkpoint-retention.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { DomainError, text } from '../../../packages/contracts/src/index.js';
@@ -59,5 +60,23 @@ export function attachCheckpoints(app: FastifyInstance, store: Store) {
   });
   app.post('/runner/v1/checkpoint-retention-report', async (r, reply) =>
     reply.code(201).send(retained.report(token(r), r.body)),
+  );
+  const results = new CheckpointRestoreResultStore(store);
+  const resultScope = (r: FastifyRequest) => {
+    const p = r.params as { taskId: string; checkpointId: string; requestId: string };
+    return [nodeId(p.taskId), nodeId(p.checkpointId), nodeId(p.requestId)] as const;
+  };
+  const resultPath =
+    '/api/v1/tasks/:taskId/checkpoints/:checkpointId/retentions/:requestId/restores';
+  app.get(resultPath, async (r) => results.list(...resultScope(r), parseCheckpointCursor(r.query)));
+  app.get(resultPath + '/:restoreId/reports', async (r) =>
+    results.history(
+      ...resultScope(r),
+      nodeId((r.params as { restoreId: string }).restoreId),
+      parseCheckpointCursor(r.query),
+    ),
+  );
+  app.post('/runner/v1/checkpoint-restore-report', async (r, reply) =>
+    reply.code(201).send(results.report(token(r), r.body)),
   );
 }

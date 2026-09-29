@@ -32,6 +32,7 @@ export interface RestoreProgress {
   totalBytes: number;
   errorCode: string | null;
   updatedAt: string;
+  verifiedAt?: string;
 }
 interface Row {
   id: string;
