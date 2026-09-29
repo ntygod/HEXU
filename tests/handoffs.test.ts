@@ -117,7 +117,7 @@ test('真实双账号副本发布固定邀请，关闭或后续任务编辑不�
       history.json().items.map((e: { action: string }) => e.action),
       ['offer', 'reject'],
     );
-    assert.equal((await f.api.call(`${f.handoffPath}/${h.id}/accept`, f.bob, {})).statusCode, 404);
+    assert.equal((await f.api.call(`${f.handoffPath}/${h.id}/accept`, f.bob, {})).statusCode, 400);
   } finally {
     await f.close();
   }

@@ -7,6 +7,7 @@ import { NodeExecutor } from './agent/executor.js';
 import { executionCommand } from './agent/execution-commands.js';
 import { readExecutionPolicy, writeExecutionPolicy } from './agent/execution-policy.js';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { assertHandoffEvidenceSettled } from './agent/handoff-acceptance.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -160,6 +161,7 @@ async function connect(storage: AgentStorage, configPath: string) {
     // Persist before exchange. A lost response is recovered using this same token,
     // never by making another node or repeating any paid operation.
     new ExecutionJournal(storage).assertCanDisconnect();
+    assertHandoffEvidenceSettled(storage.home);
     storage.resetForPairing();
     writeExecutionPolicy(storage.home, null);
     writeCredentials(storage.home, credentials);
@@ -270,6 +272,7 @@ async function main() {
     }
     if (command === 'disconnect') {
       new ExecutionJournal(storage).assertCanDisconnect();
+      assertHandoffEvidenceSettled(storage.home);
       const c = readCredentials(storage.home);
       if (!options['--local-only']) {
         try {

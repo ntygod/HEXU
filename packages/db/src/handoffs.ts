@@ -16,6 +16,7 @@ import { assertRevision } from '../../domain/src/index.js';
 import { closeHandoff } from '../../domain/src/handoffs.js';
 import { CheckpointTransferStore } from './checkpoint-transfer.js';
 import type { Store } from './store.js';
+import { cancelHandoffAcceptances } from './handoff-reservations.js';
 
 type Row = { rowid: number; body: string };
 const decode = (row: Row) => JSON.parse(row.body) as Handoff;
@@ -44,6 +45,10 @@ export class HandoffStore {
       .get(taskId, id) as Row | undefined;
     if (!row) throw new DomainError('NOT_FOUND', '邀请不存在或不属于此任务', 404);
     return decode(row);
+  }
+  record(taskId: string, id: string): Handoff {
+    this.task(taskId);
+    return this.row(taskId, id);
   }
   private transfer(taskId: string, id: string) {
     const row = this.store.db
@@ -137,6 +142,7 @@ export class HandoffStore {
           updatedAt: at,
         };
         this.save(h);
+        cancelHandoffAcceptances(this.store, h.id, at);
         this.event(h, 'expire', true);
       }
     });
@@ -163,6 +169,11 @@ export class HandoffStore {
       canReject:
         editable && h.state === 'offered' && h.material.recipient.id === this.store.actorId,
       canWithdraw: editable && h.state === 'offered' && h.sender.id === this.store.actorId,
+      canAccept:
+        editable &&
+        h.state === 'offered' &&
+        h.material.recipient.id === this.store.actorId &&
+        materialAvailable,
     };
   }
   options(taskId: string): HandoffOptions {
@@ -226,6 +237,7 @@ export class HandoffStore {
         summary: data.summary,
         remainingWork: data.remainingWork,
         environment: data.environment,
+        transferOwnerRequested: data.transferOwner === true,
         createdAt: at,
         updatedAt: at,
         expiresAt: new Date(
@@ -305,6 +317,7 @@ export class HandoffStore {
         updatedAt: this.now(),
       };
       this.save(next);
+      cancelHandoffAcceptances(this.store, next.id, next.updatedAt);
       this.event(next, action);
       return { id };
     });

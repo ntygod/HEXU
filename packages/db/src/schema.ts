@@ -410,4 +410,36 @@ CREATE TABLE handoff_events (
 -- Received objects and historical restore reports never automatically become an invitation or acceptance.
 `,
   },
+  {
+    version: 26,
+    sql: `
+CREATE TABLE handoffs_v26 (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), space_id TEXT NOT NULL,
+ transfer_id TEXT NOT NULL REFERENCES checkpoint_transfers(id), sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('offered','accepted','rejected','withdrawn','expired')),
+ revision INTEGER NOT NULL CHECK(revision>=1), expires_at TEXT NOT NULL, body TEXT NOT NULL
+);
+INSERT INTO handoffs_v26 SELECT * FROM handoffs;
+CREATE TABLE handoff_events_v26 (
+ handoff_id TEXT NOT NULL REFERENCES handoffs_v26(id), revision INTEGER NOT NULL, body TEXT NOT NULL,
+ PRIMARY KEY(handoff_id,revision)
+);
+INSERT INTO handoff_events_v26 SELECT * FROM handoff_events;
+DROP TABLE handoff_events;
+DROP TABLE handoffs;
+ALTER TABLE handoffs_v26 RENAME TO handoffs;
+ALTER TABLE handoff_events_v26 RENAME TO handoff_events;
+CREATE INDEX handoffs_task ON handoffs(task_id);
+CREATE INDEX handoffs_expiry ON handoffs(state,expires_at);
+CREATE UNIQUE INDEX handoffs_active_transfer ON handoffs(transfer_id) WHERE state='offered';
+CREATE TABLE handoff_acceptances (
+ id TEXT PRIMARY KEY, handoff_id TEXT NOT NULL REFERENCES handoffs(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ state TEXT NOT NULL CHECK(state IN ('waiting_local','needs_attention','succeeded','cancelled')), body TEXT NOT NULL
+);
+CREATE INDEX handoff_acceptances_handoff ON handoff_acceptances(handoff_id);
+CREATE UNIQUE INDEX handoff_acceptance_pending_task ON handoff_acceptances(task_id) WHERE state='waiting_local';
+-- No legacy operator/acceptance is inferred from ownership or a restore report.
+`,
+  },
 ];

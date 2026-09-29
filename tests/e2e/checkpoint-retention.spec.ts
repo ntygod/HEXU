@@ -921,6 +921,7 @@ async function prepareHandoff(page: Page, browser: Browser) {
       recipientPage,
       recipientId: joined.user.id,
       transferId: id,
+      receiverHome: t.receiverHome,
       path: `${origin}/api/v1/tasks/${f.task.id}/handoffs`,
       close: async () => {
         await receiverContext.close().catch(() => {});
@@ -959,7 +960,7 @@ test('正式接手邀请固定工作说明，丢失回执只确认原请求，�
     );
     await f.panel.getByRole('button', { name: '确认上次邀请操作', exact: true }).click();
     await expect(f.panel.getByLabel('接手邀请记录')).toHaveCount(1);
-    await expect(f.panel).toContainText('接受接手与操作者切换尚未开放');
+    await expect(f.panel).toContainText('接收者需在本机核对原恢复目录');
     await expect(f.panel.getByRole('button', { name: '接受接手', exact: true })).toHaveCount(0);
     await mkdir('artifacts', { recursive: true });
     await page.screenshot({ path: 'artifacts/94-handoff-offer-dark.png', fullPage: true });
@@ -1047,6 +1048,169 @@ test('接手邀请编辑保留暂时读错和版本冲突中的文字，确认�
     );
   } finally {
     await page.unrouteAll().catch(() => {});
+    await f.close();
+  }
+});
+
+async function recipientAcceptance(f: Awaited<ReturnType<typeof prepareHandoff>>) {
+  const items = (
+    await (await f.recipientPage.request.get(f.path, { headers: headers(f.space.id) })).json()
+  ).items;
+  const id = items[0].handoff.id as string;
+  await f.recipientPage.goto(origin);
+  await f.recipientPage.getByLabel('当前工作空间', { exact: true }).selectOption(f.space.id);
+  await f.recipientPage.goto(`${origin}/tasks/${f.task.id}`);
+  await f.recipientPage.getByRole('button', { name: '接手邀请', exact: true }).click();
+  const panel = f.recipientPage.getByRole('dialog', { name: '任务接手邀请' });
+  await panel.getByRole('button', { name: '接受接手', exact: true }).click();
+  await panel.getByRole('button', { name: '核对并接受', exact: true }).click();
+  return { panel, path: `${f.path}/${id}` };
+}
+async function acceptanceCli(home: string, operationId: string, target: string) {
+  const child = spawn(
+    process.execPath,
+    [
+      resolve('dist/apps/runner/src/accept-handoff.js'),
+      '--state',
+      home,
+      '--operation',
+      operationId,
+      '--target',
+      target,
+    ],
+    {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { PATH: process.env.PATH, HOME: process.env.HOME },
+    },
+  );
+  let output = '';
+  child.stdout.on('data', (v) => (output += v));
+  child.stderr.on('data', (v) => (output += v));
+  child.stdin.end(`ACCEPT ${operationId}\n`);
+  const [code] = await once(child, 'close');
+  return { code, output };
+}
+
+test('接受接手经本机真实文件核验，原请求回执与可选负责人移交一起落盘且不启动Run', async ({
+  page,
+  browser,
+}) => {
+  const f = await prepareHandoff(page, browser);
+  try {
+    await f.panel.getByRole('checkbox', { name: /同时邀请对方担任负责人/ }).check();
+    await f.panel.getByRole('button', { name: '发布邀请', exact: true }).click();
+    await expect(f.panel.getByLabel('接手邀请记录')).toHaveCount(1);
+    const restored = await receiverRestoreCli(f.receiverHome, f.transferId, 'restore');
+    expect(restored.code, restored.output).toBe(0);
+    const r = await recipientAcceptance(f);
+    await r.panel.getByRole('checkbox', { name: /我同时接受负责人职责/ }).check();
+    let drop = true;
+    await f.recipientPage.route(r.path + '/accept', async (route) => {
+      if (drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await r.panel.getByRole('button', { name: '开始本机确认', exact: true }).click();
+    await expect(r.panel.getByLabel('接手确认回执待确认')).toBeVisible();
+    await r.panel.getByRole('button', { name: '确认上次接手请求', exact: true }).click();
+    await expect(r.panel.getByLabel('接手确认记录')).toHaveCount(1);
+    await expect(r.panel).toContainText('等待接收节点本机确认');
+    const records = await (
+      await f.recipientPage.request.get(r.path + '/acceptances', { headers: headers(f.space.id) })
+    ).json();
+    const op = records.items[0];
+    expect(op.state).toBe('waiting_local');
+    await expect(r.panel.getByLabel('本机接手确认命令')).toContainText(op.ticket.id);
+    const accepted = await acceptanceCli(f.receiverHome, op.ticket.id, restored.target);
+    expect(accepted.code, accepted.output).toBe(0);
+    await expect(r.panel.getByLabel('接手确认记录')).toContainText('接手已提交');
+    await expect(r.panel.getByLabel('接手邀请记录')).toContainText('已接受接手');
+    const detail = await (
+      await f.recipientPage.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(detail.task.operatorUserId).toBe(f.recipientId);
+    expect(detail.task.ownerUserId).toBe(f.recipientId);
+    expect(detail.runs).toHaveLength(0);
+    await f.recipientPage.emulateMedia({ reducedMotion: 'reduce' });
+    await mkdir('artifacts', { recursive: true });
+    await f.recipientPage.screenshot({
+      path: 'artifacts/97-handoff-accepted-dark.png',
+      fullPage: true,
+    });
+    await f.recipientPage.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await f.recipientPage.screenshot({
+      path: 'artifacts/98-handoff-accepted-light.png',
+      fullPage: true,
+    });
+    await f.recipientPage.setViewportSize({ width: 390, height: 844 });
+    await f.recipientPage.screenshot({
+      path: 'artifacts/99-handoff-accepted-mobile.png',
+      fullPage: true,
+    });
+    expect(
+      await f.recipientPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
+    await f.recipientPage.keyboard.press('Escape');
+    await expect(f.recipientPage.getByLabel('当前操作者', { exact: true })).toContainText(
+      '接手同事',
+    );
+  } finally {
+    await f.recipientPage.unrouteAll().catch(() => {});
+    await f.close();
+  }
+});
+
+test('接受接手固定当前讨论，撤权暂停原确认且权限恢复不自动接受，编辑者可取消', async ({
+  page,
+  browser,
+}) => {
+  const f = await prepareHandoff(page, browser);
+  try {
+    await f.panel.getByRole('button', { name: '发布邀请', exact: true }).click();
+    await expect(f.panel.getByLabel('接手邀请记录')).toHaveCount(1);
+    const r = await recipientAcceptance(f);
+    await expect(r.panel.getByRole('button', { name: '开始本机确认', exact: true })).toBeEnabled();
+    await post(
+      page,
+      `tasks/${f.task.id}/messages`,
+      { body: '接手之前请先核对新的异常处理要求' },
+      f.space.id,
+    );
+    await expect(r.panel.getByLabel('接手确认内容变化')).toBeVisible();
+    await expect(r.panel.getByRole('button', { name: '开始本机确认', exact: true })).toBeDisabled();
+    await r.panel.getByRole('button', { name: '已核对最新接手内容', exact: true }).click();
+    await r.panel.getByRole('button', { name: '开始本机确认', exact: true }).click();
+    await expect(r.panel).toContainText('等待接收节点本机确认');
+    await post(
+      page,
+      `projects/${f.task.projectId}/members/${f.recipientId}`,
+      { role: 'view' },
+      f.space.id,
+    );
+    await expect(r.panel).toContainText('接手确认需要重新核对');
+    await expect(r.panel.getByLabel('本机接手确认命令')).toHaveCount(0);
+    await post(
+      page,
+      `projects/${f.task.projectId}/members/${f.recipientId}`,
+      { role: 'edit' },
+      f.space.id,
+    );
+    await expect(r.panel).toContainText('接手确认需要重新核对');
+    await f.panel.getByRole('button', { name: '查看接手处理', exact: true }).click();
+    await f.panel.getByRole('button', { name: '取消这次接手确认', exact: true }).click();
+    await expect(r.panel).toContainText('接手确认已取消');
+    const task = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(task.task.operatorUserId).toBeUndefined();
+    expect(task.runs).toHaveLength(0);
+  } finally {
     await f.close();
   }
 });

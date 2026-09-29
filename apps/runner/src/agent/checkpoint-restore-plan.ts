@@ -90,6 +90,13 @@ export function inspectRestoreTarget(
   target: string,
   protectedPaths: readonly string[],
 ): RestoreTargetObservation {
+  return inspectTarget(target, protectedPaths);
+}
+function inspectTarget(
+  target: string,
+  protectedPaths: readonly string[],
+  publishedIdentity?: string,
+): RestoreTargetObservation {
   if (process.platform !== 'linux')
     throw new DomainError('PLATFORM_UNSUPPORTED', '当前恢复预检仅支持 Linux 普通文件/目录');
   absolutePath(target);
@@ -111,9 +118,19 @@ export function inspectRestoreTarget(
   }
   // lstat, not exists/stat: an existing dangling link is still an occupied target.
   try {
-    lstatSync(target);
+    const s = lstatSync(target, { bigint: true });
+    if (
+      publishedIdentity &&
+      s.isDirectory() &&
+      !s.isSymbolicLink() &&
+      !(s.mode & 0o077n) &&
+      s.uid === BigInt(process.getuid!()) &&
+      `${s.dev}:${s.ino}:${s.birthtimeNs}` === publishedIdentity
+    )
+      return { path: target, parents };
   } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return { path: target, parents };
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT' && !publishedIdentity)
+      return { path: target, parents };
     throw cause;
   }
   throw new DomainError('RESTORE_TARGET_EXISTS', '目标已存在；请选择全新目录，不覆盖已有内容');
@@ -125,6 +142,30 @@ export async function buildRestorePlan(
   target: string,
   protectedPaths: readonly string[],
   signal?: AbortSignal,
+) {
+  return makeRestorePlan(source, read, target, protectedPaths, signal);
+}
+
+/** Fresh comparison of an already-published directory with its exact recorded
+ * root identity. This never enables the ordinary restore/preflight routes to overwrite. */
+export async function rebuildPublishedRestorePlan(
+  source: RestorePlanSource,
+  read: ObjectReader,
+  target: string,
+  protectedPaths: readonly string[],
+  publishedIdentity: string,
+  signal?: AbortSignal,
+) {
+  if (!publishedIdentity) throw new DomainError('RESTORE_JOURNAL_INVALID', '缺少原发布目录身份');
+  return makeRestorePlan(source, read, target, protectedPaths, signal, publishedIdentity);
+}
+async function makeRestorePlan(
+  source: RestorePlanSource,
+  read: ObjectReader,
+  target: string,
+  protectedPaths: readonly string[],
+  signal?: AbortSignal,
+  publishedIdentity?: string,
 ) {
   checkAbort(signal);
   const manifest = parseRetentionManifest(source.manifest);
@@ -170,7 +211,7 @@ export async function buildRestorePlan(
       );
   };
   fresh();
-  const observed = inspectRestoreTarget(target, protectedPaths);
+  const observed = inspectTarget(target, protectedPaths, publishedIdentity);
   const snapshot = await verifySnapshot(
     manifest.objectFormat,
     manifest.commit,
@@ -238,7 +279,10 @@ export async function buildRestorePlan(
   }
   entries.sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)));
   fresh();
-  if (canonicalJson(inspectRestoreTarget(target, protectedPaths)) !== canonicalJson(observed))
+  if (
+    canonicalJson(inspectTarget(target, protectedPaths, publishedIdentity)) !==
+    canonicalJson(observed)
+  )
     throw new DomainError('RESTORE_TARGET_CHANGED', '预检期间目标父目录已变化，请重新核对');
   const plan = {
     version: 1 as const,

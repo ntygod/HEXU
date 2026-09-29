@@ -84,10 +84,10 @@
 | HX-DEV-11-06 | 采纳、追问、取消与恢复 | FE/BE | 部分实现 | 真人协助追问、明确结束/撤销、过期来源提示和网络/并发保留已接入，旧回执不重复回复或复活授权。AI 取消/实际停止及未知本机确认已接入，不影响主运行或目录锁。真人/有效 AI 建议可多片段明确采用到原任务说明，来源/目标修订和权限重查、等待接续暂停、不可变记录及幂等同事务；更多目标、AI 会话恢复与重新分享仍缺。 | [采用事务](../../packages/db/src/assistance-adoption.ts) / [回归](../../tests/assistance-adoption.test.ts) |
 | HX-DEV-12-01 | 多仓库提交/补丁检查点 | RN | 部分实现 | 单仓库 team-local 项目任务的本人本机提交引用已接入：完整 commit/root-tree 哈希核对、独立逐次同意、不可变记录与排除项、当前权限和原子回执。仅本机引用，不是备份；多仓库、补丁/文件清单、remote identity 与恢复仍缺；单提交文件对象保留见12-02。 | [核对](../../apps/runner/src/agent/checkpoints.ts) / [事务](../../packages/db/src/checkpoints.ts) / [用法](../engineering/commit-checkpoints.md) |
 | HX-DEV-12-02 | 检查点传输与目标恢复 | RN/BE | 部分实现 | 原本人/接收者各自 Linux 新目录恢复、清理与任务内报告已接入；新增同项目双节点明确同意的加密对象传输、独立接收核验与固定回执。仍限同控制服务和回环，最后报告不是实时文件可用性；跨电脑、多仓库/补丁/LFS等完整范围仍缺。 | [传输](../../packages/db/src/checkpoint-transfer.ts) / [接收恢复](../../apps/runner/src/agent/checkpoint-received-source.ts) / [用法](../engineering/checkpoint-received-restore.md) |
-| HX-DEV-12-03 | Handoff 发布、接受与状态 | BE | 部分实现 | 固定材料与工作说明的邀请发布、指定接收者拒绝、发布者撤回、持久到期、独立修订/历史与原子回执已有；真正接受、操作者切换及接受 Operation 尚未交付。 | [邀请事务](../../packages/db/src/handoffs.ts) / [状态](../../packages/domain/src/handoffs.ts) |
+| HX-DEV-12-03 | Handoff 发布、接受与状态 | BE | 部分实现 | 邀请发布/关闭/到期、独立接受操作与任务预约、原节点本机新核验、操作者与回执原子提交已有；服务重启/上下文变化暂停。自动现场恢复编排及完整跨电脑接手仍缺。 | [邀请](../../packages/db/src/handoffs.ts) / [接受事务](../../packages/db/src/handoff-acceptance.ts) / [本机核验](../../apps/runner/src/agent/handoff-acceptance.ts) |
 | HX-DEV-12-04 | 选择性分享和跨空间明确发布 | BE/FE | 未实现 | 选择性分享与跨空间明确发布未实现。 | —（尚无可用实现） |
-| HX-DEV-12-05 | 接手卡与责任可选转移 | FE | 部分实现 | W1 原任务接手抽屉、固定接收者/副本/摘要/剩余工作/环境、期限及历史已有；接受进度与负责人可选转移仍未交付。 | [接手抽屉](../../apps/web/src/handoffs.tsx) / [用法](../engineering/handoff-invitations.md) |
-| HX-DEV-12-06 | 接手刷新恢复与部分失败处理 | RN/BE | 部分实现 | 邀请刷新后读取、未知回执确认同包、冲突与权限失效清理、并发关闭和重启后到期保持已有；真正接受的持久操作、现场恢复失败与操作者联动仍缺。 | [工程检查](../../tests/handoffs.test.ts) / [浏览器流程](../../tests/e2e/checkpoint-retention.spec.ts) |
+| HX-DEV-12-05 | 接手卡与责任可选转移 | FE | 部分实现 | W1 接手材料/工作说明、接受进度、当前操作者与双方明确选择的可选负责人移交已接入；实际 Git/执行现场的接续入口及远程完整体验仍缺。 | [邀请](../../apps/web/src/handoffs.tsx) / [接受面板](../../apps/web/src/handoff-acceptance.tsx) / [用法](../engineering/handoff-acceptance.md) |
+| HX-DEV-12-06 | 接手刷新恢复与部分失败处理 | RN/BE | 部分实现 | 邀请与接受操作刷新/取消、固定回执对账、当前权限/上下文、重启暂停和真实文件变化拒绝已有；未知写入保留，降权只清编辑并保留可读进度。自动恢复编排与跨电脑部分失败处置仍缺。 | [接受回归](../../tests/handoff-acceptance.test.ts) / [浏览器](../../tests/e2e/checkpoint-retention.spec.ts) |
 | HX-DEV-13-01 | WorkBranch 与共同起点 | BE | 未实现 | WorkBranch 与共同起点模型未实现。 | —（尚无可用实现） |
 | HX-DEV-13-02 | 分支独立现场与并发执行 | RN/BE | 未实现 | 分支独立现场和并发代码执行未实现。 | —（尚无可用实现） |
 | HX-DEV-13-03 | 分支成果绑定与部分失败 | BE | 未实现 | 分支成果绑定与部分失败处理未实现。 | —（尚无可用实现） |
