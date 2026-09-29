@@ -1,4 +1,5 @@
 import { attachCheckpoints } from './checkpoints.js';
+import { attachHandoffs } from './handoffs.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
@@ -173,6 +174,7 @@ export async function createApp(
   attachAssistance(app, store);
   const nodeExecution = attachNodes(app, store);
   attachCheckpoints(app, store);
+  attachHandoffs(app, store);
   const operationRecords = (id: string) =>
     nodeExecution &&
     store.db.prepare('SELECT id FROM node_continuation_operations WHERE id=?').get(id)

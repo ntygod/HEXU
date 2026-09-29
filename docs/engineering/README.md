@@ -31,6 +31,9 @@
 | 只读检查新目录恢复材料，不实际写入 | [恢复预检](checkpoint-restore-plan.md) |
 | 本机暂存写入、不覆盖发布与明确清理 | [新目录恢复](checkpoint-restore.md) |
 | 明确报告恢复结果、任务内历史与丢失回执对账 | [恢复结果](checkpoint-restore-results.md) |
+| 同项目双节点明确收发固定对象 | [受控传输](checkpoint-transfer.md) |
+| 接收者用自己的副本恢复与报告 | [接收端恢复](checkpoint-received-restore.md) |
+| 发布、拒绝、撤回接手邀请 | [任务接手邀请](handoff-invitations.md) |
 
 ## 架构决策
 
