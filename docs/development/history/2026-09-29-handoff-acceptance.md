@@ -30,4 +30,6 @@ Linux / Node24.19.0 的独立容器按锁定依赖构建。**首轮115/115相关
 
 ## 仍未交付
 
+最终 `acff453690ae499c167d70eeb7953822247d7617` 的 [CI 36523058725](https://github.com/ntygod/HEXU/actions/runs/36523058725) 全部成功：500项工程、108项Chromium，engineering / browser / check 三作业均通过。PR #23 已合并至 main `7105be1`，核对功能树相同后清理接受分支。下列限制是此接受切片当时的范围，后续研发衔接见[接手现场指南](../../engineering/handoff-workspace.md)。
+
 接受不使普通文件副本自动成为 Git 研发现场，未注册目录不能据此使用模型。工作区登记、Git 身份/浅历史边界及本人新 Run 是22中的下一项；跨电脑、跨空间、完整材料类型和桌面分发仍按原工作包分别推进。

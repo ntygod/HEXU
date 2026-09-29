@@ -320,9 +320,29 @@ export class HandoffAcceptanceStore {
     // Permission is rechecked even for receipt replay; node Bearer is never a browser principal.
     return this.asRecipient(initial, () => {
       this.recipient(initial.ticket.taskId, initial.ticket.handoffId);
-      if (data.action === 'inspect') {
+      if (data.action === 'inspect' || data.action === 'workspace-source') {
         this.sweep();
-        return this.row(data.operationId);
+        const current = this.row(data.operationId);
+        if (data.action === 'workspace-source') {
+          if (current.state !== 'succeeded')
+            throw new DomainError('HANDOFF_NOT_ACCEPTED', '接手尚未确认，不能准备研发现场', 409);
+          const task = this.store.getTask(current.ticket.taskId, true);
+          const last = this.store.db
+            .prepare(
+              "SELECT id FROM handoff_acceptances WHERE task_id=? AND state='succeeded' ORDER BY rowid DESC LIMIT 1",
+            )
+            .get(task.id) as { id: string } | undefined;
+          if (last?.id !== current.ticket.id || task.operatorUserId !== this.store.actorId)
+            throw new DomainError(
+              'HANDOFF_CONTEXT_CHANGED',
+              '请使用当前操作者最近已接受的接手记录',
+              409,
+            );
+          this.material(current.snapshot);
+          this.noWriters(task.id);
+          assertNoPendingHandoff(this.store, task.id);
+        }
+        return current;
       }
       return this.store.atomic(() => {
         const op = this.row(data.operationId),

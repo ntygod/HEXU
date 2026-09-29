@@ -181,10 +181,27 @@ export function withOwnedDirectory<T>(
     for (const h of opened.reverse()) closeSync(h);
   }
 }
-export function checkOwnedTree(root: number, owned: ReadonlyMap<string, OwnedRestoreEntry>) {
+export function checkOwnedTree(
+  root: number,
+  owned: ReadonlyMap<string, OwnedRestoreEntry>,
+  gitMetadata?: { name: '.git'; identity: string },
+) {
   let count = 0;
+  let metadataSeen = false;
   const walk = (fd: number, prefix: string) => {
     for (const name of readdirSync(fdPath(fd))) {
+      if (!prefix && gitMetadata && name === gitMetadata.name) {
+        const s = lstatSync(fdPath(fd, name), { bigint: true });
+        if (
+          !s.isDirectory() ||
+          s.isSymbolicLink() ||
+          identity(s) !== gitMetadata.identity ||
+          s.mode & 0o077n
+        )
+          throw unsafe();
+        metadataSeen = true;
+        continue;
+      }
       const path = prefix ? `${prefix}/${name}` : name;
       const expected = owned.get(path);
       if (!expected) throw unsafe();
@@ -205,6 +222,7 @@ export function checkOwnedTree(root: number, owned: ReadonlyMap<string, OwnedRes
   };
   walk(root, '');
   if (count !== owned.size) throw unsafe();
+  if (gitMetadata && !metadataSeen) throw unsafe();
 }
 export function readOwnedFile(
   root: number,

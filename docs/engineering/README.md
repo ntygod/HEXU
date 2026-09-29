@@ -35,6 +35,7 @@
 | 接收者用自己的副本恢复与报告 | [接收端恢复](checkpoint-received-restore.md) |
 | 发布、拒绝、撤回接手邀请 | [任务接手邀请](handoff-invitations.md) |
 | 本机新核验、接受接手与操作者/可选负责人 | [接受接手](handoff-acceptance.md) |
+| 接手目录准备 Git、本人配对与新 Run | [接手现场研发](handoff-workspace.md) |
 
 ## 架构决策
 

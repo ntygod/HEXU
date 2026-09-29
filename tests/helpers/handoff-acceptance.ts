@@ -10,8 +10,12 @@ import { localRestoreCheckpoint } from '../../apps/runner/src/agent/checkpoint-r
 import { acceptLocalHandoff } from '../../apps/runner/src/agent/handoff-acceptance.js';
 import { transferFixture, silent } from './checkpoint-transfer.js';
 
-export async function handoffAcceptanceFixture(requestOwner = false, restore = true) {
-  const f = await transferFixture();
+export async function handoffAcceptanceFixture(
+  requestOwner = false,
+  restore = true,
+  format: 'sha1' | 'sha256' = 'sha1',
+) {
+  const f = await transferFixture(format);
   try {
     await f.accept();
     await f.send();

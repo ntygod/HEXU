@@ -120,6 +120,7 @@ export function validatePreview(v: PairingView): PairingView {
   nodeId(v.id);
   nodeId(v.projectId);
   nodeId(v.spaceId);
+  if (v.ownerId !== undefined) nodeId(v.ownerId);
   if (
     v.state !== 'pending' ||
     ![v.ownerName, v.spaceName, v.projectName].every(

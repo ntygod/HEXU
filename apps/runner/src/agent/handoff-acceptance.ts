@@ -37,7 +37,7 @@ interface Row {
   packet: string | null;
   outcome: string | null;
 }
-function validate(op: HandoffAcceptance, id: string) {
+export function validateHandoffAcceptanceReply(op: HandoffAcceptance, id: string) {
   if (
     !op ||
     typeof op !== 'object' ||
@@ -139,7 +139,7 @@ export async function acceptLocalHandoff(
   };
   const inspect = async () => {
     stillBound();
-    const op = validate(
+    const op = validateHandoffAcceptanceReply(
       await nodeRequest<HandoffAcceptance>(
         c.controlUrl,
         'handoff-acceptance',
@@ -182,7 +182,7 @@ export async function acceptLocalHandoff(
       );
     const settle = async (packet: ReturnType<typeof parseHandoffNodeCommand>) => {
       stillBound();
-      const result = validate(
+      const result = validateHandoffAcceptanceReply(
         await nodeRequest<HandoffAcceptance>(
           c.controlUrl,
           'handoff-acceptance',

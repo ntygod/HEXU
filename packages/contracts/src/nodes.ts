@@ -25,6 +25,7 @@ export interface NodeSnapshot {
 }
 export interface PairingView {
   id: string;
+  ownerId?: string;
   projectId: string;
   projectName: string;
   spaceId: string;

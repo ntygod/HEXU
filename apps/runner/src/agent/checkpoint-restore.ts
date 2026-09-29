@@ -65,9 +65,10 @@ export function verifyRestoreFiles(
   plan: RestorePlan,
   journal: RestoreJournal,
   progress: RestoreProgress,
+  gitMetadata?: { name: '.git'; identity: string },
 ) {
   const owned = journal.entries(progress.id);
-  checkOwnedTree(stage, owned);
+  checkOwnedTree(stage, owned, gitMetadata);
   if (owned.size !== plan.entries.length)
     throw new DomainError('RESTORE_INCOMPLETE', '暂存清单与计划不一致');
   for (const e of plan.entries) {
