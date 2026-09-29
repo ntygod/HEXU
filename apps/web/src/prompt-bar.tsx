@@ -20,7 +20,7 @@ export function PromptBar({
   onConfigure(): void;
   onContinue(): void;
 }) {
-  const node = run?.provider === 'node';
+  const node = run?.provider === 'node' && !run.node?.workBranch;
   const [intent, setIntent] = useState(node ? 'next' : 'discussion');
   useEffect(() => setIntent(node ? 'next' : 'discussion'), [node]);
   return (

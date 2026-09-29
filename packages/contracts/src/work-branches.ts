@@ -1,4 +1,4 @@
-import { DomainError, revision, text } from './index.js';
+import { DomainError, revision, text, type Run } from './index.js';
 import { exact, nodeId, publicName } from './nodes.js';
 import type { CommitCheckpoint } from './checkpoints.js';
 
@@ -27,10 +27,12 @@ export interface WorkBranch {
   name: string;
   goal: string;
   revision: number;
-  state: 'planned' | 'discarded';
-  workingCopyId: null;
-  runId: null;
+  state: 'planned' | 'active' | 'discarded';
+  workingCopyId: string | null;
+  runId: string | null;
   resultId: null;
+  workspace?: import('./work-branch-workspaces.js').BranchWorkspaceOperation;
+  run?: Run;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,7 +53,15 @@ export interface WorkBranchOptions {
 }
 export interface WorkBranchEvent {
   revision: number;
-  action: 'plan' | 'discard';
+  action:
+    | 'plan'
+    | 'discard'
+    | 'workspace_requested'
+    | 'workspace_prepared'
+    | 'workspace_bound'
+    | 'workspace_cancelled'
+    | 'run_created'
+    | 'run_started';
   actor: { id: string; name: string };
   at: string;
 }

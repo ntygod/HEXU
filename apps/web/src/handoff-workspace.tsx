@@ -23,7 +23,13 @@ function PairingFeedback({ command }: { command: ReturnType<typeof useAssistance
     </>
   );
 }
-function WorkspacePairing({ projectId }: { projectId: string }) {
+export function WorkspacePairing({
+  projectId,
+  purpose = '接手现场',
+}: {
+  projectId: string;
+  purpose?: string;
+}) {
   const { notice } = useApp();
   const [pairing, setPairing] = useState<Pairing | null>(null),
     [showCode, setShowCode] = useState(false);
@@ -49,7 +55,7 @@ function WorkspacePairing({ projectId }: { projectId: string }) {
   }, [denied, current?.state]);
   if (denied) return <p role="alert">配对权限已失效，配对码已清除；请重新核对项目权限。</p>;
   return (
-    <section className="handoff-panel-status" aria-label="接手现场配对">
+    <section className="handoff-panel-status" aria-label={`${purpose}配对`}>
       <p>生成自己的原项目配对码，在终端使用准备成功后给出的 connect 命令确认目录。</p>
       <PairingFeedback command={create} />
       <PairingFeedback command={cancel} />
@@ -77,9 +83,9 @@ function WorkspacePairing({ projectId }: { projectId: string }) {
               {pairing.code ? (
                 <>
                   <label className="field">
-                    接手现场配对码
+                    {purpose}配对码
                     <input
-                      aria-label="接手现场配对码"
+                      aria-label={`${purpose}配对码`}
                       type={showCode && usable ? 'text' : 'password'}
                       value={pairing.code}
                       readOnly

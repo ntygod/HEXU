@@ -55,6 +55,7 @@ export async function nodeRequest<T>(
       'checkpoint-transfer-restore-report',
       'checkpoint-transfer',
       'handoff-acceptance',
+      'work-branch-workspace',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');

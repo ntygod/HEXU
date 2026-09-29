@@ -27,6 +27,8 @@ import { WorkspaceLease } from '../workspace-lease.js';
 import { AgentConnection, nodeRequest } from './connection.js';
 import { captureDirectory } from './workspaces.js';
 import { ExecutionJournal } from './execution-journal.js';
+import { parseBranchExecutionBinding } from '../../../../packages/contracts/src/work-branch-workspaces.js';
+import { verifyBranchOrigin, boundBranchNode } from './branch-origin.js';
 import {
   keyFor,
   readExecutionPolicy,
@@ -101,9 +103,22 @@ export class NodeExecutor {
       'session',
       'purpose',
       'assistanceId',
+      'workBranch',
     ]);
     const policy = parsePolicy(b.policy);
     const assist = b.purpose === 'assist';
+    const branchNode = boundBranchNode(this.connection.storage, this.connection.credentials);
+    if (branchNode) {
+      const selection = parseBranchExecutionBinding(b.workBranch);
+      if (
+        selection.operationId !== branchNode.operationId ||
+        selection.originHash !== branchNode.originHash ||
+        selection.branchId !== branchNode.branchId
+      )
+        throw new DomainError('WORK_BRANCH_SCOPE_MISMATCH', '此节点仅用于本机明确登记的方案首轮');
+    }
+    if (b.workBranch !== undefined && (assist || b.session !== undefined))
+      throw new DomainError('WORK_BRANCH_SCOPE_MISMATCH', '方案首轮不能混入协助或原会话恢复');
     if (
       (b.purpose !== undefined && !assist) ||
       (assist &&
@@ -131,6 +146,9 @@ export class NodeExecutor {
     if (b.session !== undefined && !policy.retainSessions)
       throw new DomainError('SESSION_NOT_ENABLED', '本机未授权保留或恢复会话');
     return {
+      ...(b.workBranch === undefined
+        ? {}
+        : { workBranch: parseBranchExecutionBinding(b.workBranch) }),
       ...(b.session === undefined ? {} : { session: parseSessionRequest(b.session) }),
       ...(assist ? { purpose: 'assist' as const, assistanceId: nodeId(b.assistanceId) } : {}),
       id: nodeId(b.id),
@@ -163,6 +181,7 @@ export class NodeExecutor {
       if (this.fatal) throw this.fatal;
       await this.flush(signal);
       if (this.closed || !this.local) return;
+      boundBranchNode(this.connection.storage, this.connection.credentials);
       if (this.publishedConnection !== this.connection.connectionId) {
         if (!keyFor(this.local.policy))
           throw new DomainError('API_KEY_REQUIRED', '本机缺少对应 API key，没有发布执行授权');
@@ -229,6 +248,27 @@ export class NodeExecutor {
       if (Date.parse(command.expiresAt) <= Date.now() || signal?.aborted || this.closed)
         throw new DomainError('DISPATCH_EXPIRED', '派发已过期或节点正在停止');
       lease = new WorkspaceLease(directory.root, command.id);
+      if (command.workBranch) {
+        const record = this.connection.storage.db
+          .prepare('SELECT body FROM branch_binding WHERE id=?')
+          .get(command.workBranch.operationId) as { body: string } | undefined;
+        const bound = record && JSON.parse(record.body);
+        if (
+          !bound ||
+          bound.phase !== 'settled' ||
+          bound.result?.state !== 'bound' ||
+          bound.result.nodeId !== this.connection.credentials.nodeId ||
+          bound.result.workingCopyId !== directory.id ||
+          bound.result.proof?.originHash !== command.workBranch.originHash
+        )
+          throw new DomainError('WORK_BRANCH_NOT_BOUND', '本机尚未确认此方案的原登记回执');
+        await verifyBranchOrigin(
+          this.connection.storage.home,
+          this.connection.credentials,
+          directory,
+          command.workBranch,
+        );
+      }
       this.journal.phase(command.id, 'preparing'); // Must precede the permit/spawn ambiguity window.
       const permit = await this.request<{ allowed: boolean }>(
         'execution-permit',
@@ -247,6 +287,13 @@ export class NodeExecutor {
       // Recheck the local directory after the network round-trip, before any child process.
       if ((await captureDirectory(directory)).state !== 'available')
         throw new DomainError('WORKSPACE_UNAVAILABLE', '启动前目录授权已变化');
+      if (command.workBranch)
+        await verifyBranchOrigin(
+          this.connection.storage.home,
+          this.connection.credentials,
+          directory,
+          command.workBranch,
+        );
       if (signal?.aborted || this.closed) {
         this.journal.settle(command.id, 'cancelled', '节点关闭，未启动模型。');
         lease.release();
