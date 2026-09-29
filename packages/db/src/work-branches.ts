@@ -13,6 +13,7 @@ import {
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import { CheckpointStore } from './checkpoints.js';
 import type { Store } from './store.js';
+import type { BranchWorkspaceOperation } from '../../contracts/src/work-branch-workspaces.js';
 
 type Row = { rowid: number; body: string };
 export class WorkBranchStore {
@@ -30,14 +31,16 @@ export class WorkBranchStore {
       );
     return task;
   }
-  private group(taskId: string, groupId: string): WorkBranchGroup {
+  group(taskId: string, groupId: string): WorkBranchGroup {
+    this.task(taskId);
     const row = this.store.db
       .prepare('SELECT body FROM work_branch_groups WHERE task_id=? AND id=?')
       .get(taskId, groupId) as Row | undefined;
     if (!row) throw new DomainError('NOT_FOUND', '方案组不存在或不属于此任务', 404);
     return JSON.parse(row.body) as WorkBranchGroup;
   }
-  private branch(taskId: string, id: string): WorkBranch {
+  branch(taskId: string, id: string): WorkBranch {
+    this.task(taskId);
     const row = this.store.db
       .prepare('SELECT body FROM work_branches WHERE task_id=? AND id=?')
       .get(taskId, id) as Row | undefined;
@@ -51,7 +54,21 @@ export class WorkBranchStore {
         this.store.db
           .prepare('SELECT body FROM work_branches WHERE group_id=? ORDER BY rowid')
           .all(group.id) as Row[]
-      ).map((r) => JSON.parse(r.body) as WorkBranch),
+      ).map((r) => {
+        const b = JSON.parse(r.body) as WorkBranch;
+        const workspace = this.store.db
+          .prepare(
+            'SELECT body FROM work_branch_workspaces WHERE branch_id=? ORDER BY rowid DESC LIMIT 1',
+          )
+          .get(b.id) as Row | undefined;
+        return {
+          ...b,
+          ...(workspace
+            ? { workspace: JSON.parse(workspace.body) as BranchWorkspaceOperation }
+            : {}),
+          ...(b.runId ? { run: this.store.run(b.runId) } : {}),
+        };
+      }),
       taskChanged: task.revision !== group.start.taskRevision,
     };
   }
@@ -67,11 +84,16 @@ export class WorkBranchStore {
       checkpoints: ids.map((r) => this.checkpoints.get(taskId, r.id)),
     };
   }
-  private event(task: Task, b: WorkBranch, action: WorkBranchEvent['action']) {
+  private event(
+    task: Task,
+    b: WorkBranch,
+    action: WorkBranchEvent['action'],
+    actor?: WorkBranchEvent['actor'],
+  ) {
     const event: WorkBranchEvent = {
       revision: b.revision,
       action,
-      actor: { id: this.store.actorId, name: this.store.actorName() },
+      actor: actor ?? { id: this.store.actorId, name: this.store.actorName() },
       at: b.updatedAt,
     };
     this.store.db
@@ -80,6 +102,21 @@ export class WorkBranchStore {
     this.store.db
       .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
       .run(task.id, `work_branch.${action}`, b.updatedAt, task.spaceId);
+  }
+  /** Caller owns the surrounding business transaction, including dispatch/receipt. */
+  change(
+    task: Task,
+    branch: WorkBranch,
+    action: WorkBranchEvent['action'],
+    actor?: WorkBranchEvent['actor'],
+  ) {
+    const { workspace: _workspace, run: _run, ...saved } = branch;
+    const next = { ...saved, revision: saved.revision + 1, updatedAt: new Date().toISOString() };
+    this.store.db
+      .prepare('UPDATE work_branches SET state=?,revision=?,body=? WHERE id=? AND task_id=?')
+      .run(next.state, next.revision, JSON.stringify(next), next.id, task.id);
+    this.event(task, next, action, actor);
+    return next;
   }
   create(taskId: string, input: unknown, key: string): WorkBranchView {
     this.task(taskId, true); // Current authority applies before idempotent receipt replay.
@@ -172,6 +209,18 @@ export class WorkBranchStore {
       const task = this.task(taskId, true),
         b = this.branch(taskId, id);
       assertRevision(b.revision, data.expectedRevision);
+      if (
+        this.store.db
+          .prepare(
+            "SELECT 1 FROM work_branch_workspaces WHERE branch_id=? AND state IN ('waiting_local','prepared','bound')",
+          )
+          .get(id)
+      )
+        throw new DomainError(
+          'WORK_BRANCH_WORKSPACE_PENDING',
+          '先处置此方案的现场准备，不能借放弃定义清除占用',
+          409,
+        );
       if (b.state !== 'planned' || b.runId || b.workingCopyId || b.resultId)
         throw new DomainError(
           'WORK_BRANCH_NOT_PLANNED',

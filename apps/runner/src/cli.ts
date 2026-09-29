@@ -9,6 +9,7 @@ import { readExecutionPolicy, writeExecutionPolicy } from './agent/execution-pol
 import { randomBytes, randomUUID } from 'node:crypto';
 import { assertHandoffEvidenceSettled } from './agent/handoff-acceptance.js';
 import { assertGitWorkspaceSettled } from './agent/handoff-workspace.js';
+import { assertBranchEvidenceSettled } from './agent/branch-workspace.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -180,6 +181,7 @@ async function connect(storage: AgentStorage, configPath: string) {
     new ExecutionJournal(storage).assertCanDisconnect();
     assertHandoffEvidenceSettled(storage.home);
     assertGitWorkspaceSettled(storage.home);
+    assertBranchEvidenceSettled(storage.home);
     storage.resetForPairing();
     writeExecutionPolicy(storage.home, null);
     writeCredentials(storage.home, credentials);
@@ -292,6 +294,7 @@ async function main() {
       new ExecutionJournal(storage).assertCanDisconnect();
       assertHandoffEvidenceSettled(storage.home);
       assertGitWorkspaceSettled(storage.home);
+      assertBranchEvidenceSettled(storage.home);
       const c = readCredentials(storage.home);
       if (!options['--local-only']) {
         try {

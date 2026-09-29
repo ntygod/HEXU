@@ -25,6 +25,8 @@
 
 [本机准备](../../apps/runner/src/agent/handoff-workspace.ts)、[有限 Git 元数据](../../apps/runner/src/agent/git-workspace-metadata.ts) 和[任务指引](../../apps/web/src/handoff-workspace.tsx)串起同一 Task 的后续研发；用法见[现场指南](../engineering/handoff-workspace.md)。
 
+底层[恢复目录Git准备](../../apps/runner/src/agent/restored-git-workspace.ts)现由接手和方案共同使用；接手入口仍须独立校验原接受证明，不能借方案授权绕过接手身份/文件核验，也不把接手成功当作方案登记。
+
 - 只有当前操作者最近成功的原接受记录可用于准备；原节点、材料与当前权限必须仍有效。再次检查原对象、代码、目录身份、任务写入与本机锁，逐次 GIT 同意后只排他添加本次 `.git`，不运行 Git/脚本/hooks/filter 或网络，不改原代码与旧身份绑定。
 - Git v2 索引与单提交 shallow 保留原 commit；不能称为完整原仓库。逐项归属日志和独占准备锁先于写入，重启只记需要处理；只有明确 CLEAN_GIT 可删除完整归属且未改变的失败元数据，已成功现场不可清理。未知模型预约不释放，未处置证据阻止原凭证删除/重新配对。
 - 生成独立节点配置，expectedScope 必须核对本人 user ID、空间与项目，不以名字推断身份。配对与 enable-execution 各有明确本机同意，复用原节点派发/许可/工作区规则；默认本人新会话，不复制发送者凭证/历史。

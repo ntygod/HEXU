@@ -4,7 +4,7 @@
 
 ## 1. 状态口径
 
-2026-09-29：**2 项已完成、74 项部分实现、26 项未实现**。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
+2026-09-29：**2 项已完成、76 项部分实现、24 项未实现**。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
 
 当前能力与最近验证看 [21](21-implementation-status.md)，下一项只看 [22](22-next-delivery.md)，详细批次证据与旧状态叙述看 [实现历史](history/2026-09-28-implementation.md)。本页不重复 CI 日志。M0—M4 是产品目标阶段，E0—E2c2 是历史代码批次，不能互相替代。
 
@@ -49,11 +49,11 @@
 | HX-DEV-06-01 | Runner CLI、配对与节点身份 | RN/BE | 部分实现 | 独立 CLI、配对、节点身份及本人执行的本机明确授权已有；系统凭证存储、跨电脑传输与完整安装分发未完成。 | [CLI](../../apps/runner/src/cli.ts) / [本机授权](../../apps/runner/src/agent/execution-policy.ts) |
 | HX-DEV-06-02 | 主动连接、心跳、spool 与重放 | RN/BE | 部分实现 | 回环主动连接、心跳、摘要和执行证据持久化 ACK/重放已有；重复启动许可拒绝，歧义不重跑。远程 WSS 与完整流量/版本协商未完成。 | [连接](../../apps/runner/src/agent/connection.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
 | HX-DEV-06-03 | 目录权限、WorkingCopy 与 Git 状态 | RN | 部分实现 | 本机目录身份、Git 摘要与明确执行子集已有；已接手原目录可逐次同意准备 SHA-1/SHA-256 单提交浅 Git，经独立本人配对登记。完整历史、远程 diff/文件读取、跨平台与通用目录授权仍缺。 | [目录](../../apps/runner/src/agent/workspaces.ts) / [接手Git](../../apps/runner/src/agent/handoff-workspace.ts) |
-| HX-DEV-06-04 | 独立工作区、写入约束与资源登记 | RN/BE | 部分实现 | 节点本地与 preview 共用持久化目录/重叠目录占用；未知旧进程不释放。新增接手Git准备归属日志、失败保留/明确清理与独立节点配置，旧绑定保持不变。隔离并行、跨 OS 用户和完整资源治理仍缺。 | [目录锁](../../apps/runner/src/workspace-lease.ts) / [接手Git](../../apps/runner/src/agent/handoff-workspace.ts) |
+| HX-DEV-06-04 | 独立工作区、写入约束与资源登记 | RN/BE | 部分实现 | 本机与preview共用持久目录占用；接手/方案复用不覆盖恢复与有限Git准备，旧绑定保持不变。方案独立Node/目录和同组首轮并发已有；未知模型占用保留。跨OS用户、端口/数据库/缓存分配和完整资源治理仍缺。 | [目录锁](../../apps/runner/src/workspace-lease.ts) / [共享Git](../../apps/runner/src/agent/restored-git-workspace.ts) / [方案现场](../../apps/runner/src/agent/branch-workspace.ts) |
 | HX-DEV-06-05 | 进程树、输入输出与取消 | RN | 部分实现 | 独立节点实际进程、结构化输出、原生停止与 POSIX 进程组确认已接入；原生输入、Windows 和完整跨平台管理未完成。 | [执行器](../../apps/runner/src/agent/executor.ts) / [进程](../../apps/runner/src/process-host.ts) |
 | HX-DEV-06-06 | 重启对账、能力发现与诊断 | RN | 部分实现 | 增加私有原生会话状态与明确清理；保持 pending-executions、未知进程保锁和异常恢复不重跑。系统凭证存储、跨平台与完整自动对账未完成。 | [诊断](../../apps/runner/src/agent/execution-journal.ts) / [CLI](../../apps/runner/src/cli.ts) |
 | HX-DEV-07-01 | Run、配置快照和状态 reducer | BE/RN | 部分实现 | 同一 Run 模型支持 node provider 和固定派发/本机策略快照；接单、许可、实际启动各有证据。协助/并行/模板完整模型与原生会话映射仍缺。 | [执行契约](../../packages/contracts/src/node-execution.ts) / [派发](../../packages/db/src/node-execution.ts) |
-| HX-DEV-07-02 | 持久化派发、ACK 与幂等 | BE/RN | 部分实现 | 独立节点 Run/dispatch/幂等、接单和一次性许可已有；普通启动/接续核对预约并原子关联 Operation。接手Git经本人单独授权复用同一派发路径，不自动启动。远程 WSS、正式存储和完整调度仍缺。 | [派发](../../packages/db/src/node-execution.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) |
+| HX-DEV-07-02 | 持久化派发、ACK 与幂等 | BE/RN | 部分实现 | 节点派发/幂等/一次性许可、接续预约与Operation原子关联已有；方案首轮Run/分支关联同事务，同组不同现场可并发且每节点仍单执行，自动任务状态修订不吞人工变化。远程WSS、正式存储和通用队列仍缺。 | [派发](../../packages/db/src/node-execution.ts) / [日志](../../apps/runner/src/agent/execution-journal.ts) / [方案绑定](../../packages/db/src/work-branch-workspaces.ts) |
 | HX-DEV-07-03 | 归一化事件、游标和权限 SSE | BE/FE | 部分实现 | 节点状态/有界输出/终态通过持久事件回到原任务和权限 SSE；撤权后丢弃内容只收结算证据。完整原生差异、用量、流式增量和远程通道仍缺。 | [事件](../../packages/db/src/node-execution.ts) / [节点](../../apps/runner/src/agent/executor.ts) |
 | HX-DEV-07-04 | 运行输入与下一轮队列 | BE/RN | 部分实现 | 节点下一轮要求、编辑/撤回与实际启动状态已有；等待接续固定选择的版本，变更暂停而非静默采用。原生即时输入、澄清和 provider receipt 未实现。 | [队列](../../packages/db/src/next-inputs.ts) / [界面](../../apps/web/src/next-inputs.tsx) |
 | HX-DEV-07-05 | 绑定式动作授权与真实拒绝 | BE/RN | 部分实现 | 模拟授权与原生额外请求默认拒绝已有；真实动作绑定授权问答尚未实现。 | [状态/事务](../../packages/db/src/store.ts) / [接口](../../apps/control/src/app.ts) |
@@ -88,12 +88,12 @@
 | HX-DEV-12-04 | 选择性分享和跨空间明确发布 | BE/FE | 未实现 | 选择性分享与跨空间明确发布未实现。 | —（尚无可用实现） |
 | HX-DEV-12-05 | 接手卡与责任可选转移 | FE | 部分实现 | W1 接手材料/说明、接受进度、操作者与可选负责人移交已有；新增原目录Git准备指引、本人配对与原执行面板。Git准备历史留在本机，不伪造服务回执；自动编排及远程完整体验仍缺。 | [邀请](../../apps/web/src/handoffs.tsx) / [研发入口](../../apps/web/src/handoff-workspace.tsx) / [用法](../engineering/handoff-workspace.md) |
 | HX-DEV-12-06 | 接手刷新恢复与部分失败处理 | RN/BE | 部分实现 | 邀请/接受刷新、固定回执、权限/上下文及重启暂停已有；Git准备增加持久尝试、失败元数据归属清理与清理后明确重试。未知写入保留，网页降权清除临时码并保留进度。自动恢复编排与跨电脑失败处置仍缺。 | [接受回归](../../tests/handoff-acceptance.test.ts) / [Git准备回归](../../tests/handoff-workspace.test.ts) / [浏览器](../../tests/e2e/checkpoint-retention.spec.ts) |
-| HX-DEV-13-01 | WorkBranch 与共同起点 | BE | 部分实现 | 同任务2—6方案组、固定任务说明/提交引用/共同指纹、原子定义/事件/回执、权限/修订与W1抽屉已接入；当前仅planned/discarded。工具/材料扩展与独立现场/Run/Result生命周期待对应能力接入。 | [事务](../../packages/db/src/work-branches.ts) / [界面](../../apps/web/src/work-branches.tsx) / [用法](../engineering/work-branches.md) |
-| HX-DEV-13-02 | 分支独立现场与并发执行 | RN/BE | 未实现 | 分支独立现场和并发代码执行未实现。 | —（尚无可用实现） |
-| HX-DEV-13-03 | 分支成果绑定与部分失败 | BE | 未实现 | 分支成果绑定与部分失败处理未实现。 | —（尚无可用实现） |
+| HX-DEV-13-01 | WorkBranch 与共同起点 | BE | 部分实现 | 同任务2—6方案组、固定说明/提交、独立目标/修订/历史与W1抽屉已有；登记后关联WorkingCopy，首轮Run同事务关联，实际启动记录active。更多共同材料、Result与选择生命周期仍缺。 | [事务](../../packages/db/src/work-branches.ts) / [界面](../../apps/web/src/work-branches.tsx) / [用法](../engineering/work-branches.md) |
+| HX-DEV-13-02 | 分支独立现场与并发执行 | RN/BE | 部分实现 | 同机Linux原本人副本独立恢复/Git、新节点登记、首轮真实文件/树复核及同组不同现场的Claude/Codex协议进程并发已接入；单独授权/停止，原目录/凭证保持。组级预算/资源队列、跨成员/远程准备和完整拓扑仍缺。 | [事务](../../packages/db/src/work-branch-workspaces.ts) / [本机](../../apps/runner/src/agent/branch-workspace.ts) / [用法](../engineering/branch-workspaces.md) |
+| HX-DEV-13-03 | 分支成果绑定与部分失败 | BE | 部分实现 | 分支已关联原Run及固定共同输入，现场和Run失败独立保留、不重做其他方案，卡片展示实际执行进度。Result/不可变成果版本、完整输出和代码产物绑定仍缺，Run成功不标为成果ready。 | [方案绑定](../../packages/db/src/work-branch-workspaces.ts) / [现场卡](../../apps/web/src/work-branch-workspaces.tsx) |
 | HX-DEV-13-04 | 方案对比与选择继续 | FE/BE | 未实现 | 方案对比和选择某分支继续未实现。 | —（尚无可用实现） |
 | HX-DEV-13-05 | 固定版本的选择性整合 | RN/BE | 未实现 | 固定版本的选择性代码整合未实现。 | —（尚无可用实现） |
-| HX-DEV-13-06 | 分支停止、丢弃与清理保护 | RN/FE | 部分实现 | 尚未准备的planned方案可明确放弃，修订/历史/回执与当前权限一致；不改变Task、目录或其他方案。实际分支停止、活动提示与目录清理保护仍缺。 | [事务](../../packages/db/src/work-branches.ts) / [回归](../../tests/work-branches.test.ts) |
+| HX-DEV-13-06 | 分支停止、丢弃与清理保护 | RN/FE | 部分实现 | 尚未持有现场的planned可放弃；准备可取消/本机处置完整归属的失败材料，已发布代码保留。首轮Run可独立停止，未知进程不解锁，其他方案不受影响。已登记目录清理、分支接续/明确重试和完整恢复仍缺。 | [本机](../../apps/runner/src/agent/branch-workspace.ts) / [回归](../../tests/branch-workspaces.test.ts) |
 | HX-DEV-14-01 | Result/Revision 与基础产物 | BE | 部分实现 | 基础 Result、文字成果和来源关联已有；不可变 Revision 与完整产物模型未实现。 | [成果](../../packages/db/src/store.ts) / [页面](../../apps/web/src/App.tsx) |
 | HX-DEV-14-02 | 成果卡、版本与说明编辑 | FE | 部分实现 | W1 任务内成果、分享入口、项目成果与独立反馈页已重建；仍仅文字／明确示例预览，不可变版本切换与成果说明版本编辑未交付。 | [成果](../../apps/web/src/results.tsx) / [分享](../../apps/web/src/forms.tsx) |
 | HX-DEV-14-03 | 预览会话与主动隧道 | RN/BE | 未实现 | 通用预览会话与主动隧道未实现；订单示例页不是用户项目预览。 | —（尚无可用实现） |

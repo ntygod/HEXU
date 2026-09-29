@@ -1,4 +1,11 @@
-import { test, expect, request as apiRequest, type Page, type Browser } from '@playwright/test';
+import {
+  test,
+  expect,
+  request as apiRequest,
+  type Page,
+  type Browser,
+  type BrowserContext,
+} from '@playwright/test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile, rm, rename, readFile, chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -15,9 +22,13 @@ import {
 import { AgentConnection } from '../../apps/runner/src/agent/connection.js';
 import { NodeExecutor } from '../../apps/runner/src/agent/executor.js';
 import { readGitWorkspaceProgress } from '../../apps/runner/src/agent/handoff-workspace.js';
+import { readBranchWorkspaceStatus } from '../../apps/runner/src/agent/branch-workspace.js';
 import { RetentionVault } from '../../apps/runner/src/agent/checkpoint-retention.js';
 const origin = 'http://127.0.0.1:4317';
 const password = 'Fictional Checkpoint Browser Password 2026!';
+// These cases share one fictional owner, but each page starts with a fresh cookie
+// jar. Reuse only its in-memory authenticated session, not repeated password sign-ins.
+let ownerCookies: Awaited<ReturnType<BrowserContext['cookies']>> | null = null;
 const headers = (spaceId?: string) => ({
   origin,
   'x-hexu-client': 'web',
@@ -33,6 +44,7 @@ async function post(page: Page, path: string, body: unknown, spaceId?: string) {
   return r.json();
 }
 async function setup(page: Page) {
+  if (ownerCookies) await page.context().addCookies(ownerCookies);
   const initial = await (await page.request.get(origin + '/api/v1/identity')).json();
   const account = { email: 'retention-browser-owner@example.invalid', password };
   if (initial.setupRequired)
@@ -41,7 +53,8 @@ async function setup(page: Page) {
       name: '林舟（对象保留测试）',
       code: 'fictional-retention-browser-setup-code-0123456789',
     });
-  else await post(page, 'identity/sign-in', account);
+  else if (initial.user?.email !== account.email) await post(page, 'identity/sign-in', account);
+  ownerCookies = await page.context().cookies(origin);
   const space = await post(page, 'spaces', { name: '检查点工作区 ' + randomUUID().slice(0, 4) });
   const project = await post(
     page,
@@ -1599,6 +1612,235 @@ test('方案编辑固定任务基线，暂时读错保留目标，明确失权�
     );
     await expect(panel).toContainText('方案读取权限已失效');
     await expect(panel.getByLabel('共同起点方案组', { exact: true })).toHaveCount(0);
+  } finally {
+    await page.unrouteAll().catch(() => {});
+    await f.close();
+  }
+});
+
+async function readyBranchSource(page: Page, f: Fixture) {
+  const state = await prepare(page, f);
+  const source = await post(
+    page,
+    state.path.replace(origin + '/api/v1/', ''),
+    { days: 7, expectedTaskRevision: 1, confirmLocalRetention: true },
+    f.space.id,
+  );
+  const retained = await cli(f, source.request.id, 'retain-checkpoint', `RETAIN ${f.oid} 7`);
+  expect(retained.code, retained.output).toBe(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '方案分支', exact: true }).click();
+  const panel = page.getByRole('dialog', { name: '任务方案分支', exact: true });
+  await panel.getByRole('button', { name: '定义一组方案', exact: true }).click();
+  await panel
+    .getByLabel('共同提交引用', { exact: true })
+    .selectOption((await pending(page, f)).checkpointId);
+  await panel.getByLabel('方案 1 目标', { exact: true }).fill('独立目录实现订单读取');
+  await panel.getByLabel('方案 2 目标', { exact: true }).fill('另一个方案保持待准备');
+  await panel.getByRole('button', { name: '保存方案组', exact: true }).click();
+  const card = panel.getByRole('article', { name: '方案：方案 A', exact: true });
+  await card.getByRole('button', { name: '准备独立现场', exact: true }).click();
+  await card.getByLabel('原对象副本', { exact: true }).selectOption(source.request.id);
+  return { panel, card, source };
+}
+async function prepareBranchCli(home: string, operationId: string, target: string) {
+  const child = spawn(
+    process.execPath,
+    [
+      resolve('dist/apps/runner/src/prepare-branch-workspace.js'),
+      'prepare',
+      '--state',
+      home,
+      '--operation',
+      operationId,
+      '--target',
+      target,
+    ],
+    { stdio: ['pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH, HOME: process.env.HOME } },
+  );
+  let output = '';
+  const answered = new Set<string>();
+  child.stdout.on('data', (v) => {
+    output += v;
+    for (const match of output.matchAll(/(?:BRANCH|RESTORE|PUBLISH|GIT) [0-9a-f-]{36}/g)) {
+      if (answered.has(match[0])) continue;
+      answered.add(match[0]);
+      child.stdin.write(match[0] + '\n');
+    }
+  });
+  child.stderr.on('data', (v) => (output += v));
+  const [code] = await once(child, 'close');
+  expect(code, output).toBe(0);
+  return readBranchWorkspaceStatus(home, operationId)!;
+}
+test('方案独立现场通过实际CLI准备/配对/登记，网页授权首轮Run并保留另一方案', async ({ page }) => {
+  test.setTimeout(90000); // Full file preparation, three CLI confirmations and a real protocol process.
+  const f = await setup(page);
+  let agent: ReturnType<typeof spawn> | undefined, finished: Promise<unknown> | undefined;
+  let output = '';
+  try {
+    const { panel, card } = await readyBranchSource(page, f);
+    await card.getByRole('button', { name: '创建现场准备请求', exact: true }).click();
+    await expect(card).toContainText('等待本人本机准备');
+    const list = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}/work-branches`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    const branch = list.items[0].branches[0],
+      op = branch.workspace;
+    await expect(card.getByLabel('方案现场准备命令')).toContainText(op.ticket.id);
+    const target = join(f.dir, 'parallel-alpha');
+    const prepared = await prepareBranchCli(f.home, op.ticket.id, target);
+    await expect(card).toContainText('现场已报告');
+    await card.getByText('本机现场操作', { exact: true }).click();
+    // Details may remain open from the waiting stage; ensure the pairing action is visible.
+    if (!(await card.getByRole('button', { name: '生成原项目配对码', exact: true }).isVisible()))
+      await card.getByText('本机现场操作', { exact: true }).click();
+    await card.getByRole('button', { name: '生成原项目配对码', exact: true }).click();
+    const code = await card.getByLabel('方案现场配对码', { exact: true }).inputValue();
+    await workspaceCommand(
+      'cli.js',
+      ['connect', '--state', prepared.git!.nodeState!, '--config', prepared.git!.configPath!],
+      `${code}\nCONNECT\n`,
+    );
+    await workspaceCommand(
+      'prepare-branch-workspace.js',
+      ['bind', '--state', prepared.git!.nodeState!],
+      `BIND ${branch.id}\n`,
+    );
+    await expect(card).toContainText('独立现场已登记');
+    const executable = join(f.dir, 'branch-browser-claude-protocol-fixture.mjs');
+    await writeFile(
+      executable,
+      `#!${process.execPath}\nawait import(${JSON.stringify(pathToFileURL(resolve('dist/tests/fixtures/native-tool.js')).href)});\n`,
+    );
+    await chmod(executable, 0o700);
+    const config = join(f.dir, 'branch-execution.json');
+    await writeFile(
+      config,
+      JSON.stringify({
+        tool: 'claude-code',
+        executable,
+        mode: 'edit',
+        workspaces: ['方案代码'],
+        timeoutSeconds: 30,
+        maxBudgetUsd: 1,
+      }),
+    );
+    await workspaceCommand(
+      'cli.js',
+      ['enable-execution', '--state', prepared.git!.nodeState!, '--config', config],
+      'EXECUTE\n',
+    );
+    agent = spawn(
+      process.execPath,
+      [resolve('dist/apps/runner/src/cli.js'), 'start', '--state', prepared.git!.nodeState!],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          PATH: process.env.PATH,
+          HOME: process.env.HOME,
+          ANTHROPIC_API_KEY: 'sk-ant-branch-browser-protocol-fixture-not-a-real-key',
+        },
+      },
+    );
+    agent.stdout!.on('data', (v) => (output = (output + v).slice(-16000)));
+    agent.stderr!.on('data', (v) => (output = (output + v).slice(-16000)));
+    finished = once(agent, 'close');
+    await card.getByRole('button', { name: '准备方案首轮执行', exact: true }).click();
+    const run = page.getByRole('dialog', { name: '在方案节点上执行', exact: true });
+    await expect(run.getByLabel('执行节点', { exact: true })).toBeDisabled();
+    await expect(run.getByLabel('授权工作目录', { exact: true })).toBeDisabled();
+    await expect(run.getByLabel('本次要求', { exact: true })).toHaveValue('独立目录实现订单读取');
+    await run.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
+    await run.getByLabel('本次要求', { exact: true }).fill('FIXTURE_CAPTURE_INPUT FIXTURE_WRITE');
+    await run.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
+    await run.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect(run).toHaveCount(0);
+    await expect
+      .poll(
+        async () => {
+          return (
+            await (
+              await page.request.get(`${origin}/api/v1/tasks/${f.task.id}/work-branches`, {
+                headers: headers(f.space.id),
+              })
+            ).json()
+          ).items[0].branches[0].run?.state;
+        },
+        { timeout: 20000 },
+      )
+      .toBe('succeeded');
+    await expect(card.getByLabel('独立节点执行进度')).toContainText('已确认结束');
+    await expect(panel.getByRole('article', { name: '方案：方案 B', exact: true })).toContainText(
+      '尚无独立目录、Run 或结果',
+    );
+    expect(await readFile(join(target, 'native-output.txt'), 'utf8')).toBe('fixture edit\n');
+    expect(await readFile(join(f.root, 'README.md'), 'utf8')).toBe(
+      'Not included in the reference\n',
+    );
+    const input = await readFile(join(target, 'received-context.txt'), 'utf8');
+    expect(input).toContain('独立目录实现订单读取');
+    expect(input).not.toContain('另一个方案保持待准备');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/105-branch-workspace-dark.png', fullPage: true });
+    await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'artifacts/106-branch-workspace-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: '方案分支', exact: true }).click();
+    await expect(card.getByLabel('独立节点执行进度')).toContainText('已确认结束');
+  } finally {
+    if (agent?.exitCode === null && agent.signalCode === null) agent.kill('SIGTERM');
+    await finished;
+    if (test.info().status !== test.info().expectedStatus)
+      await test.info().attach('branch-agent.log', { body: output, contentType: 'text/plain' });
+    await f.close();
+  }
+});
+test('方案现场请求未知回执保留原选择，重复确认和取消不重建现场', async ({ page }) => {
+  const f = await setup(page);
+  try {
+    const { card, source } = await readyBranchSource(page, f);
+    const values = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}/work-branches`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    const id = values.items[0].branches[0].id,
+      path = `${origin}/api/v1/tasks/${f.task.id}/work-branches/${id}/workspaces`;
+    let drop = true;
+    const keys: string[] = [];
+    await page.route(path, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      keys.push(route.request().headers()['idempotency-key']!);
+      if (drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await card.getByRole('button', { name: '创建现场准备请求', exact: true }).click();
+    await expect(card.getByLabel('现场请求待确认')).toBeVisible();
+    await expect(card.getByLabel('原对象副本', { exact: true })).toHaveValue(source.request.id);
+    await card.getByRole('button', { name: '确认上次现场请求', exact: true }).click();
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    await expect(card).toContainText('等待本人本机准备');
+    await card.getByRole('button', { name: '取消此现场准备', exact: true }).click();
+    await expect(card).toContainText('现场准备已取消');
+    await expect(card.getByRole('button', { name: '准备独立现场', exact: true })).toBeVisible();
+    const detail = await (
+      await page.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+        headers: headers(f.space.id),
+      })
+    ).json();
+    expect(detail.runs).toHaveLength(0);
   } finally {
     await page.unrouteAll().catch(() => {});
     await f.close();

@@ -235,6 +235,47 @@ async function makeRestorePlan(
       'RESTORE_SNAPSHOT_MISMATCH',
       '持久对象与原保留清单不一致，未生成恢复计划',
     );
+  const { entries, materializedBytes } = snapshotEntries(
+    manifest.objectFormat,
+    manifest.tree,
+    snapshot,
+    target,
+    fresh,
+  );
+  fresh();
+  if (
+    canonicalJson(inspectTarget(target, protectedPaths, publishedIdentity)) !==
+    canonicalJson(observed)
+  )
+    throw new DomainError('RESTORE_TARGET_CHANGED', '预检期间目标父目录已变化，请重新核对');
+  const plan = {
+    version: 1 as const,
+    kind: 'local_restore_preflight' as const,
+    source: { ...identity, manifest },
+    target: observed,
+    entries,
+    materializedBytes,
+    exclusions: RESTORE_EXCLUSIONS,
+    committedSensitiveContentMayBeIncluded: true as const,
+    restored: false as const,
+    writeAuthorized: false as const,
+  };
+  return {
+    ...plan,
+    planHash: createHash('sha256').update(canonicalJson(plan)).digest('hex'),
+    observedAt: new Date().toISOString(),
+  };
+}
+
+/** Pure mapping from verified Git objects. Also used to recheck a copied branch
+ * before execution, without renewing or reading the original expired retention. */
+export function snapshotEntries(
+  format: 'sha1' | 'sha256',
+  tree: string,
+  snapshot: Awaited<ReturnType<typeof verifySnapshot>>,
+  target: string,
+  fresh: () => void = () => {},
+) {
   if (snapshot.coverage.symlinks || snapshot.coverage.gitlinks || snapshot.coverage.lfsPointers)
     throw new DomainError(
       'RESTORE_EXTERNAL_CONTENT',
@@ -242,8 +283,8 @@ async function makeRestorePlan(
     );
   const objects = new Map(snapshot.objects.map((o) => [o.id, o]));
   const entries: RestoreEntry[] = [];
-  const width = manifest.objectFormat === 'sha1' ? 20 : 32;
-  const stack = [{ objectId: manifest.tree, path: '' }];
+  const width = format === 'sha1' ? 20 : 32;
+  const stack = [{ objectId: tree, path: '' }];
   let materializedBytes = 0;
   while (stack.length) {
     fresh();
@@ -278,27 +319,5 @@ async function makeRestorePlan(
     }
   }
   entries.sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)));
-  fresh();
-  if (
-    canonicalJson(inspectTarget(target, protectedPaths, publishedIdentity)) !==
-    canonicalJson(observed)
-  )
-    throw new DomainError('RESTORE_TARGET_CHANGED', '预检期间目标父目录已变化，请重新核对');
-  const plan = {
-    version: 1 as const,
-    kind: 'local_restore_preflight' as const,
-    source: { ...identity, manifest },
-    target: observed,
-    entries,
-    materializedBytes,
-    exclusions: RESTORE_EXCLUSIONS,
-    committedSensitiveContentMayBeIncluded: true as const,
-    restored: false as const,
-    writeAuthorized: false as const,
-  };
-  return {
-    ...plan,
-    planHash: createHash('sha256').update(canonicalJson(plan)).digest('hex'),
-    observedAt: new Date().toISOString(),
-  };
+  return { entries, materializedBytes };
 }

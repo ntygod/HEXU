@@ -8,7 +8,7 @@ import {
   type NodeContinuationPreview,
 } from '../../contracts/src/next-input.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { DomainError, type Message, type Run, type Task } from '../../contracts/src/index.js';
+import { DomainError, text, type Message, type Run, type Task } from '../../contracts/src/index.js';
 import type {
   DispatchCommand,
   ExecutionEvent,
@@ -23,6 +23,8 @@ import type { Store } from './store.js';
 import type { IdentityUser } from '../../contracts/src/identity.js';
 import { appendProjectMaterials } from '../../contracts/src/project-materials.js';
 import type { NodeRegistry } from './nodes.js';
+import { BranchWorkspaceStore } from './work-branch-workspaces.js';
+import { branchContext } from '../../contracts/src/work-branch-workspaces.js';
 
 export const executionHash = (v: unknown) =>
   createHash('sha256').update(canonicalJson(v)).digest('hex');
@@ -197,6 +199,7 @@ export class NodeExecution {
     taskId: string,
     allowedSourceRunId?: string,
     allowedOperationId?: string,
+    workBranchId?: string,
   ): {
     items: NodeExecutionOption[];
     contextText: string;
@@ -205,10 +208,22 @@ export class NodeExecution {
     taskStatus: Task['status'];
   } {
     const task = this.store.getTask(taskId);
-    const contextText = this.humanContext(task),
+    const branches = new BranchWorkspaceStore(this.store).branches;
+    const branch = workBranchId ? branches.branch(taskId, workBranchId) : null;
+    const group = branch ? branches.group(taskId, branch.groupId) : null;
+    const contextText =
+        branch && group
+          ? branchContext(
+              group.start.taskTitle,
+              group.start.taskDescription,
+              group.start.checkpoint.manifest.commit,
+              branch.name,
+              branch.goal,
+            )
+          : this.humanContext(task),
       metadata = {
         contextText,
-        taskContextHash: executionHash(contextText),
+        taskContextHash: executionHash(this.humanContext(task)),
         taskRevision: task.revision,
         taskStatus: task.status,
       };
@@ -225,6 +240,16 @@ export class NodeExecution {
             .prepare('SELECT connection_id FROM runner_nodes WHERE id=?')
             .get(n.id) as { connection_id: string };
           const policy = JSON.parse(p.body) as ExecutionPolicy;
+          const workspaces = n.workspaces.filter((w) => {
+            if (!policy.workspaceIds.includes(w.id)) return false;
+            const bound = this.store.db
+              .prepare(
+                "SELECT branch_id FROM work_branch_workspaces WHERE node_id=? AND workspace_id=? AND state='bound'",
+              )
+              .get(n.id, w.id) as { branch_id: string } | undefined;
+            return workBranchId ? bound?.branch_id === workBranchId : !bound;
+          });
+          if (!workspaces.length) return [];
           const occupied = !!this.store.db
             .prepare(
               "SELECT 1 FROM node_dispatches WHERE node_id=? AND stage!='terminal' AND run_id!=?",
@@ -243,23 +268,26 @@ export class NodeExecution {
             p.connection_id === raw.connection_id &&
             !occupied &&
             !reserved;
+          const usable = available && (!branch || (branch.state === 'planned' && !branch.runId));
           return [
             {
               nodeId: n.id,
               name: n.name,
-              available,
-              reason: archived
-                ? PROJECT_ARCHIVED.message
-                : reserved
-                  ? '任务或节点已有待接续安排'
-                  : occupied
-                    ? '节点仍有执行或待核对现场'
-                    : available
-                      ? '仅节点所有者可发起；模型账户未据此验证'
-                      : '节点离线或尚未重新发布执行授权',
+              available: usable,
+              reason: branch?.runId
+                ? '此方案首轮已创建，请查看原执行'
+                : archived
+                  ? PROJECT_ARCHIVED.message
+                  : reserved
+                    ? '任务或节点已有待接续安排'
+                    : occupied
+                      ? '节点仍有执行或待核对现场'
+                      : available
+                        ? '仅节点所有者可发起；模型账户未据此验证'
+                        : '节点离线或尚未重新发布执行授权',
               policyHash: p.policy_hash,
               policy,
-              workspaces: n.workspaces.filter((w) => policy.workspaceIds.includes(w.id)),
+              workspaces,
             },
           ];
         }),
@@ -375,6 +403,12 @@ export class NodeExecution {
   ): NodeContinuationPreview {
     const task = this.store.getTask(taskId, true);
     const source = this.store.run(sourceRunId);
+    if (source.node?.workBranch)
+      throw new DomainError(
+        'WORK_BRANCH_CONTINUATION_PENDING',
+        '方案首轮的继续/结果选择将由方案入口接入，不能借普通接续脱离方案绑定',
+        409,
+      );
     if (
       source.taskId !== taskId ||
       source.purpose === 'assist' ||
@@ -509,8 +543,13 @@ export class NodeExecution {
     if (task.projectId !== node.project_id)
       throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务与节点不属于同一项目', 409);
     this.store.projectMaterials.assertAccess(taskId, input.projectMaterials);
+    const workspaces = new BranchWorkspaceStore(this.store);
+    workspaces.execution(taskId, input, true); // Bound directory/owner checked before receipt replay.
     const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
       const task = this.store.projectLifecycle.assertExecution(taskId);
+      const branch = workspaces.execution(taskId, input);
+      if (branch && operation)
+        throw new DomainError('WORK_BRANCH_MANUAL', '方案首轮需单独明确发起', 409);
       if (task.projectId !== node.project_id)
         throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务项目已变化', 409);
       if (
@@ -548,9 +587,12 @@ export class NodeExecution {
           input.sessionMode,
         );
       }
-      const option = this.options(taskId, undefined, operation?.operationId).items.find(
-        (n) => n.nodeId === input.nodeId,
-      );
+      const option = this.options(
+        taskId,
+        undefined,
+        operation?.operationId,
+        input.workBranch?.branchId,
+      ).items.find((n) => n.nodeId === input.nodeId);
       if (!option?.available || option.policyHash !== input.policyHash)
         throw new DomainError(
           'EXECUTION_UNAVAILABLE',
@@ -562,8 +604,7 @@ export class NodeExecution {
         throw new DomainError('WORKSPACE_SCOPE_MISMATCH', '目录或编辑能力超出本机授权', 409);
       if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
         throw new DomainError('TASK_REOPEN_REQUIRED', '请明确重新打开任务后执行', 409);
-      if (this.store.codingRuns(taskId).some((r) => isActiveRun(r.state)))
-        throw new DomainError('TASK_BUSY', '任务还有未结束执行', 409);
+      workspaces.assertParallel(taskId, branch?.binding);
       let taskRevision = task.revision;
       if (task.status === 'done') {
         taskRevision++;
@@ -580,8 +621,9 @@ export class NodeExecution {
       const context = this.humanContext(task);
       const baseContext =
         continuationContext ??
-        `${context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
+        `${branch?.context ?? context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
       const command: DispatchCommand = {
+        ...(branch ? { workBranch: branch.binding } : {}),
         ...(session ? { session } : {}),
         id,
         generation: randomUUID(),
@@ -595,6 +637,7 @@ export class NodeExecution {
         context: operation ? baseContext : appendProjectMaterials(baseContext, materialSnapshot),
         expiresAt: new Date(Date.now() + 60000).toISOString(),
       };
+      if (branch) text(command.context, '方案执行材料', 20000);
       const run: Run = {
         createdByUserId: this.store.actorId,
         id: runId,
@@ -610,6 +653,7 @@ export class NodeExecution {
         updatedAt: now,
         revision: 1,
         node: {
+          ...(branch ? { workBranch: branch.binding } : {}),
           nodeId: node.id,
           nodeName: node.name,
           workingCopyId: workspace.id,
@@ -673,6 +717,7 @@ export class NodeExecution {
       const d = this.row(id);
       this.message(d, '已保存节点派发；尚未确认接单或启动。输出将共享到当前项目任务。');
       this.event(d, 'run.created');
+      if (branch) workspaces.attach(task, run);
       operation?.attach(run);
       return { id: runId };
     });
@@ -836,7 +881,8 @@ export class NodeExecution {
         new NextInputs(this.store).started(r.id);
         this.store.projectMaterials.started(r.id);
         const task = this.task(d);
-        if (r.purpose !== 'assist' && task.status === 'todo')
+        new BranchWorkspaceStore(this.store).started(task, r);
+        if (r.purpose !== 'assist' && task.status === 'todo') {
           this.store.db.prepare('UPDATE tasks SET body=? WHERE id=?').run(
             JSON.stringify({
               ...task,
@@ -846,6 +892,21 @@ export class NodeExecution {
             }),
             task.id,
           );
+          // Only this automatic todo -> in_progress transition advances queued
+          // peers. Human edits keep their mismatch and still cancel old permits.
+          if (r.node?.workBranch)
+            this.store.db
+              .prepare(
+                "UPDATE node_dispatches SET task_revision=? WHERE task_id=? AND task_revision=? AND context_hash=? AND stage IN ('queued','accepted') AND json_extract(command,'$.workBranch.groupId')=?",
+              )
+              .run(
+                task.revision + 1,
+                task.id,
+                task.revision,
+                executionHash(this.humanContext(task)),
+                r.node.workBranch.groupId,
+              );
+        }
       } else if (input.kind === 'unknown') {
         this.save(d, { ...r, observation: 'unknown' }, 'unknown');
         this.message(d, '节点执行现场需要核对；未重启进程，也未释放目录占用。');

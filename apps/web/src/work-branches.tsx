@@ -12,6 +12,7 @@ import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
 import './work-branches.css';
+import { BranchWorkspace } from './work-branch-workspaces.js';
 
 const base = (taskId: string) => `/tasks/${encodeURIComponent(taskId)}/work-branches`;
 function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
@@ -243,7 +244,19 @@ function BranchHistory({ path }: { path: string }) {
         <ol aria-label="方案历史">
           {read.value.items.map((e) => (
             <li key={e.revision}>
-              {e.action === 'plan' ? '定义方案' : '放弃方案'} · {e.actor.name} · {time(e.at)}
+              {
+                {
+                  plan: '定义方案',
+                  discard: '放弃方案',
+                  workspace_requested: '请求独立现场',
+                  workspace_prepared: '报告现场准备',
+                  workspace_bound: '登记独立现场',
+                  workspace_cancelled: '取消现场准备',
+                  run_created: '保存方案执行',
+                  run_started: '方案实际启动',
+                }[e.action]
+              }{' '}
+              · {e.actor.name} · {time(e.at)}
             </li>
           ))}
         </ol>
@@ -259,26 +272,33 @@ function Discard({ branch, path, saved }: { branch: WorkBranch; path: string; sa
   return (
     <>
       <Feedback command={command} />
-      {branch.state === 'planned' && (
-        <Button
-          busy={command.busy}
-          disabled={!!command.uncertain}
-          onClick={() =>
-            void command.send(path + '/discard', { expectedRevision: branch.revision })
-          }
-        >
-          放弃此方案
-        </Button>
-      )}
+      {branch.state === 'planned' &&
+        !branch.workingCopyId &&
+        (!branch.workspace ||
+          ['cancelled', 'needs_attention'].includes(branch.workspace.state)) && (
+          <Button
+            busy={command.busy}
+            disabled={!!command.uncertain}
+            onClick={() =>
+              void command.send(path + '/discard', { expectedRevision: branch.revision })
+            }
+          >
+            放弃此方案
+          </Button>
+        )}
     </>
   );
 }
 function Branch({
+  task,
+  startHash,
   branch,
   path,
   editable,
   saved,
 }: {
+  task: Task;
+  startHash: string;
   branch: WorkBranch;
   path: string;
   editable: boolean;
@@ -289,10 +309,27 @@ function Branch({
     <article className="work-branch-card" aria-label={`方案：${branch.name}`}>
       <header>
         <strong>{branch.name}</strong>
-        <span className="badge neutral">{branch.state === 'planned' ? '待准备' : '已放弃'}</span>
+        <span className="badge neutral">
+          {branch.state === 'discarded'
+            ? '已放弃'
+            : branch.runId
+              ? '已关联执行'
+              : branch.workingCopyId
+                ? '已登记现场'
+                : '待准备'}
+        </span>
       </header>
       <p className="work-branch-text">{branch.goal}</p>
-      <p>尚无独立目录、Run 或结果。</p>
+      {branch.state !== 'discarded' && (
+        <BranchWorkspace
+          task={task}
+          branch={branch}
+          startHash={startHash}
+          path={path}
+          editable={editable}
+          saved={saved}
+        />
+      )}
       <div className="work-branch-actions">
         {editable && <Discard branch={branch} path={path} saved={saved} />}
         <Button onClick={() => setHistory((v) => !v)}>
@@ -379,6 +416,8 @@ function Panel({ task }: { task: Task }) {
               {v.branches.map((b) => (
                 <Branch
                   key={b.id}
+                  task={task}
+                  startHash={v.group.startHash}
                   branch={b}
                   path={`${path}/${b.id}`}
                   editable={editable}

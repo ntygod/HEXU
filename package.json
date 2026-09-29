@@ -42,7 +42,11 @@
     "runner:handoff-accept": "node dist/apps/runner/src/accept-handoff.js",
     "runner:handoff-workspace": "node dist/apps/runner/src/prepare-handoff-workspace.js prepare",
     "runner:handoff-workspace-status": "node dist/apps/runner/src/prepare-handoff-workspace.js status",
-    "runner:handoff-workspace-cleanup": "node dist/apps/runner/src/prepare-handoff-workspace.js cleanup"
+    "runner:handoff-workspace-cleanup": "node dist/apps/runner/src/prepare-handoff-workspace.js cleanup",
+    "runner:branch-workspace": "node dist/apps/runner/src/prepare-branch-workspace.js prepare",
+    "runner:branch-workspace-status": "node dist/apps/runner/src/prepare-branch-workspace.js status",
+    "runner:branch-workspace-cleanup": "node dist/apps/runner/src/prepare-branch-workspace.js cleanup",
+    "runner:branch-bind": "node dist/apps/runner/src/prepare-branch-workspace.js bind"
   },
   "dependencies": {
     "better-auth": "1.7.6",

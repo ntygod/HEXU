@@ -464,4 +464,42 @@ CREATE TABLE work_branch_events (
 -- Definition only: no legacy Run, directory, result or execution consent is backfilled.
 `,
   },
+  {
+    version: 28,
+    sql: `
+CREATE TABLE work_branches_v28 (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ group_id TEXT NOT NULL REFERENCES work_branch_groups(id),
+ state TEXT NOT NULL CHECK(state IN ('planned','active','discarded')),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+INSERT INTO work_branches_v28 SELECT * FROM work_branches;
+CREATE TABLE work_branch_events_v28 (
+ branch_id TEXT NOT NULL REFERENCES work_branches_v28(id), revision INTEGER NOT NULL, body TEXT NOT NULL,
+ PRIMARY KEY(branch_id,revision)
+);
+INSERT INTO work_branch_events_v28 SELECT * FROM work_branch_events;
+DROP TABLE work_branch_events;
+DROP TABLE work_branches;
+ALTER TABLE work_branches_v28 RENAME TO work_branches;
+ALTER TABLE work_branch_events_v28 RENAME TO work_branch_events;
+CREATE INDEX work_branches_group ON work_branches(group_id);
+CREATE TABLE work_branch_workspaces (
+ id TEXT PRIMARY KEY, branch_id TEXT NOT NULL REFERENCES work_branches(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), state TEXT NOT NULL,
+ node_id TEXT, workspace_id TEXT, body TEXT NOT NULL
+);
+CREATE INDEX work_branch_workspaces_branch ON work_branch_workspaces(branch_id);
+CREATE UNIQUE INDEX work_branch_workspace_active ON work_branch_workspaces(branch_id)
+ WHERE state IN ('waiting_local','prepared','bound');
+CREATE UNIQUE INDEX work_branch_workspace_binding ON work_branch_workspaces(node_id,workspace_id)
+ WHERE state='bound';
+DROP INDEX one_pending_task_dispatch;
+CREATE UNIQUE INDEX one_pending_task_dispatch ON node_dispatches(task_id)
+ WHERE stage!='terminal' AND json_extract(command,'$.workBranch.branchId') IS NULL;
+CREATE UNIQUE INDEX one_pending_branch_dispatch ON node_dispatches(task_id,json_extract(command,'$.workBranch.branchId'))
+ WHERE stage!='terminal' AND json_extract(command,'$.workBranch.branchId') IS NOT NULL;
+-- Definitions stay unprepared until the original owner explicitly prepares and binds a new node.
+`,
+  },
 ];

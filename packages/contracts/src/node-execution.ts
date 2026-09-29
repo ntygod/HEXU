@@ -1,6 +1,7 @@
 import { parseNodeContinuation, type NodeContinuationSelection } from './next-input.js';
 import { DomainError, enumValue, revision, text, type Tool, type RunState } from './index.js';
 import { exact, nodeId, parseSequence } from './nodes.js';
+import { parseBranchRunSelection, type BranchExecutionBinding } from './work-branch-workspaces.js';
 import {
   parseProjectMaterialSelection,
   parseTaskContextHash,
@@ -32,6 +33,7 @@ export interface SessionRequest {
   sourceDispatchId: string;
 }
 export interface NodeRunInfo {
+  workBranch?: BranchExecutionBinding;
   nodeId: string;
   nodeName: string;
   workingCopyId: string;
@@ -52,6 +54,7 @@ export interface NodeRunInfo {
   nativeSession?: NativeSessionInfo;
 }
 export interface NodeRunInput {
+  workBranch?: ReturnType<typeof parseBranchRunSelection>;
   projectMaterials?: ProjectMaterialSelection;
   expectedTaskContextHash?: string;
   provider: 'node';
@@ -67,6 +70,7 @@ export interface NodeRunInput {
   sessionMode?: 'resume';
 }
 export interface DispatchCommand {
+  workBranch?: BranchExecutionBinding;
   purpose?: 'assist';
   assistanceId?: string;
   id: string;
@@ -169,15 +173,24 @@ export function parseNodeRun(value: unknown): NodeRunInput {
     'sessionMode',
     'projectMaterials',
     'expectedTaskContextHash',
+    'workBranch',
   ]);
   if (b.provider !== 'node' || b.confirmExecution !== true)
     throw new DomainError('EXECUTION_CONSENT_REQUIRED', '请确认共享输出、目录范围及模型费用', 422);
   if (b.sessionMode !== undefined && (b.sessionMode !== 'resume' || !b.continuation))
     throw new DomainError('INVALID_SESSION_MODE', '恢复原会话必须明确选择来源执行');
+  if (
+    b.workBranch !== undefined &&
+    (b.continuation !== undefined ||
+      b.sessionMode !== undefined ||
+      b.projectMaterials !== undefined)
+  )
+    throw new DomainError('INVALID_INPUT', '方案首轮使用固定共同材料与本人新会话');
   const hash = text(b.policyHash, '授权版本', 64);
   if (!/^[a-f0-9]{64}$/.test(hash)) throw new DomainError('INVALID_INPUT', '授权版本无效');
   return {
     provider: 'node',
+    ...(b.workBranch === undefined ? {} : { workBranch: parseBranchRunSelection(b.workBranch) }),
     nodeId: nodeId(b.nodeId),
     workingCopyId: nodeId(b.workingCopyId),
     policyHash: hash,
