@@ -34,6 +34,9 @@ export interface Project {
   revision: number;
 }
 export interface Task {
+  /** Explicitly accepted handoff operator; absent on older tasks, never an access grant. */
+  operatorUserId?: string | null;
+  operatorName?: string | null;
   /** Current participants projected for reads; never persisted in Task JSON or sent as model input. */
   participantUserIds?: string[];
   /** Unknown for legacy records; never inferred from the current owner. */

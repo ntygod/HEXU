@@ -60,7 +60,7 @@ function outsideSources(home: string, roots: string[]) {
       '节点状态目录与原授权来源重叠，不能写入恢复日志',
     );
 }
-function verifyStage(
+export function verifyRestoreFiles(
   stage: number,
   plan: RestorePlan,
   journal: RestoreJournal,
@@ -236,7 +236,7 @@ export async function localRestoreCheckpoint(
         }
       });
       stageUnchanged();
-      verifyStage(stage, plan, journal, progress);
+      verifyRestoreFiles(stage, plan, journal, progress);
       progress.state = 'verified';
       progress.verifiedAt = new Date().toISOString();
       await update();
@@ -254,7 +254,7 @@ export async function localRestoreCheckpoint(
       parent.revalidate();
       parent.assertAbsent();
       stageUnchanged();
-      verifyStage(stage, plan, journal, progress);
+      verifyRestoreFiles(stage, plan, journal, progress);
       progress.state = 'publishing';
       await update();
       // This final hook-free authorization/path check precedes the single native
@@ -264,7 +264,7 @@ export async function localRestoreCheckpoint(
       parent.assertAbsent();
       source.stillBound();
       stageUnchanged();
-      verifyStage(stage, plan, journal, progress);
+      verifyRestoreFiles(stage, plan, journal, progress);
       publicationAttempted = true;
       const result = publishRestore(parent, progress.stageName, stage);
       if (result === 'not_published') {

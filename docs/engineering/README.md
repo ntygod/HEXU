@@ -34,6 +34,7 @@
 | 同项目双节点明确收发固定对象 | [受控传输](checkpoint-transfer.md) |
 | 接收者用自己的副本恢复与报告 | [接收端恢复](checkpoint-received-restore.md) |
 | 发布、拒绝、撤回接手邀请 | [任务接手邀请](handoff-invitations.md) |
+| 本机新核验、接受接手与操作者/可选负责人 | [接受接手](handoff-acceptance.md) |
 
 ## 架构决策
 

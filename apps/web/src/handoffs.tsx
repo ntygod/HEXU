@@ -12,10 +12,12 @@ import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
 import './handoffs.css';
+import { HandoffAcceptancePanel } from './handoff-acceptance.js';
 
 const base = (id: string) => `/tasks/${encodeURIComponent(id)}/handoffs`;
 const labels: Record<HandoffState, string> = {
   offered: '待接手邀请',
+  accepted: '已接受接手',
   rejected: '已拒绝',
   withdrawn: '已撤回',
   expired: '已到期',
@@ -93,6 +95,7 @@ function Editor({
   const [remainingWork, setRemainingWork] = useState('');
   const [environment, setEnvironment] = useState('');
   const [hours, setHours] = useState(24);
+  const [transferOwner, setTransferOwner] = useState(false);
   const command = useAssistanceCommand<HandoffView>(saved);
   const denied = read.denied || command.denied;
   useEffect(() => {
@@ -121,6 +124,7 @@ function Editor({
             remainingWork,
             environment,
             hours,
+            ...(transferOwner ? { transferOwner: true } : {}),
           });
       }}
     >
@@ -190,8 +194,16 @@ function Editor({
             <option value={72}>72 小时</option>
           </select>
         </label>
+        <label className="checkpoint-consent">
+          <input
+            type="checkbox"
+            checked={transferOwner}
+            onChange={(e) => setTransferOwner(e.target.checked)}
+          />
+          同时邀请对方担任负责人，仍需对方明确接受
+        </label>
         <p>
-          有效期不超过原材料期限。发布说明供项目成员查看，接收者由固定副本确定；不转移负责人、目录权限或模型账号。
+          有效期不超过原材料期限。发布说明供项目成员查看，接收者由固定副本确定；发布本身不转移负责人、目录权限或模型账号。
         </p>
       </fieldset>
       {read.error && (
@@ -240,6 +252,7 @@ function Editor({
 function History({ path }: { path: string }) {
   const read = useAssistanceRead<{ items: HandoffEvent[] }>(path + '/history', 0);
   const action = {
+    accept: '接受接手',
     offer: '发布邀请',
     reject: '拒绝邀请',
     withdraw: '撤回邀请',
@@ -268,6 +281,39 @@ function History({ path }: { path: string }) {
     </section>
   );
 }
+function CardActions({ view, path, reload }: { view: HandoffView; path: string; reload(): void }) {
+  const command = useAssistanceCommand<HandoffView>(reload);
+  if (command.denied) return null;
+  return (
+    <>
+      <Feedback command={command} />
+      <div className="handoff-actions">
+        {view.canReject && (
+          <Button
+            busy={command.busy}
+            disabled={!!command.uncertain}
+            onClick={() =>
+              void command.send(path + '/reject', { expectedRevision: view.handoff.revision })
+            }
+          >
+            拒绝邀请
+          </Button>
+        )}
+        {view.canWithdraw && (
+          <Button
+            busy={command.busy}
+            disabled={!!command.uncertain}
+            onClick={() =>
+              void command.send(path + '/withdraw', { expectedRevision: view.handoff.revision })
+            }
+          >
+            撤回邀请
+          </Button>
+        )}
+      </div>
+    </>
+  );
+}
 function Card({
   view,
   path,
@@ -281,7 +327,6 @@ function Card({
 }) {
   const h = view.handoff;
   const [history, setHistory] = useState(false);
-  const command = useAssistanceCommand<HandoffView>(reload);
   return (
     <article className="handoff-card" aria-label="接手邀请记录">
       <header>
@@ -319,41 +364,14 @@ function Card({
         </p>
       )}
       {h.state === 'offered' && (
-        <p>邀请已发布。接受接手与操作者切换尚未开放，现有恢复记录不代表已经接管任务。</p>
+        <p>邀请已发布。接收者需在本机核对原恢复目录，再提交接手；现有报告不直接改变操作者。</p>
       )}
-      {editable && !command.denied && (
-        <>
-          <Feedback command={command} />
-          <div className="handoff-actions">
-            {view.canReject && (
-              <Button
-                busy={command.busy}
-                disabled={!!command.uncertain}
-                onClick={() =>
-                  void command.send(path + '/reject', { expectedRevision: h.revision })
-                }
-              >
-                拒绝邀请
-              </Button>
-            )}
-            {view.canWithdraw && (
-              <Button
-                busy={command.busy}
-                disabled={!!command.uncertain}
-                onClick={() =>
-                  void command.send(path + '/withdraw', { expectedRevision: h.revision })
-                }
-              >
-                撤回邀请
-              </Button>
-            )}
-          </div>
-        </>
-      )}
+      {editable && <CardActions view={view} path={path} reload={reload} />}
       <Button onClick={() => setHistory((v) => !v)}>
         {history ? '收起流转记录' : '查看流转记录'}
       </Button>
       {history && <History path={path} />}
+      <HandoffAcceptancePanel view={view} path={path} editable={editable} />
     </article>
   );
 }
@@ -415,7 +433,7 @@ function Panel({ task }: { task: Task }) {
       ) : (
         read.value.items.map((v) => (
           <Card
-            key={`${v.handoff.id}:${editable}`}
+            key={v.handoff.id}
             view={v}
             path={`${path}/${v.handoff.id}`}
             editable={editable}

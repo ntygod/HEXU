@@ -38,7 +38,8 @@
     "runner:restore-report": "node dist/apps/runner/src/restore-checkpoint.js report",
     "runner:restore-status": "node dist/apps/runner/src/restore-checkpoint.js status",
     "runner:restore-cleanup": "node dist/apps/runner/src/restore-checkpoint.js cleanup",
-    "runner:transfer": "node dist/apps/runner/src/transfer-checkpoint.js"
+    "runner:transfer": "node dist/apps/runner/src/transfer-checkpoint.js",
+    "runner:handoff-accept": "node dist/apps/runner/src/accept-handoff.js"
   },
   "dependencies": {
     "better-auth": "1.7.6",

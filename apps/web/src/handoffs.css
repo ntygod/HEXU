@@ -48,3 +48,12 @@
 .handoff-text {
   white-space: pre-wrap;
 }
+.handoff-panel-status {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.handoff-panel-status pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

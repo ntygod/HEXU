@@ -9,7 +9,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  check:
+  engineering:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -21,6 +21,17 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run format:check
       - run: npm run check
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
@@ -32,3 +43,16 @@ jobs:
             test-results/
             artifacts/
           retention-days: 7
+  check:
+    needs: [engineering, browser]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require both suites to pass
+        env:
+          ENGINEERING_RESULT: ${{ needs.engineering.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: |
+          test "$ENGINEERING_RESULT" = success
+          test "$BROWSER_RESULT" = success

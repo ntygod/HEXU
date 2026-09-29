@@ -10,6 +10,7 @@ import {
 } from '../../contracts/src/continuation.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import type { Store } from './store.js';
+import { assertNoPendingHandoff } from './handoff-reservations.js';
 
 type Row = { body: string };
 const stamp = () => new Date().toISOString();
@@ -39,6 +40,7 @@ export function assertNoPendingContinuation(
   workingCopyId: string | null = null,
   allowedId?: string,
 ) {
+  assertNoPendingHandoff(store, taskId);
   const rows = store.db
     .prepare(
       "SELECT body FROM continuation_operations WHERE state IN ('waiting_for_stop','preparing') AND (task_id=? OR working_copy_id=?)",

@@ -54,6 +54,7 @@ export async function nodeRequest<T>(
       'checkpoint-restore-report',
       'checkpoint-transfer-restore-report',
       'checkpoint-transfer',
+      'handoff-acceptance',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');
@@ -81,7 +82,12 @@ export async function nodeRequest<T>(
       if (done) break;
       length += value.length;
       if (
-        length > (path.startsWith('execution-') || path === 'checkpoint-transfer' ? 131072 : 32768)
+        length >
+        (path.startsWith('execution-') || path === 'checkpoint-transfer'
+          ? 131072
+          : path === 'handoff-acceptance'
+            ? 65536
+            : 32768)
       ) {
         await reader.cancel();
         throw new DomainError('INVALID_RESPONSE', '节点响应超出上限');

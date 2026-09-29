@@ -211,6 +211,9 @@ export function TaskPage({ id }: { id: string }) {
           <TaskAssistances task={task} />
           <TaskCheckpoints task={task} />
           <TaskHandoffs task={task} />
+          {task.operatorUserId && (
+            <span aria-label="当前操作者">当前操作者：{task.operatorName ?? '记录中的成员'}</span>
+          )}
           <span className="spacer" />
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明

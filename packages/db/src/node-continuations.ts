@@ -12,6 +12,7 @@ import { assertRevision, canonicalJson, isActiveRun } from '../../domain/src/ind
 import { NextInputs } from './next-inputs.js';
 import { executionHash, type NodeExecution } from './node-execution.js';
 import type { Store } from './store.js';
+import { assertNoPendingHandoff } from './handoff-reservations.js';
 
 type Row = { body: string };
 const stamp = () => new Date().toISOString();
@@ -23,6 +24,7 @@ export function assertNoPendingNodeContinuation(
   nodeId: string | null = null,
   allowedId?: string,
 ) {
+  assertNoPendingHandoff(store, taskId);
   const rows = store.db
     .prepare(
       "SELECT id FROM node_continuation_operations WHERE state IN ('waiting_for_stop','preparing') AND (task_id=? OR node_id=?)",

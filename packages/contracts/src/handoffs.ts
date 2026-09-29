@@ -5,7 +5,7 @@ import type { SnapshotCoverage } from './checkpoint-retention.js';
 
 // This slice publishes invitations. Acceptance requires a separate, fresh local
 // handover check; a transfer receipt or a restore report cannot manufacture it.
-export type HandoffState = 'offered' | 'rejected' | 'withdrawn' | 'expired';
+export type HandoffState = 'offered' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
 export type HandoffAction = 'reject' | 'withdraw';
 export interface HandoffMaterial {
   transferId: string;
@@ -36,6 +36,7 @@ export interface Handoff {
   summary: string;
   remainingWork: string;
   environment: string;
+  transferOwnerRequested?: boolean;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -46,6 +47,7 @@ export interface HandoffView {
   materialAvailable: boolean;
   canReject: boolean;
   canWithdraw: boolean;
+  canAccept: boolean;
 }
 export interface HandoffList {
   items: HandoffView[];
@@ -53,7 +55,7 @@ export interface HandoffList {
 }
 export interface HandoffEvent {
   revision: number;
-  action: 'offer' | 'reject' | 'withdraw' | 'expire';
+  action: 'offer' | 'reject' | 'withdraw' | 'expire' | 'accept';
   actor: { id: string; name: string } | null;
   at: string;
 }
@@ -70,10 +72,14 @@ export function parseHandoffOffer(input: unknown) {
     'remainingWork',
     'environment',
     'hours',
+    'transferOwner',
   ]);
   if (b.hours !== 1 && b.hours !== 24 && b.hours !== 72)
     throw new DomainError('INVALID_INPUT', '邀请有效期只能为 1、24 或 72 小时');
+  if (b.transferOwner !== undefined && typeof b.transferOwner !== 'boolean')
+    throw new DomainError('INVALID_INPUT', '负责人移交必须明确选择');
   return {
+    ...(b.transferOwner === undefined ? {} : { transferOwner: b.transferOwner }),
     transferId: nodeId(b.transferId),
     transferHash: checkpointHash(b.transferHash),
     expectedTaskRevision: revision(b.expectedTaskRevision),
