@@ -25,12 +25,12 @@ npm run runner:handoff-accept -- --operation OPERATION_ID --state /path/to/recei
 
 核验使用同 OS 用户的目录预约来排除受管写入。自身只读核验的原预约可在拿到独占日志锁后对账；不会恢复、删除或给其他未知模型进程发信号。对象内容、目录、文件名与凭证不上传，服务只接收有界数量、时间、哈希和不透明目录引用。
 
-文件检查与服务事务不构成跨进程/网络的分布式原子事务，也不隔离同 OS 用户的手动修改。本次提交记录核验时事实，不承诺目录今后持续不变。原恢复目录尚不会因此自动变成已登记的 Git 工作区或模型执行目录；下一步见 [22](../development/22-next-delivery.md)。
+文件检查与服务事务不构成跨进程/网络的分布式原子事务，也不隔离同 OS 用户的手动修改。本次提交记录核验时事实，不承诺目录今后持续不变。原恢复目录不会因接受而自动成为 Git 或执行目录；需按[接手现场研发](handoff-workspace.md)另行准备、配对和授权。
 
 ## 接口与验证入口
 
 `GET .../handoffs/:handoffId/acceptance-preview` 返回当前版本；`POST .../accept` 返回 202 与持久操作。`GET .../acceptances`、`GET .../acceptances/:acceptanceId` 读取状态，`POST .../:acceptanceId/cancel` 使用独立操作修订和幂等键。
 
-`POST /runner/v1/handoff-acceptance` 仅接受原接收节点 Bearer 渠道的 inspect / commit / 有界失败类别，不接受浏览器 Cookie、路径或执行命令。核验新提交只接受近期匹配证据，旧成功回执仅对账原指纹。固定说明使该专用节点回复上限为64 KiB，其他协议限制不变。
+`POST /runner/v1/handoff-acceptance` 仅接受原接收节点 Bearer 渠道的 inspect / commit / 有界失败类别，另有 `workspace-source` 为后续本机准备复核当前来源；不接受浏览器 Cookie、路径或执行命令。核验新提交只接受近期匹配证据，旧成功回执仅对账原指纹。固定说明使该专用节点回复上限为64 KiB，其他协议限制不变。
 
 实际检查见 [21](../development/21-implementation-status.md) 与 [本轮记录](../development/history/2026-09-29-handoff-acceptance.md)；工程测试使用真实临时 Git/HTTP/SQLite/目录和虚构凭证，不调用真实模型。

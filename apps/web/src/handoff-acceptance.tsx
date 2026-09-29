@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { HandoffView } from '../../../packages/contracts/src/handoffs.js';
+import type { Task } from '../../../packages/contracts/src/index.js';
 import type {
   HandoffAcceptance,
   HandoffAcceptancePreview,
@@ -7,6 +8,7 @@ import type {
 import { Button } from '../../../packages/ui/src/index.js';
 import { time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
+import { HandoffWorkspace } from './handoff-workspace.js';
 
 function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
   return (
@@ -140,11 +142,13 @@ function AcceptanceForm({
 }
 function Operation({
   op,
+  task,
   path,
   editable,
   reload,
 }: {
   op: HandoffAcceptance;
+  task: Task;
   path: string;
   editable: boolean;
   reload(): void;
@@ -183,6 +187,12 @@ function Operation({
           Run，后续文件变化和实际执行独立记录。
         </p>
       )}
+      {op.state === 'succeeded' &&
+        editable &&
+        data.user.id === op.ticket.recipientId &&
+        task.operatorUserId === data.user.id && (
+          <HandoffWorkspace key={`${data.user.id}:${data.space?.id}`} task={task} op={op} />
+        )}
       {editable && <Feedback command={command} />}
       {editable && !command.denied && ['waiting_local', 'needs_attention'].includes(op.state) && (
         <Button
@@ -201,10 +211,12 @@ function Operation({
   );
 }
 export function HandoffAcceptancePanel({
+  task,
   view,
   path,
   editable,
 }: {
+  task: Task;
   view: HandoffView;
   path: string;
   editable: boolean;
@@ -273,6 +285,7 @@ export function HandoffAcceptancePanel({
             {read.value?.items.map((op) => (
               <Operation
                 key={`${op.ticket.id}:${editable}`}
+                task={task}
                 op={op}
                 path={path}
                 editable={editable}

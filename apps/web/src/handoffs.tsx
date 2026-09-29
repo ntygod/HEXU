@@ -315,11 +315,13 @@ function CardActions({ view, path, reload }: { view: HandoffView; path: string; 
   );
 }
 function Card({
+  task,
   view,
   path,
   editable,
   reload,
 }: {
+  task: Task;
   view: HandoffView;
   path: string;
   editable: boolean;
@@ -371,7 +373,7 @@ function Card({
         {history ? '收起流转记录' : '查看流转记录'}
       </Button>
       {history && <History path={path} />}
-      <HandoffAcceptancePanel view={view} path={path} editable={editable} />
+      <HandoffAcceptancePanel task={task} view={view} path={path} editable={editable} />
     </article>
   );
 }
@@ -434,6 +436,7 @@ function Panel({ task }: { task: Task }) {
         read.value.items.map((v) => (
           <Card
             key={v.handoff.id}
+            task={task}
             view={v}
             path={`${path}/${v.handoff.id}`}
             editable={editable}

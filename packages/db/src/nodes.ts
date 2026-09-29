@@ -97,6 +97,7 @@ export class NodeRegistry {
   private pairingView(row: PairRow): PairingView {
     return {
       id: row.id,
+      ownerId: row.owner_id,
       projectId: row.project_id,
       spaceId: row.space_id,
       ...this.labels(row),

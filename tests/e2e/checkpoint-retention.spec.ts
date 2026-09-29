@@ -1,12 +1,20 @@
 import { test, expect, request as apiRequest, type Page, type Browser } from '@playwright/test';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, writeFile, rm, rename, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm, rename, readFile, chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
 import { authorizeDirectories } from '../../apps/runner/src/agent/workspaces.js';
-import { writeCredentials } from '../../apps/runner/src/agent/storage.js';
+import {
+  writeCredentials,
+  readCredentials,
+  AgentStorage,
+} from '../../apps/runner/src/agent/storage.js';
+import { AgentConnection } from '../../apps/runner/src/agent/connection.js';
+import { NodeExecutor } from '../../apps/runner/src/agent/executor.js';
+import { readGitWorkspaceProgress } from '../../apps/runner/src/agent/handoff-workspace.js';
 import { RetentionVault } from '../../apps/runner/src/agent/checkpoint-retention.js';
 const origin = 'http://127.0.0.1:4317';
 const password = 'Fictional Checkpoint Browser Password 2026!';
@@ -1243,6 +1251,218 @@ test('接受接手固定当前讨论，撤权暂停原确认且权限恢复不�
     expect(task.task.operatorUserId).toBeUndefined();
     expect(task.runs).toHaveLength(0);
   } finally {
+    await f.close();
+  }
+});
+
+async function acceptedWorkspace(page: Page, browser: Browser) {
+  const f = await prepareHandoff(page, browser);
+  try {
+    await f.panel.getByRole('button', { name: '发布邀请', exact: true }).click();
+    const restored = await receiverRestoreCli(f.receiverHome, f.transferId, 'restore');
+    expect(restored.code, restored.output).toBe(0);
+    const r = await recipientAcceptance(f);
+    await r.panel.getByRole('button', { name: '开始本机确认', exact: true }).click();
+    await expect(r.panel).toContainText('等待接收节点本机确认');
+    const op = (
+      await (
+        await f.recipientPage.request.get(r.path + '/acceptances', { headers: headers(f.space.id) })
+      ).json()
+    ).items[0];
+    const result = await acceptanceCli(f.receiverHome, op.ticket.id, restored.target);
+    expect(result.code, result.output).toBe(0);
+    await r.panel.getByRole('button', { name: '准备接手现场研发', exact: true }).click();
+    return { ...f, receiverPanel: r.panel, op, target: restored.target };
+  } catch (error) {
+    await f.close();
+    throw error;
+  }
+}
+async function workspaceCommand(entry: string, args: string[], input: string) {
+  const child = spawn(process.execPath, [resolve('dist/apps/runner/src/' + entry), ...args], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      ANTHROPIC_API_KEY: 'sk-ant-handoff-browser-protocol-fixture-not-a-real-key',
+    },
+  });
+  let output = '';
+  child.stdout.on('data', (v) => (output += v));
+  child.stderr.on('data', (v) => (output += v));
+  child.stdin.end(input);
+  const [code] = await once(child, 'close');
+  expect(code, output).toBe(0);
+  return output;
+}
+
+test('接手现场经Git准备、本人配对和执行授权后，在原任务网页创建新Run', async ({
+  page,
+  browser,
+}) => {
+  const f = await acceptedWorkspace(page, browser);
+  let storage: AgentStorage | undefined,
+    connection: AgentConnection | undefined,
+    executor: NodeExecutor | undefined;
+  const oldKey = process.env.ANTHROPIC_API_KEY;
+  try {
+    const guide = f.receiverPanel.getByLabel('接手现场研发', { exact: true });
+    await expect(guide.getByLabel('接手Git准备命令')).toContainText(f.op.ticket.id);
+    await expect(guide).toContainText('网页尚未获知本机准备结果');
+    await workspaceCommand(
+      'prepare-handoff-workspace.js',
+      ['prepare', '--state', f.receiverHome, '--operation', f.op.ticket.id, '--target', f.target],
+      `GIT ${f.op.ticket.id}\n`,
+    );
+    const p = readGitWorkspaceProgress(f.receiverHome, f.op.ticket.id)!;
+    expect(p.state).toBe('ready');
+    await guide.getByRole('button', { name: '生成原项目配对码', exact: true }).click();
+    const field = guide.getByLabel('接手现场配对码', { exact: true });
+    await expect(field).toHaveAttribute('type', 'password');
+    const code = await field.inputValue();
+    await workspaceCommand(
+      'cli.js',
+      ['connect', '--state', p.nodeState!, '--config', p.configPath!],
+      `${code}\nCONNECT\n`,
+    );
+    const executable = join(f.dir, 'handoff-claude-protocol-fixture.mjs');
+    await writeFile(
+      executable,
+      `#!${process.execPath}\nawait import(${JSON.stringify(pathToFileURL(resolve('dist/tests/fixtures/native-tool.js')).href)});\n`,
+    );
+    await chmod(executable, 0o700);
+    const execution = join(f.dir, 'handoff-execution.json');
+    await writeFile(
+      execution,
+      JSON.stringify({
+        tool: 'claude-code',
+        executable,
+        mode: 'edit',
+        workspaces: ['接手代码'],
+        timeoutSeconds: 30,
+        maxBudgetUsd: 1,
+      }),
+    );
+    await workspaceCommand(
+      'cli.js',
+      ['enable-execution', '--state', p.nodeState!, '--config', execution],
+      'EXECUTE\n',
+    );
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-handoff-browser-protocol-fixture-not-a-real-key';
+    storage = new AgentStorage(p.nodeState!);
+    connection = new AgentConnection(storage);
+    executor = new NodeExecutor(connection);
+    await connection.cycle();
+    await executor.tick();
+    await expect(guide).toContainText('节点已配对');
+    await expect(field).toHaveCount(0);
+    await guide.getByRole('button', { name: '查看节点并准备新 Run', exact: true }).click();
+    const run = f.recipientPage.getByRole('dialog', { name: '在我的节点上执行', exact: true });
+    const credentials = readCredentials(p.nodeState!);
+    await run.getByLabel('执行节点', { exact: true }).selectOption(credentials.nodeId!);
+    await run
+      .getByLabel('授权工作目录', { exact: true })
+      .selectOption(credentials.directories[0]!.id);
+    await run.getByLabel('本次执行模式', { exact: true }).selectOption('edit');
+    await run.getByLabel('本次要求', { exact: true }).fill('FIXTURE_WRITE');
+    await run.getByRole('checkbox', { name: /我确认本次目录与模式/ }).check();
+    await run.getByRole('button', { name: '在节点上开始', exact: true }).click();
+    await expect(run).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        await connection!.cycle();
+        await executor!.tick();
+        return (
+          await (
+            await f.recipientPage.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+              headers: headers(f.space.id),
+            })
+          ).json()
+        ).runs[0]?.state;
+      })
+      .toBe('succeeded');
+    expect(await readFile(join(f.target, 'native-output.txt'), 'utf8')).toBe('fixture edit\n');
+    await f.recipientPage.keyboard.press('Escape');
+    await f.recipientPage.reload();
+    await expect(f.recipientPage.getByLabel('当前操作者', { exact: true })).toContainText(
+      '接手同事',
+    );
+    await expect(f.recipientPage.locator('main')).toContainText(
+      `接手现场 ${f.op.ticket.id.slice(0, 8)}`,
+    );
+  } finally {
+    await executor?.close();
+    await connection?.goodbye();
+    storage?.close();
+    if (oldKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = oldKey;
+    await f.close();
+  }
+});
+
+test('接手研发配对丢失回执不泄露或重复生成，关闭与降权清空临时码', async ({ page, browser }) => {
+  const f = await acceptedWorkspace(page, browser);
+  try {
+    const guide = f.receiverPanel.getByLabel('接手现场研发', { exact: true });
+    const requests: string[] = [];
+    let drop = true;
+    await f.recipientPage.route(`${origin}/api/v1/nodes/pairings`, async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      requests.push(route.request().headers()['idempotency-key']!);
+      if (drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await guide.getByRole('button', { name: '生成原项目配对码', exact: true }).click();
+    await guide.getByRole('button', { name: '确认上次配对请求', exact: true }).click();
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toBe(requests[1]);
+    await expect(guide).toContainText('无法从回执或刷新恢复');
+    await expect(guide.getByLabel('接手现场配对码', { exact: true })).toHaveCount(0);
+    await guide.getByRole('button', { name: '取消这次配对', exact: true }).click();
+    await guide.getByRole('button', { name: '生成原项目配对码', exact: true }).click();
+    await expect(guide.getByLabel('接手现场配对码', { exact: true })).toHaveValue(
+      /^[A-Za-z0-9_-]{43}$/,
+    );
+    await guide.getByRole('button', { name: '收起研发准备', exact: true }).click();
+    await guide.getByRole('button', { name: '准备接手现场研发', exact: true }).click();
+    await expect(guide.getByLabel('接手现场配对码', { exact: true })).toHaveCount(0);
+    await guide.getByRole('button', { name: '生成原项目配对码', exact: true }).click();
+    await expect(guide.getByLabel('接手现场配对码', { exact: true })).toHaveCount(1);
+    await mkdir('artifacts', { recursive: true });
+    // Mask the one-time code even for fictional test identities.
+    await f.recipientPage.screenshot({
+      path: 'artifacts/100-handoff-workspace-dark.png',
+      fullPage: true,
+      mask: [guide.getByLabel('接手现场配对码', { exact: true })],
+    });
+    await f.recipientPage.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+    await f.recipientPage.screenshot({
+      path: 'artifacts/101-handoff-workspace-light.png',
+      fullPage: true,
+      mask: [guide.getByLabel('接手现场配对码', { exact: true })],
+    });
+    await f.recipientPage.setViewportSize({ width: 390, height: 844 });
+    await f.recipientPage.screenshot({
+      path: 'artifacts/102-handoff-workspace-mobile.png',
+      fullPage: true,
+      mask: [guide.getByLabel('接手现场配对码', { exact: true })],
+    });
+    expect(
+      await f.recipientPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
+    await post(
+      page,
+      `projects/${f.task.projectId}/members/${f.recipientId}`,
+      { role: 'view' },
+      f.space.id,
+    );
+    await expect(guide).toHaveCount(0);
+    await expect(f.receiverPanel.getByLabel('接手确认记录')).toContainText('接手已提交');
+  } finally {
+    await f.recipientPage.unrouteAll().catch(() => {});
     await f.close();
   }
 });

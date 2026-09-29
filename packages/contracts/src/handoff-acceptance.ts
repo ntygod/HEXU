@@ -104,7 +104,7 @@ export function parseHandoffAcceptanceProof(input: unknown): HandoffAcceptancePr
 export function parseHandoffNodeCommand(input: unknown) {
   const action =
     input && typeof input === 'object' ? (input as { action?: unknown }).action : undefined;
-  if (action === 'inspect') {
+  if (action === 'inspect' || action === 'workspace-source') {
     const b = exact(input, ['action', 'operationId']);
     return { action, operationId: nodeId(b.operationId) } as const;
   }

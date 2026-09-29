@@ -8,6 +8,7 @@ import { executionCommand } from './agent/execution-commands.js';
 import { readExecutionPolicy, writeExecutionPolicy } from './agent/execution-policy.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { assertHandoffEvidenceSettled } from './agent/handoff-acceptance.js';
+import { assertGitWorkspaceSettled } from './agent/handoff-workspace.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -19,6 +20,7 @@ import {
   NODE_INTERVAL_MS,
   controlOrigin,
   exact,
+  nodeId,
   nodeSecret,
   publicName,
   type PairingView,
@@ -100,7 +102,12 @@ async function connect(storage: AgentStorage, configPath: string) {
     );
   const raw = readFileSync(configPath, 'utf8');
   if (raw.length > 32768) throw new DomainError('INVALID_CONFIG', '配置过大');
-  const cfg = exact(JSON.parse(raw), ['controlUrl', 'name', 'workspaces']);
+  const cfg = exact(JSON.parse(raw), ['controlUrl', 'name', 'workspaces', 'expectedScope']);
+  const scope =
+    cfg.expectedScope === undefined
+      ? null
+      : exact(cfg.expectedScope, ['spaceId', 'projectId', 'ownerId']);
+  if (scope) for (const id of [scope.spaceId, scope.projectId, scope.ownerId]) nodeId(id);
   const origin = controlOrigin(cfg.controlUrl),
     name = publicName(cfg.name);
   if (!Array.isArray(cfg.workspaces))
@@ -140,6 +147,16 @@ async function connect(storage: AgentStorage, configPath: string) {
     const preview = validatePreview(
       await nodeRequest<PairingView>(origin, 'pairing-preview', { code }),
     );
+    if (
+      scope &&
+      (preview.spaceId !== scope.spaceId ||
+        preview.projectId !== scope.projectId ||
+        preview.ownerId !== scope.ownerId)
+    )
+      throw new DomainError(
+        'PAIRING_SCOPE_CHANGED',
+        '配对码不是此接手现场明确绑定的本人、空间与项目；没有创建新节点',
+      );
     say(`控制服务：${origin}`);
     say(`所有者：${preview.ownerName} · 空间：${preview.spaceName} · 项目：${preview.projectName}`);
     for (const w of directories)
@@ -162,6 +179,7 @@ async function connect(storage: AgentStorage, configPath: string) {
     // never by making another node or repeating any paid operation.
     new ExecutionJournal(storage).assertCanDisconnect();
     assertHandoffEvidenceSettled(storage.home);
+    assertGitWorkspaceSettled(storage.home);
     storage.resetForPairing();
     writeExecutionPolicy(storage.home, null);
     writeCredentials(storage.home, credentials);
@@ -273,6 +291,7 @@ async function main() {
     if (command === 'disconnect') {
       new ExecutionJournal(storage).assertCanDisconnect();
       assertHandoffEvidenceSettled(storage.home);
+      assertGitWorkspaceSettled(storage.home);
       const c = readCredentials(storage.home);
       if (!options['--local-only']) {
         try {
