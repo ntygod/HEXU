@@ -442,4 +442,26 @@ CREATE UNIQUE INDEX handoff_acceptance_pending_task ON handoff_acceptances(task_
 -- No legacy operator/acceptance is inferred from ownership or a restore report.
 `,
   },
+  {
+    version: 27,
+    sql: `
+CREATE TABLE work_branch_groups (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ checkpoint_id TEXT NOT NULL REFERENCES commit_checkpoints(id), body TEXT NOT NULL
+);
+CREATE INDEX work_branch_groups_task ON work_branch_groups(task_id);
+CREATE TABLE work_branches (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ group_id TEXT NOT NULL REFERENCES work_branch_groups(id),
+ state TEXT NOT NULL CHECK(state IN ('planned','discarded')),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+CREATE INDEX work_branches_group ON work_branches(group_id);
+CREATE TABLE work_branch_events (
+ branch_id TEXT NOT NULL REFERENCES work_branches(id), revision INTEGER NOT NULL, body TEXT NOT NULL,
+ PRIMARY KEY(branch_id,revision)
+);
+-- Definition only: no legacy Run, directory, result or execution consent is backfilled.
+`,
+  },
 ];

@@ -26,6 +26,7 @@ Markdown 引用不等于工具已注入其内容；执行任务时必须实际�
 | assistance、text-claude、assistance-adoption | [assistance](assistance.md) |
 | checkpoints、checkpoint-objects/retention、后续恢复 | [checkpoints](checkpoints.md) |
 | handoffs、邀请状态/接手卡、后续接受与操作者 | [handoffs](handoffs.md) |
+| work-branches、共同起点、后续独立现场与整合 | [parallel](parallel.md) |
 | README、AGENTS、文档入口/事实/历史 | [documentation](documentation.md) |
 
 例如：只改按钮样式读 UI；改资料采用读上下文，涉及任务写事务再看项目任务；改节点接续读接续与节点，只有改变原生会话协议才打开对应 provider。跨包改动按真实影响补读，不以文件数量决定阅读范围。

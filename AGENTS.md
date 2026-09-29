@@ -26,6 +26,7 @@
 | 真人/AI 协助、分享授权、建议采用 | [协助](docs/harness/assistance.md) |
 | Git 引用、对象副本、恢复与清理 | [检查点](docs/harness/checkpoints.md) |
 | 接手邀请、关闭/到期、后续操作者接管 | [接手](docs/harness/handoffs.md) |
+| 方案共同起点、独立分支、后续隔离并行 | [方案分支](docs/harness/parallel.md) |
 | 文档、AGENTS、harness 与进度维护 | [文档治理](docs/harness/documentation.md) |
 
 完整索引与组合示例见 [harness 目录](docs/harness/README.md)。引用文件需要按任务实际打开；链接本身不代表已加载其中规则。
