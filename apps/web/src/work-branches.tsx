@@ -15,6 +15,7 @@ import './work-branches.css';
 import { BranchWorkspace } from './work-branch-workspaces.js';
 import { BranchResult } from './work-branch-results.js';
 import { BranchDiscardEditor } from './work-branch-lifecycle.js';
+import { BranchCleanupEntry } from './branch-cleanup-check.js';
 
 const base = (taskId: string) => `/tasks/${encodeURIComponent(taskId)}/work-branches`;
 function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
@@ -352,6 +353,7 @@ function Branch({
         </p>
       )}
       <div className="work-branch-actions">
+        {editable && <BranchCleanupEntry branch={branch} />}
         {editable &&
           branch.workingCopyId &&
           branch.workspace?.state === 'bound' &&

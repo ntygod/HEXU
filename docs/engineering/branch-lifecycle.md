@@ -22,6 +22,8 @@
 - 保留原 WorkingCopy 绑定；普通执行入口不能绕过方案绑定重用目录。新工作需另行明确安排，不能借原放弃回执获得执行权限
 - 已登记目录实际清理、未保存文件处置、未知现场自动恢复和解除绑定仍未支持，本轮不删除真实用户目录
 
+清理前可另行[核对现场保护条件](branch-cleanup-check.md)，选择同一现场的固定提交副本并在原节点实际检查；核对通过不是删除许可。
+
 ## 接口与原子性
 
 `GET /tasks/:taskId/work-branches/:branchId/discard-preview` 在当前 Task 编辑权下返回固定分支、任务修订和能否放弃的原因。`POST .../discard-preserving` 仅接受 expectedRevision、expectedTaskRevision、confirmPreserveWorkspace:true 和 confirmExecutionContinues:true，不接收任意路径、Run、停止、删除或代为清除选择字段。

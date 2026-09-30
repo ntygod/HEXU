@@ -56,6 +56,7 @@ export async function nodeRequest<T>(
       'checkpoint-transfer',
       'handoff-acceptance',
       'work-branch-workspace',
+      'branch-cleanup-inspect',
       'result-code-inspect',
       'result-code-publish',
       'integration-inspect',
