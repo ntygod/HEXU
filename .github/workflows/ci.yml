@@ -56,6 +56,15 @@ jobs:
             artifacts/145-readable-line-diff-mobile-light.png
             artifacts/146-readable-line-diff-mobile-changes.png
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-code-feedback-previews
+          path: |
+            artifacts/147-code-feedback-editor-dark.png
+            artifacts/148-code-feedback-editor-mobile-light.png
+            artifacts/149-code-feedback-fixed-location-mobile.png
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

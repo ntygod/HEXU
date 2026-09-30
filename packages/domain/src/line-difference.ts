@@ -30,6 +30,16 @@ function lines(text: string): TextLine[] {
   if (offset < text.length) result.push({ text: text.slice(offset), ending: 'none' });
   return result;
 }
+/** Read-only excerpt from already-shared text, with the same line boundaries. */
+export function textLineRange(text: string, start: number, end: number): TextLine[] {
+  return lines(text).slice(start - 1, end);
+}
+/** Same line numbering as the diff, including CRLF/CR and an unterminated tail. */
+export function countTextLines(text: string): number {
+  let count = 0;
+  for (const _ of text.matchAll(/\r\n|\r|\n/g)) count++;
+  return count + (text && !/[\r\n]$/.test(text) ? 1 : 0);
+}
 const same = (a: TextLine, b: TextLine) => a.text === b.text && a.ending === b.ending;
 export function compareTextLines(before: string, after: string): TextLineComparison {
   if (before.length + after.length > LINE_DIFFERENCE_LIMITS.characters)

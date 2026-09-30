@@ -1,3 +1,5 @@
+import type { BranchResultSource } from '../../../packages/contracts/src/results.js';
+import { CodeFeedbackEntry } from './result-code-feedback.js';
 import { useEffect, useState } from 'react';
 import type { ResultDetail } from '../../../packages/contracts/src/results.js';
 import { Button, Empty, Icon, Skeleton, StatusBadge } from '../../../packages/ui/src/index.js';
@@ -41,7 +43,15 @@ export function Results() {
     </div>
   );
 }
-export function ResultPage({ id, revisionId }: { id: string; revisionId?: string }) {
+export function ResultPage({
+  id,
+  revisionId,
+  feedbackId,
+}: {
+  id: string;
+  revisionId?: string;
+  feedbackId?: string;
+}) {
   const [pinned, setPinned] = useState(revisionId);
   const read = useAssistanceRead<ResultDetail>(
     `/results/${id}${pinned ? `/versions/${pinned}` : ''}`,
@@ -72,6 +82,12 @@ export function ResultPage({ id, revisionId }: { id: string; revisionId?: string
   const editable = canEditTask(data, task);
   return (
     <div className="work-page result-workspace">
+      {feedbackId &&
+        !messages.some((message) => message.id === feedbackId && message.codeAnchor) && (
+          <p className="form-error" role="alert">
+            此固定版本没有该代码反馈位置，没有跳到最新版本或读取其他文件。
+          </p>
+        )}
       {error && (
         <p role="alert">
           {error}
@@ -156,7 +172,17 @@ export function ResultPage({ id, revisionId }: { id: string; revisionId?: string
             </article>
           )}
           {version.source.kind === 'work_branch' && (
-            <ResultSource source={version.source} evidence={value.code} revisionId={version.id} />
+            <CodeFeedbackEntry task={task} version={version} evidence={value.code}>
+              {(onCodeFeedback) => (
+                <ResultSource
+                  source={version.source as BranchResultSource}
+                  evidence={value.code}
+                  revisionId={version.id}
+                  onCodeFeedback={onCodeFeedback}
+                  focusAnchor={messages.find((message) => message.id === feedbackId)?.codeAnchor}
+                />
+              )}
+            </CodeFeedbackEntry>
           )}
           <PrepareIntegration version={version} />
           <div className="result-source">

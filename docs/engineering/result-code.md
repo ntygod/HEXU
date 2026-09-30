@@ -43,4 +43,6 @@ ResultRevision来源的`code`可为`not_captured`或固定`commit_reference`；�
 - `GET /results/:resultId[/versions/:revisionId]`补充代码副本状态、共享差异和是否可由当前本人节点操作的投影。
 - `/runner/v1/result-code-inspect`与`result-code-publish`只接受独立Node Bearer通道，不接收浏览器Cookie、路径或任意文件读取请求。发布严格校验原版本/引用指纹、预算、结构与文本blob哈希；源树遍历来自原节点核验，不把服务端校验称为再次读取了完整仓库。
 
-原本人可在原目录核对实际代码后[从所选方案继续](branch-continuation.md)。仍未交付：未提交文件/补丁的明确捕获、完整文件下载与对象托管、文件/行级评论、真实预览、脏现场/跨目录接续和代码整合。当前材料不能直接作为恢复成功或代码已合并的证明。验证和下一项见 [21](../development/21-implementation-status.md)/[22](../development/22-next-delivery.md)。
+原本人可在原目录核对实际代码后[从所选方案继续](branch-continuation.md)。仍未交付：未提交文件/补丁的明确捕获、完整文件下载与对象托管、独立反馈回复关系、真实预览、脏现场/跨目录接续和代码整合。当前材料不能直接作为恢复成功或代码已合并的证明。验证和下一项见 [21](../development/21-implementation-status.md)/[22](../development/22-next-delivery.md)。
+
+在固定成果文件可另行填写[代码位置反馈](result-code-feedback.md)，保存原Task消息及版本/对象锚点，不自动修改代码或发送模型。
