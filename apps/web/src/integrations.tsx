@@ -46,7 +46,7 @@ const applicationReasons: Record<NonNullable<IntegrationApplicationReport['reaso
   target_changed: '目标现场已变化',
   workspace_busy: '目录仍有活动或未知写入',
   objects_unavailable: '完整对象缺失、损坏或到期',
-  unsupported_snapshot: '文件类型、父目录或路径不支持本轮写入',
+  unsupported_snapshot: '文件类型、路径或新目录预算不支持本轮写入',
   application_failed: '本机应用未完成',
   interrupted: '应用被中断或上次结果不明',
 };
@@ -81,7 +81,7 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
                 npm run runner:integration-apply -- --operation {o.id} --state &lt;节点状态目录&gt;
               </code>
               <p>
-                仅在本人Linux节点执行；会再次核对所选路径、完整对象、目标现场与恢复点。所有父目录必须已存在。
+                仅在本人Linux节点执行；会再次核对所选路径、完整对象、目标现场与恢复点。必要的新父目录会排他创建，不接管后来出现的目录。
               </p>
             </>
           )}
@@ -102,6 +102,11 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
           {view.recovery
             ? '原应用报告仍为需要本机处理，可能已部分写入；原已确认路径不能代表全部现场。本机结算观察单独保留在下方。'
             : '可能已部分写入，目录锁仍需在原节点核对处理。不要重试写入或自动回滚；已确认的路径不能代表全部现场。'}
+        </p>
+      )}
+      {(o.state === 'applying' || o.state === 'needs_attention') && (
+        <p>
+          文件计数不包含目录；即使已确认0个文件，也可能已创建父目录或保留未确认暂存。请在原节点核对本机状态，不自动清理。
         </p>
       )}
       {o.state === 'failed' && (
@@ -142,7 +147,7 @@ function RecoveryStatus({ view }: { view: IntegrationView }) {
     <section className="work-branch-notice" aria-label="本机保留文件结算观察">
       <strong>本次应用占用已在本机明确结算 · 历史观察</strong>
       <p>
-        原目标节点所有者当时明确确认原应用进程及其子进程、孤立的 integration-add 进程均已停止：
+        原目标节点所有者当时明确确认原应用进程及全部子进程、遗留孤儿进程均已停止：
         {time(r.stoppedConfirmedAt)}
       </p>
       <p>仅本次应用的占用已释放：{time(r.releasedAt)}</p>
@@ -716,7 +721,7 @@ function ApplicationEditor({
             </dl>
           </section>
           <p className="work-branch-notice">
-            本轮仅支持无冲突的新增普通文件，且目标父目录必须已存在。修改、删除、冲突、目标已有文件与有省略的清单均不能选择；不会创建目录或自动合并文本。
+            本轮支持无冲突的新增普通文件及必要的新父目录（最多256个）。修改、删除、冲突、目标已有文件与有省略的清单均不能选择；不覆盖或接管已有目录，不自动合并文本。
           </p>
           <fieldset className="integration-selection" disabled={locked}>
             <legend>选择新增文件</legend>
@@ -768,7 +773,7 @@ function ApplicationEditor({
               disabled={locked || !paths.length}
               onChange={(event) => setConfirmed(event.target.checked)}
             />
-            我已核对固定来源、目标、恢复点与所选路径，确认仅应用这些新增文件
+            我已核对固定来源、目标、恢复点与所选路径，确认仅应用这些新增文件及必要的新父目录
           </label>
           {stale && !command.uncertain && (
             <p className="work-branch-notice">

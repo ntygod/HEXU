@@ -7,6 +7,7 @@ import {
 } from '../../../../packages/contracts/src/integrations.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import type { RestoreEntry } from './checkpoint-restore-plan.js';
+import { INTEGRATION_DIRECTORY_LIMITS } from './integration-application-plan.js';
 import {
   validateRecoveryContextBinding,
   type IntegrationRecoveryContext,
@@ -14,6 +15,15 @@ import {
 const invalid = () =>
   new DomainError('INTEGRATION_JOURNAL_INVALID', '本机应用证据不完整或不一致；保留原凭证和写锁');
 type Added = RestoreEntry & { identity: string };
+export interface CreatedIntegrationDirectory {
+  path: string;
+  identity: string;
+}
+export interface IntegrationDirectoryIntent {
+  path: string;
+  stageName: string;
+  stageIdentity: string | null;
+}
 export interface LocalApplication {
   binding: string;
   integrationId: string;
@@ -26,6 +36,9 @@ export interface LocalApplication {
   pending: IntegrationApplicationReport | null;
   acknowledged: number;
   recoveryContext?: IntegrationRecoveryContext;
+  /** Absent on older file-only records; never backfill unknown ownership. */
+  directories?: CreatedIntegrationDirectory[];
+  directoryIntent?: IntegrationDirectoryIntent | null;
 }
 export function validateLocalShape(record: LocalApplication) {
   const invalid = () =>
@@ -79,6 +92,49 @@ export function validateLocalShape(record: LocalApplication) {
       throw invalid();
     seen.add(entry.path);
   }
+  if ((record.directories === undefined) !== (record.directoryIntent === undefined))
+    throw invalid();
+  if (record.directories !== undefined) {
+    if (
+      !record.recoveryContext ||
+      !Array.isArray(record.directories) ||
+      record.directories.length > INTEGRATION_DIRECTORY_LIMITS.count
+    )
+      throw invalid();
+    let pathBytes = 0;
+    for (const directory of record.directories) {
+      if (
+        !directory ||
+        !path(directory.path) ||
+        seen.has(directory.path) ||
+        typeof directory.identity !== 'string' ||
+        !/^\d+:\d+:\d+$/.test(directory.identity)
+      )
+        throw invalid();
+      seen.add(directory.path);
+      pathBytes += Buffer.byteLength(directory.path);
+    }
+    if (pathBytes > INTEGRATION_DIRECTORY_LIMITS.pathBytes) throw invalid();
+    const intent = record.directoryIntent;
+    if (intent !== null) {
+      if (
+        !intent ||
+        !path(intent.path) ||
+        seen.has(intent.path) ||
+        record.intent === null ||
+        !record.intent.startsWith(intent.path + '/') ||
+        typeof intent.stageName !== 'string' ||
+        !/^\.hexu-restore-[a-f0-9-]{36}$/.test(intent.stageName) ||
+        (intent.stageIdentity !== null && !/^\d+:\d+:\d+$/.test(intent.stageIdentity))
+      )
+        throw invalid();
+      try {
+        nodeId(intent.stageName.slice('.hexu-restore-'.length));
+      } catch {
+        throw invalid();
+      }
+    }
+  }
   if (record.pending !== null) {
     try {
       parseIntegrationApplicationReport(record.pending);
@@ -114,13 +170,17 @@ export function parseLocalApplicationRecord(
         'pending',
         'acknowledged',
         ...(record.recoveryContext === undefined ? [] : ['recoveryContext']),
+        ...(record.directories === undefined ? [] : ['directories', 'directoryIntent']),
       ]) ||
       record.integrationId !== integrationId ||
       nodeId(record.applicationId) !== record.applicationId ||
       record.added.some(
         (entry) => !exact(entry, ['path', 'kind', 'objectId', 'gitMode', 'bytes', 'identity']),
       ) ||
-      record.added.some((entry) => entry.path === record.intent)
+      record.added.some((entry) => entry.path === record.intent) ||
+      record.directories?.some((entry) => !exact(entry, ['path', 'identity'])) ||
+      (record.directoryIntent &&
+        !exact(record.directoryIntent, ['path', 'stageName', 'stageIdentity']))
     )
       throw invalid();
 
@@ -141,7 +201,13 @@ export function parseLocalApplicationRecord(
       case 'prepared':
         // The start ACK is persisted before the following phase update, so a
         // concurrent observer can legitimately see prepared + acknowledged=1.
-        if (record.added.length || record.intent !== null || record.acknowledged > 1)
+        if (
+          record.added.length ||
+          record.intent !== null ||
+          record.acknowledged > 1 ||
+          record.directories?.length ||
+          record.directoryIntent
+        )
           throw invalid();
         break;
       case 'applying':
@@ -151,12 +217,19 @@ export function parseLocalApplicationRecord(
         if (
           !record.added.length ||
           record.intent !== null ||
+          record.directoryIntent ||
           (pending ? record.acknowledged !== 1 : record.acknowledged !== 2)
         )
           throw invalid();
         break;
       case 'failed':
-        if (record.added.length || record.intent !== null) throw invalid();
+        if (
+          record.added.length ||
+          record.intent !== null ||
+          record.directories?.length ||
+          record.directoryIntent
+        )
+          throw invalid();
         break;
       case 'needs_attention':
         if (pending ? record.acknowledged !== 1 : record.acknowledged !== 2) throw invalid();

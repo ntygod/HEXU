@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { buildIntegrationPlan } from '../apps/runner/src/agent/integration-plan.js';
-import { integrationAdditions } from '../apps/runner/src/agent/integration-application-plan.js';
+import {
+  integrationAdditions,
+  integrationAdditionPlan,
+} from '../apps/runner/src/agent/integration-application-plan.js';
 import {
   objectHash,
   verifySnapshot,
@@ -232,7 +235,7 @@ test('所选新增范围重新核对完整目标树，不能借未选删除绕�
     );
   }
 });
-test('只选已有父目录中的新增文件，保留其他修改；新目录/重复/未列出或省略计划拒绝', async () => {
+test('只选新增文件并规划新父目录，保留其他修改；重复/未列出或省略计划拒绝', async () => {
   const base = await snapshot({ 'src/keep': 'base' }),
     source = await snapshot({ 'src/keep': 'changed', 'src/new': 'new', 'brand-new/file': 'new' }),
     target = base;
@@ -248,7 +251,12 @@ test('只选已有父目录中的新增文件，保留其他修改；新目录/�
     ),
     ['src/new'],
   );
-  for (const paths of [['src/keep'], ['brand-new/file'], ['unknown'], ['src/new', 'src/new'], []])
+  assert.deepEqual(
+    integrationAdditionPlan('sha1', target.tree, target, plan, ['brand-new/file'], '/fixture')
+      .directories,
+    ['brand-new'],
+  );
+  for (const paths of [['src/keep'], ['unknown'], ['src/new', 'src/new'], []])
     assert.throws(() => integrationAdditions('sha1', target.tree, target, plan, paths, '/fixture'));
   assert.throws(() =>
     integrationAdditions(
@@ -260,4 +268,82 @@ test('只选已有父目录中的新增文件，保留其他修改；新目录/�
       '/fixture',
     ),
   );
+});
+
+test('new parent planning reuses shared directories, preserves frozen ancestor anchors and bounds directory expansion', async () => {
+  const base = await snapshot({ 'existing/keep': 'base' });
+  const source = await snapshot({
+    'existing/keep': 'base',
+    'existing/new/deep/a': 'A',
+    'existing/new/deep/b': 'B',
+    'fresh/c': 'C',
+  });
+  const plan = buildIntegrationPlan(
+    'sha1',
+    { base: base.tree, source: source.tree, target: base.tree },
+    { base, source, target: base },
+    '/fixture',
+  );
+  const selected = integrationAdditionPlan(
+    'sha1',
+    base.tree,
+    base,
+    plan,
+    ['existing/new/deep/a', 'existing/new/deep/b', 'fresh/c'],
+    '/fixture',
+  );
+  assert.deepEqual(selected.directories, ['fresh', 'existing/new', 'existing/new/deep']);
+  assert.deepEqual(selected.anchors, ['existing/new', 'fresh']);
+  assert.equal(selected.files.length, 3);
+  const data: Record<string, string> = { keep: 'base' };
+  for (let i = 0; i < 80; i++) data[`d${String(i).padStart(2, '0')}/a/b/c/file`] = 'one';
+  const target = await snapshot({ keep: 'base' }),
+    wide = await snapshot(data);
+  const widePlan = buildIntegrationPlan(
+    'sha1',
+    { base: target.tree, source: wide.tree, target: target.tree },
+    { base: target, source: wide, target },
+    '/fixture',
+  );
+  const paths = Object.keys(data).filter((p) => p !== 'keep');
+  assert.equal(
+    integrationAdditionPlan('sha1', target.tree, target, widePlan, paths.slice(0, 64), '/fixture')
+      .directories.length,
+    256,
+  );
+  assert.throws(
+    () =>
+      integrationAdditionPlan(
+        'sha1',
+        target.tree,
+        target,
+        widePlan,
+        paths.slice(0, 65),
+        '/fixture',
+      ),
+    /有界|新父目录/,
+  );
+});
+
+test('new-directory evidence has a total path-byte budget independent of selected file count', async () => {
+  const base = await snapshot({ keep: 'base' });
+  const make = (n: number) =>
+    Array.from({ length: n }, (_, i) => String(i).padStart(2, '0') + 'x'.repeat(118)).join('/') +
+    '/file';
+  for (const [depth, allowed] of [
+    [32, true],
+    [33, false],
+  ] as const) {
+    const path = make(depth),
+      source = await snapshot({ keep: 'base', [path]: 'new' });
+    const plan = buildIntegrationPlan(
+      'sha1',
+      { base: base.tree, source: source.tree, target: base.tree },
+      { base, source, target: base },
+      '/fixture',
+    );
+    const build = () => integrationAdditionPlan('sha1', base.tree, base, plan, [path], '/fixture');
+    if (allowed) assert.equal(build().directories.length, depth);
+    else assert.throws(build, /有界|新父目录/);
+  }
 });

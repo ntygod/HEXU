@@ -143,6 +143,7 @@ test('文件应用只允许新增，选择变化重置确认；重复点击、�
     await open(page, f);
     await records(page).getByRole('button', { name: '选择文件应用', exact: true }).click();
     await expect(editor(page).getByLabel('固定应用基线')).toContainText(f.source.commit);
+    await expect(editor(page)).toContainText('必要的新父目录（最多256个）');
     await expect(editor(page).getByLabel('固定应用基线')).toContainText(f.target.commit);
     await expect(editor(page).getByLabel('固定应用基线')).toContainText(f.tr.request.id);
     for (const name of ['README.md', 'removed.txt', 'present.txt', 'conflict.txt']) {
@@ -403,6 +404,28 @@ test('应用中断展示部分写入和处理边界，不能取消或误报未�
       records(page).getByRole('button', { name: '取消应用请求', exact: true }),
     ).toHaveCount(0);
     await expect(records(page).getByLabel('文件整合预检')).toBeVisible();
+  } finally {
+    await close(page, f);
+  }
+});
+
+test('零个已确认文件的中断仍提示父目录或暂存可能存在，不提供重试写入', async ({ page }) => {
+  const f = await integrationFixture(origin);
+  try {
+    const v = await queue(f, await ready(f));
+    await publish(f, v, 'applying');
+    await publish(f, v, 'needs_attention', []);
+    await open(page, f);
+    const status = records(page).getByLabel('文件应用状态');
+    await expect(status).toContainText('已确认写入 0 个文件');
+    await expect(status).toContainText('也可能已创建父目录或保留未确认暂存');
+    await expect(status).not.toContainText('未确认任何文件写入');
+    await expect(
+      records(page).getByRole('button', { name: '选择文件应用', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      records(page).getByRole('button', { name: '取消应用请求', exact: true }),
+    ).toHaveCount(0);
   } finally {
     await close(page, f);
   }

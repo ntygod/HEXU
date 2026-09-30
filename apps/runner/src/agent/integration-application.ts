@@ -23,9 +23,13 @@ import { captureCommitReference } from './checkpoints.js';
 import { verifyCleanCommit } from './committed-workspace.js';
 import { assertCodeQuiescent } from './result-code.js';
 import { buildIntegrationPlan } from './integration-plan.js';
-import { integrationAdditions } from './integration-application-plan.js';
-import { inspectRestoreTarget } from './checkpoint-restore-plan.js';
-import { PinnedRestoreParent } from './checkpoint-restore-files.js';
+import { integrationAdditionPlan } from './integration-application-plan.js';
+import { checkRestoreHelper } from './checkpoint-restore-files.js';
+import {
+  IntegrationAdditionParents,
+  newIntegrationDirectoryIntent,
+  publishIntegrationDirectory,
+} from './integration-add-directories.js';
 import { checkIntegrationAddHelper, publishIntegrationAddition } from './integration-add-files.js';
 import { WorkspaceLease } from '../workspace-lease.js';
 import { terminalLabel } from './terminal-label.js';
@@ -86,9 +90,14 @@ function validateLocalApplication(record: LocalApplication, operation: Integrati
   }
   if (
     (record.phase === 'completed' &&
-      (record.intent !== null || seen.size !== application.paths.length)) ||
-    (record.phase === 'failed' && (record.intent !== null || record.added.length > 0)) ||
-    (record.phase === 'prepared' && (record.intent !== null || record.added.length > 0))
+      (record.intent !== null ||
+        record.directoryIntent ||
+        seen.size !== application.paths.length)) ||
+    (['failed', 'prepared'].includes(record.phase) &&
+      (record.intent !== null ||
+        record.added.length > 0 ||
+        record.directories?.length ||
+        record.directoryIntent))
   )
     throw invalid();
   if (record.pending) {
@@ -185,10 +194,11 @@ export async function withSettledIntegrationEvidence<T>(
           !Array.isArray(r.added) ||
           r.pending !== null ||
           r.intent !== null ||
+          !!r.directoryIntent ||
           !['completed', 'failed'].includes(r.phase) ||
           (r.phase === 'completed'
             ? r.acknowledged !== 2 || !r.added.length
-            : r.added.length > 0 || ![0, 1, 2].includes(r.acknowledged))
+            : r.added.length > 0 || !!r.directories?.length || ![0, 1, 2].includes(r.acknowledged))
         )
           throw new DomainError(
             'INTEGRATION_UNSETTLED',
@@ -380,6 +390,8 @@ export async function applyIntegration(
           if (
             record.phase !== 'prepared' ||
             record.added.length ||
+            record.directories?.length ||
+            record.directoryIntent ||
             record.intent !== null ||
             record.acknowledged !== 0
           )
@@ -422,11 +434,12 @@ export async function applyIntegration(
         409,
       );
     checkIntegrationAddHelper();
+    checkRestoreHelper();
     log(
       `成果 ${terminalLabel(o.source.title)} · v${o.source.revision}\n来源 ${o.material.manifest.commit}\n目标 ${o.target.manifest.commit}\n恢复副本 ${o.target.retentionId}\n本机目标 ${terminalLabel(w.root)}\n选定新增文件：\n${a.paths.join('\n')}`,
     );
     log(
-      '只新增所选普通文件，父目录必须已存在。保留未选文件、HEAD与索引；不调用模型、不提交、不覆盖。确认同时共享应用阶段及已写文件名。中断/部分失败保留现场和写锁，不自动恢复。',
+      '只新增所选普通文件，必要且缺少的父目录会排他新建（最多256个）；不接管后来出现的目录。保留未选文件、HEAD与索引；不调用模型、不提交、不覆盖。确认同时共享应用阶段及已写文件名。中断/部分失败保留现场和写锁，不自动恢复。',
     );
     if ((await ask(`输入 APPLY ${a.id}：`)) !== `APPLY ${a.id}`)
       throw new DomainError('CONFIRMATION_REQUIRED', '未确认本机写入，原应用范围仍可在任务中取消');
@@ -498,7 +511,7 @@ export async function applyIntegration(
       );
       if (canonicalJson(plan) !== canonicalJson(o.report!.plan))
         throw new DomainError('INTEGRATION_SCOPE_CHANGED', '完整重算计划与原预检不一致');
-      const additions = integrationAdditions(
+      const additionPlan = integrationAdditionPlan(
         start.objectFormat,
         o.target.manifest.tree,
         t,
@@ -506,9 +519,11 @@ export async function applyIntegration(
         a.paths,
         w.root,
       );
-      const observations = additions.map((e) =>
-        inspectRestoreTarget(join(w.root, e.path), [home, w.gitDir]),
-      );
+      const additions = additionPlan.files;
+      const parents = new IntegrationAdditionParents(w.root, additionPlan.anchors, [
+        home,
+        w.gitDir,
+      ]);
       await verifyCleanCommit(home, c, w, o.target.checkpoint.manifest);
       await current('queued');
       lease = new WorkspaceLease(w.root, claim);
@@ -524,6 +539,8 @@ export async function applyIntegration(
         pending: null,
         acknowledged: 0,
         recoveryContext: freezeIntegrationRecoveryContext(o, c),
+        directories: [],
+        directoryIntent: null,
       };
       try {
         save();
@@ -531,6 +548,16 @@ export async function applyIntegration(
         lease.release();
         throw e;
       }
+      const verifyTarget = () =>
+        verifyCleanCommit(
+          home,
+          c,
+          w,
+          o.target.checkpoint.manifest,
+          record!.added,
+          undefined,
+          record!.directories ?? [],
+        );
       try {
         await current('queued', true);
         await verifyCleanCommit(home, c, w, o.target.checkpoint.manifest);
@@ -541,12 +568,46 @@ export async function applyIntegration(
         await publish();
         record.phase = 'applying';
         save();
-        for (const [index, entry] of additions.entries()) {
+        for (const path of additionPlan.directories) {
           await current('applying', true);
           await source.authorized();
           await target.authorized();
-          await verifyCleanCommit(home, c, w, o.target.checkpoint.manifest, record.added);
-          const parent = new PinnedRestoreParent(observations[index]!);
+          await verifyTarget();
+          const parent = parents.open(path, record.directories!);
+          try {
+            lease.assertHeld();
+            bound();
+            if (signal?.aborted)
+              throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
+            record.intent = additions.find((entry) => entry.path.startsWith(path + '/'))!.path;
+            record.directoryIntent = newIntegrationDirectoryIntent(path);
+            save();
+            const created = publishIntegrationDirectory(
+              parent,
+              record.directoryIntent,
+              (identity) => {
+                record!.directoryIntent!.stageIdentity = identity;
+                save();
+                lease!.assertHeld();
+                bound();
+                if (signal?.aborted)
+                  throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
+              },
+            );
+            record.directories!.push(created);
+            record.directoryIntent = null;
+            record.intent = null;
+            save();
+          } finally {
+            parent.close();
+          }
+        }
+        for (const entry of additions) {
+          await current('applying', true);
+          await source.authorized();
+          await target.authorized();
+          await verifyTarget();
+          const parent = parents.open(entry.path, record.directories!);
           try {
             const object = s.objects.find((o) => o.id === entry.objectId);
             if (
@@ -580,7 +641,7 @@ export async function applyIntegration(
         await current('applying', true);
         await source.authorized();
         await target.authorized();
-        await verifyCleanCommit(home, c, w, o.target.checkpoint.manifest, record.added);
+        await verifyTarget();
         record.phase = 'completed';
         record.pending = packet('completed');
         save();
@@ -593,7 +654,13 @@ export async function applyIntegration(
           record.pending = packet('failed', failure(cause), 1);
           save();
         } else {
-          record.phase = record.added.length || record.intent ? 'needs_attention' : 'failed';
+          record.phase =
+            record.added.length ||
+            record.directories?.length ||
+            record.intent ||
+            record.directoryIntent
+              ? 'needs_attention'
+              : 'failed';
           record.pending = packet(record.phase, failure(cause));
           save();
         }

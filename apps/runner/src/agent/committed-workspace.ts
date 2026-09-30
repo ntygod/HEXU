@@ -110,6 +110,7 @@ export async function verifyCleanCommit(
   expected: Pick<CheckpointManifest, 'commit' | 'tree' | 'objectFormat' | 'repositoryIdentity'>,
   additions: readonly (RestoreEntry & { identity: string })[] = [],
   observe?: (assertUnchanged: () => void) => void,
+  directories: readonly { path: string; identity: string }[] = [],
 ) {
   let root: number | undefined, git: number | undefined;
   try {
@@ -209,12 +210,25 @@ export async function verifyCleanCommit(
     )
       throw changed();
     const plan = snapshotEntries(expected.objectFormat, expected.tree, snapshot!, directory.root);
-    const entries = new Map(plan.entries.map((e) => [e.path, e]));
+    const entries = new Map<
+      string,
+      RestoreEntry | { path: string; kind: 'directory'; gitMode: '40000'; bytes: 0 }
+    >(plan.entries.map((e) => [e.path, e]));
+    for (const directory of directories) {
+      if (entries.has(directory.path)) throw changed();
+      entries.set(directory.path, {
+        path: directory.path,
+        kind: 'directory',
+        gitMode: '40000',
+        bytes: 0,
+      });
+    }
     for (const entry of additions) {
       if (entry.kind !== 'file' || entries.has(entry.path)) throw changed();
       entries.set(entry.path, entry);
     }
     const additionIdentities = new Map(additions.map((e) => [e.path, e.identity]));
+    const directoryIdentities = new Map(directories.map((e) => [e.path, e.identity]));
     const observed = new Map<string, string>();
     const walk = (fd: number, prefix = '') => {
       for (const name of readdirSync(fdPath(fd))) {
@@ -236,6 +250,11 @@ export async function verifyCleanCommit(
         try {
           const s = fstatSync(handle, { bigint: true });
           if (additionIdentities.has(path) && additionIdentities.get(path) !== inode(s))
+            throw changed();
+          if (
+            directoryIdentities.has(path) &&
+            (directoryIdentities.get(path) !== identity(s) || (s.mode & 0o777n) !== 0o700n)
+          )
             throw changed();
           observed.set(path, identity(s) + ':' + stamp(s));
           if (entry.kind === 'directory') walk(handle, path);

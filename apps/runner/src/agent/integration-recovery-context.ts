@@ -249,7 +249,12 @@ export function validateRecoveryContextBinding(
     c.applicationInputHash !== record.inputHash ||
     c.root !== record.root ||
     record.added.some((entry) => !c.selectedPaths.includes(entry.path)) ||
-    (record.intent !== null && !c.selectedPaths.includes(record.intent))
+    (record.intent !== null && !c.selectedPaths.includes(record.intent)) ||
+    record.directories?.some(
+      (directory) => !c.selectedPaths.some((path) => path.startsWith(directory.path + '/')),
+    ) ||
+    (record.directoryIntent &&
+      !c.selectedPaths.some((path) => path.startsWith(record.directoryIntent!.path + '/')))
   )
     throw invalid();
   if (record.phase === 'completed' && record.added.length !== c.selectedPaths.length)

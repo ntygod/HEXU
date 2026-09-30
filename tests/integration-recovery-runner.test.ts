@@ -501,6 +501,9 @@ test('旧日志只从当前精确授权回复补全上下文，离线失败关�
     await stranded(f);
     editApplication(f, (r) => {
       delete r.recoveryContext;
+      // The legacy file-only format predates directory ownership fields too.
+      delete r.directories;
+      delete r.directoryIntent;
     });
     const before = applicationBody(f),
       hash = originalApplicationEvidenceHash(application(f));

@@ -148,19 +148,19 @@ export async function recoverIntegration(
         `原整合 ${integrationId} · 应用 ${record.applicationId}\n原 Task ${context.taskId}\n原目录 ${terminalLabel(context.root)}\n保留所有当前文件、HEAD 和索引，只释放原应用占用。不会核验当前文件、判断应用成功、继续写入或回滚。`,
       );
       log(
-        `历史固定来源 ${context.source.resultId} · v${context.source.revision} · 修订 ${context.source.revisionId}\n来源提交 ${context.source.commit} · 材料 ${context.source.materialKind}:${context.source.materialId}\n原目标提交 ${context.target.commit} · 检查点 ${context.target.checkpointId} · 恢复副本 ${context.target.retentionId}\n原选定 ${context.selectedPaths.length} 个文件；原记录已新增 ${record.added.length} 个；未确认写入意图 ${record.intent === null ? '无' : '有'}。以上均为历史证据，当前文件未经核验。`,
+        `历史固定来源 ${context.source.resultId} · v${context.source.revision} · 修订 ${context.source.revisionId}\n来源提交 ${context.source.commit} · 材料 ${context.source.materialKind}:${context.source.materialId}\n原目标提交 ${context.target.commit} · 检查点 ${context.target.checkpointId} · 恢复副本 ${context.target.retentionId}\n原选定 ${context.selectedPaths.length} 个文件；原记录已新增 ${record.added.length} 个文件、${record.directories?.length ?? 0} 个目录；未确认写入意图 ${record.intent === null ? '无' : '有'}。以上均为历史证据，当前文件未经核验。`,
       );
       log(
         '确认后仅在原 Task 当前授权允许时共享有界结算观察（原应用、停止确认、释放时间、原已记录数量及未确认写入意图标记）；网络或授权失败仍保留本机释放结果和原待发包。',
       );
       if (
         (await ask(
-          `请确认原应用进程 ${record.applicationId} 以及所有 integration-add 子进程/遗留孤儿进程均已停止。输入 STOPPED ${record.applicationId}：`,
+          `请确认原应用进程 ${record.applicationId} 以及所有 integration-add / restore-publish 子进程/遗留孤儿进程均已停止。输入 STOPPED ${record.applicationId}：`,
         )) !== `STOPPED ${record.applicationId}`
       )
         throw new DomainError(
           'CONFIRMATION_REQUIRED',
-          '未明确确认原应用及 integration-add 子进程/孤儿进程已停止；保留全部文件与原写锁',
+          '未明确确认原应用及 integration-add / restore-publish 子进程/孤儿进程已停止；保留全部文件与原写锁',
         );
       originalStillBound();
       const recoveryId = randomUUID(),

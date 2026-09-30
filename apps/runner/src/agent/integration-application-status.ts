@@ -164,6 +164,8 @@ export function readIntegrationApplicationStatus(home: string, integrationId: st
         }
       : null,
     intendedUnconfirmedPath: record.intent,
+    confirmedCreatedDirectories: record.directories ?? [],
+    intendedDirectory: record.directoryIntent ?? null,
     confirmedAdded: record.added.map((entry) => ({
       path: entry.path,
       objectId: entry.objectId,
