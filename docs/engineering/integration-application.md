@@ -40,6 +40,20 @@ npm run runner:integration-apply -- --operation <整合ID> --state <节点状态
 
 可用Ctrl+C/SIGTERM停止后续文件；已完成当前原子新增不能当作撤销。SIGKILL或系统崩溃后也保留原尝试。当前还没有“需要本机处理”的明确恢复/锁结算命令；保留现场，不能用其他Run恢复命令、编辑数据库或自动清理来清锁。这是下一步待交付范围，不把未知结果包装成已恢复。
 
+## 只读查看本机证据
+
+服务暂时离线或应用需处理时，可单独读取原节点持久日志：
+
+```sh
+npm run runner:integration-status -- --operation <整合ID> --state <节点状态目录>
+```
+
+本命令只打开已经存在的私有SQLite日志；不会初始化状态、取得应用进程锁、联系服务、读取代码/副本、扫描目标、改写阶段、重发报告或释放写锁。它可在应用进程仍运行时读取最后一次已提交的日志快照，不把“prepared/applying”自动改成“已中断”。
+
+输出包括本机历史阶段、已确认/待决报告序号、最后一个未确认文件意图及已确认新增的文件身份。`directoryChecked`、`currentServerAuthorityChecked`、`processStoppedConfirmed`、`writeAuthorized` 均为false；旧目录已移动、文件被修改、节点已撤权或服务离线时，这些日志都不是当前安全/权限证明。没有每条记录的观察时间时不从文件mtime补造时间。
+
+原凭证/目录登记绑定必须仍匹配；日志缺失、损坏或路径被替换时明确报错，不重新配对或伪造一条状态。文件名和本机路径仅在原节点显示，不作为新共享报告上传。该命令帮助核对证据，但不是恢复或解锁，未知现场继续保留。
+
 ## 尚未支持
 
 修改/删除已有文件、新建父目录、文本自动合并、冲突选择、linked worktree、Windows/macOS、多来源、跨电脑部署和未知现场的明确恢复均未交付。Linux文件/协议夹具不代表真实Claude/Codex账户联调。本地实现和实际验证见[应用记录](../development/history/2026-09-30-integration-application.md)。

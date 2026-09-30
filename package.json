@@ -49,6 +49,7 @@
     "runner:branch-bind": "node dist/apps/runner/src/prepare-branch-workspace.js bind",
     "runner:result-code": "node dist/apps/runner/src/share-result-code.js",
     "runner:integration-apply": "node dist/apps/runner/src/integration-application.js",
+    "runner:integration-status": "node dist/apps/runner/src/integration-application-status.js",
     "runner:integration-plan": "node dist/apps/runner/src/integration-preflight.js"
   },
   "dependencies": {

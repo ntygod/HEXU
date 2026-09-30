@@ -36,7 +36,7 @@ const inside = (a: string, b: string) => {
   return !r || (!isAbsolute(r) && r !== '..' && !r.startsWith('..' + sep));
 };
 type Added = RestoreEntry & { identity: string };
-interface LocalApplication {
+export interface LocalApplication {
   binding: string;
   integrationId: string;
   applicationId: string;
@@ -48,7 +48,7 @@ interface LocalApplication {
   pending: IntegrationApplicationReport | null;
   acknowledged: number;
 }
-function validateLocalShape(record: LocalApplication) {
+export function validateLocalShape(record: LocalApplication) {
   const invalid = () =>
     new DomainError('INTEGRATION_JOURNAL_INVALID', '本机应用证据不完整或不一致；保留原凭证和写锁');
   const path = (value: unknown) =>
