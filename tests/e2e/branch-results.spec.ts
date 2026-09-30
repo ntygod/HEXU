@@ -341,6 +341,10 @@ test('成果明确选择固定提交，节点共享后可查看两侧文件，�
     await panel.getByText('查看固定代码差异（3个文件）', { exact: true }).click();
     await panel.locator('summary').filter({ hasText: 'README.md' }).click();
     await expect(panel.getByText('export const pageSize = 20;', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('table', { name: '起点文件与所选文件行级差异' })).toContainText(
+      'export const pageSize = 50;',
+    );
+    await panel.getByRole('button', { name: '两侧全文', exact: true }).click();
     await expect(panel.locator('pre').filter({ hasText: 'pageSize = 50' })).toContainText(
       '<script>not executable</script>',
     );

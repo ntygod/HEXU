@@ -97,7 +97,7 @@ test('已登记未运行方案可明确放弃且全部现场/授权保持，旧p
     await f.close();
   }
 });
-test('放弃运行方案不停止它或同伴；独立停止仍需终止确认，保存终态成果不复活方案', async () => {
+test('放弃已启动但连接未知的方案不停止它或同伴；独立停止仍需终止确认，保存终态成果不复活方案', async () => {
   const f = await branchResultFixture();
   try {
     const a = f.begin(),
@@ -105,8 +105,20 @@ test('放弃运行方案不停止它或同伴；独立停止仍需终止确认�
     a.start();
     b.start();
     a.send('output', 'KEEP DISCARDED RUN OUTPUT');
-    const before = snapshot(f, untouched),
-      request = await body(f);
+    // This protocol fixture and the HTTP app have distinct registry epochs.
+    // Settle the intended connection-unknown observation before the immutability
+    // baseline, rather than racing the app's independent 250ms reconciliation.
+    for (const node of f.ns) f.nodes.goodbye(node.token, node.connection);
+    f.execution.reconcile();
+    for (const branch of f.read().branches) {
+      assert.equal(branch.run!.state, 'running');
+      assert.equal(branch.run!.observation, 'unknown');
+      assert.equal(f.as(() => f.api.store.run(branch.run!.id)).node!.terminationConfirmed, false);
+    }
+    const request = await body(f),
+      before = snapshot(f, untouched);
+    f.execution.reconcile();
+    assert.deepEqual(snapshot(f, untouched), before);
     const r = await f.api.call(path(f), f.alice, request);
     assert.equal(r.statusCode, 200, r.body);
     assert.deepEqual(snapshot(f, untouched), before);

@@ -45,6 +45,17 @@ jobs:
             test-results/
             artifacts/
           retention-days: 7
+      # Keep the full report/trace artifact above. These focused previews remain
+      # small enough to inspect even when the complete ZIP exceeds reader limits.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-code-diff-previews
+          path: |
+            artifacts/144-readable-line-diff-dark.png
+            artifacts/145-readable-line-diff-mobile-light.png
+            artifacts/146-readable-line-diff-mobile-changes.png
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
