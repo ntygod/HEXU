@@ -502,4 +502,107 @@ CREATE UNIQUE INDEX one_pending_branch_dispatch ON node_dispatches(task_id,json_
 -- Definitions stay unprepared until the original owner explicitly prepares and binds a new node.
 `,
   },
+  {
+    version: 29,
+    sql: `
+CREATE TABLE work_branches_v29 (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ group_id TEXT NOT NULL REFERENCES work_branch_groups(id),
+ state TEXT NOT NULL CHECK(state IN ('planned','active','ready','discarded')),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+INSERT INTO work_branches_v29 SELECT * FROM work_branches;
+CREATE TABLE work_branch_events_v29 (
+ branch_id TEXT NOT NULL REFERENCES work_branches_v29(id), revision INTEGER NOT NULL, body TEXT NOT NULL,
+ PRIMARY KEY(branch_id,revision)
+);
+INSERT INTO work_branch_events_v29 SELECT * FROM work_branch_events;
+CREATE TABLE work_branch_workspaces_v29 (
+ id TEXT PRIMARY KEY, branch_id TEXT NOT NULL REFERENCES work_branches_v29(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), state TEXT NOT NULL,
+ node_id TEXT, workspace_id TEXT, body TEXT NOT NULL
+);
+INSERT INTO work_branch_workspaces_v29 SELECT * FROM work_branch_workspaces;
+DROP TABLE work_branch_workspaces;
+DROP TABLE work_branch_events;
+DROP TABLE work_branches;
+ALTER TABLE work_branches_v29 RENAME TO work_branches;
+ALTER TABLE work_branch_events_v29 RENAME TO work_branch_events;
+ALTER TABLE work_branch_workspaces_v29 RENAME TO work_branch_workspaces;
+CREATE INDEX work_branches_group ON work_branches(group_id);
+CREATE INDEX work_branch_workspaces_branch ON work_branch_workspaces(branch_id);
+CREATE UNIQUE INDEX work_branch_workspace_active ON work_branch_workspaces(branch_id)
+ WHERE state IN ('waiting_local','prepared','bound');
+CREATE UNIQUE INDEX work_branch_workspace_binding ON work_branch_workspaces(node_id,workspace_id)
+ WHERE state='bound';
+CREATE TABLE result_revisions (
+ id TEXT PRIMARY KEY, result_id TEXT NOT NULL REFERENCES results(id),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL,
+ UNIQUE(result_id,revision)
+);
+-- Preserve exactly the one known legacy version; never invent missing history or actors.
+INSERT INTO result_revisions(id,result_id,revision,body)
+ SELECT id || '-v' || json_extract(body,'$.revision'), id, json_extract(body,'$.revision'),
+ json_object('id',id || '-v' || json_extract(body,'$.revision'),'resultId',id,
+ 'taskId',task_id,'revision',json_extract(body,'$.revision'),'title',json_extract(body,'$.title'),
+ 'body',json_extract(body,'$.body'),'kind',json_extract(body,'$.kind'),'limitations','',
+ 'source',json_object('kind','legacy'),'createdBy',NULL,'createdAt',json_extract(body,'$.updatedAt'))
+ FROM results;
+CREATE TRIGGER result_revisions_immutable_update BEFORE UPDATE ON result_revisions
+ BEGIN SELECT RAISE(ABORT,'result revisions are immutable'); END;
+CREATE TRIGGER result_revisions_immutable_delete BEFORE DELETE ON result_revisions
+ BEGIN SELECT RAISE(ABORT,'result revisions are immutable'); END;
+-- Null means an older terminal Run did not retain a reliable output boundary.
+ALTER TABLE node_dispatches ADD COLUMN terminal_sequence INTEGER;
+CREATE TABLE work_branch_choices (
+ group_id TEXT NOT NULL REFERENCES work_branch_groups(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ branch_id TEXT REFERENCES work_branches(id), result_revision_id TEXT REFERENCES result_revisions(id),
+ body TEXT NOT NULL, PRIMARY KEY(group_id,revision),
+ CHECK((branch_id IS NULL)=(result_revision_id IS NULL))
+);
+CREATE TRIGGER work_branch_choices_immutable_update BEFORE UPDATE ON work_branch_choices
+ BEGIN SELECT RAISE(ABORT,'branch choices are immutable'); END;
+CREATE TRIGGER work_branch_choices_immutable_delete BEFORE DELETE ON work_branch_choices
+ BEGIN SELECT RAISE(ABORT,'branch choices are immutable'); END;
+-- selected is derived from this fixed-version choice, not a second mutable branch flag.
+`,
+  },
+  {
+    version: 30,
+    sql: `
+CREATE TABLE result_code_differences (
+ revision_id TEXT PRIMARY KEY REFERENCES result_revisions(id), task_id TEXT NOT NULL REFERENCES tasks(id),
+ node_id TEXT NOT NULL REFERENCES runner_nodes(id), digest TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE TRIGGER result_code_differences_immutable_update BEFORE UPDATE ON result_code_differences
+ BEGIN SELECT RAISE(ABORT,'result code differences are immutable'); END;
+CREATE TRIGGER result_code_differences_immutable_delete BEFORE DELETE ON result_code_differences
+ BEGIN SELECT RAISE(ABORT,'result code differences are immutable'); END;
+`,
+  },
+  {
+    version: 31,
+    sql: `
+CREATE TABLE integration_operations (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ state TEXT NOT NULL CHECK(state IN ('queued','awaiting_choice','conflict','failed','cancelled')),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+CREATE INDEX integration_operations_task ON integration_operations(task_id);
+CREATE TABLE integration_events (
+ integration_id TEXT NOT NULL REFERENCES integration_operations(id), revision INTEGER NOT NULL,
+ body TEXT NOT NULL, PRIMARY KEY(integration_id,revision)
+);
+CREATE TRIGGER integration_events_immutable_update BEFORE UPDATE ON integration_events
+ BEGIN SELECT RAISE(ABORT,'integration events are immutable'); END;
+CREATE TRIGGER integration_events_immutable_delete BEFORE DELETE ON integration_events
+ BEGIN SELECT RAISE(ABORT,'integration events are immutable'); END;
+CREATE TRIGGER integration_report_immutable BEFORE UPDATE ON integration_operations
+ WHEN json_extract(OLD.body,'$.report') IS NOT NULL
+ AND json_extract(OLD.body,'$.report') IS NOT json_extract(NEW.body,'$.report')
+ BEGIN SELECT RAISE(ABORT,'integration reports are immutable'); END;
+-- No existing Result, Run, restore or choice is relabelled as an integration.
+`,
+  },
 ];

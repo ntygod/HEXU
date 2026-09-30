@@ -1,6 +1,6 @@
 # 方案成果来源预览
 
-> HX-DEV-13-03 的只读前置切片。[方案现场](branch-workspaces.md)之后使用；当前范围见[21](../development/21-implementation-status.md)，剩余保存工作见[22](../development/22-next-delivery.md)。
+> HX-DEV-13-03 的只读来源接口。[方案现场](branch-workspaces.md)之后使用；不可变保存现已通过[方案成果](branch-results.md)另行交付，当前范围见[21](../development/21-implementation-status.md)，后续看[22](../development/22-next-delivery.md)。
 
 ## 入口与前提
 
@@ -23,6 +23,7 @@ GET /api/v1/tasks/:taskId/work-branches/:branchId/result-source
 | `run` | 来源Run的ID/修订/终态、工具/模型、节点/目录ID及时间；不返回启动generation或私有会话引用 |
 | `input` | 原派发中实际持久化的上下文和Run要求，不采用任务后来编辑的说明 |
 | `output.text` | 已共享output事件按序连接的UTF-8完整前缀，保留空白；最多24 KiB，不加伪造省略号 |
+| `output.availability` | `captured`表示有持久结算边界；`legacy_unavailable`保留旧来源元数据但没有可采用输出，不补推旧历史 |
 | `output.totalBytes` / `retainedBytes` / `truncated` | 共享文本连接后的总字节、实际保留字节和是否截取；事件间两个换行也计入预算。24 KiB限制仅指该文本，不是整个响应 |
 | `output.digest` | 全部纳入输出事件的序号和已共享文本的SHA-256摘要，包含未展示的尾部；不是工具签名或代码校验 |
 | `evidence` | 服务已接收序号、纳入范围的终态边界、边界后忽略的事件数及独立终态报告 |
@@ -33,7 +34,7 @@ GET /api/v1/tasks/:taskId/work-branches/:branchId/result-source
 
 ## 终态和迟到事件
 
-节点协议允许在Run已终止后继续接收经验证的迟到事件，而Run.revision不一定变化。本接口把首次terminal事件作为输出边界，只纳入此前的output事件；terminal说明单独返回，不混成AI正文。边界后的事件计数可见，但不能扩大本次成果输出。
+节点协议允许在Run已终止后继续接收经验证的迟到事件，而Run.revision不一定变化。本接口先使用持久`terminal_sequence`限定结算范围，再取其中首次terminal事件作为输出边界；只纳入该边界内且`shared`不为false的output事件。terminal说明单独返回，不混成AI正文。边界后事件计数可见，但不能扩大本次成果输出。旧执行没有结算记录时输出为空，终态元数据保留，`toolReportedSuccess`不追认未知证据。
 
 因此迟到事件到达后，`receivedThroughSequence`及`sourceHash`可能变化，而`output.text`和`output.digest`保持不变。修改被截取的尾部时，展示前缀也可能不变，但完整摘要必须变化。
 
@@ -48,9 +49,9 @@ GET /api/v1/tasks/:taskId/work-branches/:branchId/result-source
 | 409 `WORK_BRANCH_RESULT_NOT_SETTLED` | Run仍活动、观察未知或终止未确认；先按原执行流程处理 |
 | 409 `WORK_BRANCH_RESULT_SOURCE_MISMATCH` | 起点、方案、Run、现场、派发或事件序号不一致；不拼接其他方案的材料作为替代 |
 
-这次读取不需要Idempotency-Key，不写Result、不可变版本、方案历史、outbox或保存回执，也不让方案进入ready。现有方案卡没有新增保存/查看版本按钮。
+这次读取不需要Idempotency-Key，不写Result、不可变版本、方案历史、outbox或保存回执，也不让方案进入ready。现有方案卡的保存/查看版本由[方案成果](branch-results.md)提供，不能把本GET的返回当成已经保存。
 
-后续明确保存应在同一写事务内重查权限与所有来源条件，并原子写入Result版本、方案修订、历史和回执。不可直接信任客户端回传的正文或将本GET包裹成嵌套SQLite事务。不能把来源指纹当成永久访问凭证。
+固定成果保存在自己的写事务内重查权限和来源条件，原子写入Result版本、方案修订、历史和回执。不可直接信任客户端回传的正文或将本GET包裹成嵌套SQLite事务。不能把来源指纹当成永久访问凭证。
 
 ## 实现与定向验证
 

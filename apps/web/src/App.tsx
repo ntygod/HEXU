@@ -5,6 +5,7 @@ import { Link, usePath, useRouteChrome } from './state.js';
 import { Workbench } from './workbench.js';
 import { Projects, ProjectPage } from './projects.js';
 import { Results, ResultPage } from './results.js';
+import { BranchComparisonPage } from './branch-comparison.js';
 import { TaskPage } from './task-workspace.js';
 import { Settings } from './settings.js';
 import { Search } from './command-menu.js';
@@ -39,10 +40,18 @@ export function App() {
             <Projects />
           )
         ) : active === 'tasks' && segment[1] ? (
-          <TaskPage id={segment[1]} key={segment[1]} />
+          segment[2] === 'compare' && segment[3] ? (
+            <BranchComparisonPage taskId={segment[1]} groupId={segment[3]} key={path} />
+          ) : (
+            <TaskPage id={segment[1]} key={segment[1]} />
+          )
         ) : active === 'results' ? (
           segment[1] ? (
-            <ResultPage id={segment[1]} key={segment[1]} />
+            <ResultPage
+              id={segment[1]}
+              revisionId={segment[2] === 'versions' ? segment[3] : undefined}
+              key={path}
+            />
           ) : (
             <Results />
           )

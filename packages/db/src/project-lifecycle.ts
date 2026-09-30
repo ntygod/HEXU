@@ -149,7 +149,9 @@ export class ProjectLifecycleStore {
               .run(JSON.stringify(next), run.id);
             if (neverPermitted) {
               this.store.db
-                .prepare("UPDATE node_dispatches SET stage='terminal',updated_at=? WHERE id=?")
+                .prepare(
+                  "UPDATE node_dispatches SET stage='terminal',terminal_sequence=last_sequence,updated_at=? WHERE id=?",
+                )
                 .run(at, run.node!.dispatchId);
               new NextInputs(this.store).notStarted(run.id);
             }

@@ -18,6 +18,7 @@ type DispatchRow = {
   stage: string;
   command: string;
   last_sequence: number;
+  terminal_sequence: number | null;
 };
 const mismatch = () =>
   new DomainError('WORK_BRANCH_RESULT_SOURCE_MISMATCH', '方案执行、现场或共同起点不一致', 409);
@@ -123,20 +124,38 @@ export class WorkBranchResultSourceStore {
     )
       throw mismatch();
     const events = rows.map((row, index) => {
-      const event = JSON.parse(row.body) as ExecutionEvent;
+      const event = JSON.parse(row.body) as ExecutionEvent & { shared?: boolean };
       if (row.sequence !== index + 1 || event.sequence !== row.sequence) throw mismatch();
       return event;
     });
-    // The node protocol drains late events after settlement. They cannot extend this run's output.
-    const terminalIndex = events.findIndex((e) => e.kind === 'terminal');
-    const terminal = terminalIndex < 0 ? null : events[terminalIndex]!;
-    if (terminal && (!terminal.terminationConfirmed || !terminal.result)) throw mismatch();
-    if (!terminal && (node.startedAt || events.some((e) => e.kind === 'output'))) throw mismatch();
-    if (state === 'succeeded' && (!node.startedAt || terminal?.result !== 'succeeded'))
+    // Use the same durable settlement boundary as immutable results. Old Runs
+    // without a recorded boundary retain their metadata, never invented output.
+    const cutoff = dispatch.terminal_sequence;
+    if (
+      cutoff !== null &&
+      (!Number.isSafeInteger(cutoff) || cutoff < 0 || cutoff > dispatch.last_sequence)
+    )
       throw mismatch();
-    const included = terminalIndex < 0 ? events : events.slice(0, terminalIndex + 1);
+    const settled = cutoff === null ? [] : events.filter((e) => e.sequence <= cutoff);
+    const terminalIndex = settled.findIndex((e) => e.kind === 'terminal');
+    const candidate = terminalIndex < 0 ? null : settled[terminalIndex]!;
+    const terminal = candidate?.shared === false ? null : candidate;
+    if (terminal && (!terminal.terminationConfirmed || !terminal.result)) throw mismatch();
+    if (
+      cutoff !== null &&
+      !terminal &&
+      (node.startedAt || settled.some((e) => e.kind === 'output'))
+    )
+      throw mismatch();
+    if (
+      cutoff !== null &&
+      state === 'succeeded' &&
+      (!node.startedAt || terminal?.result !== 'succeeded')
+    )
+      throw mismatch();
+    const included = terminalIndex < 0 ? settled : settled.slice(0, terminalIndex + 1);
     const output = included
-      .filter((e) => e.kind === 'output')
+      .filter((e) => e.kind === 'output' && e.shared !== false)
       .map((e) => ({ sequence: e.sequence, text: e.text }));
     const bounded = boundedBranchOutput(output.map((e) => e.text));
     const unsigned: Omit<WorkBranchResultSource, 'sourceHash'> = {
@@ -160,11 +179,16 @@ export class WorkBranchResultSourceStore {
         updatedAt: run.updatedAt,
       },
       input: { context: command.context, prompt: run.prompt },
-      output: { ...bounded, eventCount: output.length, digest: hash(output) },
+      output: {
+        ...bounded,
+        availability: cutoff === null ? 'legacy_unavailable' : 'captured',
+        eventCount: output.length,
+        digest: hash(output),
+      },
       evidence: {
         receivedThroughSequence: dispatch.last_sequence,
         includedThroughSequence: included.at(-1)?.sequence ?? 0,
-        ignoredAfterTerminal: events.length - included.length,
+        ignoredAfterTerminal: cutoff === null ? 0 : events.length - included.length,
         terminal: terminal
           ? { sequence: terminal.sequence, result: terminal.result!, text: terminal.text }
           : null,
@@ -174,7 +198,10 @@ export class WorkBranchResultSourceStore {
       limitations: [
         '这是来源预览，不是已保存的不可变成果版本，也不改变方案或任务状态。',
         '只读取服务已接收的共享输出，不保证包含工具的全部输出。',
-        '共同提交只是输入起点；本轮代码尚未固定，不读取活动目录或示例预览。',
+        '共同提交只是输入起点；此来源预览不包含本轮代码引用或文件，不读取活动目录或示例预览。',
+        ...(cutoff === null
+          ? ['旧执行没有可靠的结算序号，仅保留来源元数据，不补推历史输出。']
+          : []),
         ...(bounded.truncated
           ? ['输出超过24 KiB，仅展示UTF-8完整前缀；摘要覆盖全部共享输出。']
           : []),

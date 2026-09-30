@@ -22,7 +22,7 @@ export function cookies(response: { headers: Record<string, unknown> }) {
     .map((v) => v.split(';')[0])
     .join('; ');
 }
-export async function teamFixture() {
+export async function teamFixture(origin = ORIGIN) {
   const dir = await mkdtemp(join(tmpdir(), 'hexu-identity-test-'));
   const dbPath = join(dir, 'workspace.sqlite'),
     identityPath = join(dir, 'identity.sqlite');
@@ -31,10 +31,10 @@ export async function teamFixture() {
     databasePath: identityPath,
     secret: 'fictional-auth-secret-not-real-0123456789',
     setupCode: SETUP,
-    baseURL: ORIGIN,
-    trustedOrigins: [ORIGIN],
+    baseURL: origin,
+    trustedOrigins: [origin],
   };
-  const app = await createApp({ store, identity: options });
+  const app = await createApp({ store, identity: options, port: Number(new URL(origin).port) });
   const call = (
     path: string,
     account: Account | null = null,
@@ -46,7 +46,7 @@ export async function teamFixture() {
       url: '/api/v1/' + path,
       method: method ?? (body === undefined ? 'GET' : 'POST'),
       headers: {
-        origin: ORIGIN,
+        origin,
         'x-hexu-client': 'web',
         'idempotency-key': key,
         ...(account ? { cookie: account.cookie, 'x-hexu-space': account.spaceId } : {}),

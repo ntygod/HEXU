@@ -25,6 +25,8 @@ Commit Run, dispatch, note binding, source link, Operation link, idempotency and
 
 ## 如何验证与回写
 
+方案Run另按[并行 harness](parallel.md#从所选版本继续)固定ResultRevision、选择修订与已记录代码；仍调用201+Run路径，没有伪装成普通202等待Operation。仅确认终止后、原本人同目录、匹配所选提交的新会话。选择后不自动派发；等待/原生恢复/脏现场仍是未交付范围。
+
 复用 [原生接续](../../tests/continuations.test.ts)、[节点派发/接续](../../tests/node-execution.test.ts)、[材料快照](../../tests/project-materials.test.ts) 及相关浏览器流程。重点验证固定输入、源 Run、取消与最后提交之间的竞态；不能把暂停改成自动重放。
 
 只运行改动涉及的检查；平台限制、真实模型未验证和未完成范围要写清楚。能力或契约变化更新 [21](../development/21-implementation-status.md) 与 [19](../development/19-work-items.md) 的原工作项，不把测试数量当作功能完成度。

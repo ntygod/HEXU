@@ -1,0 +1,62 @@
+.result-provenance,
+.branch-result {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.result-provenance {
+  padding: var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.result-provenance pre,
+.result-provenance code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.result-provenance summary {
+  cursor: pointer;
+  color: var(--hx-text-secondary);
+}
+.result-provenance pre {
+  max-height: 28rem;
+  overflow: auto;
+  margin-top: var(--hx-space-3);
+}
+.result-version-picker {
+  max-width: 100%;
+  min-width: 0;
+}
+.result-version-picker select {
+  max-width: 100%;
+}
+.branch-result-link {
+  font-weight: 600;
+}
+.result-provenance .flex-line {
+  flex-wrap: wrap;
+}
+.result-provenance .flex-line strong {
+  white-space: nowrap;
+}
+.result-main-surface.fixed-version-surface {
+  max-height: none;
+  align-self: start;
+}
+.fixed-version-surface .written-result {
+  flex: none;
+  min-height: 0;
+}
+.fixed-version-surface h3 {
+  margin-top: var(--hx-space-4);
+  margin-bottom: var(--hx-space-2);
+}
+.result-workspace > .result-version-picker,
+.result-workspace > .work-branch-notice {
+  margin-bottom: var(--hx-space-4);
+}
+@media (max-width: 650px) {
+  .result-workspace .work-page-heading > div:first-child {
+    flex-basis: 100%;
+  }
+}

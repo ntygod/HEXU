@@ -1,0 +1,126 @@
+import type {
+  ResultCodeReference,
+  ResultCodeEvidence,
+} from '../../../packages/contracts/src/result-code.js';
+import { time } from './state.js';
+import './result-code.css';
+export function ResultCodePanel({
+  code,
+  evidence,
+  revisionId,
+}: {
+  code: ResultCodeReference;
+  evidence?: ResultCodeEvidence;
+  revisionId?: string;
+}) {
+  const difference = evidence?.difference;
+  const state = evidence?.retention;
+  return (
+    <section className="result-code" aria-label="固定代码与差异">
+      <strong>固定提交引用</strong>
+      <dl>
+        <dt>共同起点</dt>
+        <dd>
+          <code>{code.base.commit}</code>
+        </dd>
+        <dt>所选代码</dt>
+        <dd>
+          <code>{code.checkpoint.manifest.commit}</code>
+        </dd>
+      </dl>
+      <p>
+        此引用在 {time(code.checkpoint.manifest.verifiedAt)}{' '}
+        核对。可能包含Run结束后的人工修改；未提交、暂存、未跟踪和忽略内容不包含。
+      </p>
+      {code.base.commit === code.checkpoint.manifest.commit && (
+        <p className="work-branch-notice">所选提交与共同起点相同，不代表生成了新的提交内容。</p>
+      )}
+      {code.retention ? (
+        <p>
+          对象副本：
+          {state?.state === 'retained' && state.nodeAuthorized
+            ? '最后报告已保留'
+            : state?.state === 'expired'
+              ? '已过期'
+              : state?.state === 'deleted'
+                ? '已删除'
+                : '当前不可用或授权已变化'}
+          ；原保留期限 {time(code.retention.manifest.expiresAt)}。这不是实时文件检测。
+        </p>
+      ) : (
+        <p>尚未关联对象副本，提交引用不等于备份或可恢复现场。</p>
+      )}
+      {difference ? (
+        <details className="result-code-diff">
+          <summary>查看固定代码差异（{difference.changedFiles}个文件）</summary>
+          <p>
+            {time(difference.comparedAt)}{' '}
+            由原节点核验并明确共享；比较两个提交中的文件，不含活动目录或完整Git历史。
+          </p>
+          {difference.omittedFiles > 0 && (
+            <p className="work-branch-notice">
+              受共享预算限制，另有 {difference.omittedFiles}{' '}
+              个变化文件未列出；当前展示不是完整补丁。
+            </p>
+          )}
+          {!difference.changedFiles && <p>所选提交相对共同起点没有普通文件变化。</p>}
+          {difference.files.map((file) => (
+            <details key={file.path} className="result-code-file">
+              <summary>
+                <span>
+                  {!file.before
+                    ? '+ 新增'
+                    : !file.after
+                      ? '− 删除'
+                      : file.before.objectId === file.after.objectId
+                        ? '模式变化'
+                        : '修改'}
+                </span>{' '}
+                <code>{file.path}</code>
+              </summary>
+              <p>
+                {file.before ? `${file.before.bytes} 字节 / ${file.before.mode}` : '原来不存在'} →{' '}
+                {file.after ? `${file.after.bytes} 字节 / ${file.after.mode}` : '已删除'}
+              </p>
+              {file.display === 'text' ? (
+                <div className="result-code-pair">
+                  <section>
+                    <h4>− 起点文件</h4>
+                    <pre>{file.before ? file.beforeText || '（空文件）' : '（此侧没有文件）'}</pre>
+                  </section>
+                  <section>
+                    <h4>+ 所选文件</h4>
+                    <pre>{file.after ? file.afterText || '（空文件）' : '（此侧没有文件）'}</pre>
+                  </section>
+                </div>
+              ) : (
+                <p>
+                  {
+                    {
+                      binary: '二进制或非UTF-8文件，仅展示固定对象与大小。',
+                      large: '文件超过单侧8 KiB正文范围，正文未共享。',
+                      budget: '受本次24 KiB共享预算限制，正文未共享。',
+                    }[file.display]
+                  }
+                </p>
+              )}
+            </details>
+          ))}
+        </details>
+      ) : (
+        <>
+          <p>此版本尚未共享可读差异，不能仅凭提交引用推断文件内容。</p>
+          {evidence?.canPublish && revisionId && (
+            <details>
+              <summary>在本人节点核验并共享差异</summary>
+              <p>在原方案节点执行，先核对两个提交，再明确确认共享文件名与差异正文。</p>
+              <pre>
+                npm run runner:result-code -- --revision {revisionId} --state /path/to/node-state
+              </pre>
+            </details>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

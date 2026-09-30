@@ -275,7 +275,9 @@ export function BranchWorkspace({
         <>
           <NodeRunStatus run={branch.run} />
           <p>
-            Run <code>{branch.run.id}</code>。方案成果尚未绑定；执行结束不等于选中或整合。
+            Run <code>{branch.run.id}</code>。
+            {branch.resultId ? '已保存文字成果版本。' : '方案成果尚未绑定。'}
+            执行结束不等于选中或整合。
           </p>
         </>
       )}

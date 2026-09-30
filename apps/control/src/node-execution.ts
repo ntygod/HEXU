@@ -37,13 +37,15 @@ export function attachNodeExecution(app: FastifyInstance, store: Store, nodes: N
       ),
   );
   app.get('/api/v1/tasks/:taskId/node-options', async (r) => {
-    const q = exact(r.query, ['sourceRunId', 'workBranchId']);
+    const q = exact(r.query, ['sourceRunId', 'workBranchId', 'continueSelected']);
     const taskId = nodeId((r.params as { taskId: string }).taskId);
     const source = q.sourceRunId === undefined ? undefined : nodeId(q.sourceRunId);
     const branch = q.workBranchId === undefined ? undefined : nodeId(q.workBranchId);
-    if (source && branch) throw new DomainError('INVALID_INPUT', '方案首轮与原执行接续分开选择');
+    if (q.continueSelected !== undefined && (q.continueSelected !== 'true' || !branch))
+      throw new DomainError('INVALID_INPUT', '选择继续必须明确指定方案');
+    if (source && branch) throw new DomainError('INVALID_INPUT', '方案执行与普通接续分开选择');
     if (source) execution.continuationPreview(taskId, source, true);
-    return execution.options(taskId, source, undefined, branch);
+    return execution.options(taskId, source, undefined, branch, q.continueSelected === 'true');
   });
   app.get('/api/v1/tasks/:taskId/next-inputs', async (r) => ({
     items: new NextInputs(store).list(nodeId((r.params as { taskId: string }).taskId)),

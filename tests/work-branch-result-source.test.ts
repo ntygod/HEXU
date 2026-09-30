@@ -138,8 +138,8 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
       .prepare('SELECT * FROM node_run_events WHERE dispatch_id=? ORDER BY sequence')
       .all(dispatchId) as EventRow[];
     const sequenceRow = db
-      .prepare('SELECT last_sequence FROM node_dispatches WHERE id=?')
-      .get(dispatchId) as { last_sequence: number };
+      .prepare('SELECT last_sequence,terminal_sequence FROM node_dispatches WHERE id=?')
+      .get(dispatchId) as { last_sequence: number; terminal_sequence: number | null };
     const originalSequence = sequenceRow.last_sequence;
     const replaceEvents = (events: ExecutionEvent[]) => {
       db.prepare('DELETE FROM node_run_events WHERE dispatch_id=?').run(dispatchId);
@@ -150,8 +150,9 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
           'fixture-hash',
           JSON.stringify(event),
         );
-      db.prepare('UPDATE node_dispatches SET last_sequence=? WHERE id=?').run(
+      db.prepare('UPDATE node_dispatches SET last_sequence=?,terminal_sequence=? WHERE id=?').run(
         events.length,
+        events.find((e) => e.kind === 'terminal')?.sequence ?? 0,
         dispatchId,
       );
     };
@@ -164,8 +165,9 @@ test('真实节点方案的成果来源预览与记录边界', async (t) => {
           row.event_hash,
           row.body,
         );
-      db.prepare('UPDATE node_dispatches SET last_sequence=? WHERE id=?').run(
+      db.prepare('UPDATE node_dispatches SET last_sequence=?,terminal_sequence=? WHERE id=?').run(
         originalSequence,
+        sequenceRow.terminal_sequence,
         dispatchId,
       );
       db.prepare('UPDATE runs SET body=? WHERE id=?').run(runBody, run.id);

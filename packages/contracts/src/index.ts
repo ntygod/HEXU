@@ -63,6 +63,7 @@ export interface Message {
   body: string;
   createdAt: string;
   resultId: string | null;
+  resultRevisionId?: string;
 }
 export interface Run {
   /** Assist runs never replace the main coding run or mutate task business state. */

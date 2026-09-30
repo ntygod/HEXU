@@ -1,0 +1,55 @@
+.integration-form,
+.integration-record {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.integration-form code,
+.integration-record code,
+.integration-record dd {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.integration-record {
+  padding: var(--hx-space-4);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-panel);
+}
+.integration-record header,
+.integration-files li > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+.integration-record p,
+.integration-record dl,
+.integration-record dd {
+  margin: 0;
+}
+.integration-record dt {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-secondary);
+}
+.integration-files {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding: 0;
+  list-style: none;
+}
+.integration-files li {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding-top: var(--hx-space-3);
+  min-width: 0;
+}
+.integration-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+}
+.integration-form select {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}

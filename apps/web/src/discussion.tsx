@@ -12,16 +12,22 @@ import { DraftFromMessage } from './ai-drafts.js';
 export function MessageComposer({
   taskId,
   resultId,
+  resultRevisionId,
   run,
 }: {
   taskId: string;
   resultId?: string;
+  resultRevisionId?: string;
   run?: Run;
 }) {
   const { data, refresh, notice } = useApp();
   const [body, setBody] = useTaskDraft(
     taskId,
-    resultId ? `feedback:${resultId}` : run ? `reply:${run.id}` : 'discussion',
+    resultId
+      ? `feedback:${resultId}:${resultRevisionId ?? 'general'}`
+      : run
+        ? `reply:${run.id}`
+        : 'discussion',
   );
   const [busy, setBusy] = useState(false);
   async function send(event: FormEvent) {
@@ -31,7 +37,9 @@ export function MessageComposer({
     try {
       await request(run ? `/runs/${run.id}/inputs` : `/tasks/${taskId}/messages`, {
         method: 'POST',
-        body: run ? { body } : { body, resultId: resultId ?? null },
+        body: run
+          ? { body }
+          : { body, resultId: resultId ?? null, ...(resultRevisionId ? { resultRevisionId } : {}) },
       });
       setBody('');
       await refresh();

@@ -14,6 +14,8 @@ import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import { CheckpointStore } from './checkpoints.js';
 import type { Store } from './store.js';
 import type { BranchWorkspaceOperation } from '../../contracts/src/work-branch-workspaces.js';
+import { ResultRevisions } from './result-revisions.js';
+import type { BranchChoice } from '../../contracts/src/branch-comparison.js';
 
 type Row = { rowid: number; body: string };
 export class WorkBranchStore {
@@ -48,8 +50,10 @@ export class WorkBranchStore {
     return JSON.parse(row.body) as WorkBranch;
   }
   private view(task: Task, group: WorkBranchGroup): WorkBranchView {
+    const selection = this.selection(task.id, group.id);
     return {
       group,
+      selection,
       branches: (
         this.store.db
           .prepare('SELECT body FROM work_branches WHERE group_id=? ORDER BY rowid')
@@ -63,14 +67,41 @@ export class WorkBranchStore {
           .get(b.id) as Row | undefined;
         return {
           ...b,
+          state: selection?.branchId === b.id ? 'selected' : b.state,
           ...(workspace
             ? { workspace: JSON.parse(workspace.body) as BranchWorkspaceOperation }
             : {}),
           ...(b.runId ? { run: this.store.run(b.runId) } : {}),
+          ...(b.resultId
+            ? {
+                result: (() => {
+                  const v = new ResultRevisions(this.store).current(this.store.result(b.resultId!));
+                  return {
+                    id: v.id,
+                    revision: v.revision,
+                    title: v.title,
+                    createdAt: v.createdAt,
+                    createdBy: v.createdBy,
+                    ...(v.source.kind === 'work_branch' && v.source.code !== 'not_captured'
+                      ? { codeKind: v.source.code.kind }
+                      : {}),
+                  };
+                })(),
+              }
+            : {}),
         };
       }),
       taskChanged: task.revision !== group.start.taskRevision,
     };
+  }
+  selection(taskId: string, groupId: string): BranchChoice | null {
+    this.group(taskId, groupId);
+    const row = this.store.db
+      .prepare(
+        'SELECT body FROM work_branch_choices WHERE group_id=? ORDER BY revision DESC LIMIT 1',
+      )
+      .get(groupId) as { body: string } | undefined;
+    return row ? (JSON.parse(row.body) as BranchChoice) : null;
   }
   options(taskId: string): WorkBranchOptions {
     const task = this.task(taskId, true);
@@ -110,7 +141,7 @@ export class WorkBranchStore {
     action: WorkBranchEvent['action'],
     actor?: WorkBranchEvent['actor'],
   ) {
-    const { workspace: _workspace, run: _run, ...saved } = branch;
+    const { workspace: _workspace, run: _run, result: _result, ...saved } = branch;
     const next = { ...saved, revision: saved.revision + 1, updatedAt: new Date().toISOString() };
     this.store.db
       .prepare('UPDATE work_branches SET state=?,revision=?,body=? WHERE id=? AND task_id=?')

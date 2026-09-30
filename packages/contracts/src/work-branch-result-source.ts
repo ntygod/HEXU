@@ -25,6 +25,7 @@ export interface WorkBranchResultSource {
   };
   input: { context: string; prompt: string };
   output: {
+    availability: 'captured' | 'legacy_unavailable';
     text: string;
     totalBytes: number;
     retainedBytes: number;

@@ -1,6 +1,10 @@
-import type { Message, Result, Task } from '../../../packages/contracts/src/index.js';
+import { useEffect, useState } from 'react';
+import type { ResultDetail } from '../../../packages/contracts/src/results.js';
 import { Button, Empty, Icon, Skeleton, StatusBadge } from '../../../packages/ui/src/index.js';
-import { Link, time, useApp, useLoad, canEditTask } from './state.js';
+import { Link, time, useApp, canEditTask, go } from './state.js';
+import { useAssistanceRead } from './assistance-common.js';
+import { ResultSource } from './result-source.js';
+import { PrepareIntegration } from './integrations.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { OrderPreview } from './preview.js';
 import { ResultCard } from './work-cards.js';
@@ -37,12 +41,25 @@ export function Results() {
     </div>
   );
 }
-export function ResultPage({ id }: { id: string }) {
-  const { value, error } = useLoad<{ result: Result; task: Task; messages: Message[] }>(
-    `/results/${id}`,
+export function ResultPage({ id, revisionId }: { id: string; revisionId?: string }) {
+  const [pinned, setPinned] = useState(revisionId);
+  const read = useAssistanceRead<ResultDetail>(
+    `/results/${id}${pinned ? `/versions/${pinned}` : ''}`,
   );
+  const { value, error } = read;
+  useEffect(() => {
+    if (!pinned && value) setPinned(value.version.id);
+  }, [pinned, value]);
   const { data, changeStatus } = useApp();
-  if (error) return <Empty title="无法打开成果" description={error} />;
+  if (read.denied) return <Empty title="无法打开成果" description={error} />;
+  if (!value && error)
+    return (
+      <Empty
+        title="无法打开成果"
+        description={error}
+        action={<Button onClick={read.retry}>重读成果</Button>}
+      />
+    );
   if (!value)
     return (
       <div className="work-page" role="status" aria-label="正在打开成果">
@@ -51,10 +68,16 @@ export function ResultPage({ id }: { id: string }) {
         <Skeleton lines={1} width="68%" />
       </div>
     );
-  const { result, task, messages } = value;
+  const { result, task, version, messages, revisions, unversionedMessages } = value;
   const editable = canEditTask(data, task);
   return (
     <div className="work-page result-workspace">
+      {error && (
+        <p role="alert">
+          {error}
+          <Button onClick={read.retry}>重读成果</Button>
+        </p>
+      )}
       <div className="eyebrow result-eyebrow">
         <Link to={`/tasks/${task.id}`}>
           {task.shortId} · {task.title}
@@ -63,10 +86,17 @@ export function ResultPage({ id }: { id: string }) {
       </div>
       <header className="work-page-heading">
         <div>
-          <h1>{result.title} · 当前成果</h1>
+          <h1>
+            {version.title} ·{' '}
+            {version.revision === result.revision ? '当前成果' : `版本 ${version.revision}`}
+          </h1>
           <p>
-            v{result.revision} · {time(result.updatedAt)} 更新 ·{' '}
-            {result.kind === 'demo-preview' ? '示例预览' : '已保存的文字成果'}
+            v{version.revision} · {time(version.createdAt)} 保存 ·{' '}
+            {version.kind === 'demo-preview'
+              ? '示例预览'
+              : version.source.kind === 'work_branch' && version.source.code !== 'not_captured'
+                ? '已保存说明与代码引用'
+                : '已保存的文字成果'}
           </p>
         </div>
         <div className="flex-line">
@@ -83,30 +113,64 @@ export function ResultPage({ id }: { id: string }) {
           </Button>
         </div>
       </header>
+      <label className="field result-version-picker">
+        查看固定版本
+        <select
+          aria-label="查看固定版本"
+          value={version.id}
+          onChange={(e) => go(`/results/${id}/versions/${e.target.value}`)}
+        >
+          {revisions.map((v) => (
+            <option value={v.id} key={v.id}>
+              v{v.revision} · {v.title} · {time(v.createdAt)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {version.revision !== result.revision && (
+        <p className="work-branch-notice">
+          正在查看历史版本 v{version.revision}，最新为 v{result.revision}
+          ；反馈仍关联当前查看的版本。
+        </p>
+      )}
       <div className="result-workspace-grid">
-        <section className="result-main-surface">
+        <section
+          className={`result-main-surface${version.source.kind === 'work_branch' ? ' fixed-version-surface' : ''}`}
+        >
           <div className="result-section-title">
-            <Icon name={result.kind === 'demo-preview' ? 'monitor' : 'file'} />
-            <h2>{result.kind === 'demo-preview' ? '示例预览' : '成果说明'}</h2>
+            <Icon name={version.kind === 'demo-preview' ? 'monitor' : 'file'} />
+            <h2>{version.kind === 'demo-preview' ? '示例预览' : '成果说明'}</h2>
           </div>
-          {result.kind === 'demo-preview' ? (
+          {version.kind === 'demo-preview' ? (
             <OrderPreview />
           ) : (
             <article className="written-result">
-              <h2>{result.title}</h2>
-              <p className="text-block">{result.body}</p>
+              <h2>{version.title}</h2>
+              <p className="text-block">{version.body}</p>
+              {version.limitations && (
+                <>
+                  <h3>已知限制</h3>
+                  <p className="text-block">{version.limitations}</p>
+                </>
+              )}
             </article>
           )}
+          {version.source.kind === 'work_branch' && (
+            <ResultSource source={version.source} evidence={value.code} revisionId={version.id} />
+          )}
+          <PrepareIntegration version={version} />
           <div className="result-source">
-            {result.kind === 'demo-preview'
+            {version.kind === 'demo-preview'
               ? '演示数据 · CSV 可按当前筛选导出'
-              : '由成员分享，关联到原任务。'}
+              : version.source.kind === 'legacy'
+                ? '历史成果，仅保留已知版本；原作者和更早版本未记录。'
+                : `由 ${version.createdBy?.name ?? '成员'} 保存，关联到原任务。`}
           </div>
         </section>
         <aside className="result-feedback-surface">
           <div className="result-feedback-summary">
-            <h2>本次做了什么</h2>
-            <p className="text-block">{result.body}</p>
+            <h2>此版本的反馈</h2>
+            <p>v{version.revision} 的讨论会保留在这个版本，不随新成果迁移。</p>
           </div>
           <div className="result-section-title">
             <h2>反馈</h2>
@@ -119,8 +183,19 @@ export function ResultPage({ id }: { id: string }) {
             )}
           </div>
           <div className="composer-wrap">
-            <MessageComposer taskId={task.id} resultId={result.id} />
+            <MessageComposer
+              key={version.id}
+              taskId={task.id}
+              resultId={result.id}
+              resultRevisionId={version.id}
+            />
           </div>
+          {!!unversionedMessages.length && (
+            <details className="result-discussion">
+              <summary>未指定版本的历史反馈（{unversionedMessages.length}）</summary>
+              <MessageList messages={unversionedMessages} />
+            </details>
+          )}
           <p className="result-source">反馈保存在原任务，不会自动发送给执行工具。</p>
         </aside>
       </div>
