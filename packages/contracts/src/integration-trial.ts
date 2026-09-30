@@ -5,6 +5,11 @@ import { retentionDate } from './checkpoint-retention.js';
 import { INTEGRATION_LIMITS } from './integrations.js';
 import { parseCodeDifferenceSummary, type CodeDifferenceSummary } from './result-code.js';
 
+import {
+  parseIntegrationConflictSelection,
+  type IntegrationConflictChoice,
+} from './integration-conflict-selection.js';
+
 export type { CodeDifferenceSummary } from './result-code.js';
 export const INTEGRATION_TRIAL_DIFFERENCE_LIMITS = {
   reports: 100,
@@ -14,15 +19,16 @@ export const INTEGRATION_TRIAL_DIFFERENCE_LIMITS = {
   textBytes: 8192,
 } as const;
 export interface IntegrationTrialDifferenceReport {
-  version: 1;
+  version: 1 | 2;
   kind: 'integration_trial_difference';
   integrationId: string;
   trialId: string;
   integrationInputHash: string;
   preflightReportHash: string;
   manifestHash: string;
-  selection: 'apply_source';
+  selection: 'apply_source' | 'explicit_conflict_choices';
   selectedPaths: string[];
+  conflictChoices?: IntegrationConflictChoice[];
   materializedAt: string;
   comparedAt: string;
   difference: CodeDifferenceSummary;
@@ -73,6 +79,7 @@ export function parseIntegrationTrialDifference(input: unknown): IntegrationTria
     'manifestHash',
     'selection',
     'selectedPaths',
+    'conflictChoices',
     'materializedAt',
     'comparedAt',
     'difference',
@@ -84,9 +91,11 @@ export function parseIntegrationTrialDifference(input: unknown): IntegrationTria
   if (b.confirmPublication !== true)
     throw new DomainError('CONFIRMATION_REQUIRED', '需本人明确确认共享候选文件名与有界代码正文');
   if (
-    b.version !== 1 ||
+    !(
+      (b.version === 1 && b.selection === 'apply_source' && !Object.hasOwn(b, 'conflictChoices')) ||
+      (b.version === 2 && b.selection === 'explicit_conflict_choices')
+    ) ||
     b.kind !== 'integration_trial_difference' ||
-    b.selection !== 'apply_source' ||
     b.trialOnly !== true ||
     b.applied !== false ||
     b.writeAuthorized !== false
@@ -94,7 +103,7 @@ export function parseIntegrationTrialDifference(input: unknown): IntegrationTria
     throw new DomainError('INVALID_INPUT', '只接受独立候选的只读差异，不授权写回原目录');
   if (
     !Array.isArray(b.selectedPaths) ||
-    !b.selectedPaths.length ||
+    (!b.selectedPaths.length && b.version !== 2) ||
     b.selectedPaths.length > INTEGRATION_LIMITS.files
   )
     throw new DomainError('INVALID_INPUT', '需保留1–80个完整、明确选择的文件名');
@@ -112,6 +121,15 @@ export function parseIntegrationTrialDifference(input: unknown): IntegrationTria
   });
   if (selectedPaths.some((path, i) => i > 0 && comparePath(selectedPaths[i - 1]!, path) >= 0))
     throw new DomainError('INVALID_INPUT', '候选选择必须按UTF-8排序且完整、不重复');
+  const choices =
+    b.version === 2
+      ? parseIntegrationConflictSelection({
+          version: 2,
+          kind: 'explicit_conflict_choices',
+          selectedPaths,
+          conflictChoices: b.conflictChoices,
+        }).conflictChoices
+      : undefined;
   const difference = parseCodeDifferenceSummary(b.difference, 'sides');
   if (
     difference.changedFiles !== selectedPaths.length ||
@@ -119,15 +137,16 @@ export function parseIntegrationTrialDifference(input: unknown): IntegrationTria
   )
     throw new DomainError('INVALID_INPUT', '候选差异只能展示原完整选择中的文件');
   const report: IntegrationTrialDifferenceReport = {
-    version: 1,
+    version: b.version as 1 | 2,
     kind: 'integration_trial_difference',
     integrationId: nodeId(b.integrationId),
     trialId: nodeId(b.trialId),
     integrationInputHash: checkpointHash(b.integrationInputHash),
     preflightReportHash: checkpointHash(b.preflightReportHash),
     manifestHash: checkpointHash(b.manifestHash),
-    selection: 'apply_source',
+    selection: b.version === 2 ? 'explicit_conflict_choices' : 'apply_source',
     selectedPaths,
+    ...(choices ? { conflictChoices: choices } : {}),
     materializedAt: retentionDate(b.materializedAt),
     comparedAt: retentionDate(b.comparedAt),
     difference,

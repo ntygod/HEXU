@@ -7,7 +7,11 @@ import type { IntegrationView } from '../../packages/contracts/src/integrations.
 import { buildIntegrationPlan } from '../../apps/runner/src/agent/integration-plan.js';
 
 /** Protocol metadata + verified pure object graphs, never advertised as node filesystem evidence. */
-export async function integrationFixture(origin?: string, format: 'sha1' | 'sha256' = 'sha1') {
+export async function integrationFixture(
+  origin?: string,
+  format: 'sha1' | 'sha256' = 'sha1',
+  options: { targetText?: string; targetDeleted?: boolean } = {},
+) {
   const base = await codeSnapshot([{ name: 'README.md', text: 'BASE' }], format);
   const source = await codeSnapshot(
     [
@@ -18,7 +22,7 @@ export async function integrationFixture(origin?: string, format: 'sha1' | 'sha2
   );
   const target = await codeSnapshot(
     [
-      { name: 'README.md', text: 'BASE' },
+      ...(options.targetDeleted ? [] : [{ name: 'README.md', text: options.targetText ?? 'BASE' }]),
       { name: 'target.txt', text: 'TARGET_ONLY' },
     ],
     format,

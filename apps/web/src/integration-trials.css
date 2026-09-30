@@ -31,3 +31,21 @@
   margin: 0;
   padding-left: var(--hx-space-5);
 }
+
+.integration-files li > .integration-conflict-choice,
+.integration-conflict-evidence {
+  display: grid;
+  gap: var(--hx-space-2);
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.integration-conflict-choice .field,
+.integration-conflict-choice select {
+  width: 100%;
+  min-width: 0;
+}
+.integration-conflict-choice p,
+.integration-conflict-evidence p {
+  margin: 0;
+}

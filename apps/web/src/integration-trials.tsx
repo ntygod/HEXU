@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import type {
   IntegrationFile,
+  IntegrationPlan,
   IntegrationView,
 } from '../../../packages/contracts/src/integrations.js';
 import type {
   IntegrationTrialDifferenceDetail,
+  IntegrationTrialDifferenceReport,
   IntegrationTrialDifferenceSummary,
 } from '../../../packages/contracts/src/integration-trial.js';
+import type { IntegrationConflictChoice } from '../../../packages/contracts/src/integration-conflict-selection.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { useAssistanceRead } from './assistance-common.js';
 import { CodeDifferencePanel } from './result-code.js';
@@ -29,6 +32,59 @@ const actionLabels = {
 };
 const selectable = (file: IntegrationFile) =>
   !file.conflict && ['add', 'modify', 'delete'].includes(file.action);
+const conflictSelectable = (file: IntegrationFile) =>
+  file.action === 'conflict' && file.conflict === 'both_changed';
+const conflictConsequence = (file: IntegrationFile, choice: IntegrationConflictChoice['choice']) =>
+  choice === 'keep_target'
+    ? file.target
+      ? '保留目标现有文件与模式，不写入、备份或恢复此路径'
+      : '保持目标缺失，不新增此路径'
+    : !file.source
+      ? '采用来源的删除：候选中移除目标文件；另行写回时也会移出该文件'
+      : !file.target
+        ? '采用来源完整文件与模式：候选中新增此路径'
+        : '采用来源完整文件与模式：替换候选中的目标内容，不自动合并文本';
+
+export function IntegrationConflictDecisions({
+  report,
+  plan,
+}: {
+  report: IntegrationTrialDifferenceReport;
+  plan?: IntegrationPlan | null;
+}) {
+  const choices = report.conflictChoices ?? [];
+  const kept = choices.filter((item) => item.choice === 'keep_target').length;
+  return (
+    <section className="integration-conflict-evidence" aria-label="固定冲突决策">
+      <strong>
+        实际变化 {report.selectedPaths.length} 个文件 · 明确保留目标 {kept} 项
+      </strong>
+      {choices.length > 0 && (
+        <ul aria-label="完整冲突决策">
+          {choices.map((item) => {
+            const file = plan?.files.find((file) => file.path === item.path);
+            return (
+              <li key={item.path}>
+                <code>{item.path}</code> · {item.choice === 'take_source' ? '采用来源' : '保留目标'}
+                {file && <p>{conflictConsequence(file, item.choice)}</p>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p>
+        {plan
+          ? `固定预检仍有 ${Math.max(0, plan.conflicts - choices.length)} 项冲突未处理。`
+          : '此处仅记录明确选择的路径与决策；未选择的冲突未处理。'}
+        候选只代表本次选择，不表示全部冲突已解决。
+      </p>
+      {kept > 0 && <p>保留目标项只作为固定决策保存，不进入写回、原文件备份或后续恢复路径。</p>}
+      {!report.selectedPaths.length && (
+        <p role="status">此候选实际变化为 0，可保留和共享决策，但不能写回。</p>
+      )}
+    </section>
+  );
+}
 
 export function IntegrationTrialEditor({
   initial,
@@ -41,6 +97,7 @@ export function IntegrationTrialEditor({
 }) {
   const [baseline, setBaseline] = useState(() => structuredClone(initial));
   const [paths, setPaths] = useState<string[]>([]);
+  const [conflictChoices, setConflictChoices] = useState<IntegrationConflictChoice[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [command, setCommand] = useState<string | null>(null);
   const read = useAssistanceRead<IntegrationView>(integrationPath(initial), 5000);
@@ -57,13 +114,26 @@ export function IntegrationTrialEditor({
       read.value.available !== baseline.available);
   const usable =
     !!read.value && !read.error && !stale && !!baseline.canTrial && !!baseline.reportHash;
+  const selectedCount =
+    paths.length + conflictChoices.filter((item) => item.choice === 'take_source').length;
+  const keptCount = conflictChoices.filter((item) => item.choice === 'keep_target').length;
+  const hasSelection = !!(paths.length || conflictChoices.length);
+  let preparedCommand: string | null = null;
+  let selectionError: string | null = null;
+  if (hasSelection) {
+    try {
+      preparedCommand = integrationTrialCommand(o.id, paths, conflictChoices);
+    } catch (error) {
+      selectionError = error instanceof Error ? error.message : '完整选择与冲突决策无效';
+    }
+  }
   if (read.denied) return null;
   return (
     <Dialog title="准备独立试应用" drawer onClose={close}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (usable && paths.length && confirmed) setCommand(integrationTrialCommand(o.id, paths));
+          if (usable && preparedCommand && confirmed) setCommand(preparedCommand);
         }}
       >
         <div className="dialog-body integration-form">
@@ -98,47 +168,95 @@ export function IntegrationTrialEditor({
             </dl>
           </section>
           <p className="work-branch-notice">
-            试应用可选择无冲突的新增、修改和删除；未选文件保留目标内容。冲突、目标已有文件及有省略的预检不能选择，不自动合并文本。
+            试应用可选择无冲突的新增、修改和删除；双方均有变化的普通文件需逐项明确采用来源或保留目标，默认暂不处理。结构路径冲突、目标已有文件及有省略的预检不能选择，不自动合并文本。
           </p>
           <fieldset className="integration-selection">
             <legend>选择试应用文件</legend>
             <ul className="integration-files">
               {o.report?.plan?.files.map((file) => (
                 <li key={file.path}>
-                  <label className="integration-consent">
-                    <input
-                      type="checkbox"
-                      aria-label={`试应用 ${file.path}`}
-                      checked={paths.includes(file.path)}
-                      disabled={!selectable(file) || !!o.report?.plan?.omittedFiles}
-                      onChange={(event) => {
-                        setPaths((old) =>
-                          event.target.checked
-                            ? sortTrialPaths([...old, file.path])
-                            : old.filter((name) => name !== file.path),
-                        );
-                        setConfirmed(false);
-                        setCommand(null);
-                      }}
-                    />
-                    <span>
-                      <span className="badge neutral">{actionLabels[file.action]}</span>{' '}
-                      <code>{file.path}</code>
-                      {!selectable(file) && <span> · 不可试应用</span>}
-                    </span>
-                  </label>
+                  {conflictSelectable(file) ? (
+                    <div className="integration-conflict-choice">
+                      <label className="field">
+                        <span>
+                          <span className="badge warning">冲突</span> <code>{file.path}</code>
+                        </span>
+                        <select
+                          aria-label={`冲突选择 ${file.path}`}
+                          value={
+                            conflictChoices.find((item) => item.path === file.path)?.choice ?? ''
+                          }
+                          disabled={!!o.report?.plan?.omittedFiles}
+                          onChange={(event) => {
+                            const choice = event.target.value as
+                              | IntegrationConflictChoice['choice']
+                              | '';
+                            setConflictChoices((old) => [
+                              ...old.filter((item) => item.path !== file.path),
+                              ...(choice ? [{ path: file.path, choice }] : []),
+                            ]);
+                            setConfirmed(false);
+                            setCommand(null);
+                          }}
+                        >
+                          <option value="">暂不处理</option>
+                          <option value="take_source">采用来源</option>
+                          <option value="keep_target">保留目标</option>
+                        </select>
+                      </label>
+                      {conflictChoices.some((item) => item.path === file.path) ? (
+                        <p>
+                          {conflictConsequence(
+                            file,
+                            conflictChoices.find((item) => item.path === file.path)!.choice,
+                          )}
+                        </p>
+                      ) : (
+                        <p>尚未作出选择；候选暂保留目标，仍计为未处理冲突。</p>
+                      )}
+                    </div>
+                  ) : (
+                    <label className="integration-consent">
+                      <input
+                        type="checkbox"
+                        aria-label={`试应用 ${file.path}`}
+                        checked={paths.includes(file.path)}
+                        disabled={!selectable(file) || !!o.report?.plan?.omittedFiles}
+                        onChange={(event) => {
+                          setPaths((old) =>
+                            event.target.checked
+                              ? sortTrialPaths([...old, file.path])
+                              : old.filter((name) => name !== file.path),
+                          );
+                          setConfirmed(false);
+                          setCommand(null);
+                        }}
+                      />
+                      <span>
+                        <span className="badge neutral">{actionLabels[file.action]}</span>{' '}
+                        <code>{file.path}</code>
+                        {!selectable(file) && <span> · 不可试应用</span>}
+                      </span>
+                    </label>
+                  )}
                 </li>
               ))}
             </ul>
           </fieldset>
           <p role="status">
-            本次明确选择 {paths.length} 个文件；这里只生成本机命令，尚未执行或共享。
+            本次实际变化 {selectedCount} 个文件；明确保留目标 {keptCount} 项；仍有{' '}
+            {Math.max(0, (o.report?.plan?.conflicts ?? 0) - conflictChoices.length)} 项冲突未处理。
+            这里只生成本机命令，尚未执行或共享。
           </p>
+          {hasSelection && !selectedCount && (
+            <p role="status">本次为 0 变化候选，可生成并共享明确决策，但不能写回原目录。</p>
+          )}
+          {selectionError && <p role="alert">{selectionError}</p>}
           <label className="integration-consent">
             <input
               type="checkbox"
               checked={confirmed}
-              disabled={!paths.length}
+              disabled={!hasSelection || !!selectionError}
               onChange={(event) => {
                 setConfirmed(event.target.checked);
                 setCommand(null);
@@ -162,6 +280,13 @@ export function IntegrationTrialEditor({
                   old.filter((name) =>
                     next.operation.report?.plan?.files.some(
                       (file) => file.path === name && selectable(file),
+                    ),
+                  ),
+                );
+                setConflictChoices((old) =>
+                  old.filter((item) =>
+                    next.operation.report?.plan?.files.some(
+                      (file) => file.path === item.path && conflictSelectable(file),
                     ),
                   ),
                 );
@@ -222,7 +347,11 @@ export function IntegrationTrialEditor({
           <Button type="button" onClick={close}>
             取消并返回
           </Button>
-          <Button type="submit" variant="primary" disabled={!usable || !paths.length || !confirmed}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!usable || !preparedCommand || !confirmed}
+          >
             生成本机试应用命令
           </Button>
         </div>
@@ -356,8 +485,14 @@ export function IntegrationTrialHistory({
               <code>{detail.value!.hash}</code>
             </dd>
           </dl>
+          <IntegrationConflictDecisions
+            report={report}
+            plan={
+              report.preflightReportHash === view.reportHash ? view.operation.report?.plan : null
+            }
+          />
           <details>
-            <summary>完整选择范围（{report.selectedPaths.length}个文件）</summary>
+            <summary>完整选择范围（{report.selectedPaths.length}个文件） · 实际变化路径</summary>
             <ul>
               {report.selectedPaths.map((name) => (
                 <li key={name}>
@@ -369,7 +504,12 @@ export function IntegrationTrialHistory({
           {applyCandidate && view.canTrial && (
             <Button
               variant="primary"
-              disabled={!!list.error || !!detail.error || report.trialId !== selected}
+              disabled={
+                !report.selectedPaths.length ||
+                !!list.error ||
+                !!detail.error ||
+                report.trialId !== selected
+              }
               onClick={() => applyCandidate(structuredClone(detail.value!))}
             >
               确认写回此候选

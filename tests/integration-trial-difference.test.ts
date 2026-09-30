@@ -452,7 +452,7 @@ test('分享核对原完整预检、选择、模式、对象格式与blob正文�
   }
 });
 
-test('候选生成投影只允许完整可用预检的无冲突增改删，实际应用仍仅新增', async () => {
+test('旧无冲突候选投影与新增许可保持，省略预检不能生成候选', async () => {
   const f = await integrationFixture();
   try {
     const initial = await f.create();
@@ -485,7 +485,7 @@ test('候选生成投影只允许完整可用预检的无冲突增改删，实�
   }
 });
 
-test('候选删除与大小写重命名遵循原预检引用；冲突和已存在项不能混入完整选择', async () => {
+test('旧候选删除与大小写重命名遵循原预检；V1不能暗中采用冲突或目标已有项', async () => {
   const f = await integrationFixture();
   try {
     const initial = await f.create(),
@@ -526,7 +526,7 @@ test('候选删除与大小写重命名遵循原预检引用；冲突和已存�
       const published = await f.protocol('publish', preflight);
       assert.equal(published.statusCode, 200, published.body);
       const v = view(f, initial.operation.id);
-      assert.equal(v.canTrial, false);
+      assert.equal(v.canTrial, action === 'conflict'); // V2 can ask explicitly; V1 below still rejects.
       const data = {
         ...report(f, v),
         selectedPaths: [item.path],

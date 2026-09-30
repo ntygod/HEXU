@@ -1,6 +1,7 @@
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import type { IntegrationPlan } from '../../../../packages/contracts/src/integrations.js';
 import { snapshotEntries, type RestoreEntry } from './checkpoint-restore-plan.js';
+import type { EffectiveIntegrationChange } from '../../../../packages/domain/src/integration-conflict-selection.js';
 import type { verifySnapshot } from './checkpoint-objects.js';
 
 export const INTEGRATION_DIRECTORY_LIMITS = { count: 256, pathBytes: 64 * 1024 } as const;
@@ -15,12 +16,11 @@ const compare = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.
 
 /** The selected union, not the preflight's union of every change, must be safe.
  * An add cannot rely on an unselected delete or normalize an existing parent. */
-export function integrationAdditionPlan(
+function planAdditionFiles(
   format: 'sha1' | 'sha256',
   targetTree: string,
   target: Awaited<ReturnType<typeof verifySnapshot>>,
-  plan: IntegrationPlan,
-  paths: readonly string[],
+  inputFiles: readonly RestoreEntry[],
   root: string,
 ): IntegrationAdditionPlan {
   const unsupported = () =>
@@ -28,12 +28,8 @@ export function integrationAdditionPlan(
       'INTEGRATION_UNSUPPORTED',
       '只应用新增普通文件及有界的新父目录；冲突、覆盖、删除或路径碰撞需另行处理',
     );
-  if (
-    plan.omittedFiles ||
-    !paths.length ||
-    paths.length > 80 ||
-    new Set(paths).size !== paths.length
-  )
+  const paths = inputFiles.map((file) => file.path);
+  if (!paths.length || paths.length > 80 || new Set(paths).size !== paths.length)
     throw unsupported();
   const entries = snapshotEntries(format, targetTree, target, root).entries;
   const original = new Map(entries.map((e) => [e.path, e.kind]));
@@ -44,9 +40,7 @@ export function integrationAdditionPlan(
     anchors = new Set<string>();
   let directoryBytes = 0;
   for (const path of paths) {
-    const file = plan.files.find((f) => f.path === path);
-    if (!file || file.action !== 'add' || file.base || file.target || !file.source || file.conflict)
-      throw unsupported();
+    const file = inputFiles.find((file) => file.path === path)!;
     const parts = path.split('/');
     for (let i = 1; i < parts.length; i++) {
       const parent = parts.slice(0, i).join('/'),
@@ -80,13 +74,66 @@ export function integrationAdditionPlan(
     files.push({
       path,
       kind: 'file',
-      objectId: file.source.objectId,
-      gitMode: file.source.mode,
-      bytes: file.source.bytes,
+      objectId: file.objectId,
+      gitMode: file.gitMode,
+      bytes: file.bytes,
     });
   }
   directories.sort((a, b) => a.split('/').length - b.split('/').length || compare(a, b));
   return { files, directories, anchors: [...anchors].sort(compare) };
+}
+
+/** Legacy ADD-only authorization keeps its original base/source/target rule. */
+export function integrationAdditionPlan(
+  format: 'sha1' | 'sha256',
+  targetTree: string,
+  target: Awaited<ReturnType<typeof verifySnapshot>>,
+  plan: IntegrationPlan,
+  paths: readonly string[],
+  root: string,
+): IntegrationAdditionPlan {
+  if (plan.omittedFiles) throw new DomainError('INTEGRATION_UNSUPPORTED', '省略预检不能应用');
+  const files = paths.map((path) => {
+    const file = plan.files.find((f) => f.path === path);
+    if (!file || file.action !== 'add' || file.base || file.target || !file.source || file.conflict)
+      throw new DomainError('INTEGRATION_UNSUPPORTED', '旧新增许可不能采用冲突、修改或删除');
+    return {
+      path,
+      kind: 'file' as const,
+      objectId: file.source.objectId,
+      gitMode: file.source.mode,
+      bytes: file.source.bytes,
+    };
+  });
+  return planAdditionFiles(format, targetTree, target, files, root);
+}
+/** Only for a separately authorized fixed candidate whose complete snapshots,
+ * explicit decisions and final union were reverified. A target-absent conflict
+ * can be an effective add without falsifying the original non-null base. */
+export function integrationCandidateAdditionPlan(
+  format: 'sha1' | 'sha256',
+  targetTree: string,
+  target: Awaited<ReturnType<typeof verifySnapshot>>,
+  changes: readonly EffectiveIntegrationChange[],
+  paths: readonly string[],
+  root: string,
+): IntegrationAdditionPlan {
+  const files = paths.map((path) => {
+    const file = changes.find((f) => f.path === path);
+    if (!file || file.action !== 'add' || file.before !== null || !file.after)
+      throw new DomainError(
+        'INTEGRATION_UNSUPPORTED',
+        '候选新增必须来自已明确核验且当前目标缺失的文件',
+      );
+    return {
+      path,
+      kind: 'file' as const,
+      objectId: file.after.objectId,
+      gitMode: file.after.mode,
+      bytes: file.after.bytes,
+    };
+  });
+  return planAdditionFiles(format, targetTree, target, files, root);
 }
 
 /** Compatibility for callers that only need the selected file metadata. */

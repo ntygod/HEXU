@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
 import type { IntegrationView } from '../../packages/contracts/src/integrations.js';
 import type {
   IntegrationFileRestorationReport,
@@ -209,6 +210,11 @@ test('文件恢复固定原应用全量范围，过期材料不阻断目标权�
     await expect(editor(page)).toContainText('不能强制覆盖后来的用户修改');
     await expect(editor(page)).toContainText('文件内容与Git可执行位');
     await expect(editor(page)).toContainText('不承诺原inode');
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({
+      path: 'artifacts/129-integration-file-restoration-dark.png',
+      fullPage: true,
+    });
     const attempts: { key: string; body: string | null }[] = [];
     let drop = true;
     await page.route(`${origin}/api/v1/${endpoint(f, v)}`, async (route) => {
@@ -261,6 +267,10 @@ test('文件恢复固定原应用全量范围，过期材料不阻断目标权�
           .evaluate((el) => el.scrollWidth - el.clientWidth),
       )
       .toBeLessThanOrEqual(1);
+    await page.screenshot({
+      path: 'artifacts/130-integration-file-restoration-command-mobile-light.png',
+      fullPage: true,
+    });
     await publish(f, q, 'restoring');
     await expect(status(page)).toContainText('可能已部分恢复');
     await expect(

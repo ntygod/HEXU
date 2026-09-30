@@ -34,6 +34,8 @@ import { fdPath, identity, PinnedRestoreParent } from './checkpoint-restore-file
 import { IntegrationTrialJournal, trialHash } from './integration-trial-journal.js';
 import { terminalLabel } from './terminal-label.js';
 
+import { evaluateIntegrationConflictSelection } from '../../../../packages/domain/src/integration-conflict-selection.js';
+
 export type IntegrationTrialDifferenceMetadata = Omit<
   IntegrationTrialDifferenceReport,
   'difference'
@@ -47,12 +49,23 @@ export function buildIntegrationTrialDifference(
   sourceObjects: ReadonlyMap<string, Buffer>,
 ): IntegrationTrialDifferenceReport {
   const fixed = structuredClone(metadata);
-  const changes = fixed.selectedPaths.map((path) => {
-    const file = plan.files.find((file) => file.path === path);
-    if (!file || file.conflict || !['add', 'modify', 'delete'].includes(file.action))
-      throw new DomainError('INTEGRATION_PLAN_CHANGED', '候选选择与原完整预检不一致');
-    return { path, before: file.target, after: file.source };
-  });
+  const effective =
+    fixed.version === 2
+      ? evaluateIntegrationConflictSelection(plan, {
+          version: 2,
+          kind: 'explicit_conflict_choices',
+          selectedPaths: fixed.selectedPaths,
+          conflictChoices: fixed.conflictChoices!,
+        }).changes
+      : undefined;
+  const changes =
+    effective ??
+    fixed.selectedPaths.map((path) => {
+      const file = plan.files.find((file) => file.path === path);
+      if (!file || file.conflict || !['add', 'modify', 'delete'].includes(file.action))
+        throw new DomainError('INTEGRATION_PLAN_CHANGED', '候选选择与原完整预检不一致');
+      return { path, before: file.target, after: file.source };
+    });
   const difference = buildCodeDifferenceSummary(
     changes,
     targetObjects,
@@ -260,6 +273,14 @@ export async function shareIntegrationTrialDifference(
               o.report!.plan!,
               p.selectedPaths,
               w.root,
+              record.version === 2
+                ? {
+                    version: 2,
+                    kind: 'explicit_conflict_choices',
+                    selectedPaths: p.selectedPaths,
+                    conflictChoices: record.manifest.conflictChoices!,
+                  }
+                : undefined,
             );
             if (
               plan.manifestHash !== p.manifestHash ||
@@ -318,15 +339,16 @@ export async function shareIntegrationTrialDifference(
       const objects = await verify();
       const packet = buildIntegrationTrialDifference(
         {
-          version: 1,
+          version: record.version,
           kind: 'integration_trial_difference',
           integrationId,
           trialId,
           integrationInputHash: p.inputHash,
           preflightReportHash: p.reportHash,
           manifestHash: p.manifestHash,
-          selection: 'apply_source',
+          selection: record.manifest.selection,
           selectedPaths: [...p.selectedPaths],
+          ...(record.version === 2 ? { conflictChoices: record.manifest.conflictChoices! } : {}),
           materializedAt: p.publishedAt,
           comparedAt: local?.report.comparedAt ?? new Date().toISOString(),
           trialOnly: true,

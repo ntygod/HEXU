@@ -191,10 +191,13 @@ test('试应用可选新增修改删除，原应用仍只新增；重复生成�
     const fixed = editor(page).getByRole('region', { name: '固定试应用基线' });
     for (const value of [f.source.commit, f.target.commit, f.tr.request.id, v.reportHash!])
       await expect(fixed).toContainText(value);
-    for (const name of ['present.txt', 'conflict.txt'])
+    for (const name of ['present.txt'])
       await expect(
         editor(page).getByRole('checkbox', { name: `试应用 ${name}`, exact: true }),
       ).toBeDisabled();
+    await expect(
+      editor(page).getByRole('combobox', { name: '冲突选择 conflict.txt', exact: true }),
+    ).toHaveValue('');
     for (const name of ['README.md', 'removed.txt', oddPath])
       await editor(page)
         .getByRole('checkbox', { name: `试应用 ${name}`, exact: true })

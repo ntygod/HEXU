@@ -31,6 +31,7 @@ export async function integrationRunnerFixture(
     sourceDeletePaths?: string[];
     sourceExecutablePaths?: string[];
     targetFiles?: Record<string, string>;
+    targetDeletePaths?: string[];
     beforeListen?: (app: Awaited<ReturnType<typeof branchResultFixture>>['api']['app']) => void;
   } = {},
 ) {
@@ -150,6 +151,7 @@ export async function integrationRunnerFixture(
       await mkdir(dirname(join(target.root, path)), { recursive: true });
       await writeFile(join(target.root, path), body);
     }
+    for (const path of changes.targetDeletePaths ?? []) await rm(join(target.root, path));
     const targetCommit = commit(target.root, 'target'),
       targetCp = await checkpoint(target, targetCommit),
       tr = await retain(target, targetCp, targetCommit);

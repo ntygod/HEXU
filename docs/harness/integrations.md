@@ -46,3 +46,11 @@
 恢复记录在既有本机applications表使用判别类型与独立claim，旧runner严格拒绝未知记录以保留凭证。逐文件意图、精确并集/短观察、进程守卫和未知留锁沿用原边界；重启仅对账。保留结算使用同一原子租约收据，绑定恢复证据和唯一已冻结待发包，原应用/恢复阶段/结算不互相重写，旧包不能重新取得写入许可或解锁后来写入者。部分/未知原应用、后续用户修改和冲突解决仍另行处理，不扩成泛用备份系统。
 
 实现：[恢复编排](../../apps/runner/src/agent/integration-file-restoration.ts)、[严格日志](../../apps/runner/src/agent/integration-restoration-record.ts)、[原备份读取](../../apps/runner/src/agent/integration-original-backup.ts)、[恢复保留结算](../../apps/runner/src/agent/integration-restoration-recovery.ts)。验证：[服务事务](../../tests/integration-file-restoration.test.ts)、[真实本机/进程](../../tests/integration-file-restoration-runner.test.ts)、[浏览器流程](../../tests/e2e/integration-restoration.spec.ts)。
+
+## 整文件明确冲突选择
+
+[版本2冲突选择](../engineering/integration-conflict-choices.md)仅处理both_changed普通文件，初始未处理，整文件take_source/keep_target分别记录；实际来源路径与保留目标决策合计80项/48KiB，选择不等于写回许可。三个完整对象和原不可变报告先重验，再由明确决策计算target→candidate有效变化；不能改原action、伪造base=null或放宽旧ADD/V1。私有清单/日志/共享报告显式版本2并绑定决策；旧runner拒绝未知参数/记录，原候选只能原包对账。
+
+全保留目标可形成0变化候选并共享决策，但不创建空application、取原目标写锁或伪报completed。保留目标项不进入实际备份/恢复；未知或未选冲突仍未处理。原path_collision及最终并集的目录/大小写/NFC碰撞继续拒绝。界面重新核对不是目标重算；后续新目标需新固定检查点/恢复副本、新操作和新确认，不覆写旧预检，不自动commit/reset/stash。
+
+核心：[决策契约](../../packages/contracts/src/integration-conflict-selection.ts)、[纯有效变更](../../packages/domain/src/integration-conflict-selection.ts)、[完整候选](../../apps/runner/src/agent/integration-trial-plan.ts)。检查：[纯规则](../../tests/integration-conflict-selection.test.ts)、[服务](../../tests/integration-conflict-service.test.ts)、[真实流程](../../tests/integration-conflict-runner.test.ts)、[重放](../../tests/integration-conflict-replay.test.ts)、[页面](../../tests/e2e/integration-conflict-selection.spec.ts)。

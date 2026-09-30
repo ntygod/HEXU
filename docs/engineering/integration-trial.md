@@ -4,7 +4,7 @@
 
 ## 前提与命令
 
-先完成[固定成果整合预检](integration-preflight.md)。只接受完整、未省略计划里的无冲突 `add` / `modify` / `delete`；未选择的变化和冲突保留目标一侧。已选择实际应用的操作不能再创建新试应用。
+先完成[固定成果整合预检](integration-preflight.md)。旧 `--files` 只接受完整、未省略计划里的无冲突 `add` / `modify` / `delete`；未选择的变化和冲突保留目标一侧。普通双方变化另可用[版本2明确整文件选择](integration-conflict-choices.md)的 `--selection`，保留未处理与明确保留目标的区别，原报告不变。已选择实际应用的操作不能再创建新试应用。
 
 ```sh
 npm run build:server
@@ -47,6 +47,6 @@ npm run runner:integration-trial -- \
 
 已发布候选可按[候选差异指南](integration-trial-differences.md)再次本机确认读取，核对有界差异并另行决定是否分享到原Task。页面也可独立选择试应用文件，生成本机命令；不会自动运行或共享。
 
-候选暂存处置、完整内容预览、冲突解决或原目标修改/删除/新增目录写回仍未交付。原目标写入仍限[已有父目录中的普通文件新增](integration-application.md)。完整13-05仍是部分实现。
+候选暂存处置、完整内容预览、结构/文本冲突与专用目标重新预检仍未交付。普通文件与必要新父目录、固定候选修改/移出已可[另行确认写回](integration-application.md)，完整已确认原应用还可[明确恢复文件](integration-file-restoration.md)。这些是独立授权与阶段，生成候选不自动写回或恢复。完整13-05仍是部分实现。
 
 实际测试和独立审查范围见[本轮记录](../development/history/2026-09-30-integration-trial.md)，后续唯一计划见[22](../development/22-next-delivery.md)。

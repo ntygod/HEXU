@@ -13,7 +13,11 @@ import { integrationCandidateApplicationCommand } from './integration-trial-comm
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { Link, canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
-import { IntegrationTrialEditor, IntegrationTrialHistory } from './integration-trials.js';
+import {
+  IntegrationConflictDecisions,
+  IntegrationTrialEditor,
+  IntegrationTrialHistory,
+} from './integration-trials.js';
 import {
   FileRestorationEditor,
   FileRestorationStatus,
@@ -828,6 +832,14 @@ function ApplicationEditor({
                 <p>
                   本机清单 <code>{candidate.report.manifestHash}</code>
                 </p>
+                <IntegrationConflictDecisions
+                  report={candidate.report}
+                  plan={
+                    candidate.report.preflightReportHash === baseline.reportHash
+                      ? o.report?.plan
+                      : null
+                  }
+                />
               </section>
             )}
             <dl className="integration-baseline">

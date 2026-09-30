@@ -88,3 +88,61 @@ test('candidate application command binds operation and quotes the separately se
     '<全新私有备份绝对目录>',
   ]);
 });
+
+test('explicit conflict command preserves shell literals and separates actual paths from kept evidence', () => {
+  const choices = [
+    { path: "keep/it's $(printf kept).txt", choice: 'keep_target' as const },
+    { path: "take/it's `printf source`.txt", choice: 'take_source' as const },
+    { path: '中文.txt', choice: 'take_source' as const },
+  ];
+  const before = structuredClone(choices),
+    paths = ['safe.txt'],
+    args = argumentsOf(integrationTrialCommand("operation'fixed", paths, choices));
+  assert.equal(args.filter((arg) => arg === '--selection').length, 1);
+  assert.equal(args.includes('--files'), false);
+  assert.equal(args[5], "operation'fixed");
+  assert.deepEqual(JSON.parse(args.at(-1)!), {
+    version: 2,
+    kind: 'explicit_conflict_choices',
+    selectedPaths: sortTrialPaths(['safe.txt', choices[1]!.path, choices[2]!.path]),
+    conflictChoices: [...choices].sort((a, b) =>
+      Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)),
+    ),
+  });
+  assert.deepEqual(choices, before);
+  assert.deepEqual(paths, ['safe.txt']);
+});
+
+test('all keep-target emits an explicit zero-delta choice, never an empty legacy --files permit', () => {
+  const args = argumentsOf(
+    integrationTrialCommand('fixed', [], [{ path: 'conflict', choice: 'keep_target' }]),
+  );
+  assert.equal(args.includes('--files'), false);
+  assert.deepEqual(JSON.parse(args.at(-1)!), {
+    version: 2,
+    kind: 'explicit_conflict_choices',
+    selectedPaths: [],
+    conflictChoices: [{ path: 'conflict', choice: 'keep_target' }],
+  });
+});
+
+test('explicit command enforces combined 80-file/48-KiB decision bounds and contradictions', () => {
+  assert.throws(
+    () =>
+      integrationTrialCommand(
+        'fixed',
+        Array.from({ length: 80 }, (_, i) => `safe-${i}`),
+        [{ path: 'conflict', choice: 'keep_target' }],
+      ),
+    /80/,
+  );
+  const long = Array.from({ length: 80 }, (_, i) => ({
+    path: `${i}-${'x'.repeat(500)}`,
+    choice: 'take_source' as const,
+  }));
+  assert.throws(() => integrationTrialCommand('fixed', [], long), /48 KiB/);
+  assert.throws(
+    () => integrationTrialCommand('fixed', ['keep'], [{ path: 'keep', choice: 'keep_target' }]),
+    /保留目标/,
+  );
+});

@@ -25,7 +25,10 @@ import { captureCommitReference } from './checkpoints.js';
 import { verifyCleanCommit } from './committed-workspace.js';
 import { assertCodeQuiescent } from './result-code.js';
 import { buildIntegrationPlan } from './integration-plan.js';
-import { integrationAdditionPlan } from './integration-application-plan.js';
+import {
+  integrationAdditionPlan,
+  integrationCandidateAdditionPlan,
+} from './integration-application-plan.js';
 import { checkRestoreHelper, PinnedRestoreParent, inode } from './checkpoint-restore-files.js';
 import { inspectRestoreTarget, type RestoreEntry } from './checkpoint-restore-plan.js';
 import { IntegrationApplicationCandidate } from './integration-application-candidate.js';
@@ -73,6 +76,11 @@ import {
   hasSettledRestorationRecovery,
   readRestorationRecovery,
 } from './integration-restoration-recovery.js';
+
+import {
+  evaluateIntegrationConflictSelection,
+  type EffectiveIntegrationChange,
+} from '../../../../packages/domain/src/integration-conflict-selection.js';
 
 const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).digest('hex');
 const inside = (a: string, b: string) => {
@@ -125,8 +133,14 @@ function validateLocalApplication(record: LocalApplication, operation: Integrati
         : !!v && e.objectId === v.objectId && e.gitMode === v.mode && e.bytes === v.bytes;
     if (
       !f ||
-      !['modify', 'delete'].includes(f.action) ||
-      f.conflict ||
+      (!['modify', 'delete'].includes(f.action) &&
+        !(
+          application.candidate &&
+          f.action === 'conflict' &&
+          f.conflict === 'both_changed' &&
+          f.target
+        )) ||
+      (f.conflict !== null && !(application.candidate && f.conflict === 'both_changed')) ||
       seen.has(entry.before.path) ||
       !matches(entry.before, f.target) ||
       !matches(entry.after, f.source)
@@ -640,6 +654,29 @@ export async function applyIntegration(
       );
       if (canonicalJson(plan) !== canonicalJson(o.report!.plan))
         throw new DomainError('INTEGRATION_SCOPE_CHANGED', '完整重算计划与原预检不一致');
+      const decisions =
+        candidate?.record.version === 2
+          ? {
+              version: 2 as const,
+              kind: 'explicit_conflict_choices' as const,
+              selectedPaths: candidate.record.progress.selectedPaths,
+              conflictChoices: candidate.record.manifest.conflictChoices!,
+            }
+          : undefined;
+      const effective: EffectiveIntegrationChange[] = decisions
+        ? evaluateIntegrationConflictSelection(plan, decisions).changes
+        : a.paths.map((path) => {
+            const f = plan.files.find((f) => f.path === path);
+            if (!f || f.conflict || !['add', 'modify', 'delete'].includes(f.action))
+              throw new DomainError('INTEGRATION_UNSUPPORTED', '旧候选或新增许可不能暗中采用冲突');
+            return {
+              path,
+              action: f.action as EffectiveIntegrationChange['action'],
+              before: f.target,
+              after: f.source,
+              decision: 'selected_source',
+            };
+          });
       const trialPlan = candidate
         ? await buildIntegrationTrialPlan(
             start.objectFormat,
@@ -648,21 +685,31 @@ export async function applyIntegration(
             plan,
             a.paths,
             w.root,
+            decisions,
           )
         : undefined;
       if (trialPlan) candidate!.verify(trialPlan);
       const addPaths = a.candidate
-        ? a.paths.filter((path) => plan.files.find((f) => f.path === path)?.action === 'add')
+        ? effective.filter((file) => file.action === 'add').map((file) => file.path)
         : a.paths;
       const additionPlan = addPaths.length
-        ? integrationAdditionPlan(
-            start.objectFormat,
-            o.target.manifest.tree,
-            t,
-            plan,
-            addPaths,
-            w.root,
-          )
+        ? a.candidate
+          ? integrationCandidateAdditionPlan(
+              start.objectFormat,
+              o.target.manifest.tree,
+              t,
+              effective,
+              addPaths,
+              w.root,
+            )
+          : integrationAdditionPlan(
+              start.objectFormat,
+              o.target.manifest.tree,
+              t,
+              plan,
+              addPaths,
+              w.root,
+            )
         : { files: [], directories: [], anchors: [] };
       const entry = (
         path: string,
@@ -676,14 +723,14 @@ export async function applyIntegration(
       });
       const changes = a.candidate
         ? a.paths.flatMap((path) => {
-            const f = plan.files.find((f) => f.path === path)!;
+            const f = effective.find((f) => f.path === path)!;
             if (f.action === 'add') return [];
-            if (!['modify', 'delete'].includes(f.action) || !f.target || f.conflict)
+            if (!['modify', 'delete'].includes(f.action) || !f.before)
               throw new DomainError('INTEGRATION_UNSUPPORTED', '固定候选存在未支持的变更');
             return [
               {
-                before: entry(path, f.target),
-                after: f.source ? entry(path, f.source) : null,
+                before: entry(path, f.before),
+                after: f.after ? entry(path, f.after) : null,
                 originalIdentity: inode(lstatSync(join(w.root, path), { bigint: true })),
                 backupName: `hexu-change-${randomUUID()}`,
                 observation: observeIntegrationChangeTarget(join(w.root, path)),

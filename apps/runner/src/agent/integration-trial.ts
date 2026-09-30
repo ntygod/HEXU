@@ -53,7 +53,14 @@ import {
 } from './integration-trial-journal.js';
 import { terminalLabel } from './terminal-label.js';
 
+import {
+  parseIntegrationConflictSelection,
+  type IntegrationConflictSelection,
+} from '../../../../packages/contracts/src/integration-conflict-selection.js';
+import { evaluateIntegrationConflictSelection } from '../../../../packages/domain/src/integration-conflict-selection.js';
+
 export interface IntegrationTrialOptions {
+  conflictSelection?: IntegrationConflictSelection;
   signal?: AbortSignal;
   log?: (message: string) => void;
   onProgress?: (progress: Readonly<IntegrationTrialProgress>) => void | Promise<void>;
@@ -144,8 +151,19 @@ export async function localIntegrationTrial(
   options: IntegrationTrialOptions = {},
 ) {
   nodeId(integrationId);
-  const selectedPaths = integrationTrialSelection(files),
+  const decisions =
+      options.conflictSelection === undefined
+        ? undefined
+        : parseIntegrationConflictSelection(options.conflictSelection),
+    selectedPaths = decisions ? decisions.selectedPaths : integrationTrialSelection(files),
     log = options.log ?? console.log;
+  if (
+    decisions &&
+    (!Array.isArray(files) ||
+      canonicalJson([...files].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)))) !==
+        canonicalJson(selectedPaths))
+  )
+    throw new DomainError('INVALID_INPUT', '明确冲突选择与实际来源路径不一致');
   if (process.platform !== 'linux')
     throw new DomainError('PLATFORM_UNSUPPORTED', '试应用仅支持 Linux 本人节点');
   if (!isAbsolute(target) || resolve(target) !== target)
@@ -254,7 +272,10 @@ export async function localIntegrationTrial(
         p.integrationId !== integrationId ||
         p.inputHash !== o.inputHash ||
         p.reportHash !== reportHash ||
-        canonicalJson(p.selectedPaths) !== canonicalJson(selectedPaths)
+        canonicalJson(p.selectedPaths) !== canonicalJson(selectedPaths) ||
+        previous.version !== (decisions ? 2 : 1) ||
+        canonicalJson(previous.manifest.conflictChoices ?? null) !==
+          canonicalJson(decisions?.conflictChoices ?? null)
       )
         throw new DomainError(
           'INTEGRATION_TRIAL_TARGET_CLAIMED',
@@ -282,17 +303,25 @@ export async function localIntegrationTrial(
     parent.assertAbsent();
     if (!o.report?.plan || o.report.plan.omittedFiles || o.report.reason)
       throw new DomainError('INTEGRATION_TRIAL_UNSUPPORTED', '试应用需要完整成功预检');
-    for (const path of selectedPaths) {
-      const entry = o.report.plan.files.find((e) => e.path === path);
-      if (!entry || entry.conflict || !['add', 'modify', 'delete'].includes(entry.action))
-        throw new DomainError(
-          'INTEGRATION_TRIAL_UNSUPPORTED',
-          '只能选择完整预检中的无冲突新增、修改或删除',
-        );
-    }
+    if (decisions) evaluateIntegrationConflictSelection(o.report.plan, decisions);
+    else
+      for (const path of selectedPaths) {
+        const entry = o.report.plan.files.find((e) => e.path === path);
+        if (!entry || entry.conflict || !['add', 'modify', 'delete'].includes(entry.action))
+          throw new DomainError(
+            'INTEGRATION_TRIAL_UNSUPPORTED',
+            '只能选择完整预检中的无冲突新增、修改或删除',
+          );
+      }
     log(
       `成果 ${terminalLabel(o.source.title)} · v${o.source.revision}\n共同起点 ${o.source.code.base.commit}\n来源 ${o.material.manifest.commit}\n原目标 ${o.target.manifest.commit}\n恢复副本 ${o.target.retentionId}\n原代码目录 ${terminalLabel(w.root)}\n新私有目录 ${terminalLabel(target)}\n选择：\n${selectedPaths.map(terminalLabel).join('\n')}`,
     );
+    if (decisions) {
+      const evaluated = evaluateIntegrationConflictSelection(o.report.plan, decisions);
+      log(
+        `明确冲突决策（不自动文本合并）：\n${decisions.conflictChoices.map((c) => `${terminalLabel(c.path)}：${c.choice === 'take_source' ? '采用来源整文件' : '保留目标整文件/缺失状态'}`).join('\n')}\n实际来源变更 ${selectedPaths.length} 项；明确保留目标 ${evaluated.keptTargetPaths.length} 项；未处理冲突 ${evaluated.unresolvedConflicts.length} 项；不支持结构冲突 ${evaluated.unsupportedConflicts.length} 项。0变更候选不授予写回许可。`,
+      );
+    }
     log(
       '只创建并排他发布新的独立试应用文件；不向原目标应用代码，不共享文件、字节或元数据，不创建 Git 状态，不运行脚本或模型。中断或结果未知时保留现场，不自动重写、回滚或清理。',
     );
@@ -368,6 +397,7 @@ export async function localIntegrationTrial(
           o.report!.plan!,
           selectedPaths,
           w.root,
+          decisions,
         );
         // The hidden staging name is longer than many final destination names.
         for (const e of plan.entries)

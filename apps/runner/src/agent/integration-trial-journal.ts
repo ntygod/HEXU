@@ -15,6 +15,8 @@ import type { RestoreTargetObservation } from './checkpoint-restore-plan.js';
 import type { OwnedRestoreEntry } from './checkpoint-restore-files.js';
 import type { IntegrationTrialManifest } from './integration-trial-plan.js';
 
+import { parseIntegrationConflictSelection } from '../../../../packages/contracts/src/integration-conflict-selection.js';
+
 export const trialHash = (value: unknown) =>
   createHash('sha256').update(canonicalJson(value)).digest('hex');
 export interface IntegrationTrialProgress {
@@ -43,7 +45,7 @@ export interface IntegrationTrialProgress {
   writeAuthorized: false;
 }
 export interface IntegrationTrialRecord {
-  version: 1;
+  version: 1 | 2;
   binding: string;
   observation: RestoreTargetObservation;
   manifest: IntegrationTrialManifest;
@@ -67,7 +69,11 @@ function decode(body: string, target: string): IntegrationTrialRecord {
   nodeId(p.id);
   nodeId(p.integrationId);
   if (
-    r.version !== 1 ||
+    ![1, 2].includes(r.version) ||
+    r.version !== r.manifest?.version ||
+    (r.version === 1
+      ? r.manifest.selection !== 'apply_source' || Object.hasOwn(r.manifest, 'conflictChoices')
+      : r.manifest.selection !== 'explicit_conflict_choices') ||
     p.target !== target ||
     r.observation.path !== target ||
     p.stageName !== `.hexu-restore-${p.id}` ||
@@ -98,6 +104,16 @@ function decode(body: string, target: string): IntegrationTrialRecord {
         p.writtenBytes !== p.totalBytes))
   )
     throw invalid();
+  if (r.version === 2) {
+    const decision = parseIntegrationConflictSelection({
+      version: 2,
+      kind: 'explicit_conflict_choices',
+      selectedPaths: p.selectedPaths,
+      conflictChoices: r.manifest.conflictChoices,
+    });
+    if (canonicalJson(decision.conflictChoices) !== canonicalJson(r.manifest.conflictChoices))
+      throw invalid();
+  }
   return r;
 }
 
@@ -170,6 +186,10 @@ export class IntegrationTrialJournal {
       report.preflightReportHash !== p.reportHash ||
       report.manifestHash !== p.manifestHash ||
       report.materializedAt !== p.publishedAt ||
+      report.version !== record.version ||
+      report.selection !== record.manifest.selection ||
+      canonicalJson(report.conflictChoices ?? null) !==
+        canonicalJson(record.manifest.conflictChoices ?? null) ||
       canonicalJson(report.selectedPaths) !== canonicalJson(p.selectedPaths) ||
       row.hash !== trialHash(report) ||
       !['frozen', 'pending', 'shared'].includes(row.state) ||
@@ -260,7 +280,7 @@ export class IntegrationTrialJournal {
     if (count.n >= 1000) throw new DomainError('INTEGRATION_TRIAL_LIMIT', '本机试应用记录已达上限');
     const id = randomUUID();
     const record: IntegrationTrialRecord = {
-      version: 1,
+      version: input.manifest.version,
       binding: input.binding,
       observation: input.observation,
       manifest: input.manifest,

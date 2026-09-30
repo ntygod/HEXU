@@ -5,7 +5,7 @@
 ## 仅新增文件的原入口
 
 1. 按[整合预检](integration-preflight.md)完成固定成果、目标提交/恢复副本和完整对象三方预检。80项/48 KiB有省略的计划不能用于应用。
-2. 打开原Task的整合记录，点“选择文件应用”。只选择明确标为新增的普通文件；修改、删除、冲突、目标已有文件不能在本轮选用。未选范围保持原目标。
+2. 打开原Task的整合记录，点“选择文件应用”。只选择明确标为新增的普通文件；修改、删除、冲突、目标已有文件不能在此旧新增入口选用。未选范围保持原目标。
 3. 核对固定来源版本、目标提交、恢复副本和所选文件，勾选确认后点“确认所选应用范围”保存。请求固定预检报告指纹、目标/Task修订和规范化选择，不能被后来的方案选择或新报告替换。尚未写入；此时可在Task内取消。
 4. 在原目标节点构建后运行：
 
@@ -78,4 +78,4 @@ npm run runner:integration-status -- --operation <整合ID> --state <节点状�
 
 ## 尚未支持
 
-固定候选的普通文件替换/移出已通过PR29精确head `799ef0a` 的工程820/820与Chromium148/148。现另有[已完成应用的文件恢复](integration-file-restoration.md)，需全新请求、原节点确认和新当前文件保留目录；恢复原备份的全部选定文件，不处理未知/部分原应用或覆盖后续用户编辑。特殊权限/扩展属性/ACL、文本自动合并、冲突选择、linked worktree、Windows/macOS、多来源和跨电脑部署仍未交付。保留现场解除原占用已有，不等于恢复了代码。Linux文件/协议夹具不代表真实Claude/Codex账户联调。新增父目录的本地实现和验证见[目录扩展记录](../development/history/2026-09-30-integration-add-directories.md)，首个应用切片见[应用记录](../development/history/2026-09-30-integration-application.md)。
+固定候选的普通文件替换/移出已通过PR29精确head `799ef0a` 的工程820/820与Chromium148/148。现另有[已完成应用的文件恢复](integration-file-restoration.md)，需全新请求、原节点确认和新当前文件保留目录；恢复原备份的全部选定文件，不处理未知/部分原应用或覆盖后续用户编辑。普通both_changed可通过[整文件明确选择](integration-conflict-choices.md)生成版本2固定候选后另行写回，保留目标项不进入应用。特殊权限/扩展属性/ACL、文本自动合并、结构冲突、linked worktree、Windows/macOS、多来源和跨电脑部署仍未交付。保留现场解除原占用已有，不等于恢复了代码。Linux文件/协议夹具不代表真实Claude/Codex账户联调。新增父目录的本地实现和验证见[目录扩展记录](../development/history/2026-09-30-integration-add-directories.md)，首个应用切片见[应用记录](../development/history/2026-09-30-integration-application.md)。

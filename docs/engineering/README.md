@@ -47,6 +47,7 @@
 | 明确停止旧应用及子进程后，保留全部文件并结算原占用 | [本机结算](integration-recovery.md) |
 | 原已完成应用的全部文件，从精确原备份另行确认恢复 | [原应用文件恢复](integration-file-restoration.md) |
 | 选中新增/修改/删除，在新私有目录核对完整候选文件 | [独立目录试应用](integration-trial.md) |
+| 逐项明确采用来源/保留目标，生成固定候选并另行写回 | [整文件冲突选择](integration-conflict-choices.md) |
 | 本机核对候选差异，另行共享并在Task查看不可变历史 | [候选差异](integration-trial-differences.md) |
 
 ## 架构决策

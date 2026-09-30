@@ -41,6 +41,10 @@ import {
   type IntegrationFileRestorationRecoveryReceipt,
 } from '../../contracts/src/integration-restorations.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
+import {
+  evaluateIntegrationConflictSelection,
+  type EffectiveIntegrationChange,
+} from '../../domain/src/integration-conflict-selection.js';
 import { CheckpointTransferStore } from './checkpoint-transfer.js';
 import { ResultRevisions } from './result-revisions.js';
 import { WorkBranchStore } from './work-branches.js';
@@ -328,7 +332,9 @@ export class IntegrationStore {
         !!o.report?.plan &&
         !o.report.plan.omittedFiles &&
         o.report.plan.files.some(
-          (f) => !f.conflict && ['add', 'modify', 'delete'].includes(f.action),
+          (f) =>
+            (!f.conflict && ['add', 'modify', 'delete'].includes(f.action)) ||
+            (f.action === 'conflict' && f.conflict === 'both_changed'),
         );
     } catch {
       /* read-only viewer */
@@ -437,16 +443,24 @@ export class IntegrationStore {
           report.preflightReportHash !== codeHash(preflight) ||
           report.materializedAt < preflight.observedAt ||
           Date.parse(report.comparedAt) > Date.now() + 60000 ||
-          report.selectedPaths.some((path) => {
-            const file = plan.files.find((file) => file.path === path);
-            return !file || file.conflict || !['add', 'modify', 'delete'].includes(file.action);
-          })
+          (report.version === 1 &&
+            report.selectedPaths.some((path) => {
+              const file = plan.files.find((file) => file.path === path);
+              return !file || file.conflict || !['add', 'modify', 'delete'].includes(file.action);
+            }))
         )
           throw new DomainError(
             'INTEGRATION_TRIAL_MISMATCH',
             '候选差异与原固定输入、完整预检、选择或时间不匹配',
             409,
           );
+        if (report.version === 2)
+          evaluateIntegrationConflictSelection(plan, {
+            version: 2,
+            kind: 'explicit_conflict_choices',
+            selectedPaths: report.selectedPaths,
+            conflictChoices: report.conflictChoices!,
+          });
         for (const file of report.difference.files) {
           const original = plan.files.find((item) => item.path === file.path)!;
           if (
@@ -623,6 +637,7 @@ export class IntegrationStore {
       if (!o.report?.plan || codeHash(o.report) !== data.reportHash)
         throw new DomainError('INTEGRATION_REPORT_MISMATCH', '需选择当前固定预检报告', 409);
       const plan = o.report.plan;
+      let candidateChanges: Map<string, EffectiveIntegrationChange> | undefined;
       if (data.candidate) {
         const candidate = this.getTrial(taskId, id, data.candidate.trialId);
         if (
@@ -638,10 +653,20 @@ export class IntegrationStore {
             '需明确选择此整合的固定候选差异与完整路径，不使用新版本或子集替换',
             409,
           );
+        if (candidate.report.version === 2)
+          candidateChanges = new Map(
+            evaluateIntegrationConflictSelection(plan, {
+              version: 2,
+              kind: 'explicit_conflict_choices',
+              selectedPaths: candidate.report.selectedPaths,
+              conflictChoices: candidate.report.conflictChoices!,
+            }).changes.map((change) => [change.path, change]),
+          );
       }
       if (
         plan.omittedFiles ||
         data.paths.some((path) => {
+          if (candidateChanges) return !candidateChanges.has(path);
           const f = plan.files.find((f) => f.path === path);
           if (!f || f.conflict) return true;
           if (data.candidate) return !['add', 'modify', 'delete'].includes(f.action);
