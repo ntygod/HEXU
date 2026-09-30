@@ -4,17 +4,23 @@
 
 ## 下一项：HX-DEV-13-03 方案成果的固定版本与来源
 
-原远端 PR #17—#22、接受接手 PR #23 和现场研发 PR #24 已合入 main。已打通同机 Linux 接手原目录的有限 Git 准备、独立本人配对、另行执行授权与同 Task 新 Run；不要重新实现接受或改写原节点目录/凭证。用法见[接手现场研发](../engineering/handoff-workspace.md)。
+原远端 PR #17—#22、接受接手 PR #23、现场研发 PR #24、方案定义 PR #25 与独立现场 PR #26 已合入 main。已打通同机 Linux 接手原目录的有限 Git 准备、独立本人配对、另行执行授权与同 Task 新 Run；不要重新实现接受或改写原节点目录/凭证。用法见[接手现场研发](../engineering/handoff-workspace.md)。
 
 共同起点定义、同机Linux独立代码/Git准备、本人新节点登记与首轮Run已接入；同组不同现场可用Claude/Codex协议进程并发，支持独立停止与失败保留。见[方案现场](../engineering/branch-workspaces.md)。下一步把可查看的实际产物绑定为有来源、有固定版本的方案成果，供后续对比与选择使用。
 
-## 本轮范围
+### 已交付的前置切片
 
-1. 复用当前Task/Run/Result，明确终态Run与方案的真实关联、输入起点、实际输出和已知限制。未知进程或仍活动的现场不能冒充固定代码产物；失败的Run也可保留有用内容，但不得标成工具成功。
+本分支已增加 `GET /api/v1/tasks/:taskId/work-branches/:branchId/result-source`：当前权限下核对终态Run、独立现场和固定起点，返回实际派发输入、已共享输出的有界前缀、完整输出摘要和事件边界。详情见[成果来源预览](../engineering/branch-result-sources.md)。
+
+这只是只读预览，不写Result/Revision、不标ready、不改变Task，也没有新增保存按钮。`sourceHash`不是保存回执或授权令牌；迟到事件可改变已接收序号而不改变Run修订，所以后续保存必须在自己的事务内重新核对来源与事件边界，不能只比较Run.revision或信任客户端回传的正文。
+
+## 本轮剩余范围
+
+1. 沿用来源预览的真实关联和字节边界，在保存事务内复核当前权限、方案/Run修订、共同起点和事件摘要；提取可在同一事务内调用的核对逻辑，避免嵌套开启SQLite事务。未知进程或仍活动的现场不能冒充固定代码产物；失败的Run可保留有用内容，但不得标成工具成功。
 2. 用户明确保存可查看的成果版本；可先交付固定文本/来源Run及可选代码检查点引用。代码尚未固定时清楚标明缺失，不能从普通变更数量、初始共同提交或示例预览推断本轮代码产物已保留。
 3. Result与不可变版本、WorkBranch关联、分支修订、历史、outbox和回执保持原子性。保存后更新任务说明或模型输出不重写旧成果。ready只表示存在可查看成果，不是质量结论、自动选中或Task完成。
 4. 在原方案卡展示版本/来源与部分失败，临时读错保留，撤权清除，未知回复对账原请求；沿用W1，不新建另一套任务/AI会话系统。
-5. 验证错误来源/不同方案拒绝、并发修订、事务回滚、刷新、撤权/旧回执和输出截取边界。后续13-04的对比/选择继续消费这些固定版本，13-05的整合不能读取活动目录拼接。
+5. 补齐保存时的并发修订、事务回滚、重复提交、刷新、撤权/旧回执与迟到输出竞争验证。现有来源/UTF-8边界测试继续保留。后续13-04的对比/选择继续消费固定版本，13-05的整合不能读取活动目录拼接。
 
 代码路径继续限定同服务、同项目、同机 Linux。采用明确协议替身验证实际进程/文件/HTTP，不把它记作真实账户联调或跨平台支持。
 
@@ -22,7 +28,7 @@
 
 - [方案分支](../harness/parallel.md)、[身份](../harness/identity.md)、[UI](../harness/ui.md)；涉及代码引用和新对象读取时补读[检查点](../harness/checkpoints.md)。
 - [13工作包](13-parallel-exploration.md)、[14成果](14-results-feedback.md)、[产品多工具行为](../product/03-functional-specification.md#hx-f05多工具多模型继续协助并行)、[领域状态](../product/05-domain-and-state.md)。
-- [方案事务](../../packages/db/src/work-branches.ts)、[现场/Run关联](../../packages/db/src/work-branch-workspaces.ts)、[Run与Result](../../packages/db/src/store.ts)、[成果页](../../apps/web/src/results.tsx)和[节点事件](../../packages/db/src/node-execution.ts)。先核对现有Result修订行为，保持现有用户成果可读。
+- [来源预览](../../packages/db/src/work-branch-result-source.ts)、[来源契约](../../packages/contracts/src/work-branch-result-source.ts)、[方案事务](../../packages/db/src/work-branches.ts)、[现场/Run关联](../../packages/db/src/work-branch-workspaces.ts)、[Run与Result](../../packages/db/src/store.ts)、[成果页](../../apps/web/src/results.tsx)和[节点事件](../../packages/db/src/node-execution.ts)。先核对现有Result修订行为，保持现有用户成果可读。
 
 ## 剩余交付队列
 
