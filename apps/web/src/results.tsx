@@ -47,10 +47,12 @@ export function ResultPage({
   id,
   revisionId,
   feedbackId,
+  messageId,
 }: {
   id: string;
   revisionId?: string;
   feedbackId?: string;
+  messageId?: string;
 }) {
   const [pinned, setPinned] = useState(revisionId);
   const read = useAssistanceRead<ResultDetail>(
@@ -82,6 +84,11 @@ export function ResultPage({
   const editable = canEditTask(data, task);
   return (
     <div className="work-page result-workspace">
+      {messageId && !messages.some((message) => message.id === messageId) && (
+        <p className="form-error" role="alert">
+          此固定版本没有该反馈消息，没有跳到最新版本或其他任务。
+        </p>
+      )}
       {feedbackId &&
         !messages.some((message) => message.id === feedbackId && message.codeAnchor) && (
           <p className="form-error" role="alert">
@@ -203,7 +210,7 @@ export function ResultPage({
             <span className="count">{messages.length}</span>
           </div>
           <div className="result-discussion">
-            <MessageList messages={messages} />
+            <MessageList messages={messages} focusMessageId={messageId} />
             {!messages.length && (
               <p className="work-empty-text">写下你的反馈，或提出下一步修改。</p>
             )}

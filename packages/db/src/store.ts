@@ -3,6 +3,11 @@ import {
   type ResultCodeFeedbackAnchor,
 } from '../../contracts/src/result-code-feedback.js';
 import { resolveCodeFeedbackAnchor } from './result-code-feedback.js';
+import {
+  parseResultFeedbackReply,
+  type ResultFeedbackReplyTarget,
+} from '../../contracts/src/result-feedback-replies.js';
+import { resolveFeedbackReplySource } from './result-feedback-replies.js';
 import { AssistanceAdoptionsStore } from './assistance-adoption.js';
 import { ResultRevisions } from './result-revisions.js';
 import { AssistanceStore } from './assistance.js';
@@ -177,13 +182,20 @@ export class Store {
       throw error;
     }
   }
-  mutate<T>(scope: string, key: string, payload: unknown, action: () => T): T {
+  mutate<T>(
+    scope: string,
+    key: string,
+    payload: unknown,
+    action: () => T,
+    beforeReplay?: () => void,
+  ): T {
     if (!key || key.length > 128 || !/^[\w.:-]+$/.test(key))
       throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', '操作需要有效的 Idempotency-Key');
     if (this.teamMode) this.permissions.space();
     const fullScope = `${this.actorId}:${this.teamMode ? this.spaceId + ':' : ''}${scope}`;
     const fingerprint = createHash('sha256').update(canonicalJson(payload)).digest('hex');
     return this.transaction(() => {
+      beforeReplay?.();
       const previous = this.db
         .prepare('SELECT fingerprint,result FROM idempotency_records WHERE scope=? AND key=?')
         .get(fullScope, key) as { fingerprint: string; result: string } | undefined;
@@ -450,6 +462,7 @@ export class Store {
     resultId: string | null = null,
     resultRevisionId?: string,
     codeAnchor?: ResultCodeFeedbackAnchor,
+    replyTo?: ResultFeedbackReplyTarget,
   ) {
     const item: Message = {
       id: randomUUID(),
@@ -459,7 +472,9 @@ export class Store {
       actorName,
       resultId,
       ...(resultRevisionId ? { resultRevisionId } : {}),
-      ...(codeAnchor ? { codeAnchor, createdByUserId: this.actorId } : {}),
+      ...(codeAnchor ? { codeAnchor } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      ...(codeAnchor || replyTo ? { createdByUserId: this.actorId } : {}),
       createdAt: now(),
     };
     this.db
@@ -507,6 +522,37 @@ export class Store {
         anchor,
       );
     });
+  }
+  addFeedbackReply(
+    resultId: string,
+    revisionId: string,
+    messageId: string,
+    value: unknown,
+    key: string,
+  ) {
+    const input = parseResultFeedbackReply(value);
+    // Current edit permission applies even when this is a retry of an old receipt.
+    let source = resolveFeedbackReplySource(this, resultId, revisionId, messageId);
+    return this.mutate(
+      `result.feedback-reply:${revisionId}:${messageId}`,
+      key,
+      input,
+      () =>
+        this.insertMessage(
+          source.taskId,
+          input.body,
+          'human',
+          this.actorName(),
+          resultId,
+          revisionId,
+          source.codeAnchor,
+          source.replyTo,
+        ),
+      () => {
+        // Recheck inside the transaction, before returning any saved receipt.
+        source = resolveFeedbackReplySource(this, resultId, revisionId, messageId);
+      },
+    );
   }
   runs(taskId: string): Run[] {
     this.getTask(taskId);
