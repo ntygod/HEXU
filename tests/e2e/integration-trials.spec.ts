@@ -441,6 +441,13 @@ test('候选历史固定trialId，新候选不替换旧详情；临时错误和�
       .locator('.result-code-file summary')
       .filter({ hasText: 'README.md' })
       .click();
+    await expect(
+      history(page).getByRole('button', { name: '行级差异', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(
+      history(page).getByRole('table', { name: '原目标文件与候选文件行级差异' }),
+    ).toContainText('较新候选正文');
+    await history(page).getByRole('button', { name: '两侧全文', exact: true }).click();
     await expect(history(page).locator('pre').last()).toHaveText('较新候选正文');
   } finally {
     await close(page, f);
