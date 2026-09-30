@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
+import { Button } from '../../../packages/ui/src/index.js';
 import {
   compareTextLines,
   type DifferenceLine,
@@ -38,9 +39,14 @@ function Context({ rows }: { rows: DifferenceLine[] }) {
       ))}
       <tr>
         <td colSpan={4} className="code-diff-fold">
-          <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+          >
             {expanded ? '收起' : '展开'} {rows.length - 6} 行未变内容
-          </button>
+          </Button>
         </td>
       </tr>
       {expanded && rows.slice(3, -3).map((row, i) => <Line row={row} key={'middle' + i} />)}
@@ -81,17 +87,17 @@ export function CodeLineDifference({
   return (
     <div className="code-line-difference">
       <div className="code-diff-toolbar" role="group" aria-label="代码阅读方式">
-        <button
+        <Button
           type="button"
           aria-pressed={!showFull}
           disabled={comparison.kind === 'fallback'}
           onClick={() => setFull(false)}
         >
           行级差异
-        </button>
-        <button type="button" aria-pressed={showFull} onClick={() => setFull(true)}>
+        </Button>
+        <Button type="button" aria-pressed={showFull} onClick={() => setFull(true)}>
           两侧全文
-        </button>
+        </Button>
         {comparison.kind === 'diff' && (
           <span aria-label="文本变化行数">
             +{comparison.added} / −{comparison.removed} 行

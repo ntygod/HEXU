@@ -113,14 +113,11 @@ test('固定代码行号和增删定位、键盘展开上下文、两侧全文�
       .click();
     await mkdir('artifacts', { recursive: true });
     await table.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: 'artifacts/144-readable-line-diff-dark.png', fullPage: true });
+    await d.screenshot({ path: 'artifacts/144-readable-line-diff-dark.png' });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
     await page.setViewportSize({ width: 390, height: 844 });
     await table.scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: 'artifacts/145-readable-line-diff-mobile-light.png',
-      fullPage: true,
-    });
+    await d.screenshot({ path: 'artifacts/145-readable-line-diff-mobile-light.png' });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

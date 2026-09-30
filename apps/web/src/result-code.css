@@ -82,6 +82,7 @@
   font-family: var(--hx-font-ui);
   color: var(--hx-text-secondary);
   text-align: left;
+  white-space: nowrap;
   font-weight: 400;
   border-bottom: 1px solid var(--hx-border-subtle);
 }
@@ -91,7 +92,7 @@
   padding: var(--hx-space-1);
 }
 .code-diff-gutter {
-  width: 4ch;
+  width: 5ch;
 }
 .code-diff-marker {
   width: 2ch;
