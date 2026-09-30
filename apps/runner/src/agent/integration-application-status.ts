@@ -173,6 +173,20 @@ export function readIntegrationApplicationStatus(home: string, integrationId: st
       bytes: entry.bytes,
       identity: entry.identity,
     })),
+    ...(record.existingChanges
+      ? {
+          existingChanges: {
+            stoppedWritersAt: record.existingChanges.stoppedWritersAt,
+            backup: record.existingChanges.backup.path,
+            backupIdentity: record.existingChanges.backupIdentity,
+            backupDirectoryIntent: record.existingChanges.directoryIntent,
+            stageName: record.existingChanges.stageName,
+            stageIdentity: record.existingChanges.stageIdentity,
+            confirmed: record.existingChanges.changes,
+            intended: record.existingChanges.intent,
+          },
+        }
+      : {}),
     directoryChecked: false,
     currentServerAuthorityChecked: false,
     processStoppedConfirmed: false,

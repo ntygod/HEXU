@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   integrationTrialCommand,
+  integrationCandidateApplicationCommand,
   integrationTrialDifferenceCommand,
   quoteShellArgument,
   sortTrialPaths,
@@ -70,5 +71,20 @@ test('difference command retains original operation and explicitly requires loca
     '<原节点状态目录>',
     '--trial',
     '<本机 ready 候选的 trialId>',
+  ]);
+});
+
+test('candidate application command binds operation and quotes the separately selected private backup path', () => {
+  assert.deepEqual(argumentsOf(integrationCandidateApplicationCommand("op'fixed")), [
+    'npm',
+    'run',
+    'runner:integration-apply',
+    '--',
+    '--operation',
+    "op'fixed",
+    '--state',
+    '<原节点状态目录>',
+    '--backup',
+    '<全新私有备份绝对目录>',
   ]);
 });

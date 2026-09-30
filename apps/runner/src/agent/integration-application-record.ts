@@ -7,6 +7,11 @@ import {
 } from '../../../../packages/contracts/src/integrations.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import type { RestoreEntry } from './checkpoint-restore-plan.js';
+import {
+  validateExistingIntegrationChanges,
+  hasExistingIntegrationMaterial,
+  type ExistingIntegrationChanges,
+} from './integration-existing-change-record.js';
 import { INTEGRATION_DIRECTORY_LIMITS } from './integration-application-plan.js';
 import {
   validateRecoveryContextBinding,
@@ -39,7 +44,13 @@ export interface LocalApplication {
   /** Absent on older file-only records; never backfill unknown ownership. */
   directories?: CreatedIntegrationDirectory[];
   directoryIntent?: IntegrationDirectoryIntent | null;
+  existingChanges?: ExistingIntegrationChanges;
 }
+export const confirmedApplicationPaths = (record: LocalApplication) =>
+  [
+    ...record.added.map((entry) => entry.path),
+    ...(record.existingChanges?.changes.map((entry) => entry.before.path) ?? []),
+  ].sort();
 export function validateLocalShape(record: LocalApplication) {
   const invalid = () =>
     new DomainError('INTEGRATION_JOURNAL_INVALID', '本机应用证据不完整或不一致；保留原凭证和写锁');
@@ -135,6 +146,19 @@ export function validateLocalShape(record: LocalApplication) {
       }
     }
   }
+  if (record.existingChanges !== undefined) {
+    if (!record.recoveryContext?.candidate) throw invalid();
+    validateExistingIntegrationChanges(
+      record.existingChanges,
+      record.root,
+      record.recoveryContext.selectedPaths,
+    );
+    if (
+      record.existingChanges.changes.some((entry) => seen.has(entry.before.path)) ||
+      (record.existingChanges.intent && record.intent !== record.existingChanges.intent.before.path)
+    )
+      throw invalid();
+  } else if (record.recoveryContext?.candidate) throw invalid();
   if (record.pending !== null) {
     try {
       parseIntegrationApplicationReport(record.pending);
@@ -171,6 +195,7 @@ export function parseLocalApplicationRecord(
         'acknowledged',
         ...(record.recoveryContext === undefined ? [] : ['recoveryContext']),
         ...(record.directories === undefined ? [] : ['directories', 'directoryIntent']),
+        ...(record.existingChanges === undefined ? [] : ['existingChanges']),
       ]) ||
       record.integrationId !== integrationId ||
       nodeId(record.applicationId) !== record.applicationId ||
@@ -192,8 +217,7 @@ export function parseLocalApplicationRecord(
         pending.inputHash !== record.inputHash ||
         pending.sequence !== record.acknowledged + 1 ||
         pending.stage !== (record.phase === 'prepared' ? 'applying' : record.phase) ||
-        canonicalJson(pending.appliedPaths) !==
-          canonicalJson(record.added.map((entry) => entry.path).sort()))
+        canonicalJson(pending.appliedPaths) !== canonicalJson(confirmedApplicationPaths(record)))
     )
       throw invalid();
 
@@ -206,7 +230,8 @@ export function parseLocalApplicationRecord(
           record.intent !== null ||
           record.acknowledged > 1 ||
           record.directories?.length ||
-          record.directoryIntent
+          record.directoryIntent ||
+          hasExistingIntegrationMaterial(record.existingChanges)
         )
           throw invalid();
         break;
@@ -215,7 +240,14 @@ export function parseLocalApplicationRecord(
         break;
       case 'completed':
         if (
-          !record.added.length ||
+          record.existingChanges &&
+          (!record.existingChanges.backupIdentity ||
+            record.existingChanges.directoryIntent ||
+            record.existingChanges.intent)
+        )
+          throw invalid();
+        if (
+          !confirmedApplicationPaths(record).length ||
           record.intent !== null ||
           record.directoryIntent ||
           (pending ? record.acknowledged !== 1 : record.acknowledged !== 2)
@@ -227,7 +259,8 @@ export function parseLocalApplicationRecord(
           record.added.length ||
           record.intent !== null ||
           record.directories?.length ||
-          record.directoryIntent
+          record.directoryIntent ||
+          hasExistingIntegrationMaterial(record.existingChanges)
         )
           throw invalid();
         break;

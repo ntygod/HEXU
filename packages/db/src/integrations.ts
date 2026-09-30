@@ -580,16 +580,34 @@ export class IntegrationStore {
       if (!o.report?.plan || codeHash(o.report) !== data.reportHash)
         throw new DomainError('INTEGRATION_REPORT_MISMATCH', '需选择当前固定预检报告', 409);
       const plan = o.report.plan;
+      if (data.candidate) {
+        const candidate = this.getTrial(taskId, id, data.candidate.trialId);
+        if (
+          candidate.hash !== data.candidate.reportHash ||
+          candidate.hash !== codeHash(candidate.report) ||
+          candidate.report.manifestHash !== data.candidate.manifestHash ||
+          candidate.report.integrationInputHash !== o.inputHash ||
+          candidate.report.preflightReportHash !== data.reportHash ||
+          canonicalJson([...candidate.report.selectedPaths].sort()) !== canonicalJson(data.paths)
+        )
+          throw new DomainError(
+            'INTEGRATION_CANDIDATE_MISMATCH',
+            '需明确选择此整合的固定候选差异与完整路径，不使用新版本或子集替换',
+            409,
+          );
+      }
       if (
         plan.omittedFiles ||
         data.paths.some((path) => {
           const f = plan.files.find((f) => f.path === path);
-          return !f || f.action !== 'add' || !f.source || !!f.base || !!f.target || !!f.conflict;
+          if (!f || f.conflict) return true;
+          if (data.candidate) return !['add', 'modify', 'delete'].includes(f.action);
+          return f.action !== 'add' || !f.source || !!f.base || !!f.target;
         })
       )
         throw new DomainError(
           'INTEGRATION_APPLICATION_UNSUPPORTED',
-          '当前仅支持完整预检中无冲突的新增普通文件，不支持修改、删除、已存在文件或省略清单',
+          '需要完整预检中的无冲突变更；已有文件修改/移出必须另行确认固定候选，旧新增许可不适用',
           409,
         );
       const applicationId = randomUUID(),
@@ -598,11 +616,13 @@ export class IntegrationStore {
         id: applicationId,
         reportHash: data.reportHash,
         paths: data.paths,
+        ...(data.candidate ? { candidate: data.candidate } : {}),
         inputHash: codeHash({
           integrationId: o.id,
           applicationId,
           reportHash: data.reportHash,
           paths: data.paths,
+          ...(data.candidate ? { candidate: data.candidate } : {}),
         }),
         requestedAt,
         requestedBy: { id: this.store.actorId, name: this.store.actorName() },

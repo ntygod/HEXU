@@ -1,5 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
+import { codeHash } from '../../packages/db/src/result-code.js';
 import type {
   IntegrationReport,
   IntegrationView,
@@ -8,12 +10,15 @@ import type {
   IntegrationTrialDifferenceDetail,
   IntegrationTrialDifferenceSummary,
 } from '../../packages/contracts/src/integration-trial.js';
-import { integrationTrialCommand } from '../../apps/web/src/integration-trial-command.js';
+import {
+  integrationCandidateApplicationCommand,
+  integrationTrialCommand,
+} from '../../apps/web/src/integration-trial-command.js';
 import { integrationFixture } from '../helpers/integrations.js';
 
 // Deterministic browser protocol/rendering fixtures only. They do not create candidate
 // directories or prove object verification; real local evidence is tested by the runner suite.
-// Browser execution is currently permission-blocked. These cases are typechecked, not run.
+// Local browser launch remains permission-blocked; exact-head GitHub CI supplies browser evidence.
 const origin = 'http://127.0.0.1:4321';
 type Fixture = Awaited<ReturnType<typeof integrationFixture>>;
 const records = (page: Page) => page.getByRole('dialog', { name: '任务整合预检', exact: true });
@@ -503,6 +508,215 @@ test('候选共享文件省略不截断80条完整选择，手机浅色仍保留
     await expect
       .poll(() => history(page).evaluate((element) => element.clientWidth))
       .toBeGreaterThan(280);
+  } finally {
+    await close(page, f);
+  }
+});
+
+const writeEditor = (page: Page) =>
+  page.getByRole('dialog', { name: '确认选择性应用', exact: true });
+const writeConsent = (page: Page) =>
+  writeEditor(page).getByRole('checkbox', { name: /我已核对这个固定候选/ });
+const writeSubmit = (page: Page) =>
+  writeEditor(page).getByRole('button', { name: '确认所选应用范围', exact: true });
+async function publishedCandidate(f: Fixture, v: IntegrationView) {
+  const detail = candidate(v, new Date().toISOString(), 'SOURCE_SECRET_BODY');
+  detail.hash = codeHash(detail.report);
+  const response = await f.protocol('trial-diff-publish', detail.report);
+  expect(response.statusCode, response.body).toBe(200);
+  return detail;
+}
+async function chooseWrite(page: Page) {
+  await history(page).getByRole('button', { name: '确认写回此候选', exact: true }).click();
+  await expect(writeEditor(page).getByRole('region', { name: '固定写回候选' })).toBeVisible();
+}
+test('完整候选另外确认新增修改删除，取消不提交、重复点击只保存一次，暗色/手机可用', async ({
+  page,
+}) => {
+  const f = await integrationFixture(origin);
+  try {
+    const v = await ready(f),
+      detail = await publishedCandidate(f, v);
+    let posts = 0;
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && r.url().endsWith(`/integrations/${v.operation.id}/apply`))
+        posts++;
+    });
+    await open(page, f);
+    await chooseWrite(page);
+    await expect(writeSubmit(page)).toBeDisabled();
+    for (const name of detail.report.selectedPaths) {
+      const box = writeEditor(page).getByRole('checkbox', { name: `选择 ${name}`, exact: true });
+      await expect(box).toBeChecked();
+      await expect(box).toBeDisabled();
+    }
+    await writeConsent(page).check();
+    await expect(writeSubmit(page)).toBeEnabled();
+    await mkdir('artifacts', { recursive: true });
+    await page.screenshot({ path: 'artifacts/126-integration-candidate-writeback-dark.png' });
+    await page.keyboard.press('Escape');
+    expect(posts).toBe(0);
+    await chooseWrite(page);
+    await expect(writeConsent(page)).not.toBeChecked();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    await expect
+      .poll(() =>
+        writeEditor(page)
+          .locator('form')
+          .evaluate((e) => e.scrollWidth - e.clientWidth),
+      )
+      .toBeLessThanOrEqual(1);
+    await expect
+      .poll(() =>
+        writeEditor(page)
+          .locator('form')
+          .evaluate((e) => e.clientWidth),
+      )
+      .toBeGreaterThan(320);
+    await page.screenshot({
+      path: 'artifacts/127-integration-candidate-writeback-mobile-light.png',
+    });
+    await writeConsent(page).check();
+    await expect(writeSubmit(page)).toBeEnabled();
+    await writeSubmit(page).evaluate((e) => {
+      (e as HTMLButtonElement).click();
+      (e as HTMLButtonElement).click();
+    });
+    await expect(writeEditor(page)).toHaveCount(0);
+    const after = (
+      await f.api.call(`${f.integrationPath}/${v.operation.id}`, f.alice)
+    ).json() as IntegrationView;
+    expect(after.operation.application!.candidate).toEqual({
+      trialId: detail.report.trialId,
+      reportHash: detail.hash,
+      manifestHash: detail.report.manifestHash,
+      confirmExistingChanges: true,
+    });
+    expect(after.operation.application!.paths).toEqual([...detail.report.selectedPaths].sort());
+    expect(posts).toBe(1);
+    const status = records(page).getByRole('region', { name: '文件应用状态', exact: true });
+    await expect(status.locator('pre')).toHaveText(
+      integrationCandidateApplicationCommand(v.operation.id),
+    );
+    await expect(status).toContainText('全部写入者已停止');
+    await expect(status).toContainText('备份路径不上传');
+  } finally {
+    await close(page, f);
+  }
+});
+
+test('固定候选写回丢失回执关闭重开仍确认原候选和原请求，不替换为后来候选', async ({ page }) => {
+  const f = await integrationFixture(origin);
+  try {
+    const v = await ready(f),
+      first = await publishedCandidate(f, v);
+    const url = `${viewUrl(f, v)}/apply`,
+      attempts: { body: unknown; key: string | undefined }[] = [];
+    await page.route(url, async (route) => {
+      attempts.push({
+        body: route.request().postDataJSON(),
+        key: route.request().headers()['idempotency-key'],
+      });
+      if (attempts.length === 1) {
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await open(page, f);
+    await chooseWrite(page);
+    await writeConsent(page).check();
+    await expect(writeSubmit(page)).toBeEnabled();
+    await writeSubmit(page).click();
+    await expect(
+      writeEditor(page).getByRole('region', { name: '应用请求待确认', exact: true }),
+    ).toBeVisible();
+    await writeEditor(page)
+      .locator('.dialog-footer')
+      .getByRole('button', { name: '关闭', exact: true })
+      .click();
+    const newer = await publishedCandidate(f, v);
+    expect(newer.report.trialId).not.toBe(first.report.trialId);
+    await records(page).getByRole('button', { name: '继续确认应用请求', exact: true }).click();
+    await expect(writeEditor(page).getByRole('region', { name: '固定写回候选' })).toContainText(
+      first.report.trialId,
+    );
+    await writeEditor(page).getByRole('button', { name: '确认上次应用请求', exact: true }).click();
+    await expect(writeEditor(page)).toHaveCount(0);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toEqual(attempts[0]);
+    expect(attempts[0]!.key).toBeTruthy();
+    const final = (
+      await f.api.call(`${f.integrationPath}/${v.operation.id}`, f.alice)
+    ).json() as IntegrationView;
+    expect(final.operation.application!.candidate!.trialId).toBe(first.report.trialId);
+  } finally {
+    await close(page, f);
+  }
+});
+
+test('候选写回临时错误保留固定选择，旧任务修订需重新核对且重新确认', async ({ page }) => {
+  const f = await integrationFixture(origin);
+  try {
+    const v = await ready(f),
+      detail = await publishedCandidate(f, v);
+    await open(page, f);
+    await chooseWrite(page);
+    await writeConsent(page).check();
+    await expect(writeSubmit(page)).toBeEnabled();
+    const url = viewUrl(f, v);
+    await page.route(url, (route) => error(route, 503, '写回状态暂时不可读'));
+    await expect(writeEditor(page)).toContainText('写回状态暂时不可读');
+    await expect(writeConsent(page)).toBeChecked();
+    await expect(writeSubmit(page)).toBeDisabled();
+    await expect(writeEditor(page).getByRole('region', { name: '固定写回候选' })).toContainText(
+      detail.report.trialId,
+    );
+    await page.unroute(url);
+    f.as(() =>
+      f.api.store.changeTask(
+        f.task.id,
+        'done',
+        f.api.store.getTask(f.task.id).revision,
+        'keep',
+        randomUUID(),
+      ),
+    );
+    await writeEditor(page).getByRole('button', { name: '重读应用状态', exact: true }).click();
+    await expect(writeEditor(page)).toContainText('明确重新核对后才能提交');
+    await writeEditor(page).getByRole('button', { name: '重新核对应用基线', exact: true }).click();
+    await expect(writeConsent(page)).not.toBeChecked();
+    for (const name of detail.report.selectedPaths)
+      await expect(
+        writeEditor(page).getByRole('checkbox', { name: `选择 ${name}`, exact: true }),
+      ).toBeChecked();
+    await writeConsent(page).check();
+    await expect(writeSubmit(page)).toBeEnabled();
+  } finally {
+    await close(page, f);
+  }
+});
+
+test('候选写回确实撤权时清除固定候选与确认，不因重新授权复活', async ({ page }) => {
+  const f = await integrationFixture(origin);
+  try {
+    const v = await ready(f),
+      detail = await publishedCandidate(f, v);
+    await open(page, f);
+    await chooseWrite(page);
+    await writeConsent(page).check();
+    const url = `${viewUrl(f, v)}/trials/${detail.report.trialId}`;
+    await page.route(url, (route) => error(route, 403, '候选权限已撤销'));
+    await expect(writeEditor(page)).toHaveCount(0);
+    await expect(records(page)).toContainText('读取或操作权限已失效，整合内容已清除');
+    await page.unroute(url);
+    await records(page).getByRole('button', { name: '关闭', exact: true }).click();
+    await page.getByRole('button', { name: '整合预检', exact: true }).click();
+    await expect(records(page)).toContainText('读取或操作权限已失效，整合内容已清除');
+    expect(
+      (await f.api.call(`${f.integrationPath}/${v.operation.id}`, f.alice)).json().operation
+        .application,
+    ).toBeNull();
   } finally {
     await close(page, f);
   }

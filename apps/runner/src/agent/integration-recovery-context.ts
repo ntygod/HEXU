@@ -3,7 +3,11 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import { exact, nodeId } from '../../../../packages/contracts/src/nodes.js';
 import { checkpointHash, commitOid } from '../../../../packages/contracts/src/checkpoints.js';
-import type { IntegrationOperation } from '../../../../packages/contracts/src/integrations.js';
+import {
+  parseIntegrationApplicationCandidate,
+  type IntegrationApplicationCandidate,
+  type IntegrationOperation,
+} from '../../../../packages/contracts/src/integrations.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import type { NodeCredentials } from './storage.js';
 import type { LocalApplication } from './integration-application-record.js';
@@ -38,6 +42,7 @@ export interface IntegrationRecoveryContext {
   target: { checkpointId: string; retentionId: string; commit: string; snapshotHash: string };
   reportHash: string;
   selectedPaths: string[];
+  candidate?: IntegrationApplicationCandidate;
   root: string;
   rootIdentity: string;
   gitDir: string;
@@ -66,6 +71,7 @@ export function parseIntegrationRecoveryContext(value: unknown): IntegrationReco
       'target',
       'reportHash',
       'selectedPaths',
+      'candidate',
       'root',
       'rootIdentity',
       'gitDir',
@@ -73,6 +79,12 @@ export function parseIntegrationRecoveryContext(value: unknown): IntegrationReco
       'contextHash',
     ]) as unknown as IntegrationRecoveryContext;
     if (c.version !== 1) throw invalid();
+    if (
+      'candidate' in c &&
+      canonicalJson(parseIntegrationApplicationCandidate(c.candidate)) !==
+        canonicalJson(c.candidate)
+    )
+      throw invalid();
     for (const id of [
       c.integrationId,
       c.applicationId,
@@ -158,6 +170,7 @@ export function parseIntegrationRecoveryContext(value: unknown): IntegrationReco
           applicationId: c.applicationId,
           reportHash: c.reportHash,
           paths: c.selectedPaths,
+          ...(c.candidate ? { candidate: c.candidate } : {}),
         })
     )
       throw invalid();
@@ -198,6 +211,7 @@ export function freezeIntegrationRecoveryContext(
         applicationId: a.id,
         reportHash: a.reportHash,
         paths: a.paths,
+        ...(a.candidate ? { candidate: a.candidate } : {}),
       })
   )
     throw invalid();
@@ -230,6 +244,7 @@ export function freezeIntegrationRecoveryContext(
     },
     reportHash: a.reportHash,
     selectedPaths: [...a.paths],
+    ...(a.candidate ? { candidate: a.candidate } : {}),
     root: w.root,
     rootIdentity: w.rootIdentity,
     gitDir: w.gitDir,
@@ -257,7 +272,10 @@ export function validateRecoveryContextBinding(
       !c.selectedPaths.some((path) => path.startsWith(record.directoryIntent!.path + '/')))
   )
     throw invalid();
-  if (record.phase === 'completed' && record.added.length !== c.selectedPaths.length)
+  if (
+    record.phase === 'completed' &&
+    record.added.length + (record.existingChanges?.changes.length ?? 0) !== c.selectedPaths.length
+  )
     throw invalid();
   if (credentials) {
     const registered = credentials.directories.filter((w) => w.id === c.workspaceId);

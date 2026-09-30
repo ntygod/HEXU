@@ -77,7 +77,20 @@ function verifiedEntry(entry: RestoreEntry, bytes: Buffer): asserts entry is Fil
 }
 /** Check the actual named regular file and hold its fd across reading; both
  * helper and caller verify persisted bytes instead of trusting exit text. */
-function verifyNamed(parent: number, leaf: string, expected: FileEntry, wantedIdentity: string) {
+export function verifyIntegrationChangeFile(
+  parent: number,
+  leaf: string,
+  expected: RestoreEntry,
+  wantedIdentity: string,
+) {
+  if (
+    expected.kind !== 'file' ||
+    !['100644', '100755'].includes(expected.gitMode) ||
+    !Number.isSafeInteger(expected.bytes) ||
+    expected.bytes < 0 ||
+    expected.bytes > 8 * 1024 * 1024
+  )
+    throw unknown();
   const fd = openSync(fdPath(parent, leaf), F.O_RDONLY | F.O_NOFOLLOW | F.O_NONBLOCK);
   try {
     const s = fstatSync(fd, { bigint: true });
@@ -111,6 +124,7 @@ function verifyNamed(parent: number, leaf: string, expected: FileEntry, wantedId
       ) !== expected.objectId
     )
       throw unknown();
+    return identity(s) + ':' + stamp(s);
   } finally {
     closeSync(fd);
   }
@@ -144,7 +158,12 @@ export function publishIntegrationFileChange(
   target.revalidate();
   backup.revalidate();
   backup.assertAbsent();
-  verifyNamed(target.fd, basename(change.before.path), change.before, change.originalIdentity);
+  verifyIntegrationChangeFile(
+    target.fd,
+    basename(change.before.path),
+    change.before,
+    change.originalIdentity,
+  );
   const [dev, ino] = change.originalIdentity.split(':') as [string, string];
   const r = spawnSync(
     helper,
@@ -179,9 +198,14 @@ export function publishIntegrationFileChange(
   try {
     target.revalidate();
     backup.revalidate();
-    verifyNamed(backup.fd, change.backupName, change.before, match[1]!);
+    verifyIntegrationChangeFile(backup.fd, change.backupName, change.before, match[1]!);
     if (change.after)
-      verifyNamed(target.fd, basename(change.before.path), change.after as FileEntry, match[2]!);
+      verifyIntegrationChangeFile(
+        target.fd,
+        basename(change.before.path),
+        change.after as FileEntry,
+        match[2]!,
+      );
     else target.assertAbsent();
     return { backupIdentity: match[1]!, targetIdentity: change.after ? match[2]! : null };
   } catch {

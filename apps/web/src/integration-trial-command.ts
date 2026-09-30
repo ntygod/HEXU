@@ -23,3 +23,7 @@ export function integrationTrialCommand(operationId: string, paths: readonly str
 export function integrationTrialDifferenceCommand(operationId: string): string {
   return `npm run runner:integration-trial-diff -- --operation ${quoteShellArgument(operationId)} --state ${quoteShellArgument('<原节点状态目录>')} --trial ${quoteShellArgument('<本机 ready 候选的 trialId>')}`;
 }
+
+export function integrationCandidateApplicationCommand(operationId: string): string {
+  return `npm run runner:integration-apply -- --operation ${quoteShellArgument(operationId)} --state ${quoteShellArgument('<原节点状态目录>')} --backup ${quoteShellArgument('<全新私有备份绝对目录>')}`;
+}

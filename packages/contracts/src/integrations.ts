@@ -81,6 +81,12 @@ export interface IntegrationApplicationReport {
   reason: (typeof integrationApplicationReasons)[number] | null;
   confirmPublication: true;
 }
+export interface IntegrationApplicationCandidate {
+  trialId: string;
+  reportHash: string;
+  manifestHash: string;
+  confirmExistingChanges: true;
+}
 export interface IntegrationApplication {
   id: string;
   reportHash: string;
@@ -88,6 +94,8 @@ export interface IntegrationApplication {
   inputHash: string;
   requestedAt: string;
   requestedBy: { id: string; name: string };
+  /** Only new, explicitly confirmed candidate applications may modify/remove files. */
+  candidate?: IntegrationApplicationCandidate;
   reports: IntegrationApplicationReport[];
 }
 /** Metadata-only historical observation; it does not verify files or settle application state. */
@@ -343,6 +351,22 @@ function integrationPaths(input: unknown, allowEmpty: boolean): string[] {
     throw new DomainError('INVALID_INPUT', '应用文件清单超出48 KiB');
   return paths.sort();
 }
+export function parseIntegrationApplicationCandidate(
+  input: unknown,
+): IntegrationApplicationCandidate {
+  const b = exact(input, ['trialId', 'reportHash', 'manifestHash', 'confirmExistingChanges']);
+  if (b.confirmExistingChanges !== true)
+    throw new DomainError(
+      'CONFIRMATION_REQUIRED',
+      '需另行明确确认候选包含的已有文件修改/移出；旧新增许可不适用',
+    );
+  return {
+    trialId: nodeId(b.trialId),
+    reportHash: checkpointHash(b.reportHash),
+    manifestHash: checkpointHash(b.manifestHash),
+    confirmExistingChanges: true,
+  };
+}
 export function parseIntegrationApply(input: unknown) {
   const b = exact(input, [
     'expectedRevision',
@@ -350,7 +374,10 @@ export function parseIntegrationApply(input: unknown) {
     'reportHash',
     'paths',
     'confirmApplication',
+    'candidate',
   ]);
+  const candidate =
+    'candidate' in b ? parseIntegrationApplicationCandidate(b.candidate) : undefined;
   if (b.confirmApplication !== true)
     throw new DomainError('CONFIRMATION_REQUIRED', '需明确确认把选定新增文件写入原目标目录');
   return {
@@ -358,6 +385,7 @@ export function parseIntegrationApply(input: unknown) {
     expectedTaskRevision: revision(b.expectedTaskRevision),
     reportHash: checkpointHash(b.reportHash),
     paths: integrationPaths(b.paths, false),
+    ...(candidate ? { candidate } : {}),
     confirmApplication: true as const,
   };
 }

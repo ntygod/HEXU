@@ -1,9 +1,11 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { join, resolve, relative, isAbsolute, sep } from 'node:path';
+import { lstatSync } from 'node:fs';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import { nodeId } from '../../../../packages/contracts/src/nodes.js';
 import {
   parseIntegrationApplicationReport,
+  parseIntegrationApplicationCandidate,
   type IntegrationView,
   type IntegrationOperation,
   type IntegrationApplicationReport,
@@ -24,7 +26,20 @@ import { verifyCleanCommit } from './committed-workspace.js';
 import { assertCodeQuiescent } from './result-code.js';
 import { buildIntegrationPlan } from './integration-plan.js';
 import { integrationAdditionPlan } from './integration-application-plan.js';
-import { checkRestoreHelper } from './checkpoint-restore-files.js';
+import { checkRestoreHelper, PinnedRestoreParent, inode } from './checkpoint-restore-files.js';
+import { inspectRestoreTarget, type RestoreEntry } from './checkpoint-restore-plan.js';
+import { IntegrationApplicationCandidate } from './integration-application-candidate.js';
+import { IntegrationApplicationBackup } from './integration-application-backup.js';
+import { buildIntegrationTrialPlan } from './integration-trial-plan.js';
+import {
+  checkIntegrationChangeHelper,
+  observeIntegrationChangeTarget,
+  publishIntegrationFileChange,
+} from './integration-change-files.js';
+import {
+  hasExistingIntegrationMaterial,
+  type ExistingIntegrationChanges,
+} from './integration-existing-change-record.js';
 import {
   IntegrationAdditionParents,
   newIntegrationDirectoryIntent,
@@ -35,6 +50,7 @@ import { WorkspaceLease } from '../workspace-lease.js';
 import { terminalLabel } from './terminal-label.js';
 import {
   validateLocalShape,
+  confirmedApplicationPaths,
   parseLocalApplicationRecord,
   type LocalApplication,
 } from './integration-application-record.js';
@@ -88,6 +104,26 @@ function validateLocalApplication(record: LocalApplication, operation: Integrati
       throw invalid();
     seen.add(entry.path);
   }
+  for (const entry of record.existingChanges?.changes ?? []) {
+    const f = operation.report!.plan!.files.find((f) => f.path === entry.before.path);
+    const matches = (
+      e: RestoreEntry | null,
+      v: { objectId: string; mode: string; bytes: number } | null | undefined,
+    ) =>
+      e === null
+        ? v === null
+        : !!v && e.objectId === v.objectId && e.gitMode === v.mode && e.bytes === v.bytes;
+    if (
+      !f ||
+      !['modify', 'delete'].includes(f.action) ||
+      f.conflict ||
+      seen.has(entry.before.path) ||
+      !matches(entry.before, f.target) ||
+      !matches(entry.after, f.source)
+    )
+      throw invalid();
+    seen.add(entry.before.path);
+  }
   if (
     (record.phase === 'completed' &&
       (record.intent !== null ||
@@ -97,7 +133,8 @@ function validateLocalApplication(record: LocalApplication, operation: Integrati
       (record.intent !== null ||
         record.added.length > 0 ||
         record.directories?.length ||
-        record.directoryIntent))
+        record.directoryIntent ||
+        hasExistingIntegrationMaterial(record.existingChanges)))
   )
     throw invalid();
   if (record.pending) {
@@ -197,8 +234,11 @@ export async function withSettledIntegrationEvidence<T>(
           !!r.directoryIntent ||
           !['completed', 'failed'].includes(r.phase) ||
           (r.phase === 'completed'
-            ? r.acknowledged !== 2 || !r.added.length
-            : r.added.length > 0 || !!r.directories?.length || ![0, 1, 2].includes(r.acknowledged))
+            ? r.acknowledged !== 2 || !confirmedApplicationPaths(r).length
+            : r.added.length > 0 ||
+              !!r.directories?.length ||
+              hasExistingIntegrationMaterial(r.existingChanges) ||
+              ![0, 1, 2].includes(r.acknowledged))
         )
           throw new DomainError(
             'INTEGRATION_UNSETTLED',
@@ -221,6 +261,7 @@ export async function applyIntegration(
   ask: (prompt: string) => Promise<string>,
   log: (text: string) => void = console.log,
   signal?: AbortSignal,
+  options: { backup?: string } = {},
 ) {
   nodeId(integrationId);
   if (process.platform !== 'linux')
@@ -273,14 +314,18 @@ export async function applyIntegration(
           applicationId: a.id,
           reportHash: a.reportHash,
           paths: a.paths,
+          ...(a.candidate ? { candidate: a.candidate } : {}),
         }) ||
       !c.directories.some((w) => w.id === o.target.checkpoint.request.workspaceId)
     )
       throw new DomainError('INTEGRATION_SCOPE_CHANGED', '应用不属于本机固定来源、选择或目标');
+    if (a.candidate) parseIntegrationApplicationCandidate(a.candidate);
     return view;
   };
   const journal = new AgentStorage(join(home, 'integration-application'));
   let lease: WorkspaceLease | undefined;
+  let candidate: IntegrationApplicationCandidate | undefined;
+  let backup: IntegrationApplicationBackup | undefined;
   try {
     journal.db.exec(
       'CREATE TABLE IF NOT EXISTS applications(id TEXT PRIMARY KEY,body TEXT NOT NULL)',
@@ -294,10 +339,11 @@ export async function applyIntegration(
       .prepare('SELECT body FROM applications WHERE id=?')
       .get(integrationId) as { body: string } | undefined;
     let record: LocalApplication | undefined = row
-      ? (JSON.parse(row.body) as LocalApplication)
+      ? parseLocalApplicationRecord(row.body, integrationId)
       : undefined;
     const save = () => {
       bound();
+      parseLocalApplicationRecord(JSON.stringify(record), integrationId);
       journal.db
         .prepare(
           'INSERT INTO applications VALUES(?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body',
@@ -316,7 +362,7 @@ export async function applyIntegration(
         sequence,
         stage,
         observedAt: new Date().toISOString(),
-        appliedPaths: record!.added.map((e) => e.path),
+        appliedPaths: confirmedApplicationPaths(record!),
         reason: why,
         confirmPublication: true,
       });
@@ -380,7 +426,7 @@ export async function applyIntegration(
         return {
           integrationId,
           state: record.phase,
-          appliedPaths: record.added.map((entry) => entry.path),
+          appliedPaths: confirmedApplicationPaths(record),
         };
       }
       if (record.phase === 'prepared' || record.phase === 'applying') {
@@ -392,6 +438,7 @@ export async function applyIntegration(
             record.added.length ||
             record.directories?.length ||
             record.directoryIntent ||
+            hasExistingIntegrationMaterial(record.existingChanges) ||
             record.intent !== null ||
             record.acknowledged !== 0
           )
@@ -417,7 +464,11 @@ export async function applyIntegration(
       }
       releaseSettled();
       await publish();
-      return { integrationId, state: record.phase, appliedPaths: record.added.map((e) => e.path) };
+      return {
+        integrationId,
+        state: record.phase,
+        appliedPaths: confirmedApplicationPaths(record),
+      };
     }
     if (
       journal.db.prepare("SELECT 1 FROM sqlite_schema WHERE name='integration_recoveries'").get() &&
@@ -433,16 +484,33 @@ export async function applyIntegration(
         original.unavailableReason ?? '应用已关闭或已开始，不能建立第二次写入',
         409,
       );
+    if (
+      (!a.candidate && options.backup !== undefined) ||
+      (a.candidate &&
+        (!options.backup ||
+          !isAbsolute(options.backup) ||
+          resolve(options.backup) !== options.backup))
+    )
+      throw new DomainError(
+        'INTEGRATION_BACKUP_REQUIRED',
+        '固定候选写回须另外指定全新绝对路径 --backup；旧新增应用不接受扩大范围',
+      );
     checkIntegrationAddHelper();
     checkRestoreHelper();
+    if (a.candidate) checkIntegrationChangeHelper();
     log(
-      `成果 ${terminalLabel(o.source.title)} · v${o.source.revision}\n来源 ${o.material.manifest.commit}\n目标 ${o.target.manifest.commit}\n恢复副本 ${o.target.retentionId}\n本机目标 ${terminalLabel(w.root)}\n选定新增文件：\n${a.paths.join('\n')}`,
+      `成果 ${terminalLabel(o.source.title)} · v${o.source.revision}\n来源 ${o.material.manifest.commit}\n目标 ${o.target.manifest.commit}\n恢复副本 ${o.target.retentionId}\n本机目标 ${terminalLabel(w.root)}\n选定文件：\n${a.paths.join('\n')}`,
     );
     log(
-      '只新增所选普通文件，必要且缺少的父目录会排他新建（最多256个）；不接管后来出现的目录。保留未选文件、HEAD与索引；不调用模型、不提交、不覆盖。确认同时共享应用阶段及已写文件名。中断/部分失败保留现场和写锁，不自动恢复。',
+      a.candidate
+        ? `固定候选 ${a.candidate.trialId}，差异指纹 ${a.candidate.reportHash}。替换/移出的原文件保留到全新私有目录 ${terminalLabel(options.backup!)}；候选目录不变。必须先停止本目录全部执行、编辑器自动保存与其他写入者；原子rename不能按内容条件阻止外部并发修改。只应用完整候选选择，保留未选文件、HEAD与索引；未知现场保留全部材料和写锁，不自动回滚或清理。确认同时共享应用阶段与已应用文件名。`
+        : '只新增所选普通文件，必要且缺少的父目录会排他新建（最多256个）；不接管后来出现的目录。保留未选文件、HEAD与索引；不调用模型、不提交、不覆盖。确认同时共享应用阶段及已写文件名。中断/部分失败保留现场和写锁，不自动恢复。',
     );
-    if ((await ask(`输入 APPLY ${a.id}：`)) !== `APPLY ${a.id}`)
+    const confirmation = a.candidate ? `STOPPED_AND_APPLY ${a.id}` : `APPLY ${a.id}`;
+    if ((await ask(`输入 ${confirmation}：`)) !== confirmation)
       throw new DomainError('CONFIRMATION_REQUIRED', '未确认本机写入，原应用范围仍可在任务中取消');
+    const stoppedWritersAt = new Date().toISOString();
+    if (a.candidate) candidate = new IntegrationApplicationCandidate(home, binding, o);
     const current = async (state: 'queued' | 'applying', own = false) => {
       if (signal?.aborted) throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
       const v = await inspect();
@@ -511,14 +579,79 @@ export async function applyIntegration(
       );
       if (canonicalJson(plan) !== canonicalJson(o.report!.plan))
         throw new DomainError('INTEGRATION_SCOPE_CHANGED', '完整重算计划与原预检不一致');
-      const additionPlan = integrationAdditionPlan(
-        start.objectFormat,
-        o.target.manifest.tree,
-        t,
-        plan,
-        a.paths,
-        w.root,
-      );
+      const trialPlan = candidate
+        ? await buildIntegrationTrialPlan(
+            start.objectFormat,
+            { base: start.tree, source: o.material.manifest.tree, target: o.target.manifest.tree },
+            { base: base!, source: s, target: t },
+            plan,
+            a.paths,
+            w.root,
+          )
+        : undefined;
+      if (trialPlan) candidate!.verify(trialPlan);
+      const addPaths = a.candidate
+        ? a.paths.filter((path) => plan.files.find((f) => f.path === path)?.action === 'add')
+        : a.paths;
+      const additionPlan = addPaths.length
+        ? integrationAdditionPlan(
+            start.objectFormat,
+            o.target.manifest.tree,
+            t,
+            plan,
+            addPaths,
+            w.root,
+          )
+        : { files: [], directories: [], anchors: [] };
+      const entry = (
+        path: string,
+        v: { objectId: string; mode: '100644' | '100755'; bytes: number },
+      ): RestoreEntry => ({
+        path,
+        kind: 'file',
+        objectId: v.objectId,
+        gitMode: v.mode,
+        bytes: v.bytes,
+      });
+      const changes = a.candidate
+        ? a.paths.flatMap((path) => {
+            const f = plan.files.find((f) => f.path === path)!;
+            if (f.action === 'add') return [];
+            if (!['modify', 'delete'].includes(f.action) || !f.target || f.conflict)
+              throw new DomainError('INTEGRATION_UNSUPPORTED', '固定候选存在未支持的变更');
+            return [
+              {
+                before: entry(path, f.target),
+                after: f.source ? entry(path, f.source) : null,
+                originalIdentity: inode(lstatSync(join(w.root, path), { bigint: true })),
+                backupName: `hexu-change-${randomUUID()}`,
+                observation: observeIntegrationChangeTarget(join(w.root, path)),
+              },
+            ];
+          })
+        : [];
+      let existingChanges: ExistingIntegrationChanges | undefined;
+      if (candidate) {
+        const protectedPaths = [
+          home,
+          ...c.directories.flatMap((w) => [w.root, w.gitDir]),
+          ...candidate.journal.storage.db
+            .prepare('SELECT target FROM trials')
+            .all()
+            .map((row) => row.target as string),
+        ];
+        existingChanges = {
+          backup: inspectRestoreTarget(options.backup!, protectedPaths),
+          stageName: `.hexu-restore-${randomUUID()}`,
+          stageIdentity: null,
+          backupIdentity: null,
+          directoryIntent: false,
+          stoppedWritersAt,
+          changes: [],
+          intent: null,
+        };
+        backup = new IntegrationApplicationBackup(existingChanges, w.root);
+      }
       const additions = additionPlan.files;
       const parents = new IntegrationAdditionParents(w.root, additionPlan.anchors, [
         home,
@@ -541,6 +674,7 @@ export async function applyIntegration(
         recoveryContext: freezeIntegrationRecoveryContext(o, c),
         directories: [],
         directoryIntent: null,
+        ...(existingChanges ? { existingChanges } : {}),
       };
       try {
         save();
@@ -548,6 +682,7 @@ export async function applyIntegration(
         lease.release();
         throw e;
       }
+      let assertObservedTarget: (() => void) | undefined;
       const verifyTarget = () =>
         verifyCleanCommit(
           home,
@@ -555,9 +690,30 @@ export async function applyIntegration(
           w,
           o.target.checkpoint.manifest,
           record!.added,
-          undefined,
+          (observed) => {
+            assertObservedTarget = observed;
+          },
           record!.directories ?? [],
+          (record!.existingChanges?.changes ?? []).map((change) => ({
+            before: change.before,
+            after: change.after ? { ...change.after, identity: change.targetIdentity! } : null,
+          })),
         );
+      const readyToWrite = () => {
+        lease!.assertHeld();
+        bound();
+        source.stillBound();
+        target.stillBound();
+        if (signal?.aborted) throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
+        if (trialPlan) candidate!.verify(trialPlan);
+        if (record!.existingChanges?.backupIdentity) backup!.verify();
+        candidate?.revalidate();
+        assertObservedTarget?.();
+        if (record!.existingChanges?.backupIdentity) backup!.revalidate();
+        if (signal?.aborted) throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
+        if ([source.manifest, target.manifest].some((m) => Date.parse(m.expiresAt) <= Date.now()))
+          throw new DomainError('RETENTION_EXPIRED', '固定材料已经到期，停止后续写入并保留现场');
+      };
       try {
         await current('queued', true);
         await verifyCleanCommit(home, c, w, o.target.checkpoint.manifest);
@@ -568,6 +724,14 @@ export async function applyIntegration(
         await publish();
         record.phase = 'applying';
         save();
+        if (backup) {
+          await current('applying', true);
+          await source.authorized();
+          await target.authorized();
+          await verifyTarget();
+          readyToWrite();
+          backup.create(save, readyToWrite);
+        }
         for (const path of additionPlan.directories) {
           await current('applying', true);
           await source.authorized();
@@ -579,6 +743,7 @@ export async function applyIntegration(
             bound();
             if (signal?.aborted)
               throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
+            readyToWrite();
             record.intent = additions.find((entry) => entry.path.startsWith(path + '/'))!.path;
             record.directoryIntent = newIntegrationDirectoryIntent(path);
             save();
@@ -620,6 +785,7 @@ export async function applyIntegration(
             bound();
             if (signal?.aborted)
               throw new DomainError('INTEGRATION_INTERRUPTED', '本机已停止后续写入');
+            readyToWrite();
             record.intent = entry.path;
             save();
             const identity = publishIntegrationAddition(parent, entry, object.data);
@@ -638,10 +804,61 @@ export async function applyIntegration(
             parent.close();
           }
         }
+        for (const change of changes) {
+          await current('applying', true);
+          await source.authorized();
+          await target.authorized();
+          await verifyTarget();
+          readyToWrite();
+          const parent = new PinnedRestoreParent(change.observation);
+          let slot: PinnedRestoreParent | undefined;
+          try {
+            slot = backup!.openSlot(change.backupName);
+            const before = t.objects.find((object) => object.id === change.before.objectId),
+              after = change.after
+                ? s.objects.find((object) => object.id === change.after!.objectId)
+                : null;
+            if (
+              !before ||
+              before.type !== 'blob' ||
+              (change.after && (!after || after.type !== 'blob'))
+            )
+              throw new DomainError('SNAPSHOT_INCOMPLETE', '固定文件对象缺失');
+            const { observation: _observation, ...intent } = change;
+            record.existingChanges!.intent = intent;
+            record.intent = change.before.path;
+            save();
+            readyToWrite();
+            const result = publishIntegrationFileChange(
+              parent,
+              slot,
+              intent,
+              before.data,
+              after?.data ?? null,
+            );
+            if (!result) {
+              record.existingChanges!.intent = null;
+              record.intent = null;
+              save();
+              throw new DomainError(
+                'INTEGRATION_CHANGE_UNSUPPORTED',
+                '原文件未写回；保留已创建的私有备份现场',
+              );
+            }
+            record.existingChanges!.changes.push({ ...intent, ...result });
+            record.existingChanges!.intent = null;
+            record.intent = null;
+            save();
+          } finally {
+            parent.close();
+            slot?.close();
+          }
+        }
         await current('applying', true);
         await source.authorized();
         await target.authorized();
         await verifyTarget();
+        readyToWrite();
         record.phase = 'completed';
         record.pending = packet('completed');
         save();
@@ -658,7 +875,8 @@ export async function applyIntegration(
             record.added.length ||
             record.directories?.length ||
             record.intent ||
-            record.directoryIntent
+            record.directoryIntent ||
+            hasExistingIntegrationMaterial(record.existingChanges)
               ? 'needs_attention'
               : 'failed';
           record.pending = packet(record.phase, failure(cause));
@@ -667,9 +885,15 @@ export async function applyIntegration(
       }
       releaseSettled();
       await publish();
-      return { integrationId, state: record.phase, appliedPaths: record.added.map((e) => e.path) };
+      return {
+        integrationId,
+        state: record.phase,
+        appliedPaths: confirmedApplicationPaths(record),
+      };
     });
   } finally {
+    backup?.close();
+    candidate?.close();
     lease?.close(); // close never erases a possibly live/unknown claim.
     journal.close();
   }

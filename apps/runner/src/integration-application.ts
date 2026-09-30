@@ -8,15 +8,18 @@ async function main() {
     const key = args[i]!,
       value = args[i + 1];
     if (
-      !['--operation', '--state'].includes(key) ||
+      !['--operation', '--state', '--backup'].includes(key) ||
       options.has(key) ||
       !value ||
       value.startsWith('--')
     )
-      throw new DomainError('INVALID_INPUT', '只接受 --operation ID 与 --state HOME');
+      throw new DomainError(
+        'INVALID_INPUT',
+        '只接受 --operation ID、--state HOME 与候选写回所需的 --backup 全新绝对路径',
+      );
     options.set(key, value);
   }
-  if (options.size !== 2)
+  if (!options.has('--operation') || !options.has('--state'))
     throw new DomainError(
       'INVALID_INPUT',
       '用法：npm run runner:integration-apply -- --operation ID --state HOME',
@@ -44,6 +47,7 @@ async function main() {
       },
       console.log,
       controller.signal,
+      { backup: options.get('--backup') },
     );
     console.log(JSON.stringify(result));
   } finally {

@@ -873,3 +873,132 @@ test('migration34只增独立候选证据表，原操作/事件字节不变且�
     db.close();
   }
 });
+
+const candidateApplyBody = (v: IntegrationView, r: IntegrationTrialDifferenceReport) => ({
+  expectedRevision: v.operation.revision,
+  expectedTaskRevision: v.taskRevision,
+  reportHash: v.reportHash,
+  paths: r.selectedPaths,
+  confirmApplication: true,
+  candidate: {
+    trialId: r.trialId,
+    reportHash: codeHash(r),
+    manifestHash: r.manifestHash,
+    confirmExistingChanges: true,
+  },
+});
+test('固定候选写回另行授权全部路径，旧新增请求不能升级修改，报告历史不变', async () => {
+  const f = await integrationFixture();
+  try {
+    const v = await ready(f),
+      r = report(f, v),
+      key = randomUUID();
+    assert(r.selectedPaths.includes('README.md'));
+    assert.equal((await publish(f, r)).statusCode, 200);
+    const path = `${f.integrationPath}/${v.operation.id}/apply`,
+      body = candidateApplyBody(v, r);
+    const { candidate, ...oldBody } = body;
+    assert.equal((await f.api.call(path, f.alice, oldBody)).statusCode, 409);
+    for (const wrong of [
+      { ...body, candidate: { ...candidate, confirmExistingChanges: false } },
+      { ...body, candidate: { ...candidate, confirmExistingChanges: undefined } },
+      { ...body, candidate: { ...candidate, privatePath: '/not-uploaded' } },
+      { ...body, candidate: null },
+      { ...body, candidate: { ...candidate, reportHash: 'a'.repeat(64) } },
+      { ...body, candidate: { ...candidate, manifestHash: 'a'.repeat(64) } },
+      { ...body, paths: ['README.md'] },
+    ])
+      assert.notEqual((await f.api.call(path, f.alice, wrong)).statusCode, 200);
+    const queued = await f.api.call(path, f.alice, body, key);
+    assert.equal(queued.statusCode, 200, queued.body);
+    const q = queued.json() as IntegrationView,
+      a = q.operation.application!;
+    assert.deepEqual(a.candidate, candidate);
+    assert.equal(
+      a.inputHash,
+      codeHash({
+        integrationId: v.operation.id,
+        applicationId: a.id,
+        reportHash: v.reportHash,
+        paths: [...r.selectedPaths].sort(),
+        candidate,
+      }),
+    );
+    assert.notEqual(
+      a.inputHash,
+      codeHash({
+        integrationId: v.operation.id,
+        applicationId: a.id,
+        reportHash: v.reportHash,
+        paths: [...r.selectedPaths].sort(),
+      }),
+      'old runners reject the broader input',
+    );
+    assert.deepEqual((await f.api.call(path, f.alice, body, key)).json(), q);
+    assert.deepEqual(q.operation.report, v.operation.report);
+    assert.deepEqual(
+      f.as(() => new IntegrationStore(f.api.store).getTrial(f.task.id, v.operation.id, r.trialId))
+        .report,
+      r,
+    );
+    assert.equal((await f.api.call(path, f.alice, oldBody, key)).statusCode, 409);
+  } finally {
+    await f.close();
+  }
+});
+test('候选授权不能借另一操作/新候选或旧回执越过当前权限', async () => {
+  const f = await integrationFixture();
+  try {
+    const v = await ready(f),
+      other = await ready(f),
+      r = report(f, v),
+      r2 = report(f, other);
+    assert.equal((await publish(f, r)).statusCode, 200);
+    assert.equal((await publish(f, r2)).statusCode, 200);
+    const path = `${f.integrationPath}/${v.operation.id}/apply`,
+      body = candidateApplyBody(v, r),
+      key = randomUUID();
+    const crossed = candidateApplyBody(v, r2);
+    assert.equal((await f.api.call(path, f.alice, crossed)).statusCode, 404);
+    const newer = { ...r, trialId: randomUUID(), manifestHash: 'd'.repeat(64) };
+    assert.equal((await publish(f, newer)).statusCode, 200);
+    assert.equal(
+      (
+        await f.api.call(path, f.alice, {
+          ...body,
+          candidate: { ...body.candidate, trialId: newer.trialId },
+        })
+      ).statusCode,
+      409,
+    );
+    assert.equal((await f.api.call(path, f.alice, body, key)).statusCode, 200);
+    f.api.store.db.prepare("UPDATE runner_nodes SET grants='[]' WHERE id=?").run(f.ns[0]!.nodeId);
+    assert.equal((await f.api.call(path, f.alice, body, key)).statusCode, 409);
+    const history = view(f, v.operation.id);
+    assert.deepEqual(history.operation.application!.candidate, body.candidate);
+    assert.equal(history.available, false);
+  } finally {
+    await f.close();
+  }
+});
+test('候选选择事务失败不留下应用、历史或幂等回执，之后原请求可成功', async () => {
+  const f = await integrationFixture();
+  try {
+    const v = await ready(f),
+      r = report(f, v);
+    assert.equal((await publish(f, r)).statusCode, 200);
+    const before = unchanged(f),
+      body = candidateApplyBody(v, r),
+      key = randomUUID();
+    const path = `${f.integrationPath}/${v.operation.id}/apply`;
+    f.api.store.db.exec(
+      "CREATE TRIGGER fail_candidate_application BEFORE INSERT ON outbox WHEN NEW.kind LIKE 'integration.%' BEGIN SELECT RAISE(ABORT,'fixture'); END",
+    );
+    assert.equal((await f.api.call(path, f.alice, body, key)).statusCode, 500);
+    assert.deepEqual(unchanged(f), before);
+    f.api.store.db.exec('DROP TRIGGER fail_candidate_application');
+    assert.equal((await f.api.call(path, f.alice, body, key)).statusCode, 200);
+  } finally {
+    await f.close();
+  }
+});

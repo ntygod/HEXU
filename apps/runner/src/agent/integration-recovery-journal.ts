@@ -73,7 +73,10 @@ export function recoveryReport(
     lease: 'released',
     filesVerified: false,
     recordedAddedCount: original.added.length,
-    unresolvedWriteIntent: original.intent !== null,
+    unresolvedWriteIntent:
+      original.intent !== null ||
+      !!original.existingChanges?.directoryIntent ||
+      !!original.existingChanges?.intent,
     confirmPublication: true,
   });
 }

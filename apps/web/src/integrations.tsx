@@ -8,6 +8,8 @@ import type {
   IntegrationFile,
   IntegrationApplicationReport,
 } from '../../../packages/contracts/src/integrations.js';
+import type { IntegrationTrialDifferenceDetail } from '../../../packages/contracts/src/integration-trial.js';
+import { integrationCandidateApplicationCommand } from './integration-trial-command.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { Link, canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
@@ -57,7 +59,15 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
   const latest = a.reports.at(-1);
   return (
     <section className="integration-application-status" aria-label="文件应用状态">
-      <strong>所选应用范围 · {a.paths.length} 个新增文件</strong>
+      <strong>
+        所选应用范围 · {a.paths.length} 个{a.candidate ? '候选文件' : '新增文件'}
+      </strong>
+      {a.candidate && (
+        <p>
+          固定候选 <code>{a.candidate.trialId}</code>
+          ；原文件替换/移出会保留到本人另行指定的私有备份，备份路径不上传。
+        </p>
+      )}
       <ul>
         {a.paths.map((name) => (
           <li key={name}>
@@ -77,9 +87,19 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
           </p>
           {view.available && !view.recovery && (
             <>
-              <code>
-                npm run runner:integration-apply -- --operation {o.id} --state &lt;节点状态目录&gt;
-              </code>
+              {a.candidate ? (
+                <pre>{integrationCandidateApplicationCommand(o.id)}</pre>
+              ) : (
+                <code>
+                  npm run runner:integration-apply -- --operation {o.id} --state
+                  &lt;节点状态目录&gt;
+                </code>
+              )}
+              {a.candidate && (
+                <p>
+                  先替换带引号的目录占位符。在原节点确认全部写入者已停止后才可写回；备份须在同一文件系统且位于代码/候选/节点状态之外的新目录。重复命令只对账原记录，不能重新应用。
+                </p>
+              )}
               <p>
                 仅在本人Linux节点执行；会再次核对所选路径、完整对象、目标现场与恢复点。必要的新父目录会排他创建，不接管后来出现的目录。
               </p>
@@ -107,6 +127,11 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
       {(o.state === 'applying' || o.state === 'needs_attention') && (
         <p>
           文件计数不包含目录；即使已确认0个文件，也可能已创建父目录或保留未确认暂存。请在原节点核对本机状态，不自动清理。
+        </p>
+      )}
+      {a.candidate && (o.state === 'applying' || o.state === 'needs_attention') && (
+        <p>
+          即使0个文件，也可能已创建私有备份目录或材料槽。不要删除它们；本机状态保留独立的备份位置与原文件证据。
         </p>
       )}
       {o.state === 'failed' && (
@@ -157,7 +182,7 @@ function RecoveryStatus({ view }: { view: IntegrationView }) {
       <p>
         原本机记录含 {r.recordedAddedCount} 个新增文件记录；
         {r.unresolvedWriteIntent ? '仍有未决写入意图' : '原记录未含未决写入意图'}。
-        这些数量不是当前文件验证结果。
+        这些数量不是当前文件验证结果，不包含已替换/移出文件或私有备份。
       </p>
       <p>服务端收到此观察：{time(recovery.receivedAt)}</p>
     </section>
@@ -199,7 +224,7 @@ function Record({
 }: {
   view: IntegrationView;
   saved(): void;
-  apply?(view: IntegrationView): void;
+  apply?(view: IntegrationView, candidate?: IntegrationTrialDifferenceDetail): void;
   pendingId?: string;
   trial?(view: IntegrationView): void;
   selectedTrialId?: string;
@@ -345,6 +370,7 @@ function Record({
       <RecoveryStatus view={view} />
       <IntegrationTrialHistory
         view={view}
+        applyCandidate={apply ? (candidate) => apply(view, candidate) : undefined}
         selectedTrialId={selectedTrialId}
         selectTrial={selectTrial}
         denied={denied}
@@ -633,26 +659,40 @@ export function PrepareIntegration({ version }: { version: ResultRevision }) {
 }
 function ApplicationEditor({
   initial,
+  candidate,
   open,
   close,
   saved,
   denied,
 }: {
   initial: IntegrationView;
+  candidate?: IntegrationTrialDifferenceDetail | null;
   open: boolean;
   close(keepPending: boolean): void;
   saved(): void;
   denied(): void;
 }) {
   const [baseline, setBaseline] = useState(() => structuredClone(initial)),
-    [paths, setPaths] = useState<string[]>([]),
+    [paths, setPaths] = useState<string[]>(() =>
+      candidate ? [...candidate.report.selectedPaths].sort() : [],
+    ),
     [confirmed, setConfirmed] = useState(false);
   const o = baseline.operation,
     read = useAssistanceRead<IntegrationView>(`${path(o.taskId)}/${o.id}`, 5000),
-    command = useAssistanceCommand<IntegrationView>(saved);
+    command = useAssistanceCommand<IntegrationView>(saved),
+    candidateRead = useAssistanceRead<IntegrationTrialDifferenceDetail>(
+      candidate
+        ? `${path(o.taskId)}/${o.id}/trials/${encodeURIComponent(candidate.report.trialId)}`
+        : null,
+      5000,
+    );
+  const canApply = candidate ? baseline.canTrial : baseline.canApply;
+  const candidateUnavailable =
+    !!candidate &&
+    (!candidateRead.value || !!candidateRead.error || candidateRead.value.hash !== candidate.hash);
   useEffect(() => {
-    if (command.denied || read.denied) denied();
-  }, [command.denied, read.denied]);
+    if (command.denied || read.denied || candidateRead.denied) denied();
+  }, [command.denied, read.denied, candidateRead.denied]);
   const locked = command.busy || !!command.uncertain,
     stale =
       !!read.value &&
@@ -660,8 +700,9 @@ function ApplicationEditor({
         read.value.operation.revision !== o.revision ||
         read.value.reportHash !== baseline.reportHash ||
         read.value.canApply !== baseline.canApply ||
+        read.value.canTrial !== baseline.canTrial ||
         read.value.available !== baseline.available);
-  if (!open || command.denied || read.denied) return null;
+  if (!open || command.denied || read.denied || candidateRead.denied) return null;
   return (
     <Dialog
       title="确认选择性应用"
@@ -678,8 +719,9 @@ function ApplicationEditor({
             stale ||
             !read.value ||
             read.error ||
-            !baseline.canApply ||
-            !baseline.reportHash
+            !canApply ||
+            !baseline.reportHash ||
+            candidateUnavailable
           )
             return;
           void command.send(`${path(o.taskId)}/${o.id}/apply`, {
@@ -688,6 +730,16 @@ function ApplicationEditor({
             reportHash: baseline.reportHash,
             paths,
             confirmApplication: true,
+            ...(candidate
+              ? {
+                  candidate: {
+                    trialId: candidate.report.trialId,
+                    reportHash: candidate.hash,
+                    manifestHash: candidate.report.manifestHash,
+                    confirmExistingChanges: true,
+                  },
+                }
+              : {}),
           });
         }}
       >
@@ -697,6 +749,20 @@ function ApplicationEditor({
               {o.source.title} · v{o.source.revision}
             </strong>
             <p>此选择固定到当前预检报告，不跟随后续成果、任务修订或方案选择。</p>
+            {candidate && (
+              <section aria-label="固定写回候选">
+                <strong>完整候选写回</strong>
+                <p>
+                  候选 <code>{candidate.report.trialId}</code>
+                </p>
+                <p>
+                  共享差异 <code>{candidate.hash}</code>
+                </p>
+                <p>
+                  本机清单 <code>{candidate.report.manifestHash}</code>
+                </p>
+              </section>
+            )}
             <dl className="integration-baseline">
               <dt>来源提交</dt>
               <dd>
@@ -721,10 +787,12 @@ function ApplicationEditor({
             </dl>
           </section>
           <p className="work-branch-notice">
-            本轮支持无冲突的新增普通文件及必要的新父目录（最多256个）。修改、删除、冲突、目标已有文件与有省略的清单均不能选择；不覆盖或接管已有目录，不自动合并文本。
+            {candidate
+              ? '另行授权此固定候选的完整新增、修改和删除范围；不能在此偷偷改变子集。原文件会保留在本人新指定的私有备份，候选不变。不自动合并冲突或清理现场；本机须确认其他写入者已停止，并重新核对完整材料与目标。'
+              : '本轮支持无冲突的新增普通文件及必要的新父目录（最多256个）。修改、删除、冲突、目标已有文件与有省略的清单均不能选择；不覆盖或接管已有目录，不自动合并文本。'}
           </p>
           <fieldset className="integration-selection" disabled={locked}>
-            <legend>选择新增文件</legend>
+            <legend>{candidate ? '固定候选完整文件范围' : '选择新增文件'}</legend>
             <ul className="integration-files">
               {o.report?.plan?.files.map((file) => (
                 <li key={file.path}>
@@ -733,7 +801,9 @@ function ApplicationEditor({
                       type="checkbox"
                       aria-label={`选择 ${file.path}`}
                       checked={paths.includes(file.path)}
-                      disabled={locked || !selectable(file) || !!o.report?.plan?.omittedFiles}
+                      disabled={
+                        !!candidate || locked || !selectable(file) || !!o.report?.plan?.omittedFiles
+                      }
                       onChange={(event) => {
                         setPaths((old) =>
                           event.target.checked
@@ -746,7 +816,7 @@ function ApplicationEditor({
                     <span>
                       <span className="badge neutral">{fileLabels[file.action]}</span>{' '}
                       <code>{file.path}</code>
-                      {!selectable(file) && <span> · 本轮不可应用</span>}
+                      {!candidate && !selectable(file) && <span> · 本轮不可应用</span>}
                     </span>
                   </label>
                 </li>
@@ -773,7 +843,9 @@ function ApplicationEditor({
               disabled={locked || !paths.length}
               onChange={(event) => setConfirmed(event.target.checked)}
             />
-            我已核对固定来源、目标、恢复点与所选路径，确认仅应用这些新增文件及必要的新父目录
+            {candidate
+              ? '我已核对这个固定候选差异与完整路径，另行确认新增、替换和移出，并在本人节点指定私有备份'
+              : '我已核对固定来源、目标、恢复点与所选路径，确认仅应用这些新增文件及必要的新父目录'}
           </label>
           {stale && !command.uncertain && (
             <p className="work-branch-notice">
@@ -787,20 +859,21 @@ function ApplicationEditor({
               onClick={() => {
                 const next = structuredClone(read.value!);
                 setBaseline(next);
-                setPaths((old) =>
-                  old.filter((name) =>
-                    next.operation.report?.plan?.files.some(
-                      (file) => file.path === name && selectable(file),
+                if (!candidate)
+                  setPaths((old) =>
+                    old.filter((name) =>
+                      next.operation.report?.plan?.files.some(
+                        (file) => file.path === name && selectable(file),
+                      ),
                     ),
-                  ),
-                );
+                  );
                 setConfirmed(false);
               }}
             >
               重新核对应用基线
             </Button>
           )}
-          {!baseline.canApply && !command.uncertain && (
+          {!canApply && !command.uncertain && (
             <p role="status">当前记录不可提交应用，请查看最新操作状态和材料可用性。</p>
           )}
           {read.error && (
@@ -810,6 +883,17 @@ function ApplicationEditor({
                 重读应用状态
               </Button>
             </p>
+          )}
+          {candidateRead.error && (
+            <p role="alert">
+              {candidateRead.error}
+              <Button type="button" onClick={candidateRead.retry}>
+                重读固定写回候选
+              </Button>
+            </p>
+          )}
+          {candidate && candidateRead.value && candidateRead.value.hash !== candidate.hash && (
+            <p role="alert">候选证据与打开时不同，请关闭并从历史重新核对；不会替换原选择。</p>
           )}
           {command.error && <p role="alert">{command.error}</p>}
           {command.uncertain && (
@@ -838,8 +922,9 @@ function ApplicationEditor({
               stale ||
               !read.value ||
               !!read.error ||
-              !baseline.canApply ||
-              !baseline.reportHash
+              !canApply ||
+              !baseline.reportHash ||
+              candidateUnavailable
             }
           >
             确认所选应用范围
@@ -859,7 +944,7 @@ function Records({
   selectTrial,
 }: {
   task: Task;
-  apply(view: IntegrationView): void;
+  apply(view: IntegrationView, candidate?: IntegrationTrialDifferenceDetail): void;
   pendingId?: string;
   denied(): void;
   trial(view: IntegrationView): void;
@@ -909,6 +994,8 @@ function Entry({ task }: { task: Task }) {
   const [open, setOpen] = useState(false),
     [application, setApplication] = useState<IntegrationView | null>(null),
     [applicationOpen, setApplicationOpen] = useState(false),
+    [applicationCandidate, setApplicationCandidate] =
+      useState<IntegrationTrialDifferenceDetail | null>(null),
     [trial, setTrial] = useState<IntegrationView | null>(null),
     [selectedTrials, setSelectedTrials] = useState<Record<string, string>>({}),
     [revoked, setRevoked] = useState(false);
@@ -916,12 +1003,14 @@ function Entry({ task }: { task: Task }) {
   useEffect(() => {
     if (!editable) {
       setApplication(null);
+      setApplicationCandidate(null);
       setApplicationOpen(false);
       setTrial(null);
     }
   }, [editable]);
   const denied = () => {
     setApplication(null);
+    setApplicationCandidate(null);
     setApplicationOpen(false);
     setTrial(null);
     setSelectedTrials({});
@@ -951,10 +1040,13 @@ function Entry({ task }: { task: Task }) {
                 setTrial(structuredClone(view));
                 setOpen(false);
               }}
-              apply={(view) => {
+              apply={(view, candidate) => {
                 if (!editable || (application && application.operation.id !== view.operation.id))
                   return;
-                if (!application) setApplication(structuredClone(view));
+                if (!application) {
+                  setApplication(structuredClone(view));
+                  setApplicationCandidate(candidate ? structuredClone(candidate) : null);
+                }
                 setOpen(false);
                 setApplicationOpen(true);
               }}
@@ -966,15 +1058,20 @@ function Entry({ task }: { task: Task }) {
         <ApplicationEditor
           key={application.operation.id}
           initial={application}
+          candidate={applicationCandidate}
           open={applicationOpen}
           denied={denied}
           close={(keepPending) => {
             setApplicationOpen(false);
-            if (!keepPending) setApplication(null);
+            if (!keepPending) {
+              setApplication(null);
+              setApplicationCandidate(null);
+            }
             setOpen(true);
           }}
           saved={() => {
             setApplication(null);
+            setApplicationCandidate(null);
             setApplicationOpen(false);
             setOpen(true);
           }}

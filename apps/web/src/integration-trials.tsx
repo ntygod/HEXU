@@ -235,11 +235,13 @@ export function IntegrationTrialHistory({
   view,
   selectedTrialId,
   selectTrial,
+  applyCandidate,
   denied,
 }: {
   view: IntegrationView;
   selectedTrialId?: string;
   selectTrial?(id: string): void;
+  applyCandidate?(candidate: IntegrationTrialDifferenceDetail): void;
   denied?(): void;
 }) {
   const base = `${integrationPath(view)}/trials`;
@@ -364,6 +366,15 @@ export function IntegrationTrialHistory({
               ))}
             </ul>
           </details>
+          {applyCandidate && view.canTrial && (
+            <Button
+              variant="primary"
+              disabled={!!list.error || !!detail.error || report.trialId !== selected}
+              onClick={() => applyCandidate(structuredClone(detail.value!))}
+            >
+              确认写回此候选
+            </Button>
+          )}
           <CodeDifferencePanel
             key={report.trialId}
             difference={report.difference}

@@ -31,6 +31,7 @@ export async function integrationRunnerFixture(
     sourceDeletePaths?: string[];
     sourceExecutablePaths?: string[];
     targetFiles?: Record<string, string>;
+    beforeListen?: (app: Awaited<ReturnType<typeof branchResultFixture>>['api']['app']) => void;
   } = {},
 ) {
   const dir = await mkdtemp(join(tmpdir(), 'hexu-integration-')),
@@ -64,6 +65,7 @@ export async function integrationRunnerFixture(
     const run = f.begin();
     run.start();
     run.finish(); // Explicit metadata protocol fixture, no model.
+    changes.beforeListen?.(f.api.app);
     await f.api.app.listen({ port: 0, host: '127.0.0.1' });
     const address = f.api.app.server.address();
     assert(address && typeof address !== 'string');

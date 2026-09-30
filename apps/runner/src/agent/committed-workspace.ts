@@ -111,6 +111,10 @@ export async function verifyCleanCommit(
   additions: readonly (RestoreEntry & { identity: string })[] = [],
   observe?: (assertUnchanged: () => void) => void,
   directories: readonly { path: string; identity: string }[] = [],
+  changes: readonly {
+    before: RestoreEntry;
+    after: (RestoreEntry & { identity: string }) | null;
+  }[] = [],
 ) {
   let root: number | undefined, git: number | undefined;
   try {
@@ -228,6 +232,32 @@ export async function verifyCleanCommit(
       entries.set(entry.path, entry);
     }
     const additionIdentities = new Map(additions.map((e) => [e.path, e.identity]));
+    const changedPaths = new Set<string>();
+    for (const change of changes) {
+      const original = plan.entries.find((entry) => entry.path === change.before.path);
+      if (
+        !original ||
+        original.kind !== 'file' ||
+        change.before.kind !== 'file' ||
+        changedPaths.has(original.path) ||
+        additions.some((entry) => entry.path === original.path) ||
+        original.objectId !== change.before.objectId ||
+        original.gitMode !== change.before.gitMode ||
+        original.bytes !== change.before.bytes
+      )
+        throw changed();
+      changedPaths.add(original.path);
+      if (change.after) {
+        if (
+          change.after.path !== original.path ||
+          change.after.kind !== 'file' ||
+          !['100644', '100755'].includes(change.after.gitMode)
+        )
+          throw changed();
+        entries.set(original.path, change.after);
+        additionIdentities.set(original.path, change.after.identity);
+      } else entries.delete(original.path);
+    }
     const directoryIdentities = new Map(directories.map((e) => [e.path, e.identity]));
     const observed = new Map<string, string>();
     const walk = (fd: number, prefix = '') => {
