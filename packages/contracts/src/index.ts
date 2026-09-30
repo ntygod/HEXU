@@ -1,4 +1,5 @@
 import type { ResultCodeFeedbackAnchor } from './result-code-feedback.js';
+import type { ResultFeedbackReplyTarget } from './result-feedback-replies.js';
 import type { NativeRunConfig } from './native.js';
 export const taskStatuses = ['todo', 'in_progress', 'done', 'cancelled'] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
@@ -66,7 +67,8 @@ export interface Message {
   resultId: string | null;
   resultRevisionId?: string;
   codeAnchor?: ResultCodeFeedbackAnchor;
-  /** Explicit author for new anchored feedback; legacy names are not retroactively resolved. */
+  replyTo?: ResultFeedbackReplyTarget;
+  /** Explicit author for code feedback and replies; legacy names are not resolved retroactively. */
   createdByUserId?: string;
 }
 export interface Run {

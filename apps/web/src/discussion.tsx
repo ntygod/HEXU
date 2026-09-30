@@ -1,7 +1,8 @@
 import { codeFeedbackHref } from './result-code-feedback.js';
 import { RequestAiAssistance } from './ai-assistance.js';
 import { RequestAssistance } from './assistance-create.js';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { FeedbackReplyAction, feedbackMessageHref } from './result-feedback-reply.js';
 import type { Message, Run } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Avatar, Button, Icon, ToolMark } from '../../../packages/ui/src/index.js';
@@ -91,12 +92,33 @@ export function MessageComposer({
     </form>
   );
 }
-export function MessageList({ messages }: { messages: Message[] }) {
+export function MessageList({
+  messages,
+  focusMessageId,
+}: {
+  messages: Message[];
+  focusMessageId?: string;
+}) {
   const { data } = useApp();
+  const focused = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!focusMessageId || !focused.current) return;
+    const frame = requestAnimationFrame(() => {
+      focused.current?.scrollIntoView({ block: 'center' });
+      focused.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusMessageId]);
   return (
     <>
       {messages.map((message) => (
-        <article className="message" key={message.id}>
+        <article
+          className={`message${message.id === focusMessageId ? ' message-feedback-focus' : ''}`}
+          key={message.id}
+          data-message-id={message.id}
+          ref={message.id === focusMessageId ? focused : undefined}
+          tabIndex={message.id === focusMessageId ? -1 : undefined}
+        >
           {message.actorType === 'human' ? (
             <Avatar
               user={data.members.find((member) =>
@@ -126,6 +148,17 @@ export function MessageList({ messages }: { messages: Message[] }) {
                 </span>
               )}
             </div>
+            {message.replyTo && message.resultId && message.resultRevisionId && (
+              <section className="feedback-reply-source" aria-label="此回复对应的原反馈">
+                <Link to={feedbackMessageHref(message, message.replyTo.messageId)}>
+                  回复 {message.replyTo.actorName} · 查看原反馈
+                </Link>
+                <p>
+                  {message.replyTo.bodyPreview}
+                  {message.replyTo.bodyTruncated ? '…' : ''}
+                </p>
+              </section>
+            )}
             {message.codeAnchor && message.resultId && message.resultRevisionId && (
               <p className="message-code-anchor">
                 <Link to={codeFeedbackHref(message)}>
@@ -138,6 +171,9 @@ export function MessageList({ messages }: { messages: Message[] }) {
               </p>
             )}
             <p>{message.body}</p>
+            {message.actorType === 'human' && message.resultId && message.resultRevisionId && (
+              <FeedbackReplyAction message={message} />
+            )}
             <PublishAgreement message={message} />
             <DraftFromMessage message={message} />
             <RequestAssistance message={message} />

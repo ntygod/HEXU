@@ -65,6 +65,15 @@ jobs:
             artifacts/148-code-feedback-editor-mobile-light.png
             artifacts/149-code-feedback-fixed-location-mobile.png
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-feedback-reply-previews
+          path: |
+            artifacts/150-feedback-reply-dark.png
+            artifacts/151-feedback-reply-mobile-light.png
+            artifacts/152-feedback-reply-location-mobile.png
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
