@@ -1,7 +1,6 @@
 import { createInterface } from 'node:readline';
 import { DomainError } from '../../../packages/contracts/src/index.js';
-import { integrationTrialSelection, localIntegrationTrial } from './agent/integration-trial.js';
-const shellQuote = (value: string) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
+import { shareIntegrationTrialDifference } from './agent/integration-trial-difference.js';
 async function main() {
   const options = new Map<string, string>(),
     args = process.argv.slice(2);
@@ -9,28 +8,19 @@ async function main() {
     const key = args[i]!,
       value = args[i + 1];
     if (
-      !['--operation', '--state', '--target', '--files'].includes(key) ||
+      !['--operation', '--state', '--trial'].includes(key) ||
       options.has(key) ||
       !value ||
       value.startsWith('--')
     )
-      throw new DomainError(
-        'INVALID_INPUT',
-        '只接受 --operation ID --state HOME --target NEW_ABSOLUTE_DIRECTORY --files JSON_ARRAY',
-      );
+      throw new DomainError('INVALID_INPUT', '只接受 --operation ID --state HOME --trial TRIAL_ID');
     options.set(key, value);
   }
-  if (options.size !== 4)
+  if (options.size !== 3)
     throw new DomainError(
       'INVALID_INPUT',
-      '用法：npm run runner:integration-trial -- --operation ID --state HOME --target NEW_ABSOLUTE_DIRECTORY --files \'["path"]\'',
+      '用法：npm run runner:integration-trial-diff -- --operation ID --state HOME --trial TRIAL_ID',
     );
-  let paths: string[];
-  try {
-    paths = integrationTrialSelection(JSON.parse(options.get('--files')!));
-  } catch {
-    throw new DomainError('INVALID_INPUT', '--files 必须是无重复的有界相对路径 JSON 数组');
-  }
   const lines = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -46,11 +36,10 @@ async function main() {
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
   try {
-    const result = await localIntegrationTrial(
+    const result = await shareIntegrationTrialDifference(
       options.get('--state')!,
       options.get('--operation')!,
-      options.get('--target')!,
-      paths,
+      options.get('--trial')!,
       async (prompt) => {
         process.stdout.write(prompt);
         const next = await iterator.next();
@@ -60,11 +49,6 @@ async function main() {
       { signal: controller.signal },
     );
     console.log(JSON.stringify(result));
-    if (result.state !== 'ready') process.exitCode = 1;
-    else
-      console.log(
-        `另行只读核验并选择共享候选差异：npm run runner:integration-trial-diff -- --operation ${shellQuote(options.get('--operation')!)} --state ${shellQuote(options.get('--state')!)} --trial ${shellQuote(result.id)}`,
-      );
   } finally {
     process.removeListener('SIGINT', stop);
     process.removeListener('SIGTERM', stop);
@@ -75,7 +59,7 @@ main().catch((cause) => {
   console.error(
     cause instanceof DomainError
       ? `${cause.code}: ${cause.message}`
-      : '本机试应用未确认；保留原日志与现场，不自动重试或清理。',
+      : '候选差异未确认；保留原固定报告与凭证，重试只对账已授权待发包。',
   );
   process.exitCode = 1;
 });

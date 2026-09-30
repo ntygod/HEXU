@@ -127,7 +127,11 @@ async function stranded(f: Fixture, partial = false) {
         silent,
         controller.signal,
       );
-      assert.equal(result.state, 'needs_attention');
+      assert.equal(
+        result.state,
+        'needs_attention',
+        JSON.stringify({ result, reports: (await f.read(f.id)).operation.application?.reports }),
+      );
       assert.deepEqual(result.appliedPaths, ['new.txt']);
     } else
       await assert.rejects(

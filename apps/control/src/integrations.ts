@@ -25,6 +25,10 @@ export function attachIntegrations(app: FastifyInstance, store: Store) {
     reply.code(201).send(integrations.create(task(r), r.body, key(r))),
   );
   app.get(path + '/:integrationId', async (r) => integrations.get(task(r), id(r)));
+  app.get(path + '/:integrationId/trials', async (r) => integrations.listTrials(task(r), id(r)));
+  app.get(path + '/:integrationId/trials/:trialId', async (r) =>
+    integrations.getTrial(task(r), id(r), nodeId((r.params as { trialId: string }).trialId)),
+  );
   app.post(path + '/:integrationId/apply', async (r) =>
     integrations.apply(task(r), id(r), r.body, key(r)),
   );
@@ -41,6 +45,9 @@ export function attachIntegrations(app: FastifyInstance, store: Store) {
   );
   app.post('/runner/v1/integration-apply-publish', async (r) =>
     integrations.publishApplication(token(r), r.body),
+  );
+  app.post('/runner/v1/integration-trial-diff-publish', async (r) =>
+    integrations.publishTrialDifference(token(r), r.body),
   );
   app.post('/runner/v1/integration-recovery-publish', async (r) =>
     integrations.publishRecovery(token(r), r.body),

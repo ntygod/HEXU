@@ -32,13 +32,15 @@ export interface CodeFileDifference {
   afterText?: string;
 }
 export const CODE_DIFF_LIMIT = 24 * 1024;
-export interface ResultCodeDifference {
-  revisionId: string;
-  referenceHash: string;
-  comparedAt: string;
+export interface CodeDifferenceSummary {
   changedFiles: number;
   omittedFiles: number;
   files: CodeFileDifference[];
+}
+export interface ResultCodeDifference extends CodeDifferenceSummary {
+  revisionId: string;
+  referenceHash: string;
+  comparedAt: string;
 }
 export interface ResultCodeEvidence {
   difference: ResultCodeDifference | null;
@@ -49,15 +51,13 @@ export interface ResultCodeEvidence {
   };
   canPublish: boolean;
 }
-export function parseCodeDifference(input: unknown): ResultCodeDifference {
-  const b = exact(input, [
-    'revisionId',
-    'referenceHash',
-    'comparedAt',
-    'changedFiles',
-    'omittedFiles',
-    'files',
-  ]);
+/** Shared bounded file evidence. Result keeps its original cross-side folded-name rule;
+ * trial candidates permit case/NFC renames by checking each snapshot side separately. */
+export function parseCodeDifferenceSummary(
+  input: unknown,
+  pathPolicy: 'folded' | 'sides' = 'folded',
+): CodeDifferenceSummary {
+  const b = exact(input, ['changedFiles', 'omittedFiles', 'files']);
   const integer = (v: unknown, max: number) => {
     if (!Number.isSafeInteger(v) || (v as number) < 0 || (v as number) > max)
       throw new DomainError('INVALID_INPUT', '代码差异数量或大小无效');
@@ -86,7 +86,7 @@ export function parseCodeDifference(input: unknown): ResultCodeDifference {
       f.path.split('/').some((p) => !p || p === '.' || p === '..' || p.toLowerCase() === '.git')
     )
       throw new DomainError('INVALID_INPUT', '差异文件名无效');
-    const key = f.path.normalize('NFC').toLowerCase();
+    const key = pathPolicy === 'folded' ? f.path.normalize('NFC').toLowerCase() : f.path;
     if (paths.has(key)) throw new DomainError('INVALID_INPUT', '差异文件名重复或冲突');
     paths.add(key);
     const before = fileVersion(f.before),
@@ -124,10 +124,24 @@ export function parseCodeDifference(input: unknown): ResultCodeDifference {
         : {}),
     };
   });
+  if (pathPolicy === 'sides') {
+    for (const side of ['before', 'after'] as const) {
+      const nodes = new Map<string, { path: string; kind: 'file' | 'directory' }>();
+      for (const file of files.filter((file) => file[side])) {
+        const parts = file.path.split('/');
+        for (let n = 1; n <= parts.length; n++) {
+          const path = parts.slice(0, n).join('/'),
+            kind = n === parts.length ? 'file' : 'directory',
+            key = path.normalize('NFC').toLowerCase(),
+            prior = nodes.get(key);
+          if (prior && (prior.path !== path || prior.kind !== kind || kind === 'file'))
+            throw new DomainError('INVALID_INPUT', '差异同侧文件或目录冲突');
+          nodes.set(key, { path, kind });
+        }
+      }
+    }
+  }
   const result = {
-    revisionId: nodeId(b.revisionId),
-    referenceHash: checkpointHash(b.referenceHash),
-    comparedAt: retentionDate(b.comparedAt),
     changedFiles: integer(b.changedFiles, 100000),
     omittedFiles: integer(b.omittedFiles, 100000),
     files,
@@ -136,6 +150,31 @@ export function parseCodeDifference(input: unknown): ResultCodeDifference {
     result.changedFiles !== files.length + result.omittedFiles ||
     new TextEncoder().encode(JSON.stringify(result)).byteLength > CODE_DIFF_LIMIT
   )
+    throw new DomainError('INVALID_INPUT', '代码差异数量不一致或超过24 KiB');
+  return result;
+}
+
+/** Preserve the original Result envelope, field order, path policy and total budget. */
+export function parseCodeDifference(input: unknown): ResultCodeDifference {
+  const b = exact(input, [
+    'revisionId',
+    'referenceHash',
+    'comparedAt',
+    'changedFiles',
+    'omittedFiles',
+    'files',
+  ]);
+  const result: ResultCodeDifference = {
+    revisionId: nodeId(b.revisionId),
+    referenceHash: checkpointHash(b.referenceHash),
+    comparedAt: retentionDate(b.comparedAt),
+    ...parseCodeDifferenceSummary({
+      changedFiles: b.changedFiles,
+      omittedFiles: b.omittedFiles,
+      files: b.files,
+    }),
+  };
+  if (new TextEncoder().encode(JSON.stringify(result)).byteLength > CODE_DIFF_LIMIT)
     throw new DomainError('INVALID_INPUT', '代码差异数量不一致或超过24 KiB');
   return result;
 }

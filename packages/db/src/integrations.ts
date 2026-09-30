@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DomainError } from '../../contracts/src/index.js';
 import type { IdentityUser } from '../../contracts/src/identity.js';
 import type { CommitCheckpoint } from '../../contracts/src/checkpoints.js';
@@ -19,6 +19,14 @@ import {
   type IntegrationOptions,
   type IntegrationRecoveryObservation,
 } from '../../contracts/src/integrations.js';
+import {
+  INTEGRATION_TRIAL_DIFFERENCE_LIMITS,
+  parseIntegrationTrialDifference,
+  type IntegrationTrialDifferenceReport,
+  type IntegrationTrialDifferenceReceipt,
+  type IntegrationTrialDifferenceSummary,
+  type IntegrationTrialDifferenceDetail,
+} from '../../contracts/src/integration-trial.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import { CheckpointTransferStore } from './checkpoint-transfer.js';
 import { ResultRevisions } from './result-revisions.js';
@@ -264,7 +272,8 @@ export class IntegrationStore {
     let available = true,
       unavailableReason: string | null = null,
       canCancel = false,
-      canApply = false;
+      canApply = false,
+      canTrial = false;
     const taskRevision = this.task(o.taskId).revision,
       recovery = this.recovery(o.id);
     // Metadata/history remains readable after material expiry or node revocation.
@@ -289,6 +298,15 @@ export class IntegrationStore {
         !!o.report?.plan &&
         !o.report.plan.omittedFiles &&
         o.report.plan.files.some((f) => f.action === 'add' && f.source && !f.target && !f.base);
+      canTrial =
+        available &&
+        !o.application &&
+        ['awaiting_choice', 'conflict'].includes(o.state) &&
+        !!o.report?.plan &&
+        !o.report.plan.omittedFiles &&
+        o.report.plan.files.some(
+          (f) => !f.conflict && ['add', 'modify', 'delete'].includes(f.action),
+        );
     } catch {
       /* read-only viewer */
     }
@@ -298,10 +316,160 @@ export class IntegrationStore {
       unavailableReason,
       canCancel,
       canApply,
+      canTrial,
       taskRevision,
       reportHash: o.report ? codeHash(o.report) : null,
       recovery,
     };
+  }
+  private trialHistoryAccess(taskId: string, id: string) {
+    // A Task may have changed visibility since the original integration. Its current
+    // readers can still read shared history; creation-only scope is not a read gate.
+    this.store.getTask(taskId);
+    if (
+      !this.store.db
+        .prepare('SELECT 1 FROM integration_operations WHERE id=? AND task_id=?')
+        .get(id, taskId)
+    )
+      throw new DomainError('NOT_FOUND', '整合预检记录不存在', 404);
+  }
+  /** Shared candidate history uses current Task read access, never material availability. */
+  listTrials(taskId: string, id: string): { items: IntegrationTrialDifferenceSummary[] } {
+    this.trialHistoryAccess(taskId, id);
+    const rows = this.store.db
+      .prepare(
+        'SELECT body,hash,received_at FROM integration_trial_differences WHERE integration_id=? ORDER BY received_at DESC,trial_id DESC',
+      )
+      .all(id) as { body: string; hash: string; received_at: string }[];
+    return {
+      items: rows.map((row) => {
+        const report = JSON.parse(row.body) as IntegrationTrialDifferenceReport;
+        return {
+          trialId: report.trialId,
+          hash: row.hash,
+          materializedAt: report.materializedAt,
+          comparedAt: report.comparedAt,
+          receivedAt: row.received_at,
+          selectedPathCount: report.selectedPaths.length,
+          changedFiles: report.difference.changedFiles,
+          omittedFiles: report.difference.omittedFiles,
+        };
+      }),
+    };
+  }
+  getTrial(taskId: string, id: string, trialId: string): IntegrationTrialDifferenceDetail {
+    this.trialHistoryAccess(taskId, id);
+    const row = this.store.db
+      .prepare(
+        'SELECT body,hash,received_at FROM integration_trial_differences WHERE integration_id=? AND trial_id=?',
+      )
+      .get(id, trialId) as { body: string; hash: string; received_at: string } | undefined;
+    if (!row) throw new DomainError('NOT_FOUND', '此整合的候选差异不存在', 404);
+    return { report: JSON.parse(row.body), hash: row.hash, receivedAt: row.received_at };
+  }
+  publishTrialDifference(token: string, input: unknown): IntegrationTrialDifferenceReceipt {
+    const report = parseIntegrationTrialDifference(input),
+      hash = codeHash(report);
+    return this.store.atomic(() =>
+      this.forNode(token, report.integrationId, (o) => {
+        // An immutable report is historical evidence, not a request to generate or apply.
+        // Current source, target and Task authority precede even an exact old receipt;
+        // material expiry, a newer application or cancellation does not erase evidence.
+        this.owner(o);
+        const preflight = o.report,
+          plan = preflight?.plan;
+        if (
+          o.inputHash !==
+            codeHash({
+              id: o.id,
+              taskId: o.taskId,
+              source: o.source,
+              target: o.target,
+              material: o.material,
+            }) ||
+          report.integrationInputHash !== o.inputHash ||
+          !preflight ||
+          !plan ||
+          plan.omittedFiles ||
+          report.preflightReportHash !== codeHash(preflight) ||
+          report.materializedAt < preflight.observedAt ||
+          Date.parse(report.comparedAt) > Date.now() + 60000 ||
+          report.selectedPaths.some((path) => {
+            const file = plan.files.find((file) => file.path === path);
+            return !file || file.conflict || !['add', 'modify', 'delete'].includes(file.action);
+          })
+        )
+          throw new DomainError(
+            'INTEGRATION_TRIAL_MISMATCH',
+            '候选差异与原固定输入、完整预检、选择或时间不匹配',
+            409,
+          );
+        for (const file of report.difference.files) {
+          const original = plan.files.find((item) => item.path === file.path)!;
+          if (
+            canonicalJson(file.before) !== canonicalJson(original.target) ||
+            canonicalJson(file.after) !== canonicalJson(original.source)
+          )
+            throw new DomainError(
+              'INTEGRATION_TRIAL_MISMATCH',
+              '候选差异必须使用原目标与所选来源的完整文件标识',
+              409,
+            );
+          for (const [version, content] of [
+            [file.before, file.beforeText],
+            [file.after, file.afterText],
+          ] as const) {
+            if (version && version.objectId.length !== o.target.manifest.commit.length)
+              throw new DomainError('INVALID_INPUT', '候选差异对象格式不匹配');
+            if (
+              version &&
+              content !== undefined &&
+              createHash(o.target.manifest.objectFormat)
+                .update(`blob ${version.bytes}\0`)
+                .update(content)
+                .digest('hex') !== version.objectId
+            )
+              throw new DomainError('INVALID_INPUT', '共享候选正文与固定blob标识不一致');
+          }
+        }
+        const old = this.store.db
+          .prepare(
+            'SELECT integration_id,hash,received_at,body FROM integration_trial_differences WHERE trial_id=?',
+          )
+          .get(report.trialId) as
+          | { integration_id: string; hash: string; received_at: string; body: string }
+          | undefined;
+        if (old) {
+          if (
+            old.integration_id !== o.id ||
+            old.hash !== hash ||
+            canonicalJson(JSON.parse(old.body)) !== canonicalJson(report)
+          )
+            throw new DomainError('INTEGRATION_TRIAL_FIXED', '同一候选的共享差异不能替换', 409);
+          return {
+            integrationId: o.id,
+            trialId: report.trialId,
+            hash: old.hash,
+            receivedAt: old.received_at,
+          };
+        }
+        const count = this.store.db
+          .prepare('SELECT COUNT(*) AS n FROM integration_trial_differences WHERE integration_id=?')
+          .get(o.id) as { n: number };
+        if (count.n >= INTEGRATION_TRIAL_DIFFERENCE_LIMITS.reports)
+          throw new DomainError('INTEGRATION_TRIAL_LIMIT', '本次整合已达100份候选差异', 409);
+        const receivedAt = new Date().toISOString();
+        this.store.db
+          .prepare(
+            'INSERT INTO integration_trial_differences(integration_id,trial_id,hash,received_at,body) VALUES(?,?,?,?,?)',
+          )
+          .run(o.id, report.trialId, hash, receivedAt, JSON.stringify(report));
+        this.store.db
+          .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
+          .run(o.taskId, 'integration.trial_shared', receivedAt, o.spaceId);
+        return { integrationId: o.id, trialId: report.trialId, hash, receivedAt };
+      }),
+    );
   }
   private recovery(id: string): IntegrationRecoveryObservation | null {
     const row = this.store.db

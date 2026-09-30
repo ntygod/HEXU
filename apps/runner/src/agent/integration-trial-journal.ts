@@ -1,7 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
-import { nodeId } from '../../../../packages/contracts/src/nodes.js';
+import { exact, nodeId } from '../../../../packages/contracts/src/nodes.js';
+import { retentionDate } from '../../../../packages/contracts/src/checkpoint-retention.js';
+import {
+  parseIntegrationTrialDifference,
+  type IntegrationTrialDifferenceReport,
+  type IntegrationTrialDifferenceReceipt,
+} from '../../../../packages/contracts/src/integration-trial.js';
 import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import { AgentStorage } from './storage.js';
 import { restorePrivatePath } from './checkpoint-restore-preflight.js';
@@ -42,6 +48,12 @@ export interface IntegrationTrialRecord {
   observation: RestoreTargetObservation;
   manifest: IntegrationTrialManifest;
   progress: IntegrationTrialProgress;
+}
+export interface LocalIntegrationTrialDifference {
+  report: IntegrationTrialDifferenceReport;
+  hash: string;
+  state: 'frozen' | 'pending' | 'shared';
+  receipt: IntegrationTrialDifferenceReceipt | null;
 }
 const invalid = () =>
   new DomainError(
@@ -90,7 +102,8 @@ function decode(body: string, target: string): IntegrationTrialRecord {
 }
 
 /** Separate local process guard and durable, private evidence. There is no
- * metadata publication, automatic resumption, rollback or cleanup operation. */
+ * automatic resumption, rollback or cleanup operation. Difference sharing uses
+ * this same guard; frozen local reports do not imply permission to publish. */
 export class IntegrationTrialJournal {
   readonly storage: AgentStorage;
   private readonly identities: string[];
@@ -102,7 +115,8 @@ export class IntegrationTrialJournal {
       this.identities = this.paths.map((p, i) => restorePrivatePath(p, i === 0));
       this.storage.db
         .exec(`CREATE TABLE IF NOT EXISTS trials(target TEXT PRIMARY KEY, context TEXT NOT NULL, progress TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS trial_entries(attempt_id TEXT NOT NULL,path TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(attempt_id,path));`);
+        CREATE TABLE IF NOT EXISTS trial_entries(attempt_id TEXT NOT NULL,path TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(attempt_id,path));
+        CREATE TABLE IF NOT EXISTS trial_differences(trial_id TEXT PRIMARY KEY,binding TEXT NOT NULL,body TEXT NOT NULL,hash TEXT NOT NULL,state TEXT NOT NULL,receipt TEXT);`);
     } catch (cause) {
       this.storage.close();
       throw cause;
@@ -124,6 +138,113 @@ export class IntegrationTrialJournal {
         target,
       )
     );
+  }
+  byId(id: string): IntegrationTrialRecord | undefined {
+    this.stillBound();
+    nodeId(id);
+    const rows = this.storage.db.prepare('SELECT target FROM trials').all() as { target: string }[];
+    let result: IntegrationTrialRecord | undefined;
+    for (const row of rows) {
+      const record = this.row(row.target)!;
+      if (record.progress.id !== id) continue;
+      if (result) throw invalid();
+      result = record;
+    }
+    return result;
+  }
+  difference(record: IntegrationTrialRecord): LocalIntegrationTrialDifference | undefined {
+    this.stillBound();
+    const row = this.storage.db
+      .prepare('SELECT * FROM trial_differences WHERE trial_id=?')
+      .get(record.progress.id) as
+      | { binding: string; body: string; hash: string; state: string; receipt: string | null }
+      | undefined;
+    if (!row) return;
+    const report = parseIntegrationTrialDifference(JSON.parse(row.body));
+    const p = record.progress;
+    if (
+      row.binding !== record.binding ||
+      report.trialId !== p.id ||
+      report.integrationId !== p.integrationId ||
+      report.integrationInputHash !== p.inputHash ||
+      report.preflightReportHash !== p.reportHash ||
+      report.manifestHash !== p.manifestHash ||
+      report.materializedAt !== p.publishedAt ||
+      canonicalJson(report.selectedPaths) !== canonicalJson(p.selectedPaths) ||
+      row.hash !== trialHash(report) ||
+      !['frozen', 'pending', 'shared'].includes(row.state) ||
+      (row.state === 'shared') !== (row.receipt !== null)
+    )
+      throw invalid();
+    const receipt =
+      row.receipt === null ? null : this.checkedReceipt(report, JSON.parse(row.receipt));
+    return {
+      report,
+      hash: row.hash,
+      state: row.state as LocalIntegrationTrialDifference['state'],
+      receipt,
+    };
+  }
+  /** Freeze the verified report locally, without authorizing publication. */
+  freezeDifference(record: IntegrationTrialRecord, value: IntegrationTrialDifferenceReport) {
+    this.stillBound();
+    const report = parseIntegrationTrialDifference(value);
+    const prior = this.difference(record);
+    if (prior) {
+      if (prior.hash !== trialHash(report)) throw invalid();
+      return prior;
+    }
+    this.storage.db
+      .prepare('INSERT INTO trial_differences VALUES(?,?,?,?,?,NULL)')
+      .run(record.progress.id, record.binding, JSON.stringify(report), trialHash(report), 'frozen');
+    return this.difference(record)!;
+  }
+  /** Called only after the separate SHARE_TRIAL_DIFF confirmation and revalidation. */
+  authorizeDifference(record: IntegrationTrialRecord, expectedHash: string) {
+    const value = this.difference(record);
+    if (!value || value.hash !== expectedHash) throw invalid();
+    if (value.state === 'frozen')
+      this.storage.db
+        .prepare("UPDATE trial_differences SET state='pending' WHERE trial_id=? AND state='frozen'")
+        .run(record.progress.id);
+    return this.difference(record)!;
+  }
+  private checkedReceipt(
+    report: IntegrationTrialDifferenceReport,
+    input: unknown,
+  ): IntegrationTrialDifferenceReceipt {
+    const r = exact(input, ['integrationId', 'trialId', 'hash', 'receivedAt']);
+    if (
+      r.integrationId !== report.integrationId ||
+      r.trialId !== report.trialId ||
+      r.hash !== trialHash(report)
+    )
+      throw invalid();
+    return {
+      integrationId: report.integrationId,
+      trialId: report.trialId,
+      hash: r.hash as string,
+      receivedAt: retentionDate(r.receivedAt),
+    };
+  }
+  acknowledgeDifference(record: IntegrationTrialRecord, input: unknown) {
+    const value = this.difference(record);
+    if (!value || value.state === 'frozen') throw invalid();
+    const receipt = this.checkedReceipt(value.report, input);
+    if (value.receipt && canonicalJson(value.receipt) !== canonicalJson(receipt)) throw invalid();
+    this.storage.db
+      .prepare("UPDATE trial_differences SET state='shared',receipt=? WHERE trial_id=?")
+      .run(JSON.stringify(receipt), record.progress.id);
+    return receipt;
+  }
+  hasPendingDifferences() {
+    this.stillBound();
+    // Unknown/corrupt states also keep credentials; only explicit frozen/shared settle.
+    return !!this.storage.db
+      .prepare(
+        "SELECT 1 FROM trial_differences WHERE state NOT IN ('frozen','shared') OR (state='shared' AND receipt IS NULL)",
+      )
+      .get();
   }
   begin(
     input: Omit<IntegrationTrialRecord, 'version' | 'progress'> & {
@@ -222,6 +343,11 @@ export async function withSettledIntegrationTrials<T>(
 ): Promise<T> {
   const journal = new IntegrationTrialJournal(home);
   try {
+    if (journal.hasPendingDifferences())
+      throw new DomainError(
+        'INTEGRATION_TRIAL_DIFFERENCE_PENDING',
+        '候选差异共享回执待确认；保留原节点凭证与固定待发包，不自动清理',
+      );
     const rows = journal.storage.db.prepare('SELECT target FROM trials').all() as {
       target: string;
     }[];

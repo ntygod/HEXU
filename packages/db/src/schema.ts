@@ -664,4 +664,19 @@ CREATE TRIGGER integration_recovery_immutable_delete BEFORE DELETE ON integratio
  BEGIN SELECT RAISE(ABORT,'integration recovery observations are immutable'); END;
 `,
   },
+  {
+    version: 34,
+    sql: `
+-- Candidate evidence is independent of original operation/application history.
+CREATE TABLE integration_trial_differences (
+ integration_id TEXT NOT NULL REFERENCES integration_operations(id),
+ trial_id TEXT PRIMARY KEY, hash TEXT NOT NULL, received_at TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE INDEX integration_trials_history ON integration_trial_differences(integration_id,received_at DESC,trial_id DESC);
+CREATE TRIGGER integration_trials_immutable_update BEFORE UPDATE ON integration_trial_differences
+ BEGIN SELECT RAISE(ABORT,'integration trial differences are immutable'); END;
+CREATE TRIGGER integration_trials_immutable_delete BEFORE DELETE ON integration_trial_differences
+ BEGIN SELECT RAISE(ABORT,'integration trial differences are immutable'); END;
+`,
+  },
 ];

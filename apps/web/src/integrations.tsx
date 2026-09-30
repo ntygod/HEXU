@@ -11,6 +11,7 @@ import type {
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { Link, canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
+import { IntegrationTrialEditor, IntegrationTrialHistory } from './integration-trials.js';
 import './integrations.css';
 
 const path = (taskId: string) => `/tasks/${taskId}/integrations`;
@@ -186,11 +187,19 @@ function Record({
   saved,
   apply,
   pendingId,
+  trial,
+  selectedTrialId,
+  selectTrial,
+  denied,
 }: {
   view: IntegrationView;
   saved(): void;
   apply?(view: IntegrationView): void;
   pendingId?: string;
+  trial?(view: IntegrationView): void;
+  selectedTrialId?: string;
+  selectTrial?(id: string): void;
+  denied?(): void;
 }) {
   const o = view.operation,
     report = o.report,
@@ -329,6 +338,20 @@ function Record({
       </p>
       <ApplicationStatus view={view} />
       <RecoveryStatus view={view} />
+      <IntegrationTrialHistory
+        view={view}
+        selectedTrialId={selectedTrialId}
+        selectTrial={selectTrial}
+        denied={denied}
+      />
+      {trial && view.canTrial && (
+        <Button
+          disabled={command.busy || !!command.uncertain || !!pendingId}
+          onClick={() => trial(view)}
+        >
+          选择文件试应用
+        </Button>
+      )}
       {apply && (view.canApply || pendingId === o.id) && (
         <Button
           disabled={command.busy || !!command.uncertain || (!!pendingId && pendingId !== o.id)}
@@ -826,11 +849,17 @@ function Records({
   apply,
   pendingId,
   denied,
+  trial,
+  selectedTrials,
+  selectTrial,
 }: {
   task: Task;
   apply(view: IntegrationView): void;
   pendingId?: string;
   denied(): void;
+  trial(view: IntegrationView): void;
+  selectedTrials: Record<string, string>;
+  selectTrial(operationId: string, trialId: string): void;
 }) {
   const read = useAssistanceRead<{ items: IntegrationView[] }>(path(task.id), 5000);
   useEffect(() => {
@@ -855,6 +884,10 @@ function Records({
               saved={read.retry}
               apply={apply}
               pendingId={pendingId}
+              trial={trial}
+              selectedTrialId={selectedTrials[v.operation.id]}
+              selectTrial={(trialId) => selectTrial(v.operation.id, trialId)}
+              denied={denied}
             />
           ))
         ) : (
@@ -871,17 +904,22 @@ function Entry({ task }: { task: Task }) {
   const [open, setOpen] = useState(false),
     [application, setApplication] = useState<IntegrationView | null>(null),
     [applicationOpen, setApplicationOpen] = useState(false),
+    [trial, setTrial] = useState<IntegrationView | null>(null),
+    [selectedTrials, setSelectedTrials] = useState<Record<string, string>>({}),
     [revoked, setRevoked] = useState(false);
   const editable = canEditTask(data, task);
   useEffect(() => {
     if (!editable) {
       setApplication(null);
       setApplicationOpen(false);
+      setTrial(null);
     }
   }, [editable]);
   const denied = () => {
     setApplication(null);
     setApplicationOpen(false);
+    setTrial(null);
+    setSelectedTrials({});
     setRevoked(true);
     setOpen(true);
   };
@@ -899,6 +937,15 @@ function Entry({ task }: { task: Task }) {
               task={task}
               pendingId={application?.operation.id}
               denied={denied}
+              selectedTrials={selectedTrials}
+              selectTrial={(operationId, trialId) =>
+                setSelectedTrials((old) => ({ ...old, [operationId]: trialId }))
+              }
+              trial={(view) => {
+                if (!editable || application) return;
+                setTrial(structuredClone(view));
+                setOpen(false);
+              }}
               apply={(view) => {
                 if (!editable || (application && application.operation.id !== view.operation.id))
                   return;
@@ -924,6 +971,17 @@ function Entry({ task }: { task: Task }) {
           saved={() => {
             setApplication(null);
             setApplicationOpen(false);
+            setOpen(true);
+          }}
+        />
+      )}
+      {trial && (
+        <IntegrationTrialEditor
+          key={trial.operation.id}
+          initial={trial}
+          denied={denied}
+          close={() => {
+            setTrial(null);
             setOpen(true);
           }}
         />

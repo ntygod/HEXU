@@ -84,11 +84,12 @@ export function integrationTrialSelection(value: unknown): string[] {
     throw new DomainError('INVALID_INPUT', '--files 必须是无重复的有界相对路径 JSON 数组');
   return [...value].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
 }
-function verifyTrialFiles(
+export function verifyTrialFiles(
   stage: number,
   plan: IntegrationTrialPlan,
   journal: IntegrationTrialJournal,
   record: IntegrationTrialRecord,
+  sync = true,
 ) {
   const owned = journal.entries(record.progress.id);
   checkOwnedTree(stage, owned);
@@ -129,7 +130,7 @@ function verifyTrialFiles(
         throw new DomainError('INTEGRATION_TRIAL_INCOMPLETE', '试应用文件字节不一致');
     }
   }
-  fsyncSync(stage);
+  if (sync) fsyncSync(stage);
 }
 
 /** One explicitly confirmed PRIVATE preview. Never writes the original target,

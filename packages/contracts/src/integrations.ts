@@ -149,6 +149,7 @@ export interface IntegrationView {
   unavailableReason: string | null;
   canCancel: boolean;
   canApply: boolean;
+  canTrial?: boolean;
   taskRevision: number;
   reportHash: string | null;
   recovery?: IntegrationRecoveryObservation | null;

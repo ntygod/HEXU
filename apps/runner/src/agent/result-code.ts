@@ -35,6 +35,7 @@ export function assertCodeQuiescent(
     restorePrivatePath(journal, false);
     const db = new DatabaseSync(journal, { readOnly: true });
     try {
+      db.exec('PRAGMA busy_timeout=5000');
       if (
         db.prepare("SELECT 1 FROM sqlite_master WHERE name='execution_commands'").get() &&
         db.prepare("SELECT 1 FROM execution_commands WHERE phase!='terminal'").get()
@@ -53,6 +54,9 @@ export function assertCodeQuiescent(
     restorePrivatePath(registry, false);
     const db = new DatabaseSync(registry, { readOnly: true });
     try {
+      // Match the registry writer's bounded transaction wait. A concurrent
+      // short commit is not evidence of a conflicting workspace claim.
+      db.exec('PRAGMA busy_timeout=5000');
       const claims = db.prepare('SELECT root,identity,dispatch_id FROM claims').all() as {
         root: string;
         identity: string;
