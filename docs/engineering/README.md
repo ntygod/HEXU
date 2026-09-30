@@ -48,6 +48,9 @@
 | 原已完成应用的全部文件，从精确原备份另行确认恢复 | [原应用文件恢复](integration-file-restoration.md) |
 | 选中新增/修改/删除，在新私有目录核对完整候选文件 | [独立目录试应用](integration-trial.md) |
 | 逐项明确采用来源/保留目标，生成固定候选并另行写回 | [整文件冲突选择](integration-conflict-choices.md) |
+| 放弃已登记方案，保留现场与Run/成果，独立停止仍明确可见 | [方案生命周期](branch-lifecycle.md) |
+| 清理前核对同现场固定副本、实际未保存修改与受管占用，无删除许可 | [现场保护核对](branch-cleanup-check.md) |
+| 明确将完整原目录含.git移到本人新私有位置，不永久删除 | [完整现场移出保留](branch-preservation.md) |
 | 明确停止后只处置归属完整的未发布试应用暂存 | [试应用暂存处置](integration-trial-cleanup.md) |
 | 保持原成果与同一目录，选择新检查点创建另一条只读预检 | [新目标重新预检](integration-target-recompute.md) |
 | 本机核对候选差异，另行共享并在Task查看不可变历史 | [候选差异](integration-trial-differences.md) |

@@ -22,7 +22,7 @@ export class WorkBranchResults {
     this.revisions = new ResultRevisions(store);
   }
   private source(taskId: string, b: WorkBranch): BranchResultSource {
-    if (!b.runId || b.state === 'discarded')
+    if (!b.runId)
       throw new DomainError('BRANCH_RESULT_UNAVAILABLE', '方案尚无可固定的来源执行', 409);
     const r = this.store.run(b.runId),
       n = r.node;
@@ -228,7 +228,12 @@ export class WorkBranchResults {
       const version = this.revisions.append(result, source, data.limitations);
       this.branches.change(
         task,
-        { ...b, state: 'ready', resultId: result.id, resultRevisionId: version.id },
+        {
+          ...b,
+          state: b.state === 'discarded' ? 'discarded' : 'ready',
+          resultId: result.id,
+          resultRevisionId: version.id,
+        },
         'result_saved',
       );
       this.store.db

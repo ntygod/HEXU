@@ -34,6 +34,11 @@ export interface WorkBranch {
   resultRevisionId?: string;
   result?: import('./results.js').ResultRevisionSummary;
   workspace?: import('./work-branch-workspaces.js').BranchWorkspaceOperation;
+  preservation?: {
+    id: string;
+    state: import('./branch-preservation.js').BranchPreservationView['state'];
+    executionRegistrationClosed: boolean;
+  };
   run?: Run;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +64,7 @@ export interface WorkBranchEvent {
   action:
     | 'plan'
     | 'discard'
+    | 'discard_preserving'
     | 'workspace_requested'
     | 'workspace_prepared'
     | 'workspace_bound'

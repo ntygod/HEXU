@@ -26,3 +26,6 @@
 迁移27只增加定义，迁移28保留旧定义并加入现场请求/绑定；旧记录不会补造目录或执行。`workingCopyId` 在本人节点登记后填写，`runId` 随派发原子关联，真实启动后状态为 active。迁移29加入固定成果与选择；用户明确保存文字成果后才关联 `resultId` / `resultRevisionId` 并进入ready，不从Run成功自动生成。selected是当前固定版本选择的读取投影。
 
 同机独立现场与首轮Run用法见[方案现场](branch-workspaces.md)，固定文字版本、反馈与比较选择见[方案成果](branch-results.md)。组级资源/预算队列、代码产物、选择后继续、整合与已登记目录清理继续按 [13工作包](../development/13-parallel-exploration.md)推进，唯一下一项见 [22](../development/22-next-delivery.md)。
+
+
+已登记现场或已有执行的方案现在可另行[明确放弃但保留现场](branch-lifecycle.md)。当前已选方案须先明确取消或替换选择；放弃不停止Run、不删除目录/成果、不释放锁。活动/未知执行和独立停止继续显示，原记录保持，不能借新动作升级原planned-only放弃许可。实际验证状态见21与对应历史。

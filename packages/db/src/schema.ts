@@ -721,4 +721,32 @@ CREATE TRIGGER integration_restoration_original_immutable BEFORE UPDATE ON integ
  BEGIN SELECT RAISE(ABORT,'restoration original application is immutable'); END;
 `,
   },
+  {
+    version: 36,
+    sql: `
+-- Moving a whole branch directory is distinct from its historical binding.
+CREATE TABLE branch_preservations (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ branch_id TEXT NOT NULL REFERENCES work_branches(id), node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ state TEXT NOT NULL CHECK(state IN ('requested','moving','preserved','failed','needs_attention','cancelled')),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+CREATE UNIQUE INDEX branch_preservation_unsettled ON branch_preservations(branch_id)
+ WHERE state IN ('requested','moving','preserved','needs_attention');
+CREATE TRIGGER branch_preservation_request_immutable BEFORE UPDATE ON branch_preservations
+ WHEN OLD.id IS NOT NEW.id OR OLD.task_id IS NOT NEW.task_id OR OLD.branch_id IS NOT NEW.branch_id
+ OR OLD.node_id IS NOT NEW.node_id OR OLD.body IS NOT NEW.body
+ BEGIN SELECT RAISE(ABORT,'branch preservation requests are immutable'); END;
+CREATE TRIGGER branch_preservation_immutable_delete BEFORE DELETE ON branch_preservations
+ BEGIN SELECT RAISE(ABORT,'branch preservation requests are immutable'); END;
+CREATE TABLE branch_preservation_reports (
+ preservation_id TEXT NOT NULL REFERENCES branch_preservations(id), sequence INTEGER NOT NULL CHECK(sequence IN (1,2)),
+ hash TEXT NOT NULL, received_at TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(preservation_id,sequence)
+);
+CREATE TRIGGER branch_preservation_report_immutable_update BEFORE UPDATE ON branch_preservation_reports
+ BEGIN SELECT RAISE(ABORT,'branch preservation reports are immutable'); END;
+CREATE TRIGGER branch_preservation_report_immutable_delete BEFORE DELETE ON branch_preservation_reports
+ BEGIN SELECT RAISE(ABORT,'branch preservation reports are immutable'); END;
+`,
+  },
 ];

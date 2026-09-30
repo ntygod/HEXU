@@ -17,6 +17,11 @@ import type { BranchWorkspaceOperation } from '../../contracts/src/work-branch-w
 import { ResultRevisions } from './result-revisions.js';
 import type { BranchChoice } from '../../contracts/src/branch-comparison.js';
 
+import {
+  parseWorkBranchDiscardPreserving,
+  type WorkBranchDiscardPreview,
+} from '../../contracts/src/work-branch-lifecycle.js';
+
 type Row = { rowid: number; body: string };
 export class WorkBranchStore {
   private readonly checkpoints: CheckpointStore;
@@ -65,8 +70,23 @@ export class WorkBranchStore {
             'SELECT body FROM work_branch_workspaces WHERE branch_id=? ORDER BY rowid DESC LIMIT 1',
           )
           .get(b.id) as Row | undefined;
+        const preservation = this.store.db
+          .prepare(
+            'SELECT id,state FROM branch_preservations WHERE branch_id=? ORDER BY rowid DESC LIMIT 1',
+          )
+          .get(b.id) as
+          | { id: string; state: NonNullable<WorkBranch['preservation']>['state'] }
+          | undefined;
         return {
           ...b,
+          ...(preservation
+            ? {
+                preservation: {
+                  ...preservation,
+                  executionRegistrationClosed: preservation.state === 'preserved',
+                },
+              }
+            : {}),
           state: selection?.branchId === b.id ? 'selected' : b.state,
           ...(workspace
             ? { workspace: JSON.parse(workspace.body) as BranchWorkspaceOperation }
@@ -141,7 +161,13 @@ export class WorkBranchStore {
     action: WorkBranchEvent['action'],
     actor?: WorkBranchEvent['actor'],
   ) {
-    const { workspace: _workspace, run: _run, result: _result, ...saved } = branch;
+    const {
+      workspace: _workspace,
+      run: _run,
+      result: _result,
+      preservation: _preservation,
+      ...saved
+    } = branch;
     const next = { ...saved, revision: saved.revision + 1, updatedAt: new Date().toISOString() };
     this.store.db
       .prepare('UPDATE work_branches SET state=?,revision=?,body=? WHERE id=? AND task_id=?')
@@ -231,6 +257,66 @@ export class WorkBranchStore {
           .all(id) as Row[]
       ).map((r) => JSON.parse(r.body) as WorkBranchEvent),
     };
+  }
+  private assertPreservingDiscard(taskId: string, b: WorkBranch) {
+    if (b.state === 'discarded')
+      throw new DomainError('WORK_BRANCH_DISCARDED', '此方案已放弃，原现场与历史继续保留', 409);
+    if (this.selection(taskId, b.groupId)?.branchId === b.id)
+      throw new DomainError(
+        'WORK_BRANCH_SELECTED',
+        '此方案仍被选用；请先在比较中明确取消或替换选择，再放弃方案',
+        409,
+      );
+    const rows = this.store.db
+      .prepare(
+        'SELECT body FROM work_branch_workspaces WHERE task_id=? AND branch_id=? ORDER BY rowid DESC',
+      )
+      .all(taskId, b.id) as Row[];
+    const operations = rows.map((r) => JSON.parse(r.body) as BranchWorkspaceOperation);
+    const bound = operations.filter((op) => op.state === 'bound');
+    if (
+      !b.workingCopyId ||
+      bound.length !== 1 ||
+      bound[0]!.workingCopyId !== b.workingCopyId ||
+      operations.some((op) => ['waiting_local', 'prepared'].includes(op.state))
+    )
+      throw new DomainError(
+        'WORK_BRANCH_WORKSPACE_PENDING',
+        '此入口只放弃已登记独立现场的方案；未完成准备先按原准备流程处理，不清理材料',
+        409,
+      );
+  }
+  discardPreview(taskId: string, id: string): WorkBranchDiscardPreview {
+    const task = this.task(taskId, true),
+      b = this.branch(taskId, id);
+    let canDiscard = true,
+      unavailableReason: string | null = null;
+    try {
+      this.assertPreservingDiscard(taskId, b);
+    } catch (cause) {
+      if (!(cause instanceof DomainError)) throw cause;
+      canDiscard = false;
+      unavailableReason = cause.message;
+    }
+    const branch = this.view(task, this.group(taskId, b.groupId)).branches.find(
+      (item) => item.id === id,
+    )!;
+    return { branch, taskRevision: task.revision, canDiscard, unavailableReason };
+  }
+  discardPreserving(taskId: string, id: string, input: unknown, key: string): WorkBranchView {
+    this.task(taskId, true);
+    this.branch(taskId, id); // Current permission before old receipts.
+    const data = parseWorkBranchDiscardPreserving(input);
+    const result = this.store.mutate(`work_branches.discard_preserving:${id}`, key, data, () => {
+      const task = this.task(taskId, true),
+        b = this.branch(taskId, id);
+      assertRevision(task.revision, data.expectedTaskRevision);
+      assertRevision(b.revision, data.expectedRevision);
+      this.assertPreservingDiscard(taskId, b);
+      this.change(task, { ...b, state: 'discarded' }, 'discard_preserving');
+      return { groupId: b.groupId };
+    });
+    return this.get(taskId, result.groupId);
   }
   discard(taskId: string, id: string, input: unknown, key: string): WorkBranchView {
     this.task(taskId, true);

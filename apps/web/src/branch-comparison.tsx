@@ -21,6 +21,7 @@ function ChoiceEditor({
   path,
   candidate,
   selection,
+  candidateAvailable,
   saved,
   close,
   denied,
@@ -28,6 +29,7 @@ function ChoiceEditor({
   path: string;
   candidate: Candidate;
   selection: BranchChoice | null;
+  candidateAvailable: boolean;
   saved(): void;
   close(): void;
   denied(): void;
@@ -46,7 +48,7 @@ function ChoiceEditor({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!stale && !locked)
+          if (!stale && !locked && candidateAvailable)
             void command.send(path + '/selection', {
               expectedSelectionRevision: baseline,
               branchId: candidate?.branchId ?? null,
@@ -94,6 +96,11 @@ function ChoiceEditor({
               </Button>
             </section>
           )}
+          {!candidateAvailable && !command.uncertain && (
+            <p className="work-branch-notice">
+              此方案已被放弃，不能创建新选择。说明保留，可关闭窗口后查看成果历史。
+            </p>
+          )}
           {command.error && <p role="alert">{command.error}</p>}
           {command.uncertain && (
             <section className="work-branch-notice" aria-label="方案选择待确认">
@@ -108,7 +115,12 @@ function ChoiceEditor({
           <Button type="button" onClick={close} disabled={command.busy}>
             关闭
           </Button>
-          <Button type="submit" variant="primary" busy={command.busy} disabled={locked || stale}>
+          <Button
+            type="submit"
+            variant="primary"
+            busy={command.busy}
+            disabled={locked || stale || !candidateAvailable}
+          >
             {candidate ? '保存选择' : '确认取消选择'}
           </Button>
         </div>
@@ -140,6 +152,11 @@ function Column({
       <header>
         <h2>{branch.name}</h2>
         <p>{branch.goal}</p>
+        {branch.state === 'discarded' && (
+          <p className="work-branch-notice">
+            已放弃 · 现场与成果历史保留，不能重新选用此方案；已有固定版本仍可查看或明确整合。
+          </p>
+        )}
       </header>
       {versions.length ? (
         <>
@@ -190,7 +207,8 @@ function Column({
                 {selected ? (
                   <span className="badge active">已选用此版本</span>
                 ) : (
-                  choose && (
+                  choose &&
+                  branch.state !== 'discarded' && (
                     <Button
                       variant="primary"
                       disabled={!!read.error}
@@ -331,6 +349,12 @@ export function BranchComparisonPage({ taskId, groupId }: { taskId: string; grou
           path={path}
           candidate={editing.candidate}
           selection={selection}
+          candidateAvailable={
+            !editing.candidate ||
+            work.branches.some(
+              (b) => b.id === editing.candidate!.branchId && b.state !== 'discarded',
+            )
+          }
           close={() => setEditing(null)}
           denied={() => {
             setEditing(null);
