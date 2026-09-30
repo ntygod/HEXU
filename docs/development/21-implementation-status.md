@@ -31,7 +31,7 @@
 
 ## 最近验证与交付位置
 
-远端最新main `a3ae2e8` 的[CI 36658556183](https://github.com/ntygod/HEXU/actions/runs/36658556183)工程通过，但Chromium **123通过/1失败**；原`4c27c59`完整通过仅是较早历史证据。失败位于固定成果版本切换用例，trace显示未等v2加载就读取空option列表，随后`selectOption({})`误选v2；当前正在修测试同步，不能将本地工程检查或旧CI声称为最终浏览器通过。
+远端最新main `a3ae2e8` 的[CI 36658556183](https://github.com/ntygod/HEXU/actions/runs/36658556183)工程通过，但Chromium **123通过/1失败**；原`4c27c59`完整通过仅是较早历史证据。失败位于固定成果版本切换用例，trace显示未等v2加载就读取空option列表，随后`selectOption({})`误选v2；已本地修正测试同步及稳定版本ID选择，并用请求屏障明确覆盖加载空态；仅完成严格类型/格式检查，最终head的Chromium尚待重验，不能将本地工程检查或旧CI声称为最终浏览器通过。诊断、trace与修正见[导航回归记录](history/2026-09-30-result-version-navigation.md)。
 
 本地选择新增文件应用已通过Node24完整检查（638/638工程测试、类型/UI tokens/构建）；六项新增浏览器自动用例因环境socket权限未运行到UI，cloud browser回环访问也被阻止。范围、实际检查及浏览器环境限制见[应用记录](history/2026-09-30-integration-application.md)；该切片尚未发布，不将主线CI当作新代码证据。其后的本地只读状态入口曾通过10项新增/17项受影响工程检查（共27/27）和类型/构建检查，见[本机状态记录](history/2026-09-30-integration-status.md)。本地明确保留现场结算已通过695/695完整工程检查、类型/UI tokens/构建；新增5项浏览器场景只完成严格类型检查，尚未运行。范围、审查修正与实际进程/回执验证见[结算记录](history/2026-09-30-integration-recovery.md)。
 
