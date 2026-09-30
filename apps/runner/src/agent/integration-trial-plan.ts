@@ -11,6 +11,13 @@ import { verifySnapshot, type SnapshotObject } from './checkpoint-objects.js';
 import { snapshotEntries } from './checkpoint-restore-plan.js';
 import { buildIntegrationPlan } from './integration-plan.js';
 
+import {
+  parseIntegrationConflictSelection,
+  type IntegrationConflictSelection,
+  type IntegrationConflictChoice,
+} from '../../../../packages/contracts/src/integration-conflict-selection.js';
+import { evaluateIntegrationConflictSelection } from '../../../../packages/domain/src/integration-conflict-selection.js';
+
 type Format = 'sha1' | 'sha256';
 type Snapshot = Awaited<ReturnType<typeof verifySnapshot>>;
 type Sides<T> = { base: T; source: T; target: T };
@@ -31,13 +38,14 @@ export interface IntegrationTrialFile {
 }
 export type IntegrationTrialEntry = IntegrationTrialDirectory | IntegrationTrialFile;
 export interface IntegrationTrialManifest {
-  version: 1;
+  version: 1 | 2;
   kind: 'integration_trial_plan';
   objectFormat: Format;
   trees: Sides<string>;
   snapshotHashes: Sides<string>;
-  selection: 'apply_source';
+  selection: 'apply_source' | 'explicit_conflict_choices';
   selectedPaths: string[];
+  conflictChoices?: IntegrationConflictChoice[];
   entries: IntegrationTrialEntry[];
   materializedBytes: number;
   trialOnly: true;
@@ -104,7 +112,9 @@ async function reverify(format: Format, tree: string, input: Snapshot): Promise<
  * acquires a lease, creates a commit/ref/index, or authorizes existing-target writes.
  * The root is used only for the original report's conservative path-length check.
  * New directory entries describe a future PRIVATE materialization, not in-place
- * directory creation support. No conflicts, merge drivers or implicit side choice. */
+ * directory creation support. Version 1 remains source-only; version 2 binds
+ * explicit whole-file choices without changing the original report. No merge
+ * drivers or implicit side choice. */
 export async function buildIntegrationTrialPlan(
   format: Format,
   trees: Sides<string>,
@@ -112,6 +122,7 @@ export async function buildIntegrationTrialPlan(
   originalPlan: IntegrationPlan,
   paths: readonly string[],
   targetRoot: string,
+  conflictSelection?: IntegrationConflictSelection,
 ): Promise<IntegrationTrialPlan> {
   if (
     !['sha1', 'sha256'].includes(format) ||
@@ -124,7 +135,7 @@ export async function buildIntegrationTrialPlan(
     throw new DomainError('RESTORE_PATH_UNSUPPORTED', '试应用路径边界无效，未写入文件');
   if (
     !Array.isArray(paths) ||
-    !paths.length ||
+    (!paths.length && conflictSelection === undefined) ||
     paths.length > INTEGRATION_LIMITS.files ||
     paths.some((p) => typeof p !== 'string') ||
     new Set(paths).size !== paths.length ||
@@ -143,7 +154,13 @@ export async function buildIntegrationTrialPlan(
   // Freeze caller metadata and every input graph before awaiting any verification.
   const fixedTrees = { ...trees },
     original = canonicalJson(originalPlan),
-    selectedPaths = [...paths].sort(comparePath);
+    selectedPaths = [...paths].sort(comparePath),
+    decisions =
+      conflictSelection === undefined
+        ? undefined
+        : parseIntegrationConflictSelection(conflictSelection);
+  if (decisions && canonicalJson(decisions.selectedPaths) !== canonicalJson(selectedPaths))
+    throw unsupported();
   const [base, source, target] = await Promise.all([
     reverify(format, fixedTrees.base, snapshots.base),
     reverify(format, fixedTrees.source, snapshots.source),
@@ -153,6 +170,11 @@ export async function buildIntegrationTrialPlan(
   const report = buildIntegrationPlan(format, fixedTrees, fresh, targetRoot);
   if (report.omittedFiles || canonicalJson(report) !== original) throw mismatch();
   const changes = new Map(report.files.map((file) => [file.path, file]));
+  const effective = decisions
+    ? new Map(
+        evaluateIntegrationConflictSelection(report, decisions).changes.map((f) => [f.path, f]),
+      )
+    : undefined;
   const mapFiles = (origin: 'source' | 'target') =>
     new Map(
       snapshotEntries(format, fixedTrees[origin], fresh[origin], targetRoot)
@@ -174,9 +196,14 @@ export async function buildIntegrationTrialPlan(
     combined = mapFiles('target');
   for (const path of selectedPaths) {
     const file = changes.get(path);
-    if (!file || file.conflict || !['add', 'modify', 'delete'].includes(file.action))
+    if (
+      !file ||
+      (effective
+        ? !effective.has(path)
+        : file.conflict || !['add', 'modify', 'delete'].includes(file.action))
+    )
       throw unsupported();
-    if (file.action === 'delete') combined.delete(path);
+    if ((effective?.get(path)?.action ?? file.action) === 'delete') combined.delete(path);
     else {
       const entry = sourceFiles.get(path);
       if (!entry || entry.objectId !== file.source?.objectId || entry.gitMode !== file.source.mode)
@@ -224,7 +251,7 @@ export async function buildIntegrationTrialPlan(
   }
   const sorted = [...entries.values()].sort((a, b) => comparePath(a.path, b.path));
   const manifest: IntegrationTrialManifest = {
-    version: 1,
+    version: decisions ? 2 : 1,
     kind: 'integration_trial_plan',
     objectFormat: format,
     trees: fixedTrees,
@@ -233,8 +260,9 @@ export async function buildIntegrationTrialPlan(
       source: source.snapshotHash,
       target: target.snapshotHash,
     },
-    selection: 'apply_source',
+    selection: decisions ? 'explicit_conflict_choices' : 'apply_source',
     selectedPaths,
+    ...(decisions ? { conflictChoices: decisions.conflictChoices } : {}),
     entries: sorted,
     materializedBytes,
     trialOnly: true,
