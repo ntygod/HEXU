@@ -29,6 +29,7 @@ import { NodeContinuationStatus } from './node-continuations.js';
 import { NativeCode, NativeEvents } from './native.js';
 import { NodeRunPanel, NodeRunStatus } from './node-execution.js';
 import { PromptBar } from './prompt-bar.js';
+import { FollowUpTaskOrigin } from './feedback-followups.js';
 import { OrderPreview } from './preview.js';
 import './task-workspace.css';
 
@@ -224,6 +225,7 @@ export function TaskPage({ id }: { id: string }) {
           </button>
         </div>
       </div>
+      {task.feedbackOrigin && <FollowUpTaskOrigin origin={task.feedbackOrigin} />}
       {archived && (
         <div className="project-archive-banner" role="status">
           <strong>所属项目已归档。</strong>{' '}

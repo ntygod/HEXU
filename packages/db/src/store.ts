@@ -188,6 +188,7 @@ export class Store {
     payload: unknown,
     action: () => T,
     beforeReplay?: () => void,
+    onReplay?: (result: T) => T,
   ): T {
     if (!key || key.length > 128 || !/^[\w.:-]+$/.test(key))
       throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', '操作需要有效的 Idempotency-Key');
@@ -202,7 +203,8 @@ export class Store {
       if (previous) {
         if (previous.fingerprint !== fingerprint)
           throw new DomainError('IDEMPOTENCY_CONFLICT', '相同操作标识不能用于不同内容', 409);
-        return JSON.parse(previous.result) as T;
+        const result = JSON.parse(previous.result) as T;
+        return onReplay ? onReplay(result) : result;
       }
       const result = action();
       this.db
@@ -348,35 +350,41 @@ export class Store {
   }
   createTask(data: { title: string; description: string; projectId: string | null }, key: string) {
     if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
-    return this.mutate('task.create', key, data, () => {
-      if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
-      if (data.projectId) this.project(data.projectId);
-      const counter = this.db
-        .prepare("SELECT value FROM metadata WHERE key='task_counter'")
-        .get() as { value: string };
-      const next = Number(counter.value) + 1;
-      this.db.prepare("UPDATE metadata SET value=? WHERE key='task_counter'").run(String(next));
-      const at = now();
-      const task: Task = {
-        id: randomUUID(),
-        shortId: `HX-${String(next).padStart(3, '0')}`,
-        spaceId: this.spaceId,
-        ...data,
-        visibility: data.projectId ? 'project' : 'private',
-        ownerUserId: this.actorId,
-        createdByUserId: this.actorId,
-        status: 'todo',
-        attention: null,
-        revision: 1,
-        createdAt: at,
-        updatedAt: at,
-      };
-      this.db
-        .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
-        .run(task.id, this.spaceId, task.projectId, JSON.stringify(task));
-      this.event(task.id, 'task.created');
-      return task;
-    });
+    return this.mutate('task.create', key, data, () => this.insertTask(data));
+  }
+  /** Shared insertion only; caller owns the transaction and immutable source resolution. */
+  insertTask(
+    data: { title: string; description: string; projectId: string | null },
+    feedbackOrigin?: Task['feedbackOrigin'],
+  ): Task {
+    if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
+    if (data.projectId) this.project(data.projectId);
+    const counter = this.db
+      .prepare("SELECT value FROM metadata WHERE key='task_counter'")
+      .get() as { value: string };
+    const next = Number(counter.value) + 1;
+    this.db.prepare("UPDATE metadata SET value=? WHERE key='task_counter'").run(String(next));
+    const at = now();
+    const task: Task = {
+      id: randomUUID(),
+      shortId: `HX-${String(next).padStart(3, '0')}`,
+      spaceId: this.spaceId,
+      ...data,
+      ...(feedbackOrigin ? { feedbackOrigin } : {}),
+      visibility: data.projectId ? 'project' : 'private',
+      ownerUserId: this.actorId,
+      createdByUserId: this.actorId,
+      status: 'todo',
+      attention: null,
+      revision: 1,
+      createdAt: at,
+      updatedAt: at,
+    };
+    this.db
+      .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
+      .run(task.id, this.spaceId, task.projectId, JSON.stringify(task));
+    this.event(task.id, 'task.created');
+    return task;
   }
   patchTask(
     id: string,

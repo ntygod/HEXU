@@ -28,4 +28,4 @@ NextInput.body是成员明确保存、以后可按原规则编辑的要求；ori
 
 GET `/api/v1/results/:resultId/versions/:revisionId/feedback/:messageId/next-input-preview` 返回可用来源或明确原因；POST同路径的`/next-inputs`只接受`{body}`。沿用task_next_inputs，无第二套队列。`workBranch.continueFrom.inputs`是可选明确id/revision列表，未传时保持原接续行为。反馈来源不能由客户端代填。
 
-[来源服务](../../packages/db/src/result-feedback-inputs.ts)、[队列](../../packages/db/src/next-inputs.ts)、[方案接续](../../packages/db/src/branch-continuation.ts)、[编辑器](../../apps/web/src/feedback-next-input.tsx)。实际验证与平台限制见[历史](../development/history/2026-09-30-feedback-next-input.md)。后续Task创建、跨方案采用、跨版本重新定位和通用文字成果采用仍需后续独立设计。
+[来源服务](../../packages/db/src/result-feedback-inputs.ts)、[队列](../../packages/db/src/next-inputs.ts)、[方案接续](../../packages/db/src/branch-continuation.ts)、[编辑器](../../apps/web/src/feedback-next-input.tsx)。实际验证与平台限制见[历史](../development/history/2026-09-30-feedback-next-input.md)。后续Task创建见独立[反馈后续任务](feedback-followups.md)；跨方案采用、跨版本重新定位和通用文字成果要求入队仍需后续独立设计。
