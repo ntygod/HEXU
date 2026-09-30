@@ -2,11 +2,11 @@
 
 更新：2026-09-30。本页维护唯一下一项与后续队列；当前能力/验证见[21](21-implementation-status.md)，原ID与剩余范围见[19](19-work-items.md)。
 
-## 下一项：HX-DEV-14-05 回复具体成果反馈
+## 下一项：HX-DEV-14-05 反馈整理入队与方案明确选材
 
-基于PR32冻结fa59d0db，用户在原反馈下回复 → 服务固定直接父消息快照、同Task/ResultRevision与原可选代码锚点 → 在原Task或成果页看清回复对象，点击回到旧版原消息。普通文字反馈不冒造代码位置，旧未指定版本/系统/工具消息不从此入口回复。复用messages，不另建评审任务。
+基于PR33冻结ef6dd8bb：原反馈单独固定，成员编辑确认<=2000字符要求 → 保存原Task NextInput，不启动 → 从已选方案继续时明确选择同方案、反馈同固定版本的要求 → 原有本人节点/同目录/显式确认流程派发，真实running后才记启动。只存队列不足以闭合当前方案路径，因此有限补齐方案选材；普通接续仍拒绝方案Run，等待/原生恢复不扩大。
 
-当前后端37/37关联和完整本地995/995通过，UI/server类型、UI tokens与203条浏览器发现通过；有限独立复核的同路由关闭问题已修正。先完成5条新页面所在精确headCI及150–152深浅/手机像素验收。重点为客户端不能偷换原目标、当前权限先于旧回执、丢ACK原包确认、降权和晚到回执不恢复草稿、旧版本跳转不漂移。转下一轮要求/建立后续Task仍留后续独立选择，不夹带模型调度或代码写回。
+当前完整本地1011/1011、Web/浏览器严格类型、UI token与208条发现通过，最终定向62项含真实Git/双协议runner；有限复核的普通接续绕行已修正并复读。先完成5条新页面所在精确headCI及153–155像素验收。原文与编辑后正文分离，来源/Task/branch/group/version不让客户端偷换；旧回执不重排，未选不带入，修订或状态变化使旧确认失效。没有可靠方案nodeRun的member/legacy反馈明确不支持，不猜源或另造队列；新后续Task仍另做独立动作。
 
 ## 前置有限核心检查点
 
@@ -14,11 +14,12 @@
 - PR30固定00a6984：13-06独立停止状态、已登记方案放弃保留、清理前保护核对和明确整目录含.git移出保留的有限Linux普通清洁现场闭环，工程973/973、Chromium186/186及汇总通过，141–143像素检查完成。当前选择须先取消，活动/未知Run不伪装停止；原绑定/材料权限保留历史。跨盘、linked worktree、未知后续人工处置/强制清锁、自动移回/恢复登记和永久删除不扩为本轮门槛。
 - PR31固定1097ba0：有界行级阅读与原候选复用完成977/977工程、189/189 Chromium及汇总。144–146实际查看，正常手机滚动下按钮命中/切换与长行可读；仅调整截图方式解释旧locator遮挡，不称产品修复。
 - PR32固定fa59d0db：固定代码位置反馈、原Task消息与旧版锚点，工程984/984、Chromium198/198与汇总通过；9项新交互和147–149深浅手机核验完成，范围独立复核的两个呈现问题已修正。内存草稿/未知回执不跨硬刷新；不扩大代码共享权限。
-- 四个PR仍为独立相依草稿，未合并或部署，main仍a3ae2e8；后续base调整必须重新验证。逐段失败修正与证据在21和对应历史，不重做已完成恢复/清理切片。
+- PR33固定ef6dd8bb：具体反馈回复，工程995/995、Chromium203/203与汇总通过，150–152深浅手机核验完成；直接父消息与原版本/代码锚点保持，有限复核同路由定位问题已修正。
+- 五个PR仍为独立相依草稿，未合并或部署，main仍a3ae2e8；后续base调整必须重新验证。逐段失败修正与证据在21和对应历史，不重做已完成恢复/清理切片。
 
 ## 开始时读取
 
-[UI](../harness/ui.md)、[成果](../harness/results.md)、[并行](../harness/parallel.md)与[开发流程](../harness/development.md)；产品目标见[14工作包](14-results-feedback.md)及[设计P07](../product/04-ux-and-design.md)。实际入口为[具体反馈回复](../engineering/result-feedback-replies.md)、[来源核对](../../packages/db/src/result-feedback-replies.ts)、[消息事务](../../packages/db/src/store.ts)与[编辑器](../../apps/web/src/result-feedback-reply.tsx)。不扩大共享预算，不从省略信息拼代码，不把显示包作为完整应用补丁。
+[UI](../harness/ui.md)、[成果](../harness/results.md)、[并行](../harness/parallel.md)与[开发流程](../harness/development.md)；产品目标见[14工作包](14-results-feedback.md)及[设计P07](../product/04-ux-and-design.md)。实际入口为[反馈采用](../engineering/feedback-next-input.md)、[来源核对](../../packages/db/src/result-feedback-inputs.ts)、[队列](../../packages/db/src/next-inputs.ts)与[方案接续](../../packages/db/src/branch-continuation.ts)。不扩大共享预算，不从省略信息拼代码，不把显示包作为完整应用补丁。
 
 ## 剩余交付队列
 

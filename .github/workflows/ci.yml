@@ -74,6 +74,15 @@ jobs:
             artifacts/151-feedback-reply-mobile-light.png
             artifacts/152-feedback-reply-location-mobile.png
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-feedback-input-previews
+          path: |
+            artifacts/153-feedback-next-input-dark.png
+            artifacts/154-feedback-next-input-mobile-light.png
+            artifacts/155-feedback-branch-input-selection-mobile.png
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

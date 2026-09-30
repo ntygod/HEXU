@@ -1,5 +1,6 @@
 import { DomainError, revision, text, type Tool } from './index.js';
 import { exact, nodeId } from './nodes.js';
+import type { ResultFeedbackInputOrigin } from './result-feedback-inputs.js';
 
 export interface NextInput {
   id: string;
@@ -13,6 +14,22 @@ export interface NextInput {
   targetRunId: string | null;
   createdAt: string;
   updatedAt: string;
+  origin?: ResultFeedbackInputOrigin;
+}
+export interface NextInputRef {
+  id: string;
+  revision: number;
+}
+export function parseNextInputRefs(value: unknown): NextInputRef[] {
+  if (!Array.isArray(value) || value.length > 6)
+    throw new DomainError('INVALID_CONTINUATION', '最多选择 6 条下一轮要求');
+  const inputs = value.map((item) => {
+    const input = exact(item, ['id', 'revision']);
+    return { id: nodeId(input.id), revision: revision(input.revision) };
+  });
+  if (new Set(inputs.map((i) => i.id)).size !== inputs.length)
+    throw new DomainError('INVALID_CONTINUATION', '下一轮要求不能重复选择');
+  return inputs;
 }
 export interface NodeContinuationSelection {
   sourceRunId: string;

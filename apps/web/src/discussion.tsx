@@ -3,6 +3,7 @@ import { RequestAiAssistance } from './ai-assistance.js';
 import { RequestAssistance } from './assistance-create.js';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FeedbackReplyAction, feedbackMessageHref } from './result-feedback-reply.js';
+import { FeedbackNextInputAction } from './feedback-next-input.js';
 import type { Message, Run } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Avatar, Button, Icon, ToolMark } from '../../../packages/ui/src/index.js';
@@ -172,7 +173,10 @@ export function MessageList({
             )}
             <p>{message.body}</p>
             {message.actorType === 'human' && message.resultId && message.resultRevisionId && (
-              <FeedbackReplyAction message={message} />
+              <>
+                <FeedbackReplyAction message={message} />
+                <FeedbackNextInputAction message={message} />
+              </>
             )}
             <PublishAgreement message={message} />
             <DraftFromMessage message={message} />

@@ -17,6 +17,8 @@ import type {
   parseBranchRunSelection,
   BranchContinuationPreview,
 } from '../../../packages/contracts/src/work-branch-workspaces.js';
+import { branchContinuationContext } from '../../../packages/contracts/src/work-branch-workspaces.js';
+import { FeedbackInputOrigin } from './feedback-next-input.js';
 
 export function NodeRunPanel({
   task,
@@ -90,8 +92,25 @@ export function NodeRunPanel({
       materialError = (e as Error).message;
     }
   }
-  if (!source)
-    fullContext = `${context}\n\n# 本次要求\n${prompt.trim()}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
+  if (!source) {
+    try {
+      fullContext = branch?.selection.continueFrom
+        ? branchContinuationContext(
+            context,
+            prompt.trim(),
+            chosen.length ? selectedNotes : undefined,
+          )
+        : `${context}\n\n# 本次要求\n${prompt.trim()}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
+    } catch (cause) {
+      materialError = (cause as Error).message;
+    }
+  }
+  if (
+    branch?.selection.continueFrom &&
+    (chosen.length !== selectedNotes.length ||
+      selectedNotes.some((note) => note.state !== 'queued'))
+  )
+    materialError = '所选要求已不可用或不再待选，请取消旧选择后重新核对。';
   try {
     if (!branch) fullContext = appendProjectMaterials(fullContext, materials.snapshot ?? undefined);
   } catch (cause) {
@@ -156,9 +175,11 @@ export function NodeRunPanel({
               `/tasks/${task.id}/node-continuation-preview?sourceRunId=${source.id}${sessionMode === 'new' ? '&waiting=true' : ''}`,
             )
           : null;
-        const queue = source
-          ? await request<{ items: NextInput[] }>(`/tasks/${task.id}/next-inputs`)
-          : { items: [] };
+        const queue = branch?.selection.continueFrom
+          ? { items: next.branchContinuation?.inputOptions ?? [] }
+          : source
+            ? await request<{ items: NextInput[] }>(`/tasks/${task.id}/next-inputs`)
+            : { items: [] };
         if (!disposed) {
           const changed =
             !!branch?.selection.continueFrom &&
@@ -167,7 +188,7 @@ export function NodeRunPanel({
           setBranchChanged((seen) => seen || changed);
           setContinuation(preview);
           setLoadedSessionMode(sessionMode);
-          setNotes(queue.items);
+          setNotes(source ? queue.items.filter((note) => !note.origin) : queue.items);
           if (preview) {
             setNode(preview.nodeId);
             setWorkspace(preview.workingCopyId);
@@ -244,7 +265,21 @@ export function NodeRunPanel({
               confirmExecution: consent,
               expectedTaskContextHash: previewTask.taskContextHash,
               ...(branch
-                ? { workBranch: branch.selection }
+                ? {
+                    workBranch:
+                      branch.selection.continueFrom && chosen.length
+                        ? {
+                            ...branch.selection,
+                            continueFrom: {
+                              ...branch.selection.continueFrom,
+                              inputs: selectedNotes.map((note) => ({
+                                id: note.id,
+                                revision: note.revision,
+                              })),
+                            },
+                          }
+                        : branch.selection,
+                  }
                 : { projectMaterials: materials.selection }),
               ...(source && continuation
                 ? {
@@ -470,34 +505,59 @@ export function NodeRunPanel({
         )}
         <fieldset className="execution-section" disabled={locked}>
           <legend>本次要求与材料</legend>
-          {source && (
+          {(source || branch?.selection.continueFrom) && (
             <fieldset className="node-input-selection">
               <legend>选择本次带入的要求（不会自动全选）</legend>
+              {branch?.selection.continueFrom && (
+                <p>
+                  仅显示本方案的要求；反馈要求还须属于所选固定版本。这里只带入你勾选的编辑后正文，原反馈原文不自动加入。
+                </p>
+              )}
+              {chosen.length !== selectedNotes.length && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setChosen([]);
+                    setConsent(false);
+                  }}
+                >
+                  取消不可用的旧要求选择
+                </Button>
+              )}
               {notes.filter((n) => n.state === 'queued' || chosen.includes(n.id)).length === 0 && (
                 <p className="muted">没有待选择要求，也可以直接填写本次要求。</p>
               )}
               {notes
                 .filter((n) => n.state === 'queued' || chosen.includes(n.id))
                 .map((n) => (
-                  <label key={n.id} className="check-field">
-                    <input
-                      type="checkbox"
-                      aria-label={`带入：${n.body}`}
-                      disabled={busy || (n.state !== 'queued' && !chosen.includes(n.id))}
-                      checked={chosen.includes(n.id)}
-                      onChange={(e) => {
-                        setConsent(false);
-                        setChosen(
-                          e.target.checked ? [...chosen, n.id] : chosen.filter((id) => id !== n.id),
-                        );
-                      }}
-                    />
-                    <span>
-                      <strong>{n.authorName}</strong>
-                      <p>{n.body}</p>
-                      {n.state !== 'queued' && <small>此要求状态已变化，请取消选择</small>}
-                    </span>
-                  </label>
+                  <div key={n.id} className="node-input-option">
+                    <label className="check-field">
+                      <input
+                        type="checkbox"
+                        aria-label={`带入：${n.body}`}
+                        disabled={
+                          busy ||
+                          (n.state !== 'queued' && !chosen.includes(n.id)) ||
+                          (chosen.length >= 6 && !chosen.includes(n.id))
+                        }
+                        checked={chosen.includes(n.id)}
+                        onChange={(e) => {
+                          setConsent(false);
+                          setChosen(
+                            e.target.checked
+                              ? [...chosen, n.id]
+                              : chosen.filter((id) => id !== n.id),
+                          );
+                        }}
+                      />
+                      <span>
+                        <strong>{n.authorName}</strong>
+                        <p>{n.body}</p>
+                        {n.state !== 'queued' && <small>此要求状态已变化，请取消选择</small>}
+                      </span>
+                    </label>
+                    {n.origin && <FeedbackInputOrigin origin={n.origin} />}
+                  </div>
                 ))}
             </fieldset>
           )}
@@ -520,7 +580,7 @@ export function NodeRunPanel({
             <p>
               {branch
                 ? branch.selection.continueFrom
-                  ? '上方包含固定共同说明、本方案目标、选定成果说明/限制/代码起点与本次要求；不带入其他方案、后来的模型输出或原生会话。'
+                  ? '上方包含固定共同说明、本方案目标、选定成果说明/限制/代码起点、明确勾选的编辑后要求与本次要求；不自动加入原反馈全文、其他方案或原生会话。'
                   : '上方包含固定共同说明、此方案目标与本次要求；不带入后来讨论、其他方案目标或发送者会话。'
                 : source
                   ? sessionMode === 'resume'

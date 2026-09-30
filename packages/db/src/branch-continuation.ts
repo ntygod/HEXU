@@ -12,6 +12,7 @@ import { WorkBranchStore } from './work-branches.js';
 import { ResultRevisions } from './result-revisions.js';
 import { CheckpointStore } from './checkpoints.js';
 import type { Store } from './store.js';
+import { NextInputs } from './next-inputs.js';
 
 type Selection = NonNullable<ReturnType<typeof parseBranchRunSelection>['continueFrom']>;
 export class BranchContinuations {
@@ -93,6 +94,7 @@ export class BranchContinuations {
         );
     }
     const binding: BranchContinuationBinding = {
+      ...(selected.inputs === undefined ? {} : { inputs: selected.inputs }),
       sourceRunId: run.id,
       sourceRunRevision: run.revision,
       resultRevisionId: version.id,
@@ -110,6 +112,14 @@ export class BranchContinuations {
       '所选方案材料',
       19000,
     );
+    if (selected.inputs !== undefined)
+      new NextInputs(this.store).branchSelected(
+        taskId,
+        branch,
+        version.id,
+        selected.inputs,
+        allowReceipt,
+      );
     return { binding, contextText, version, sourceRun: run };
   }
   preview(taskId: string, branchId: string): BranchContinuationPreview {
@@ -140,6 +150,7 @@ export class BranchContinuations {
       resultRevision: value.version.revision,
       commit: value.binding.code.commit,
       contextText: value.contextText,
+      inputOptions: new NextInputs(this.store).branchOptions(taskId, b, value.version.id),
     };
   }
   /** Internal permit barrier; bearer ownership is checked by NodeExecution. Selection
@@ -163,6 +174,8 @@ export class BranchContinuations {
       choice = JSON.parse(choiceRow.body),
       run = JSON.parse(runRow.body) as Run;
     return (
+      (!from.inputs ||
+        new NextInputs(this.store).attachedCurrent(taskId, pendingRunId, from.inputs)) &&
       branch.runId === pendingRunId &&
       choice.revision === from.selectionRevision &&
       choice.branchId === binding.branchId &&

@@ -3,6 +3,7 @@ import { attachHandoffs } from './handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
+import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-inputs.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
@@ -764,6 +765,30 @@ export async function createApp(
         .code(201)
         .send(
           store.addFeedbackReply(
+            param(request.params, 'resultId'),
+            param(request.params, 'revisionId'),
+            param(request.params, 'messageId'),
+            request.body,
+            key(request.headers),
+          ),
+        ),
+  );
+  app.get(
+    '/api/v1/results/:resultId/versions/:revisionId/feedback/:messageId/next-input-preview',
+    async (request) =>
+      new ResultFeedbackInputs(store).preview(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'messageId'),
+      ),
+  );
+  app.post(
+    '/api/v1/results/:resultId/versions/:revisionId/feedback/:messageId/next-inputs',
+    async (request, reply) =>
+      reply
+        .code(201)
+        .send(
+          new ResultFeedbackInputs(store).create(
             param(request.params, 'resultId'),
             param(request.params, 'revisionId'),
             param(request.params, 'messageId'),

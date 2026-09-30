@@ -5,13 +5,15 @@
 ## 当前路径
 
 1. 原方案最新Run必须确认终止，当前项目/节点/目录授权仍有效；选择必须指向同组、同分支的固定ResultRevision，且带原本人节点的提交引用。纯文字版本需要另存带代码引用的版本并明确选择。
-2. 页面固定选择修订、成果版本、上一轮Run及修订，预览共同任务说明、该方案目标、所选成果说明/限制、代码起点与本次要求。不会自动带入其他方案、后来模型输出、讨论、反馈或旧原生会话。
+2. 页面固定选择修订、成果版本、上一轮Run及修订，预览共同任务说明、该方案目标、所选成果说明/限制、代码起点、本次要求和明确勾选的同方案待选要求。不会自动带入其他方案、后来模型输出、讨论、反馈或旧原生会话。
 3. 节点和目录固定，工具/模型/限额来自节点实际发布的执行策略。明确确认本次目录、模式、材料与费用后，创建新的Run；任务已完成时沿用原重新打开确认。派发保存不是实际启动。
 4. 节点在一次性许可前后都核对实际HEAD、完整普通文件/模式、Git对象、原目录身份和占用。必须与所选提交一致；暂存改动、冲突、未提交/额外/忽略文件或未知占用会拒绝启动，保留现场。不会替用户checkout、reset、stash、删除文件或释放未知进程锁。
 
 当前先支持同机Linux、原本人、同一已登记目录、干净的固定提交和新会话。支持SHA-1/SHA-256，直接HEAD/分支引用及正常packed refs。切换Claude/Codex使用节点自己的新授权，按原节点流程停止空闲agent、重新配置并启动以发布策略；修改配置文件不等于运行中的agent已热加载。
 
 ## 选择、失败与历史
+
+[从反馈整理的要求](feedback-next-input.md)先保留原文再保存编辑内容，保存不启动。继续窗口默认不勾选；仅同Task/方案/组可带入，反馈还须同一所选固定版本。要求修订或状态变化使旧确认失效，最多6条且合计6000字符，原反馈全文不自动进模型材料。绑定与Run/dispatch同事务，真实running才标已启动；明确未许可取消可归还，未知保持绑定。
 
 选择记录与继续执行是两个动作。尚未取得启动许可时，选择变化会取消该次排队；一旦已获许可，后来的选择不会改写或自动停止本次Run。其他方案的执行不受影响，停止仍使用原Run停止入口。
 
@@ -24,7 +26,7 @@
 ## API 与实现
 
 - `GET /api/v1/tasks/:taskId/node-options?workBranchId=ID&continueSelected=true`返回本人可用策略及固定`branchContinuation`预览。
-- 原`POST /api/v1/tasks/:taskId/runs`仍返回201+Run。在`workBranch`内显式提供`continueFrom:{sourceRunId,expectedRunRevision,resultRevisionId,expectedSelectionRevision}`，以及原分支修订/起点指纹、Task修订/材料指纹和费用确认。客户端不能指定代码目录路径、伪造commit、会话ID或额外执行参数。
+- 原`POST /api/v1/tasks/:taskId/runs`仍返回201+Run。在`workBranch`内显式提供`continueFrom:{sourceRunId,expectedRunRevision,resultRevisionId,expectedSelectionRevision,inputs?}`，以及原分支修订/起点指纹、Task修订/材料指纹和费用确认。inputs是可选的明确id/revision列表；未传保持原行为。客户端不能指定代码目录路径、伪造commit、会话ID或额外执行参数。
 - 新Run、dispatch、分支关联/修订/历史、任务重开、outbox与幂等回执同事务；许可阶段复查当前选择与来源。首轮仍核验原共同起点，接续单独核验所选提交，不能删除首轮检查来支持新流程。
 
 当前不支持方案内自动wait/request_stop安排、私有原生会话恢复、脏现场直接继续、从另一节点/目录恢复继续或代码整合。普通非分支Run已有的等待/原生恢复保持原规则，不能借其入口绕过方案绑定。材料总量仍有20000字符上限，过长明确拒绝，不静默截断固定内容。实际检查见[21](../development/21-implementation-status.md)，下一项见[22](../development/22-next-delivery.md)。
