@@ -27,10 +27,12 @@ export interface WorkBranch {
   name: string;
   goal: string;
   revision: number;
-  state: 'planned' | 'active' | 'discarded';
+  state: 'planned' | 'active' | 'ready' | 'selected' | 'discarded';
   workingCopyId: string | null;
   runId: string | null;
-  resultId: null;
+  resultId: string | null;
+  resultRevisionId?: string;
+  result?: import('./results.js').ResultRevisionSummary;
   workspace?: import('./work-branch-workspaces.js').BranchWorkspaceOperation;
   run?: Run;
   createdAt: string;
@@ -40,6 +42,7 @@ export interface WorkBranchView {
   group: WorkBranchGroup;
   branches: WorkBranch[];
   taskChanged: boolean;
+  selection: import('./branch-comparison.js').BranchChoice | null;
 }
 export interface WorkBranchPage {
   items: WorkBranchView[];
@@ -61,7 +64,10 @@ export interface WorkBranchEvent {
     | 'workspace_bound'
     | 'workspace_cancelled'
     | 'run_created'
-    | 'run_started';
+    | 'run_started'
+    | 'result_saved'
+    | 'result_selected'
+    | 'selection_cleared';
   actor: { id: string; name: string };
   at: string;
 }

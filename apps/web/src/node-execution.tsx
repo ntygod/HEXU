@@ -13,7 +13,10 @@ import { useTaskDraft } from './state.js';
 import { ExecutionReceipt, useExecutionRequest } from './execution-request.js';
 import { ProjectMaterialPicker, useProjectMaterialSelection } from './project-materials.js';
 import { appendProjectMaterials } from '../../../packages/contracts/src/project-materials.js';
-import type { parseBranchRunSelection } from '../../../packages/contracts/src/work-branch-workspaces.js';
+import type {
+  parseBranchRunSelection,
+  BranchContinuationPreview,
+} from '../../../packages/contracts/src/work-branch-workspaces.js';
 
 export function NodeRunPanel({
   task,
@@ -29,11 +32,13 @@ export function NodeRunPanel({
     nodeId: string;
     workingCopyId: string;
     goal: string;
+    continuation?: BranchContinuationPreview;
   };
 }) {
   const [options, setOptions] = useState<NodeExecutionOption[]>([]),
     [context, setContext] = useState(''),
     [error, setError] = useState('');
+  const [branchChanged, setBranchChanged] = useState(false);
   const materials = useProjectMaterialSelection(task);
   const [taskContext, setTaskContext] = useState<{
     taskRevision: number;
@@ -45,8 +50,8 @@ export function NodeRunPanel({
     [mode, setMode] = useState<'read-only' | 'edit'>('read-only');
   const [prompt, setPrompt] = useTaskDraft(
     task.id,
-    `node-run:${branch ? 'branch:' + branch.selection.branchId : (source?.id ?? 'new')}`,
-    branch?.goal ?? '',
+    `node-run:${branch ? 'branch:' + branch.selection.branchId + (branch.selection.continueFrom ? ':continue' : '') : (source?.id ?? 'new')}`,
+    branch?.selection.continueFrom ? '' : (branch?.goal ?? ''),
   );
   const delivery = useExecutionRequest(
     () => {
@@ -93,7 +98,8 @@ export function NodeRunPanel({
     materialError = (cause as Error).message;
   }
   if (branch && fullContext.length > 20000)
-    materialError = '方案执行材料超过20000字符，请缩短本次要求；固定共同说明和目标保留。';
+    materialError =
+      '方案执行材料超过20000字符，请缩短本次要求或另存更精炼的成果版本；固定材料不会截断。';
   const selectionVersion = selectedNotes.map((n) => `${n.id}:${n.revision}:${n.state}`).join(',');
   // The preview and its task revision come from the same synchronous server read.
   // A delayed parent snapshot cannot invalidate an already newer preview. A truly
@@ -141,8 +147,9 @@ export function NodeRunPanel({
           taskRevision: number;
           taskStatus: Task['status'];
           taskContextHash: string;
+          branchContinuation?: BranchContinuationPreview;
         }>(
-          `/tasks/${task.id}/node-options${branch ? `?workBranchId=${branch.selection.branchId}` : source ? `?sourceRunId=${source.id}` : ''}`,
+          `/tasks/${task.id}/node-options${branch ? `?workBranchId=${branch.selection.branchId}${branch.selection.continueFrom ? '&continueSelected=true' : ''}` : source ? `?sourceRunId=${source.id}` : ''}`,
         );
         const preview = source
           ? await request<NodeContinuationPreview>(
@@ -153,6 +160,11 @@ export function NodeRunPanel({
           ? await request<{ items: NextInput[] }>(`/tasks/${task.id}/next-inputs`)
           : { items: [] };
         if (!disposed) {
+          const changed =
+            !!branch?.selection.continueFrom &&
+            JSON.stringify(next.branchContinuation?.selection) !== JSON.stringify(branch.selection);
+          // Once a newer revision is seen, a delayed older read cannot restore consent.
+          setBranchChanged((seen) => seen || changed);
           setContinuation(preview);
           setLoadedSessionMode(sessionMode);
           setNotes(queue.items);
@@ -166,7 +178,8 @@ export function NodeRunPanel({
             taskStatus: next.taskStatus,
             taskContextHash: next.taskContextHash,
           });
-          setContext(next.contextText);
+          // Keep the selected material baseline fixed while the user edits.
+          setContext(branch?.continuation?.contextText ?? next.contextText);
           setError('');
         }
       } catch (e) {
@@ -189,7 +202,15 @@ export function NodeRunPanel({
   }, [task.id, source?.id, sessionMode, branch?.selection.branchId]);
   return (
     <Dialog
-      title={branch ? '在方案节点上执行' : source ? '沿原目录继续' : '在我的节点上执行'}
+      title={
+        branch?.selection.continueFrom
+          ? '从选定方案继续'
+          : branch
+            ? '在方案节点上执行'
+            : source
+              ? '沿原目录继续'
+              : '在我的节点上执行'
+      }
       onClose={() => !busy && onClose()}
       drawer
     >
@@ -202,6 +223,7 @@ export function NodeRunPanel({
             locked ||
             !consent ||
             staleTask ||
+            branchChanged ||
             resumeBlocked ||
             (!branch && !materials.ready) ||
             materialError ||
@@ -249,6 +271,25 @@ export function NodeRunPanel({
             只列出你拥有且已在本机明确启用执行的节点。代码留在授权目录，模型输出会共享到当前项目任务；在线不代表模型账户已验证。
           </p>
         </div>
+        {branch?.continuation && (
+          <section
+            className="node-source-summary branch-continuation-scope"
+            aria-label="选定方案接续基线"
+          >
+            <strong>
+              {branch.continuation.resultTitle} · v{branch.continuation.resultRevision} · 新会话
+            </strong>
+            <p>
+              原方案目录必须与这个提交一致：<code>{branch.continuation.commit}</code>
+            </p>
+            <p>
+              启动前核验HEAD、完整文件/模式与占用。有未提交或额外文件时保留现场并拒绝启动，不自动checkout、恢复或丢弃文件。
+            </p>
+            <p>
+              继续会创建新的Run，保留原版本、选择与历史；不停止其他方案。不迁移旧原生会话，不自动带入未选择的讨论或反馈。
+            </p>
+          </section>
+        )}
         {source && (
           <div className="node-source-summary">
             <strong>
@@ -478,7 +519,9 @@ export function NodeRunPanel({
             <pre>{fullContext}</pre>
             <p>
               {branch
-                ? '上方包含固定共同说明、此方案目标与本次要求；不带入后来讨论、其他方案目标或发送者会话。'
+                ? branch.selection.continueFrom
+                  ? '上方包含固定共同说明、本方案目标、选定成果说明/限制/代码起点与本次要求；不带入其他方案、后来的模型输出或原生会话。'
+                  : '上方包含固定共同说明、此方案目标与本次要求；不带入后来讨论、其他方案目标或发送者会话。'
                 : source
                   ? sessionMode === 'resume'
                     ? '上方仅为本轮新增文本，所选工具另会读取节点保留的原生历史。恢复不保证代码回到历史状态，取消本次选材不清除旧历史。'
@@ -497,6 +540,7 @@ export function NodeRunPanel({
               locked ||
               !selected?.available ||
               staleTask ||
+              branchChanged ||
               resumeBlocked ||
               (!branch && !materials.ready) ||
               !!materialError ||
@@ -518,6 +562,11 @@ export function NodeRunPanel({
             {materialError}
           </p>
         )}
+        {branchChanged && (
+          <p className="form-error" role="alert">
+            方案选择、成果或来源执行已变化。当前要求已保留，请返回后重新打开并核对接续基线。
+          </p>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -535,6 +584,7 @@ export function NodeRunPanel({
             disabled={
               !consent ||
               locked ||
+              branchChanged ||
               (!branch && !materials.ready) ||
               !previewTask ||
               staleTask ||
@@ -585,8 +635,10 @@ export function NodeRunStatus({ run }: { run: Run }) {
       {run.previousRunId && (
         <p className="node-continuation-origin">
           接续来源：{run.previousRunId} ·{' '}
-          {n.sessionMode === 'resume' ? '请求恢复原生会话' : '同目录新会话'} · 带入{' '}
-          {n.continuationInputIds?.length ?? 0} 条要求
+          {n.sessionMode === 'resume' ? '请求恢复原生会话' : '同目录新会话'} ·{' '}
+          {n.workBranch?.continueFrom
+            ? `所选成果 ${n.workBranch.continueFrom.resultRevisionId}`
+            : `带入 ${n.continuationInputIds?.length ?? 0} 条要求`}
         </p>
       )}
       <div className="node-policy-summary">

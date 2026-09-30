@@ -115,10 +115,13 @@ export class NodeExecutor {
         selection.originHash !== branchNode.originHash ||
         selection.branchId !== branchNode.branchId
       )
-        throw new DomainError('WORK_BRANCH_SCOPE_MISMATCH', '此节点仅用于本机明确登记的方案首轮');
+        throw new DomainError('WORK_BRANCH_SCOPE_MISMATCH', '此节点仅用于本机明确登记的方案');
     }
     if (b.workBranch !== undefined && (assist || b.session !== undefined))
-      throw new DomainError('WORK_BRANCH_SCOPE_MISMATCH', '方案首轮不能混入协助或原会话恢复');
+      throw new DomainError(
+        'WORK_BRANCH_SCOPE_MISMATCH',
+        '方案执行不能混入协助或未授权的原会话恢复',
+      );
     if (
       (b.purpose !== undefined && !assist) ||
       (assist &&
@@ -299,6 +302,19 @@ export class NodeExecutor {
         lease.release();
         return;
       }
+      if (Date.parse(command.expiresAt) <= Date.now())
+        throw new DomainError('DISPATCH_EXPIRED', '代码核验后派发已过期，没有启动模型');
+      if (
+        command.workBranch?.continueFrom &&
+        (canonicalJson(readExecutionPolicy(this.connection.storage.home)) !==
+          canonicalJson(this.local) ||
+          !this.local ||
+          !keyFor(this.local.policy))
+      )
+        throw new DomainError(
+          'EXECUTION_POLICY_CHANGED',
+          '本机执行授权或账户配置在代码核验期间改变，未启动模型',
+        );
       this.active = { command, handle: null, stopRequested: false, job: null };
       const active = this.active;
       active.job = this.execute(command, directory.root, lease)

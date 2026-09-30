@@ -47,6 +47,29 @@ export interface BranchExecutionBinding {
   startHash: string;
   originHash: string;
   commit: string;
+  continueFrom?: BranchContinuationBinding;
+}
+export interface BranchContinuationBinding {
+  sourceRunId: string;
+  sourceRunRevision: number;
+  resultRevisionId: string;
+  selectionRevision: number;
+  code: {
+    objectFormat: 'sha1' | 'sha256';
+    commit: string;
+    tree: string;
+    repositoryIdentity: string;
+    nodeRevision: number;
+  };
+}
+export interface BranchContinuationPreview {
+  selection: ReturnType<typeof parseBranchRunSelection>;
+  nodeId: string;
+  workingCopyId: string;
+  resultTitle: string;
+  resultRevision: number;
+  commit: string;
+  contextText: string;
 }
 export function parseBranchExecutionBinding(input: unknown): BranchExecutionBinding {
   const b = exact(input, [
@@ -56,6 +79,7 @@ export function parseBranchExecutionBinding(input: unknown): BranchExecutionBind
     'startHash',
     'originHash',
     'commit',
+    'continueFrom',
   ]);
   return {
     branchId: nodeId(b.branchId),
@@ -64,6 +88,48 @@ export function parseBranchExecutionBinding(input: unknown): BranchExecutionBind
     startHash: checkpointHash(b.startHash),
     originHash: checkpointHash(b.originHash),
     commit: commitOid(b.commit),
+    ...(b.continueFrom === undefined
+      ? {}
+      : { continueFrom: parseBranchContinuationBinding(b.continueFrom) }),
+  };
+}
+function parseBranchContinuationBinding(input: unknown): BranchContinuationBinding {
+  const b = exact(input, [
+    'sourceRunId',
+    'sourceRunRevision',
+    'resultRevisionId',
+    'selectionRevision',
+    'code',
+  ]);
+  const c = exact(b.code, ['objectFormat', 'commit', 'tree', 'repositoryIdentity', 'nodeRevision']);
+  if (c.objectFormat !== 'sha1' && c.objectFormat !== 'sha256')
+    throw new DomainError('INVALID_INPUT', '所选提交对象格式无效');
+  return {
+    sourceRunId: nodeId(b.sourceRunId),
+    sourceRunRevision: revision(b.sourceRunRevision),
+    resultRevisionId: nodeId(b.resultRevisionId),
+    selectionRevision: revision(b.selectionRevision),
+    code: {
+      objectFormat: c.objectFormat,
+      commit: commitOid(c.commit, c.objectFormat),
+      tree: commitOid(c.tree, c.objectFormat),
+      repositoryIdentity: checkpointHash(c.repositoryIdentity),
+      nodeRevision: revision(c.nodeRevision),
+    },
+  };
+}
+function parseBranchContinuationSelection(input: unknown) {
+  const b = exact(input, [
+    'sourceRunId',
+    'expectedRunRevision',
+    'resultRevisionId',
+    'expectedSelectionRevision',
+  ]);
+  return {
+    sourceRunId: nodeId(b.sourceRunId),
+    expectedRunRevision: revision(b.expectedRunRevision),
+    resultRevisionId: nodeId(b.resultRevisionId),
+    expectedSelectionRevision: revision(b.expectedSelectionRevision),
   };
 }
 export function parseBranchWorkspaceCreate(input: unknown) {
@@ -121,11 +187,14 @@ export function parseBranchWorkspaceCommand(input: unknown) {
   throw new DomainError('INVALID_INPUT', '不支持的方案现场命令');
 }
 export function parseBranchRunSelection(input: unknown) {
-  const b = exact(input, ['branchId', 'expectedRevision', 'startHash']);
+  const b = exact(input, ['branchId', 'expectedRevision', 'startHash', 'continueFrom']);
   return {
     branchId: nodeId(b.branchId),
     expectedRevision: revision(b.expectedRevision),
     startHash: checkpointHash(b.startHash),
+    ...(b.continueFrom === undefined
+      ? {}
+      : { continueFrom: parseBranchContinuationSelection(b.continueFrom) }),
   };
 }
 /** Fixed shared input, intentionally excludes later discussion and sender sessions. */

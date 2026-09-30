@@ -38,6 +38,10 @@
 | 接手目录准备 Git、本人配对与新 Run | [接手现场研发](handoff-workspace.md) |
 | 同一 Task 的共同起点、方案定义与放弃 | [方案分支](work-branches.md) |
 | 方案独立目录、登记、本人首轮 Run 与并发 | [方案现场](branch-workspaces.md) |
+| 固定成果版本、来源/反馈、方案比较与选择 | [方案成果](branch-results.md) |
+| 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |
+| 选定成果后，在原目录明确开始下一轮 | [方案接续](branch-continuation.md) |
+| 固定成果到本人目标提交的只读冲突检查 | [整合预检](integration-preflight.md) |
 
 ## 架构决策
 

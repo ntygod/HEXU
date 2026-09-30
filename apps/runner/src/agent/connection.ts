@@ -56,6 +56,10 @@ export async function nodeRequest<T>(
       'checkpoint-transfer',
       'handoff-acceptance',
       'work-branch-workspace',
+      'result-code-inspect',
+      'result-code-publish',
+      'integration-inspect',
+      'integration-publish',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');

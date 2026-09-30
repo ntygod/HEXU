@@ -24,6 +24,7 @@ import { objectHash, verifySnapshot } from './checkpoint-objects.js';
 import type { LocalDirectory } from './workspaces.js';
 import type { NodeCredentials, AgentStorage } from './storage.js';
 import { restoreBinding } from './checkpoint-restore-preflight.js';
+import { verifyBranchContinuationOrigin } from './branch-continuation-origin.js';
 
 export interface BranchOrigin {
   version: 1;
@@ -112,6 +113,10 @@ export async function verifyBranchOrigin(
     directory.gitDir !== join(directory.root, '.git')
   )
     throw new DomainError('WORK_BRANCH_ORIGIN_CHANGED', '方案、共同起点与本机目录绑定不一致');
+  if (binding.continueFrom) {
+    await verifyBranchContinuationOrigin(home, c, directory, origin, binding.continueFrom);
+    return origin;
+  }
   const parent = new PinnedRestoreParent(origin.plan.target);
   let root: number | undefined, git: number | undefined;
   try {

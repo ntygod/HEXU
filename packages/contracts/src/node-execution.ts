@@ -185,7 +185,10 @@ export function parseNodeRun(value: unknown): NodeRunInput {
       b.sessionMode !== undefined ||
       b.projectMaterials !== undefined)
   )
-    throw new DomainError('INVALID_INPUT', '方案首轮使用固定共同材料与本人新会话');
+    throw new DomainError(
+      'INVALID_INPUT',
+      '方案执行使用固定材料与本人新会话，不混入普通接续或额外选材',
+    );
   const hash = text(b.policyHash, '授权版本', 64);
   if (!/^[a-f0-9]{64}$/.test(hash)) throw new DomainError('INVALID_INPUT', '授权版本无效');
   return {

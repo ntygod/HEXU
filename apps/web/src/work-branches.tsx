@@ -9,10 +9,11 @@ import type {
 } from '../../../packages/contracts/src/work-branches.js';
 import { parseWorkBranchCreate } from '../../../packages/contracts/src/work-branches.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
-import { canEditTask, time, useApp } from './state.js';
+import { canEditTask, Link, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
 import './work-branches.css';
 import { BranchWorkspace } from './work-branch-workspaces.js';
+import { BranchResult } from './work-branch-results.js';
 
 const base = (taskId: string) => `/tasks/${encodeURIComponent(taskId)}/work-branches`;
 function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
@@ -254,6 +255,9 @@ function BranchHistory({ path }: { path: string }) {
                   workspace_cancelled: '取消现场准备',
                   run_created: '保存方案执行',
                   run_started: '方案实际启动',
+                  result_saved: '保存成果版本',
+                  result_selected: '选用成果版本',
+                  selection_cleared: '取消或替换选择',
                 }[e.action]
               }{' '}
               · {e.actor.name} · {time(e.at)}
@@ -312,11 +316,15 @@ function Branch({
         <span className="badge neutral">
           {branch.state === 'discarded'
             ? '已放弃'
-            : branch.runId
-              ? '已关联执行'
-              : branch.workingCopyId
-                ? '已登记现场'
-                : '待准备'}
+            : branch.state === 'selected'
+              ? '已选用固定版本'
+              : branch.state === 'ready'
+                ? '已有固定成果'
+                : branch.runId
+                  ? '已关联执行'
+                  : branch.workingCopyId
+                    ? '已登记现场'
+                    : '待准备'}
         </span>
       </header>
       <p className="work-branch-text">{branch.goal}</p>
@@ -336,6 +344,7 @@ function Branch({
           {history ? '收起方案历史' : '查看方案历史'}
         </Button>
       </div>
+      <BranchResult branch={branch} path={path} editable={editable} saved={saved} />
       {history && <BranchHistory path={path} />}
     </article>
   );
@@ -396,6 +405,15 @@ function Panel({ task }: { task: Task }) {
                   {v.group.createdBy.name} · {time(v.group.createdAt)}
                 </span>
               </header>
+              <Link className="button secondary" to={`/tasks/${task.id}/compare/${v.group.id}`}>
+                比较与选择方案
+              </Link>
+              {v.selection?.branchId && (
+                <p>
+                  已选用 {v.selection.branchName} · v{v.selection.resultRevision}
+                  ，后来保存的版本不会自动替换此选择。
+                </p>
+              )}
               <details>
                 <summary>共同起点与范围</summary>
                 <p className="work-branch-text">

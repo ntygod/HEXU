@@ -13,6 +13,7 @@ import {
 import { assertRevision, canonicalJson, isActiveRun } from '../../domain/src/index.js';
 import { CheckpointRetentionStore } from './checkpoint-retention.js';
 import { WorkBranchStore } from './work-branches.js';
+import { BranchContinuations } from './branch-continuation.js';
 import type { Store } from './store.js';
 
 const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).digest('hex');
@@ -370,7 +371,7 @@ export class BranchWorkspaceStore {
       throw new DomainError('WORK_BRANCH_BINDING_CHANGED', '方案与本人已登记现场不匹配', 409);
     if (!allowExisting) {
       assertRevision(b.revision, selection.expectedRevision);
-      if (b.state !== 'planned' || b.runId)
+      if (!selection.continueFrom && (b.state !== 'planned' || b.runId))
         throw new DomainError('WORK_BRANCH_ALREADY_RUN', '此方案首轮已创建，不能隐式重试', 409);
     }
     const binding: BranchExecutionBinding = {
@@ -381,16 +382,27 @@ export class BranchWorkspaceStore {
       originHash: op.proof!.originHash,
       commit: op.ticket.manifest.commit,
     };
+    const continuation = selection.continueFrom
+      ? new BranchContinuations(this.store).resolve(
+          taskId,
+          b,
+          selection.continueFrom,
+          allowExisting,
+        )
+      : null;
+    if (continuation) binding.continueFrom = continuation.binding;
     return {
       branch: b,
       binding,
-      context: branchContext(
-        group.start.taskTitle,
-        group.start.taskDescription,
-        binding.commit,
-        b.name,
-        b.goal,
-      ),
+      context:
+        continuation?.contextText ??
+        branchContext(
+          group.start.taskTitle,
+          group.start.taskDescription,
+          binding.commit,
+          b.name,
+          b.goal,
+        ),
     };
   }
   assertParallel(taskId: string, binding: BranchExecutionBinding | undefined) {

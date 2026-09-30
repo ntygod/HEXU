@@ -25,6 +25,8 @@ import { appendProjectMaterials } from '../../contracts/src/project-materials.js
 import type { NodeRegistry } from './nodes.js';
 import { BranchWorkspaceStore } from './work-branch-workspaces.js';
 import { branchContext } from '../../contracts/src/work-branch-workspaces.js';
+import type { BranchContinuationPreview } from '../../contracts/src/work-branch-workspaces.js';
+import { BranchContinuations } from './branch-continuation.js';
 
 export const executionHash = (v: unknown) =>
   createHash('sha256').update(canonicalJson(v)).digest('hex');
@@ -136,13 +138,21 @@ export class NodeExecution {
     this.event(d, 'run.updated');
     return next;
   }
-  private finish(d: Row, state: 'cancelled' | 'failed' | 'succeeded', body: string) {
+  private finish(
+    d: Row,
+    state: 'cancelled' | 'failed' | 'succeeded',
+    body: string,
+    terminalSequence = d.last_sequence,
+  ) {
     const r = this.run(d);
     this.save(
       d,
       { ...r, state, observation: 'fresh', node: { ...r.node!, terminationConfirmed: true } },
       'terminal',
     );
+    this.store.db
+      .prepare('UPDATE node_dispatches SET terminal_sequence=? WHERE id=?')
+      .run(terminalSequence, d.id);
     if (!r.node?.startedAt && !['preparing', 'running', 'unknown'].includes(d.stage))
       new NextInputs(this.store).notStarted(r.id);
     // A permit without a running event is an ambiguous launch, not proof of no launch.
@@ -200,19 +210,26 @@ export class NodeExecution {
     allowedSourceRunId?: string,
     allowedOperationId?: string,
     workBranchId?: string,
+    continueSelected = false,
   ): {
     items: NodeExecutionOption[];
     contextText: string;
     taskContextHash: string;
     taskRevision: number;
     taskStatus: Task['status'];
+    branchContinuation?: BranchContinuationPreview;
   } {
     const task = this.store.getTask(taskId);
     const branches = new BranchWorkspaceStore(this.store).branches;
     const branch = workBranchId ? branches.branch(taskId, workBranchId) : null;
     const group = branch ? branches.group(taskId, branch.groupId) : null;
-    const contextText =
-        branch && group
+    const branchContinuation =
+      branch && continueSelected
+        ? new BranchContinuations(this.store).preview(taskId, branch.id)
+        : undefined;
+    const contextText = branchContinuation
+        ? branchContinuation.contextText
+        : branch && group
           ? branchContext(
               group.start.taskTitle,
               group.start.taskDescription,
@@ -222,6 +239,7 @@ export class NodeExecution {
             )
           : this.humanContext(task),
       metadata = {
+        ...(branchContinuation ? { branchContinuation } : {}),
         contextText,
         taskContextHash: executionHash(this.humanContext(task)),
         taskRevision: task.revision,
@@ -268,23 +286,26 @@ export class NodeExecution {
             p.connection_id === raw.connection_id &&
             !occupied &&
             !reserved;
-          const usable = available && (!branch || (branch.state === 'planned' && !branch.runId));
+          const usable =
+            available &&
+            (!branch || !!branchContinuation || (branch.state === 'planned' && !branch.runId));
           return [
             {
               nodeId: n.id,
               name: n.name,
               available: usable,
-              reason: branch?.runId
-                ? '此方案首轮已创建，请查看原执行'
-                : archived
-                  ? PROJECT_ARCHIVED.message
-                  : reserved
-                    ? '任务或节点已有待接续安排'
-                    : occupied
-                      ? '节点仍有执行或待核对现场'
-                      : available
-                        ? '仅节点所有者可发起；模型账户未据此验证'
-                        : '节点离线或尚未重新发布执行授权',
+              reason:
+                branch?.runId && !branchContinuation
+                  ? '此方案首轮已创建，请查看原执行'
+                  : archived
+                    ? PROJECT_ARCHIVED.message
+                    : reserved
+                      ? '任务或节点已有待接续安排'
+                      : occupied
+                        ? '节点仍有执行或待核对现场'
+                        : available
+                          ? '仅节点所有者可发起；模型账户未据此验证'
+                          : '节点离线或尚未重新发布执行授权',
               policyHash: p.policy_hash,
               policy,
               workspaces,
@@ -406,7 +427,7 @@ export class NodeExecution {
     if (source.node?.workBranch)
       throw new DomainError(
         'WORK_BRANCH_CONTINUATION_PENDING',
-        '方案首轮的继续/结果选择将由方案入口接入，不能借普通接续脱离方案绑定',
+        '方案执行请从已选成果入口继续，普通接续不能脱离方案绑定',
         409,
       );
     if (
@@ -549,7 +570,7 @@ export class NodeExecution {
       const task = this.store.projectLifecycle.assertExecution(taskId);
       const branch = workspaces.execution(taskId, input);
       if (branch && operation)
-        throw new DomainError('WORK_BRANCH_MANUAL', '方案首轮需单独明确发起', 409);
+        throw new DomainError('WORK_BRANCH_MANUAL', '方案执行需单独明确发起', 409);
       if (task.projectId !== node.project_id)
         throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务项目已变化', 409);
       if (
@@ -592,6 +613,7 @@ export class NodeExecution {
         undefined,
         operation?.operationId,
         input.workBranch?.branchId,
+        !!input.workBranch?.continueFrom,
       ).items.find((n) => n.nodeId === input.nodeId);
       if (!option?.available || option.policyHash !== input.policyHash)
         throw new DomainError(
@@ -647,7 +669,8 @@ export class NodeExecution {
         observation: 'fresh',
         requestedTool: option.policy.tool,
         scenario: 'success',
-        previousRunId: input.continuation?.sourceRunId ?? null,
+        previousRunId:
+          input.workBranch?.continueFrom?.sourceRunId ?? input.continuation?.sourceRunId ?? null,
         prompt: input.prompt,
         createdAt: now,
         updatedAt: now,
@@ -751,6 +774,9 @@ export class NodeExecution {
           (c.purpose === 'assist' && !this.store.assistance.aiAuthorized(r.id)) ||
           (['queued', 'accepted'].includes(d.stage) &&
             this.store.projectLifecycle.isArchived(this.task(d).projectId)) ||
+          (['queued', 'accepted'].includes(d.stage) &&
+            !!c.workBranch &&
+            !new BranchContinuations(this.store).current(d.task_id, c.workBranch, r.id)) ||
           r.state === 'stopping' ||
           (['queued', 'accepted'].includes(d.stage) && Date.parse(c.expiresAt) <= Date.now())
         )
@@ -814,6 +840,8 @@ export class NodeExecution {
       }
       const valid =
         materialsCurrent &&
+        (!c.workBranch ||
+          new BranchContinuations(this.store).current(d.task_id, c.workBranch, r.id)) &&
         d.stage === 'accepted' &&
         !this.store.projectLifecycle.isArchived(task.projectId) &&
         r.state !== 'stopping' &&
@@ -929,7 +957,12 @@ export class NodeExecution {
             throw new DomainError('SESSION_EVIDENCE_MISMATCH', '会话声明与当前派发不一致', 409);
           this.save(d, { ...r, node: { ...r.node!, nativeSession: info } });
         }
-        this.finish(d, input.result!, body || '节点已确认进程结束；任务是否完成由成员决定。');
+        this.finish(
+          d,
+          input.result!,
+          body || '节点已确认进程结束；任务是否完成由成员决定。',
+          input.sequence,
+        );
       } else {
         if (!['preparing', 'running', 'unknown'].includes(d.stage))
           throw new DomainError('INVALID_TRANSITION', '当前阶段不接受输出', 409);
@@ -942,6 +975,7 @@ export class NodeExecution {
         JSON.stringify({
           ...input,
           text: body,
+          shared: !discard && d.stage !== 'terminal',
           ...(discard ? { nativeSession: undefined } : {}),
         }),
       );

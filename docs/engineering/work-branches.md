@@ -23,6 +23,6 @@
 
 `/api/v1/tasks/:taskId/work-branches` 的 GET 返回按组分页的定义，POST 接受 `expectedTaskRevision`、`checkpointId` 和 `branches:[{name,goal}]`，需幂等键。`GET .../options` 读取编辑基线与引用选择；`GET .../groups/:groupId` 读单组；`GET .../:branchId/history` 读方案历史；`POST .../:branchId/discard` 接受 `expectedRevision`。
 
-迁移27只增加定义，迁移28保留旧定义并加入现场请求/绑定；旧记录不会补造目录或执行。`workingCopyId` 在本人节点登记后填写，`runId` 随派发原子关联，真实启动后状态为 active；`resultId` 仍为 null，不将Run成功当作ready结果。
+迁移27只增加定义，迁移28保留旧定义并加入现场请求/绑定；旧记录不会补造目录或执行。`workingCopyId` 在本人节点登记后填写，`runId` 随派发原子关联，真实启动后状态为 active。迁移29加入固定成果与选择；用户明确保存文字成果后才关联 `resultId` / `resultRevisionId` 并进入ready，不从Run成功自动生成。selected是当前固定版本选择的读取投影。
 
-同机独立现场与首轮Run用法见[方案现场](branch-workspaces.md)。组级资源/预算队列、Result绑定、对比选择、整合与已登记目录清理继续按 [13工作包](../development/13-parallel-exploration.md)推进，唯一下一项见 [22](../development/22-next-delivery.md)。
+同机独立现场与首轮Run用法见[方案现场](branch-workspaces.md)，固定文字版本、反馈与比较选择见[方案成果](branch-results.md)。组级资源/预算队列、代码产物、选择后继续、整合与已登记目录清理继续按 [13工作包](../development/13-parallel-exploration.md)推进，唯一下一项见 [22](../development/22-next-delivery.md)。

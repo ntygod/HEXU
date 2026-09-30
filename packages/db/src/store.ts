@@ -1,4 +1,5 @@
 import { AssistanceAdoptionsStore } from './assistance-adoption.js';
+import { ResultRevisions } from './result-revisions.js';
 import { AssistanceStore } from './assistance.js';
 import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
@@ -442,6 +443,7 @@ export class Store {
     actorType: Message['actorType'],
     actorName: string,
     resultId: string | null = null,
+    resultRevisionId?: string,
   ) {
     const item: Message = {
       id: randomUUID(),
@@ -450,6 +452,7 @@ export class Store {
       actorType,
       actorName,
       resultId,
+      ...(resultRevisionId ? { resultRevisionId } : {}),
       createdAt: now(),
     };
     this.db
@@ -458,12 +461,25 @@ export class Store {
     this.event(taskId, 'message.created');
     return item;
   }
-  addMessage(taskId: string, body: string, resultId: string | null, key: string) {
+  addMessage(
+    taskId: string,
+    body: string,
+    resultId: string | null,
+    key: string,
+    resultRevisionId?: string,
+  ) {
     this.getTask(taskId, true);
     if (resultId && this.result(resultId).taskId !== taskId)
       throw new DomainError('INVALID_INPUT', '成果不属于当前任务');
-    return this.mutate(`message.create:${taskId}`, key, { body, resultId }, () =>
-      this.insertMessage(taskId, body, 'human', this.actorName(), resultId),
+    if (resultRevisionId) {
+      if (!resultId) throw new DomainError('INVALID_INPUT', '版本反馈需要成果标识');
+      new ResultRevisions(this).get(resultId, resultRevisionId);
+    }
+    return this.mutate(
+      `message.create:${taskId}`,
+      key,
+      { body, resultId, ...(resultRevisionId ? { resultRevisionId } : {}) },
+      () => this.insertMessage(taskId, body, 'human', this.actorName(), resultId, resultRevisionId),
     );
   }
   runs(taskId: string): Run[] {
@@ -921,6 +937,7 @@ export class Store {
       this.db
         .prepare('INSERT INTO results VALUES(?,?,?)')
         .run(result.id, taskId, JSON.stringify(result));
+      new ResultRevisions(this).append(result, { kind: 'member' });
       this.event(taskId, 'result.created');
       return result;
     });
@@ -992,6 +1009,7 @@ export class Store {
       this.db
         .prepare('INSERT INTO results VALUES(?,?,?)')
         .run(result.id, result.taskId, JSON.stringify(result));
+      new ResultRevisions(this).append(result, { kind: 'legacy' }, '', true);
       this.db.prepare('INSERT INTO metadata VALUES(?,?)').run('task_counter', '35');
       this.db.prepare('INSERT INTO metadata VALUES(?,?)').run('seeded', '1');
     });

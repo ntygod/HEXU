@@ -1,6 +1,8 @@
 import { attachCheckpoints } from './checkpoints.js';
 import { attachHandoffs } from './handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
+import { attachIntegrations } from './integrations.js';
+import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
@@ -177,6 +179,7 @@ export async function createApp(
   attachCheckpoints(app, store);
   attachHandoffs(app, store);
   attachWorkBranches(app, store);
+  attachIntegrations(app, store);
   const operationRecords = (id: string) =>
     nodeExecution &&
     store.db.prepare('SELECT id FROM node_continuation_operations WHERE id=?').get(id)
@@ -581,6 +584,7 @@ export async function createApp(
           text(body.body, '内容', 12000),
           body.resultId == null ? null : text(body.resultId, '成果', 100),
           key(request.headers),
+          body.resultRevisionId == null ? undefined : text(body.resultRevisionId, '成果版本', 150),
         ),
       );
   });
@@ -733,13 +737,14 @@ export async function createApp(
   });
   app.get('/api/v1/results', async () => ({ items: store.results() }));
   app.get('/api/v1/results/:resultId', async (request) => {
-    const result = store.result(param(request.params, 'resultId'));
-    return {
-      result,
-      task: store.getTask(result.taskId),
-      messages: store.messages(result.taskId).filter((message) => message.resultId === result.id),
-    };
+    return new ResultRevisions(store).detail(param(request.params, 'resultId'));
   });
+  app.get('/api/v1/results/:resultId/versions/:revisionId', async (request) =>
+    new ResultRevisions(store).detail(
+      param(request.params, 'resultId'),
+      param(request.params, 'revisionId'),
+    ),
+  );
   app.post('/api/v1/tasks/:taskId/results', async (request, reply) => {
     const body = record(request.body);
     return reply
