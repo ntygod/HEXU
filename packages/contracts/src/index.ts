@@ -1,5 +1,6 @@
 import type { ResultCodeFeedbackAnchor } from './result-code-feedback.js';
 import type { ResultFeedbackReplyTarget } from './result-feedback-replies.js';
+import type { ResultFeedbackFollowUpOrigin } from './result-feedback-followups.js';
 import type { NativeRunConfig } from './native.js';
 export const taskStatuses = ['todo', 'in_progress', 'done', 'cancelled'] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
@@ -36,6 +37,8 @@ export interface Project {
   revision: number;
 }
 export interface Task {
+  /** Server-derived original feedback snapshot; never changed by ordinary Task edits. */
+  feedbackOrigin?: ResultFeedbackFollowUpOrigin;
   /** Explicitly accepted handoff operator; absent on older tasks, never an access grant. */
   operatorUserId?: string | null;
   operatorName?: string | null;

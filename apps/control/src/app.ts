@@ -4,6 +4,7 @@ import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
 import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-inputs.js';
+import { ResultFeedbackFollowUps } from '../../../packages/db/src/result-feedback-followups.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
@@ -765,6 +766,41 @@ export async function createApp(
         .code(201)
         .send(
           store.addFeedbackReply(
+            param(request.params, 'resultId'),
+            param(request.params, 'revisionId'),
+            param(request.params, 'messageId'),
+            request.body,
+            key(request.headers),
+          ),
+        ),
+  );
+  app.get(
+    '/api/v1/results/:resultId/versions/:revisionId/feedback/:messageId/follow-up-preview',
+    async (request) =>
+      new ResultFeedbackFollowUps(store).preview(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'messageId'),
+      ),
+  );
+  app.get(
+    '/api/v1/results/:resultId/versions/:revisionId/feedback/:messageId/follow-ups',
+    async (request) =>
+      new ResultFeedbackFollowUps(store).list(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'messageId'),
+      ),
+  );
+  app.post(
+    '/api/v1/results/:resultId/versions/:revisionId/feedback/:messageId/follow-ups',
+    // Covers 160/12000 UTF-16 characters, including JSON escapes, within a finite request budget.
+    { bodyLimit: 96 * 1024 },
+    async (request, reply) =>
+      reply
+        .code(201)
+        .send(
+          new ResultFeedbackFollowUps(store).create(
             param(request.params, 'resultId'),
             param(request.params, 'revisionId'),
             param(request.params, 'messageId'),

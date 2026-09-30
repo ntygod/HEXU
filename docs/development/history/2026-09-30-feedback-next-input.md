@@ -26,3 +26,10 @@ PR34首个head6cb5c15a的[CI144](https://github.com/ntygod/HEXU/actions/runs/367
 静态检查发现该用例的has过滤使用包含dialog祖先的locator，导致在选项内部再查找dialog；与[Playwright相对locator规则](https://playwright.dev/docs/api/class-locator#locator-filter-option-has)不符。改为仅相对checkbox并新增唯一匹配断言。这是明确测试定位错误；是否解释整条超时仍待新head CI，不称已由trace证实。完整归档36.1MB超本地标准读取器32MiB上限，临时URL只读请求403后已停止该路线；后续CI单独保留失败用例小归档，原完整报告照常保存。
 
 首轮153/154小图核验SHA256 b75856abe2d58736d689d935991670021cbd1b4235f7c82521d01a6bcc7c1df9后实际看过，深浅手机原文与编辑要求分开、输入可读；155未产出，不能宣称主流程或完整像素验收。修正只涉及测试定位/工件与记录，产品代码未改，工程1011无需本地重复。
+
+
+## 修正后精确CI与固定检查点
+
+PR34最终d8f83b00的[CI145](https://github.com/ntygod/HEXU/actions/runs/36777194149)工程1011/1011（425.85秒）、Chromium208/208（18.6分钟）及汇总均通过，0重试/跳过。此前超时的主流程在新head8.3秒完成；这里只确认相对locator修正后的复验结果，没有取得旧trace便不声称trace证明根因。
+
+小图工件11126827597核对SHA256 e686988697530fc24e33a8193ff10d13a22f5ea077a60ed67133a242ab317e21后实际查看153–155。深浅手机原文与编辑要求区分清楚，方案选择中勾选项/未选项/原文和明确启动同一真实流程通过。PR34作为相依草稿冻结，未合并或部署；后续任务另立相依切片，旧完整独审未完成边界保持。

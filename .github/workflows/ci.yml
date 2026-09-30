@@ -89,6 +89,21 @@ jobs:
           name: hexu-feedback-input-failures
           path: test-results/feedback-next-input-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-feedback-followup-previews
+          path: |
+            artifacts/156-feedback-followup-dark.png
+            artifacts/157-feedback-followup-mobile-light.png
+            artifacts/158-feedback-followup-origin-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-feedback-followup-failures
+          path: test-results/feedback-followups-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

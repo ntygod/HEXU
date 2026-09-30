@@ -23,7 +23,7 @@
     "build": "npm run build:server && vite build --config apps/web/vite.config.ts",
     "start": "node --env-file-if-exists=.env dist/apps/control/src/main.js",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
-    "test": "npm run build:server && node --test dist/tests/*.test.js",
+    "test": "npm run build:server && node --test --test-reporter=tap dist/tests/*.test.js",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run check:ui && npm test && npm run build",
     "format": "prettier --write \"apps/**/*.{ts,tsx,css,json,html,svg}\" \"packages/**/*.{ts,tsx,css,json}\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.json\" \"playwright.config.ts\"",

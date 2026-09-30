@@ -9,7 +9,7 @@ import { parseLocalBranchPreservation } from '../apps/runner/src/agent/branch-pr
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { closePreservationFixture } from './helpers/branch-preservation-cleanup.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { branchCleanupRunnerFixture } from './helpers/branch-cleanup-runner.js';
 import { branchCli } from './helpers/branch-workspace.js';
@@ -429,12 +429,7 @@ for (const stage of ['before_move', 'after_move'] as const)
       response?.destroy();
       f.api.app.server.removeListener('request', listener);
       // Only this temporary fixture's deliberately retained unknown claim.
-      const db = new DatabaseSync(join(homedir(), '.hexu/workspace-leases/registry.sqlite'));
-      db.prepare('DELETE FROM claims WHERE dispatch_id=?').run(
-        'branch-preserve:' + f.view.request.id,
-      );
-      db.close();
-      await f.close();
+      await closePreservationFixture(f);
     }
   });
 for (const phase of ['before', 'after'] as const)
@@ -464,12 +459,7 @@ for (const phase of ['before', 'after'] as const)
         });
     } finally {
       globalThis.fetch = originalFetch;
-      const db = new DatabaseSync(join(homedir(), '.hexu/workspace-leases/registry.sqlite'));
-      db.prepare('DELETE FROM claims WHERE dispatch_id=?').run(
-        'branch-preserve:' + f.view.request.id,
-      );
-      db.close();
-      await f.close();
+      await closePreservationFixture(f);
     }
   });
 test('严格本机记录拒绝伪造结算、回执、意图或字段；旧凭证守卫不忽略新增保留行', async () => {
