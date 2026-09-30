@@ -51,3 +51,98 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.code-line-difference {
+  min-width: 0;
+}
+.code-diff-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.code-diff-toolbar button[aria-pressed='true'] {
+  background: var(--hx-brand-soft);
+  color: var(--hx-brand-text);
+  border-color: var(--hx-brand-text);
+}
+.code-diff-toolbar span,
+.code-diff-legend {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.code-diff-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  background: var(--hx-surface-raised);
+  font-family: var(--hx-font-code);
+  font-size: var(--hx-font-code-size);
+}
+.code-diff-table th {
+  font-family: var(--hx-font-ui);
+  color: var(--hx-text-secondary);
+  text-align: left;
+  font-weight: 400;
+  border-bottom: 1px solid var(--hx-border-subtle);
+}
+.code-diff-table td,
+.code-diff-table th {
+  vertical-align: top;
+  padding: var(--hx-space-1);
+}
+.code-diff-gutter {
+  width: 4ch;
+}
+.code-diff-marker {
+  width: 2ch;
+}
+.code-diff-table .code-diff-number {
+  text-align: right;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-metadata);
+  user-select: none;
+}
+.code-diff-sign {
+  user-select: none;
+}
+.code-diff-content {
+  min-width: 0;
+}
+.code-diff-content code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+  font-size: inherit;
+  color: inherit;
+}
+.code-diff-addition {
+  background: var(--hx-running-soft);
+  color: var(--hx-running-text);
+}
+.code-diff-deletion {
+  background: var(--hx-danger-soft);
+  color: var(--hx-danger-text);
+}
+.code-diff-context {
+  color: var(--hx-code-text);
+}
+.code-diff-ending {
+  display: block;
+  font-family: var(--hx-font-ui);
+  font-size: var(--hx-font-metadata);
+  color: var(--hx-text-secondary);
+}
+.code-diff-fold {
+  text-align: center;
+  background: var(--hx-surface-panel);
+}
+.code-diff-fold button {
+  min-height: var(--hx-control-height);
+  color: var(--hx-text-secondary);
+}
+@media (max-width: 650px) {
+  .code-diff-toolbar button,
+  .code-diff-fold button {
+    min-height: var(--hx-touch-target);
+  }
+}

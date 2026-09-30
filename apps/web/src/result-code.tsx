@@ -6,6 +6,7 @@ import type {
 import type { ReactNode } from 'react';
 import { time } from './state.js';
 import './result-code.css';
+import { CodeLineDifference } from './code-line-difference.js';
 
 /** Text-only presentation shared by result commits and immutable trial candidates. */
 export function CodeDifferencePanel({
@@ -36,7 +37,10 @@ export function CodeDifferencePanel({
       )}
       {!difference.changedFiles && <p>{emptyLabel}</p>}
       {difference.files.map((file) => (
-        <details key={file.path} className="result-code-file">
+        <details
+          key={`${file.path}:${file.before?.objectId}:${file.after?.objectId}:${file.before?.mode}:${file.after?.mode}`}
+          className="result-code-file"
+        >
           <summary>
             <span>
               {!file.before
@@ -54,16 +58,14 @@ export function CodeDifferencePanel({
             {file.after ? `${file.after.bytes} 字节 / ${file.after.mode}` : '已删除'}
           </p>
           {file.display === 'text' ? (
-            <div className="result-code-pair">
-              <section>
-                <h4>− {beforeLabel}</h4>
-                <pre>{file.before ? file.beforeText || '（空文件）' : '（此侧没有文件）'}</pre>
-              </section>
-              <section>
-                <h4>+ {afterLabel}</h4>
-                <pre>{file.after ? file.afterText || '（空文件）' : '（此侧没有文件）'}</pre>
-              </section>
-            </div>
+            <CodeLineDifference
+              before={file.beforeText ?? ''}
+              after={file.afterText ?? ''}
+              beforeExists={!!file.before}
+              afterExists={!!file.after}
+              beforeLabel={beforeLabel}
+              afterLabel={afterLabel}
+            />
           ) : (
             <p>
               {
