@@ -37,4 +37,12 @@
 
 候选差异保持只读历史，新应用另行绑定其trialId、共享报告和本机清单指纹及完整路径；当前Task/节点/材料权限与修订先于旧回执。原节点确认停止其他写入者并指定同文件系统的新私有备份，备份必须与所有代码/候选/节点状态隔离且不能接管已有目录。沿用原应用日志、进程守卫、工作区锁、阶段与保留结算，旧记录不补造候选或备份归属。
 
-普通文件原inode保留到私有备份；替换用RENAME_EXCHANGE，移出用RENAME_NOREPLACE，不unlink或降级普通覆盖。rename不是内容CAS，不能声称阻止所有非受管并发编辑；已知异常或未知材料保留两处现场/意图，不逆向交换、自动清理或重放。完整对象和候选、目标并集、备份字节/身份与最后短观察都须核对。完整内容恢复、特殊权限/ACL/属性和冲突处理仍另行交付。
+普通文件原inode保留到私有备份；替换用RENAME_EXCHANGE，移出用RENAME_NOREPLACE，不unlink或降级普通覆盖。rename不是内容CAS，不能声称阻止所有非受管并发编辑；已知异常或未知材料保留两处现场/意图，不逆向交换、自动清理或重放。完整对象和候选、目标并集、备份字节/身份与最后短观察都须核对。已完整完成的原应用可另行明确恢复全部文件，见下节；未知/部分应用恢复、特殊权限/ACL/属性和冲突处理仍另行交付。
+
+## 已完成应用的明确文件恢复
+
+[恢复入口](../engineering/integration-file-restoration.md)只反转原应用全部已确认路径，要求原完成ACK2和精确备份/目标身份；另存一次固定请求、独立阶段/取消修订，原Operation和应用历史不可变。目标侧当前授权独立于来源材料可用性，不读取/修补/续期保留对象。原删除文件排他恢复时不能扩大备份普通读权限；写后字节/身份/权限须核对。原备份不消耗，当前文件另存新的私有目录，原创建空目录保留。
+
+恢复记录在既有本机applications表使用判别类型与独立claim，旧runner严格拒绝未知记录以保留凭证。逐文件意图、精确并集/短观察、进程守卫和未知留锁沿用原边界；重启仅对账。保留结算使用同一原子租约收据，绑定恢复证据和唯一已冻结待发包，原应用/恢复阶段/结算不互相重写，旧包不能重新取得写入许可或解锁后来写入者。部分/未知原应用、后续用户修改和冲突解决仍另行处理，不扩成泛用备份系统。
+
+实现：[恢复编排](../../apps/runner/src/agent/integration-file-restoration.ts)、[严格日志](../../apps/runner/src/agent/integration-restoration-record.ts)、[原备份读取](../../apps/runner/src/agent/integration-original-backup.ts)、[恢复保留结算](../../apps/runner/src/agent/integration-restoration-recovery.ts)。验证：[服务事务](../../tests/integration-file-restoration.test.ts)、[真实本机/进程](../../tests/integration-file-restoration-runner.test.ts)、[浏览器流程](../../tests/e2e/integration-restoration.spec.ts)。

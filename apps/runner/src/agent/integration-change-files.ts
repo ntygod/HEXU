@@ -77,7 +77,7 @@ function verifiedEntry(entry: RestoreEntry, bytes: Buffer): asserts entry is Fil
 }
 /** Check the actual named regular file and hold its fd across reading; both
  * helper and caller verify persisted bytes instead of trusting exit text. */
-export function verifyIntegrationChangeFile(
+export function readIntegrationChangeFile(
   parent: number,
   leaf: string,
   expected: RestoreEntry,
@@ -124,10 +124,18 @@ export function verifyIntegrationChangeFile(
       ) !== expected.objectId
     )
       throw unknown();
-    return identity(s) + ':' + stamp(s);
+    return {
+      bytes: bytes.subarray(0, count),
+      fingerprint: identity(s) + ':' + stamp(s),
+      permissions: Number(s.mode & 0o7777n),
+    };
   } finally {
     closeSync(fd);
   }
+}
+
+export function verifyIntegrationChangeFile(...args: Parameters<typeof readIntegrationChangeFile>) {
+  return readIntegrationChangeFile(...args).fingerprint;
 }
 
 /** Call only after durable exact intent, explicit stopped-writers consent and a

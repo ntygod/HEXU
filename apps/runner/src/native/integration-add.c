@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     puts("hexu-integration-add-v1"); return 0;
   }
   struct stat parent, file;
-  if (argc != 4 || getuid() != geteuid() || fstat(3, &parent) ||
+  if ((argc != 4 && argc != 5) || getuid() != geteuid() || fstat(3, &parent) ||
       !S_ISDIR(parent.st_mode) || parent.st_uid != geteuid() ||
       (parent.st_mode & 0022) || !local_fs(3) || !argv[1][0] ||
       strlen(argv[1]) > 255 || strchr(argv[1], '/') || strchr(argv[1], '\\') ||
@@ -35,6 +35,12 @@ int main(int argc, char **argv) {
   if (!strcmp(argv[2], "100644")) mode = 0644;
   else if (!strcmp(argv[2], "100755")) mode = 0755;
   else return refused();
+  /* Restoring a privately readable original never broadens its visibility.
+   * Older helpers reject this extra argument rather than publish a public file. */
+  if (argc == 5) {
+    if (strcmp(argv[4], "owner")) return refused();
+    mode &= 0700;
+  }
   char *end = NULL;
   errno = 0;
   unsigned long length = strtoul(argv[3], &end, 10);

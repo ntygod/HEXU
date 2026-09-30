@@ -11,6 +11,13 @@ import {
 } from './integration-application-record.js';
 import { validateRecoveryContextBinding } from './integration-recovery-context.js';
 
+import {
+  parseLocalIntegrationRestoration,
+  confirmedRestorationPaths,
+  type LocalIntegrationRestoration,
+} from './integration-restoration-record.js';
+import { readRestorationRecovery } from './integration-restoration-recovery.js';
+
 const invalid = () =>
   new DomainError('INTEGRATION_JOURNAL_INVALID', '本机应用证据不完整或不一致；保留原凭证和写锁');
 const scopeChanged = () =>
@@ -85,6 +92,10 @@ export function readIntegrationApplicationStatus(home: string, integrationId: st
   stillBound();
   const db = new DatabaseSync(database, { readOnly: true });
   let record: LocalApplication;
+  let restorations: {
+    record: LocalIntegrationRestoration;
+    recovery: ReturnType<typeof readRestorationRecovery>;
+  }[] = [];
   try {
     stillBound();
     db.exec('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA busy_timeout=1000; BEGIN;');
@@ -127,6 +138,24 @@ export function readIntegrationApplicationStatus(home: string, integrationId: st
     if (row.id !== integrationId) throw invalid();
     record = parseLocalApplicationRecord(row.body, integrationId);
     if (record.recoveryContext) validateRecoveryContextBinding(record, credentials);
+    // Select only this original application's discriminated rows. JSON text is
+    // bounded before parsing; no target/backup/registry lookup is performed.
+    const restorationRows = db
+      .prepare(
+        "SELECT id, CASE WHEN typeof(body)='text' AND length(CAST(body AS BLOB)) <= 524288 THEN body ELSE NULL END AS body FROM applications WHERE id LIKE 'restoration:%'",
+      )
+      .all();
+    for (const row of restorationRows) {
+      if (typeof row.body !== 'string') throw invalid();
+      const raw = JSON.parse(row.body);
+      if (raw.request?.integrationId !== integrationId) continue;
+      const restored = parseLocalIntegrationRestoration(row.body, row.id as string, record);
+      restorations.push({
+        record: restored,
+        recovery: readRestorationRecovery(db, record, restored),
+      });
+    }
+    if (restorations.length > 1) throw invalid();
     const registered = credentials.directories.filter((entry) => entry.root === record.root);
     if (
       record.binding !== binding ||
@@ -185,6 +214,32 @@ export function readIntegrationApplicationStatus(home: string, integrationId: st
             confirmed: record.existingChanges.changes,
             intended: record.existingChanges.intent,
           },
+        }
+      : {}),
+    ...(restorations.length
+      ? {
+          restorations: restorations.map(({ record: r, recovery }) => ({
+            restorationId: r.request.id,
+            localPhase: r.phase,
+            originalApplicationEvidenceHash: r.originalApplicationEvidenceHash,
+            selectedPaths: r.request.paths,
+            confirmedRestoredPaths: confirmedRestorationPaths(r),
+            intendedUnconfirmedPath: r.intent,
+            acknowledgedReportSequence: r.acknowledged,
+            pendingReport: r.pending,
+            retainedCurrentFiles: r.existingChanges,
+            restoredDeletedFiles: r.added,
+            recovery: recovery
+              ? {
+                  recoveryId: recovery.recoveryId,
+                  phase: recovery.phase,
+                  report: recovery.report,
+                  acknowledged: recovery.acknowledged !== null,
+                }
+              : null,
+            directoryChecked: false,
+            writeAuthorized: false,
+          })),
         }
       : {}),
     directoryChecked: false,

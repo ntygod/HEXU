@@ -78,4 +78,4 @@ npm run runner:integration-status -- --operation <整合ID> --state <节点状�
 
 ## 尚未支持
 
-固定候选的普通文件替换/移出已在本地扩充，仍待其精确head完整验收；特殊权限/扩展属性/ACL、文本自动合并、冲突选择、linked worktree、Windows/macOS、多来源、跨电脑部署和文件内容的实际恢复仍未交付。保留现场解除原占用已有，不等于恢复了代码。Linux文件/协议夹具不代表真实Claude/Codex账户联调。新增父目录的本地实现和验证见[目录扩展记录](../development/history/2026-09-30-integration-add-directories.md)，首个应用切片见[应用记录](../development/history/2026-09-30-integration-application.md)。
+固定候选的普通文件替换/移出已通过PR29精确head `799ef0a` 的工程820/820与Chromium148/148。现另有[已完成应用的文件恢复](integration-file-restoration.md)，需全新请求、原节点确认和新当前文件保留目录；恢复原备份的全部选定文件，不处理未知/部分原应用或覆盖后续用户编辑。特殊权限/扩展属性/ACL、文本自动合并、冲突选择、linked worktree、Windows/macOS、多来源和跨电脑部署仍未交付。保留现场解除原占用已有，不等于恢复了代码。Linux文件/协议夹具不代表真实Claude/Codex账户联调。新增父目录的本地实现和验证见[目录扩展记录](../development/history/2026-09-30-integration-add-directories.md)，首个应用切片见[应用记录](../development/history/2026-09-30-integration-application.md)。

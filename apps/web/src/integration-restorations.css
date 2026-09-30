@@ -1,0 +1,16 @@
+.integration-restoration-command {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.integration-restoration-command pre {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--hx-font-code);
+  font-size: var(--hx-font-code-size);
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+  border-radius: var(--hx-radius-control);
+}

@@ -33,10 +33,12 @@ test('共享标题不能在本人写入确认前注入终端控制、双向标�
 });
 
 const helper = fileURLToPath(new URL('../apps/runner/src/native/integration-add', import.meta.url));
-for (const [name, bytes, mode] of [
+for (const [name, bytes, mode, ownerOnly = false] of [
   ['empty', Buffer.alloc(0), '100644'],
   ['binary', Buffer.from([0, 255, 13, 10, 128]), '100644'],
   ['script', Buffer.from('#!/bin/false\n'), '100755'],
+  ['private', Buffer.from('PRIVATE\n'), '100644', true],
+  ['private-script', Buffer.from('#!/bin/false\n'), '100755', true],
 ] as const)
   test(
     `真实匿名inode排他新增${name}，无暂存名且落地身份/模式/正文正确`,
@@ -58,10 +60,14 @@ for (const [name, bytes, mode] of [
             bytes: bytes.length,
           },
           bytes,
+          ownerOnly,
         );
         assert.equal(result, inode(lstatSync(join(sub, name))));
         assert.deepEqual(readFileSync(join(sub, name)), bytes);
-        assert.equal(lstatSync(join(sub, name)).mode & 0o777, mode === '100755' ? 0o755 : 0o644);
+        assert.equal(
+          lstatSync(join(sub, name)).mode & 0o777,
+          ownerOnly ? (mode === '100755' ? 0o700 : 0o600) : mode === '100755' ? 0o755 : 0o644,
+        );
         assert.deepEqual(readdirSync(sub), [name]);
         assert.equal(lstatSync(join(sub, name)).nlink, 1);
       } finally {

@@ -180,3 +180,116 @@ test('部分/未知/回执未确认或缺原上下文时拒绝恢复计划，不
     planIntegrationFileRestoration(JSON.stringify(base), 'different-integration'),
   );
 });
+
+async function realBackup() {
+  const { mkdtempSync, mkdirSync, lstatSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { objectHash } = await import('../apps/runner/src/agent/checkpoint-objects.js');
+  const { observeIntegrationChangeTarget } = await import(
+    '../apps/runner/src/agent/integration-change-files.js'
+  );
+  const { identity, inode } = await import('../apps/runner/src/agent/checkpoint-restore-files.js');
+  const dir = mkdtempSync(join(tmpdir(), 'hexu-original-backup-read-')),
+    root = join(dir, 'original-target'),
+    backup = join(dir, 'original-backup');
+  mkdirSync(root, { mode: 0o700 });
+  mkdirSync(backup, { mode: 0o700 });
+  const r = original();
+  r.root = root;
+  r.recoveryContext!.root = root;
+  r.recoveryContext!.gitDir = join(root, '.git');
+  r.existingChanges!.backup = observeIntegrationChangeTarget(backup);
+  r.existingChanges!.stageIdentity = r.existingChanges!.backupIdentity = identity(
+    lstatSync(backup, { bigint: true }),
+  );
+  for (const c of r.existingChanges!.changes) {
+    const data = Buffer.from(c.before.path === 'deleted.txt' ? 'gone' : 'prev');
+    writeFileSync(join(backup, c.backupName), data, { mode: 0o600 });
+    c.before.bytes = data.length;
+    c.before.objectId = objectHash('sha1', 'blob', data);
+    c.originalIdentity = c.backupIdentity = inode(
+      lstatSync(join(backup, c.backupName), { bigint: true }),
+    );
+  }
+  const { contextHash: _hash, ...context } = r.recoveryContext!;
+  r.recoveryContext!.contextHash = hash(context);
+  return {
+    r,
+    dir,
+    root,
+    backup,
+    close() {
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+test(
+  '原备份读取只按确认清单/身份/哈希返回字节，不依赖目标Git或过期来源材料',
+  { skip: process.platform !== 'linux' },
+  async () => {
+    const { OriginalIntegrationBackup } = await import(
+      '../apps/runner/src/agent/integration-original-backup.js'
+    );
+    const { readdirSync, readFileSync, writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const f = await realBackup();
+    const reader = new OriginalIntegrationBackup(JSON.stringify(f.r), f.r.integrationId);
+    try {
+      assert.throws(() => reader.assertUnchanged());
+      const bytes = reader.read();
+      assert.equal(bytes.get('deleted.txt')!.toString(), 'gone');
+      assert.equal(bytes.get('modified.txt')!.toString(), 'prev');
+      assert.deepEqual(
+        readdirSync(f.root),
+        [],
+        'no Git, target or candidate material was created/read',
+      );
+      reader.assertUnchanged();
+      bytes.get('deleted.txt')!.fill(0);
+      assert.equal(
+        readFileSync(join(f.backup, f.r.existingChanges!.changes[0]!.backupName), 'utf8'),
+        'gone',
+      );
+      writeFileSync(join(f.backup, f.r.existingChanges!.changes[1]!.backupName), 'USER');
+      assert.throws(() => reader.assertUnchanged());
+      assert.throws(() => reader.read());
+      assert.equal(
+        readFileSync(join(f.backup, f.r.existingChanges!.changes[1]!.backupName), 'utf8'),
+        'USER',
+      );
+    } finally {
+      reader.close();
+      f.close();
+    }
+  },
+);
+test(
+  '原备份多出文件或目录改名/替换时拒绝，不扫描其他目录或接管用户副本',
+  { skip: process.platform !== 'linux' },
+  async () => {
+    const { OriginalIntegrationBackup } = await import(
+      '../apps/runner/src/agent/integration-original-backup.js'
+    );
+    const { writeFileSync, renameSync, mkdirSync, readdirSync, readFileSync } = await import(
+      'node:fs'
+    );
+    const { join } = await import('node:path');
+    const f = await realBackup();
+    const reader = new OriginalIntegrationBackup(JSON.stringify(f.r), f.r.integrationId);
+    try {
+      reader.read();
+      writeFileSync(join(f.backup, 'user-extra'), 'KEEP');
+      assert.throws(() => reader.assertUnchanged());
+      assert.throws(() => new OriginalIntegrationBackup(JSON.stringify(f.r), f.r.integrationId));
+      renameSync(f.backup, f.backup + '-moved');
+      mkdirSync(f.backup, { mode: 0o700 });
+      assert.throws(() => reader.assertUnchanged());
+      assert.equal(readFileSync(join(f.backup + '-moved', 'user-extra'), 'utf8'), 'KEEP');
+      assert.deepEqual(readdirSync(f.backup), []);
+    } finally {
+      reader.close();
+      f.close();
+    }
+  },
+);

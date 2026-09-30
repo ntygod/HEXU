@@ -679,4 +679,46 @@ CREATE TRIGGER integration_trials_immutable_delete BEFORE DELETE ON integration_
  BEGIN SELECT RAISE(ABORT,'integration trial differences are immutable'); END;
 `,
   },
+  {
+    version: 35,
+    sql: `
+-- Restoration consent and evidence never rewrite the original completed application.
+CREATE TABLE integration_file_restorations (
+ id TEXT PRIMARY KEY, integration_id TEXT NOT NULL UNIQUE REFERENCES integration_operations(id),
+ application_id TEXT NOT NULL UNIQUE, node_id TEXT NOT NULL REFERENCES runner_nodes(id),
+ state TEXT NOT NULL CHECK(state IN ('queued','restoring','completed','failed','needs_attention','cancelled')),
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+CREATE TRIGGER integration_restoration_request_immutable BEFORE UPDATE ON integration_file_restorations
+ WHEN OLD.id IS NOT NEW.id OR OLD.integration_id IS NOT NEW.integration_id
+ OR OLD.application_id IS NOT NEW.application_id OR OLD.node_id IS NOT NEW.node_id
+ OR OLD.body IS NOT NEW.body
+ BEGIN SELECT RAISE(ABORT,'integration restoration request is immutable'); END;
+CREATE TRIGGER integration_restoration_immutable_delete BEFORE DELETE ON integration_file_restorations
+ BEGIN SELECT RAISE(ABORT,'integration restoration request is immutable'); END;
+CREATE TABLE integration_file_restoration_reports (
+ restoration_id TEXT NOT NULL REFERENCES integration_file_restorations(id),
+ sequence INTEGER NOT NULL CHECK(sequence IN (1,2)), hash TEXT NOT NULL,
+ received_at TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(restoration_id,sequence)
+);
+CREATE TRIGGER integration_restoration_report_immutable_update BEFORE UPDATE ON integration_file_restoration_reports
+ BEGIN SELECT RAISE(ABORT,'integration restoration reports are immutable'); END;
+CREATE TRIGGER integration_restoration_report_immutable_delete BEFORE DELETE ON integration_file_restoration_reports
+ BEGIN SELECT RAISE(ABORT,'integration restoration reports are immutable'); END;
+CREATE TABLE integration_file_restoration_recoveries (
+ restoration_id TEXT PRIMARY KEY REFERENCES integration_file_restorations(id),
+ integration_id TEXT NOT NULL REFERENCES integration_operations(id), recovery_id TEXT NOT NULL UNIQUE,
+ hash TEXT NOT NULL, received_at TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE TRIGGER integration_restoration_recovery_immutable_update BEFORE UPDATE ON integration_file_restoration_recoveries
+ BEGIN SELECT RAISE(ABORT,'integration restoration recovery observations are immutable'); END;
+CREATE TRIGGER integration_restoration_recovery_immutable_delete BEFORE DELETE ON integration_file_restoration_recoveries
+ BEGIN SELECT RAISE(ABORT,'integration restoration recovery observations are immutable'); END;
+CREATE TRIGGER integration_restoration_original_immutable BEFORE UPDATE ON integration_operations
+ WHEN EXISTS(SELECT 1 FROM integration_file_restorations WHERE integration_id=OLD.id)
+ AND (OLD.id IS NOT NEW.id OR OLD.task_id IS NOT NEW.task_id OR OLD.node_id IS NOT NEW.node_id
+ OR OLD.state IS NOT NEW.state OR OLD.revision IS NOT NEW.revision OR OLD.body IS NOT NEW.body)
+ BEGIN SELECT RAISE(ABORT,'restoration original application is immutable'); END;
+`,
+  },
 ];

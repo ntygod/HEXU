@@ -23,6 +23,8 @@ import {
 import { releaseWorkspaceClaim, workspaceReleaseReceipt } from '../workspace-lease.js';
 import { terminalLabel } from './terminal-label.js';
 
+import { recoverIntegrationRestoration } from './integration-restoration-recovery.js';
+
 const inside = (parent: string, child: string) => {
   const p = relative(parent, child);
   return !p || (!isAbsolute(p) && p !== '..' && !p.startsWith('..' + sep));
@@ -36,7 +38,10 @@ export async function recoverIntegration(
   integrationId: string,
   ask: (prompt: string) => Promise<string>,
   log: (text: string) => void = console.log,
+  options: { restorationId?: string } = {},
 ) {
+  if (options.restorationId)
+    return recoverIntegrationRestoration(home, integrationId, options.restorationId, ask, log);
   nodeId(integrationId);
   if (process.platform !== 'linux')
     throw new DomainError('PLATFORM_UNSUPPORTED', '整合本机结算目前仅支持 Linux 普通 Git 目录');

@@ -27,6 +27,19 @@ import {
   type IntegrationTrialDifferenceSummary,
   type IntegrationTrialDifferenceDetail,
 } from '../../contracts/src/integration-trial.js';
+import {
+  parseIntegrationFileRestorationCreate,
+  parseIntegrationFileRestorationCancel,
+  parseIntegrationFileRestorationInspect,
+  parseIntegrationFileRestorationReport,
+  parseIntegrationFileRestorationRecoveryReport,
+  type IntegrationFileRestoration,
+  type IntegrationFileRestorationRequest,
+  type IntegrationFileRestorationReport,
+  type IntegrationFileRestorationReceipt,
+  type IntegrationFileRestorationRecoveryObservation,
+  type IntegrationFileRestorationRecoveryReceipt,
+} from '../../contracts/src/integration-restorations.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import { CheckpointTransferStore } from './checkpoint-transfer.js';
 import { ResultRevisions } from './result-revisions.js';
@@ -268,16 +281,24 @@ export class IntegrationStore {
     if (!r) throw new DomainError('NOT_FOUND', '整合预检记录不存在', 404);
     return JSON.parse(r.body) as IntegrationOperation;
   }
-  private view(o: IntegrationOperation): IntegrationView {
+  private view(o: IntegrationOperation, targetOnly = false): IntegrationView {
     let available = true,
       unavailableReason: string | null = null,
       canCancel = false,
       canApply = false,
-      canTrial = false;
+      canTrial = false,
+      canRestoreFiles = false,
+      canCancelFileRestoration = false;
     const taskRevision = this.task(o.taskId).revision,
-      recovery = this.recovery(o.id);
+      recovery = this.recovery(o.id),
+      restoration = this.restoration(o.id);
     // Metadata/history remains readable after material expiry or node revocation.
     try {
+      if (targetOnly)
+        throw new DomainError(
+          'INTEGRATION_TARGET_ONLY',
+          '文件恢复只核对当前目标权限，不重新读取来源材料',
+        );
       this.authority(o, true);
     } catch (e) {
       if (!(e instanceof DomainError)) throw e;
@@ -285,6 +306,8 @@ export class IntegrationStore {
       unavailableReason = e.message;
     }
     try {
+      if (targetOnly)
+        throw new DomainError('INTEGRATION_TARGET_ONLY', '文件恢复不授权来源材料操作');
       this.owner(o);
       this.authority(o, false);
       canCancel =
@@ -310,6 +333,22 @@ export class IntegrationStore {
     } catch {
       /* read-only viewer */
     }
+    let completedReportHash: string | null = null;
+    try {
+      completedReportHash = codeHash(this.completedApplication(o));
+      this.targetAuthority(o);
+      canCancelFileRestoration =
+        !!restoration &&
+        restoration.state === 'queued' &&
+        !restoration.reports.length &&
+        !restoration.recovery;
+      if (!restoration) {
+        this.idle(o.target);
+        canRestoreFiles = true;
+      }
+    } catch (e) {
+      if (!(e instanceof DomainError)) throw e;
+    }
     return {
       operation: o,
       available,
@@ -320,6 +359,10 @@ export class IntegrationStore {
       taskRevision,
       reportHash: o.report ? codeHash(o.report) : null,
       recovery,
+      restoration,
+      completedReportHash,
+      canRestoreFiles,
+      canCancelFileRestoration,
     };
   }
   private trialHistoryAccess(taskId: string, id: string) {
@@ -694,56 +737,400 @@ export class IntegrationStore {
   inspect(token: string, id: string) {
     return this.forNode(token, id, (o) => this.view(o));
   }
+  /** Current target permission only. Never re-open source grants, objects or retention. */
+  private targetAuthority(o: IntegrationOperation) {
+    const task = this.owner(o),
+      target = this.retained.checkpoints.get(o.taskId, o.target.checkpoint.id, true),
+      node = this.checkpointAuthority(o.taskId, target),
+      a = o.application;
+    if (
+      o.projectId !== task.projectId ||
+      o.spaceId !== task.spaceId ||
+      canonicalJson(target) !== canonicalJson(o.target.checkpoint) ||
+      o.inputHash !==
+        codeHash({
+          id: o.id,
+          taskId: o.taskId,
+          source: o.source,
+          target: o.target,
+          material: o.material,
+        }) ||
+      !a ||
+      !o.report ||
+      a.reportHash !== codeHash(o.report) ||
+      a.inputHash !==
+        codeHash({
+          integrationId: o.id,
+          applicationId: a.id,
+          reportHash: a.reportHash,
+          paths: a.paths,
+          ...(a.candidate ? { candidate: a.candidate } : {}),
+        })
+    )
+      throw new DomainError('INTEGRATION_SCOPE_CHANGED', '原整合、应用或目标绑定发生变化', 409);
+    return { task, node };
+  }
+  private forTargetNode<T>(token: string, id: string, fn: (o: IntegrationOperation) => T): T {
+    const n = this.retained.checkpoints.nodes.settlementIdentity(token);
+    if (n.settlementOnly) throw new DomainError('NODE_REVOKED', '节点或项目权限已撤销', 401);
+    const row = this.store.db
+      .prepare('SELECT task_id,node_id FROM integration_operations WHERE id=?')
+      .get(id) as { task_id: string; node_id: string } | undefined;
+    if (!row || row.node_id !== n.id)
+      throw new DomainError('NOT_FOUND', '整合不属于此原目标节点', 404);
+    const user = this.store.db
+      .prepare('SELECT id,name,email FROM collab_people WHERE id=?')
+      .get(n.owner_id) as unknown as IdentityUser | undefined;
+    if (!user) throw new DomainError('NODE_REVOKED', '原目标节点所有者已不可访问', 401);
+    return this.store.as({ user, spaceId: n.space_id }, () => {
+      const o = this.row(row.task_id, id),
+        { node } = this.targetAuthority(o);
+      if (node.id !== n.id)
+        throw new DomainError('INTEGRATION_SCOPE_CHANGED', '原目标节点绑定发生变化', 409);
+      return fn(o);
+    });
+  }
+  private completedApplication(o: IntegrationOperation) {
+    const a = o.application,
+      start = a?.reports[0],
+      done = a?.reports[1];
+    if (
+      !a ||
+      o.state !== 'completed' ||
+      !o.applied ||
+      a.reports.length !== 2 ||
+      !start ||
+      start.sequence !== 1 ||
+      start.stage !== 'applying' ||
+      start.appliedPaths.length ||
+      !done ||
+      done.sequence !== 2 ||
+      done.stage !== 'completed' ||
+      [start, done].some(
+        (r) => r.integrationId !== o.id || r.applicationId !== a.id || r.inputHash !== a.inputHash,
+      ) ||
+      done.observedAt < start.observedAt ||
+      canonicalJson(done.appliedPaths) !== canonicalJson(a.paths)
+    )
+      throw new DomainError(
+        'INTEGRATION_RESTORATION_UNAVAILABLE',
+        '只有完整完成并保留原应用报告的全部已确认文件可恢复一次',
+        409,
+      );
+    return done;
+  }
+  private restoration(id: string): IntegrationFileRestoration | null {
+    const row = this.store.db
+      .prepare(
+        'SELECT body,state,revision FROM integration_file_restorations WHERE integration_id=?',
+      )
+      .get(id) as
+      | { body: string; state: IntegrationFileRestoration['state']; revision: number }
+      | undefined;
+    if (!row) return null;
+    const request = JSON.parse(row.body) as IntegrationFileRestorationRequest;
+    const reports = this.store.db
+      .prepare(
+        'SELECT body FROM integration_file_restoration_reports WHERE restoration_id=? ORDER BY sequence',
+      )
+      .all(request.id) as { body: string }[];
+    return {
+      ...request,
+      state: row.state,
+      revision: row.revision,
+      reports: reports.map((r) => JSON.parse(r.body) as IntegrationFileRestorationReport),
+      recovery: this.restorationRecovery(request.id),
+    };
+  }
+  private boundRestoration(o: IntegrationOperation, id: string) {
+    const r = this.restoration(o.id),
+      a = o.application!,
+      done = this.completedApplication(o);
+    if (!r || r.id !== id) throw new DomainError('NOT_FOUND', '原应用的文件恢复请求不存在', 404);
+    const {
+      inputHash,
+      revision: _revision,
+      state: _state,
+      reports: _reports,
+      recovery: _recovery,
+      ...request
+    } = r;
+    if (
+      r.integrationId !== o.id ||
+      r.applicationId !== a.id ||
+      r.applicationInputHash !== a.inputHash ||
+      r.completedReportHash !== codeHash(done) ||
+      canonicalJson(r.paths) !== canonicalJson(a.paths) ||
+      r.requestedBy.id !== a.requestedBy.id ||
+      r.inputHash !== codeHash(request)
+    )
+      throw new DomainError(
+        'INTEGRATION_RESTORATION_MISMATCH',
+        '恢复请求与原应用、完整范围或完成报告不匹配',
+        409,
+      );
+    return r;
+  }
+  private restorationEvent(o: IntegrationOperation, state: string) {
+    this.store.db
+      .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
+      .run(o.taskId, 'integration.restoration_' + state, new Date().toISOString(), o.spaceId);
+  }
+  restoreFiles(taskId: string, id: string, input: unknown, key: string) {
+    const data = parseIntegrationFileRestorationCreate(input),
+      original = this.row(taskId, id);
+    this.targetAuthority(original); // Authorization always precedes the stored receipt.
+    this.store.mutate(`integration.restore:${id}`, key, data, () => {
+      const o = this.row(taskId, id),
+        { task, node } = this.targetAuthority(o),
+        done = this.completedApplication(o),
+        a = o.application!;
+      assertRevision(o.revision, data.expectedRevision);
+      assertRevision(task.revision, data.expectedTaskRevision);
+      if (this.restoration(id))
+        throw new DomainError(
+          'INTEGRATION_RESTORATION_FIXED',
+          '原应用已有唯一的文件恢复请求，不能再次恢复',
+          409,
+        );
+      if (
+        a.id !== data.applicationId ||
+        a.inputHash !== data.applicationInputHash ||
+        codeHash(done) !== data.completedReportHash ||
+        canonicalJson(data.paths) !== canonicalJson(a.paths)
+      )
+        throw new DomainError(
+          'INTEGRATION_RESTORATION_MISMATCH',
+          '需明确确认原应用、固定完成报告和全部已确认文件，不接受子集',
+          409,
+        );
+      this.idle(o.target);
+      const request = {
+        version: 1 as const,
+        kind: 'restore_confirmed_integration_files' as const,
+        id: randomUUID(),
+        integrationId: o.id,
+        applicationId: a.id,
+        applicationInputHash: a.inputHash,
+        completedReportHash: data.completedReportHash,
+        paths: data.paths,
+        requestedAt: new Date().toISOString(),
+        requestedBy: { id: this.store.actorId, name: this.store.actorName() },
+      };
+      const frozen: IntegrationFileRestorationRequest = {
+        ...request,
+        inputHash: codeHash(request),
+      };
+      this.store.db
+        .prepare(
+          'INSERT INTO integration_file_restorations(id,integration_id,application_id,node_id,state,revision,body) VALUES(?,?,?,?,?,?,?)',
+        )
+        .run(frozen.id, o.id, a.id, node.id, 'queued', 1, JSON.stringify(frozen));
+      this.restorationEvent(o, 'queued');
+      return { id };
+    });
+    return this.view(this.row(taskId, id), true);
+  }
+  cancelFileRestoration(taskId: string, id: string, input: unknown, key: string) {
+    const data = parseIntegrationFileRestorationCancel(input),
+      original = this.row(taskId, id);
+    this.targetAuthority(original);
+    this.boundRestoration(original, data.restorationId);
+    this.store.mutate(`integration.restore.cancel:${id}`, key, data, () => {
+      const o = this.row(taskId, id),
+        { task } = this.targetAuthority(o),
+        r = this.boundRestoration(o, data.restorationId);
+      assertRevision(r.revision, data.expectedRevision);
+      assertRevision(task.revision, data.expectedTaskRevision);
+      if (r.state !== 'queued' || r.reports.length || r.recovery)
+        throw new DomainError(
+          'INTEGRATION_RESTORATION_CLOSED',
+          '文件恢复已关闭或已进入写入阶段，不能取消',
+          409,
+        );
+      this.store.db
+        .prepare(
+          "UPDATE integration_file_restorations SET state='cancelled',revision=revision+1 WHERE id=?",
+        )
+        .run(r.id);
+      this.restorationEvent(o, 'cancelled');
+      return { id };
+    });
+    return this.view(this.row(taskId, id), true);
+  }
+  inspectRestoration(token: string, input: unknown) {
+    const data = parseIntegrationFileRestorationInspect(input);
+    return this.store.atomic(() =>
+      this.forTargetNode(token, data.integrationId, (o) => {
+        this.boundRestoration(o, data.restorationId);
+        return this.view(o, true);
+      }),
+    );
+  }
+  publishRestoration(token: string, input: unknown): IntegrationFileRestorationReceipt {
+    const report = parseIntegrationFileRestorationReport(input),
+      hash = codeHash(report);
+    return this.store.atomic(() =>
+      this.forTargetNode(token, report.integrationId, (o) => {
+        const r = this.boundRestoration(o, report.restorationId);
+        if (
+          report.applicationId !== r.applicationId ||
+          report.inputHash !== r.inputHash ||
+          report.observedAt < r.requestedAt ||
+          Date.parse(report.observedAt) > Date.now() + 60000 ||
+          report.restoredPaths.some((p) => !r.paths.includes(p)) ||
+          (report.stage === 'completed' &&
+            canonicalJson(report.restoredPaths) !== canonicalJson(r.paths)) ||
+          (r.reports.length > 0 &&
+            report.originalApplicationEvidenceHash !==
+              r.reports[0]!.originalApplicationEvidenceHash)
+        )
+          throw new DomainError(
+            'INTEGRATION_RESTORATION_MISMATCH',
+            '恢复报告与固定请求、原证据、范围或时间不匹配',
+            409,
+          );
+        const old = r.reports.find((p) => p.sequence === report.sequence);
+        // An accepted start receipt is permission-sensitive until preserve-only settlement.
+        // Afterwards it is only historical acknowledgement, never fresh write authority.
+        if (report.stage === 'restoring' && !r.recovery) this.idle(o.target);
+        if (old) {
+          if (codeHash(old) !== hash || canonicalJson(old) !== canonicalJson(report))
+            throw new DomainError('INTEGRATION_RESTORATION_FIXED', '同阶段恢复证据不能替换', 409);
+        } else {
+          if (
+            r.recovery &&
+            (r.recovery.report.pendingReportHash !== hash ||
+              r.recovery.report.originalApplicationEvidenceHash !==
+                report.originalApplicationEvidenceHash ||
+              report.observedAt > r.recovery.report.stoppedConfirmedAt)
+          )
+            throw new DomainError(
+              'INTEGRATION_RESTORATION_SETTLED',
+              '恢复已保留结算，只接受当时固定的原待发包，不允许新的写入声明或结果',
+              409,
+            );
+          if (
+            report.sequence !== r.reports.length + 1 ||
+            (report.sequence === 1 ? r.state !== 'queued' : r.state !== 'restoring') ||
+            (report.sequence === 2 &&
+              (r.reports[0]!.stage !== 'restoring' || report.observedAt < r.reports[0]!.observedAt))
+          )
+            throw new DomainError(
+              'INTEGRATION_RESTORATION_SEQUENCE',
+              '恢复已关闭、缺少写入声明或时间顺序不符',
+              409,
+            );
+          this.store.db
+            .prepare(
+              'INSERT INTO integration_file_restoration_reports(restoration_id,sequence,hash,received_at,body) VALUES(?,?,?,?,?)',
+            )
+            .run(r.id, report.sequence, hash, new Date().toISOString(), JSON.stringify(report));
+          this.store.db
+            .prepare(
+              'UPDATE integration_file_restorations SET state=?,revision=revision+1 WHERE id=?',
+            )
+            .run(report.stage, r.id);
+          this.restorationEvent(o, report.stage);
+          r.state = report.stage;
+          r.revision++;
+        }
+        return {
+          integrationId: o.id,
+          applicationId: r.applicationId,
+          restorationId: r.id,
+          hash,
+          sequence: report.sequence,
+          state: r.state,
+          revision: r.revision,
+        };
+      }),
+    );
+  }
+  private restorationRecovery(id: string): IntegrationFileRestorationRecoveryObservation | null {
+    const row = this.store.db
+      .prepare(
+        'SELECT body,hash,received_at FROM integration_file_restoration_recoveries WHERE restoration_id=?',
+      )
+      .get(id) as { body: string; hash: string; received_at: string } | undefined;
+    return row
+      ? { report: JSON.parse(row.body), hash: row.hash, receivedAt: row.received_at }
+      : null;
+  }
+  publishRestorationRecovery(
+    token: string,
+    input: unknown,
+  ): IntegrationFileRestorationRecoveryReceipt {
+    const report = parseIntegrationFileRestorationRecoveryReport(input),
+      hash = codeHash(report);
+    return this.store.atomic(() =>
+      this.forTargetNode(token, report.integrationId, (o) => {
+        const r = this.boundRestoration(o, report.restorationId);
+        if (
+          report.integrationInputHash !== o.inputHash ||
+          report.applicationId !== r.applicationId ||
+          report.applicationInputHash !== r.applicationInputHash ||
+          report.restorationInputHash !== r.inputHash ||
+          report.recordedRestoredCount > r.paths.length ||
+          report.stoppedConfirmedAt < r.requestedAt ||
+          report.releasedAt < report.stoppedConfirmedAt ||
+          Date.parse(report.releasedAt) > Date.now() + 60000 ||
+          r.reports.some(
+            (p) =>
+              p.originalApplicationEvidenceHash !== report.originalApplicationEvidenceHash ||
+              p.observedAt > report.stoppedConfirmedAt,
+          )
+        )
+          throw new DomainError(
+            'INTEGRATION_RESTORATION_RECOVERY_MISMATCH',
+            '结算观察与原恢复、完整范围、证据或时间不匹配',
+            409,
+          );
+        const old = r.recovery;
+        if (old) {
+          if (old.hash !== hash || canonicalJson(old.report) !== canonicalJson(report))
+            throw new DomainError(
+              'INTEGRATION_RESTORATION_RECOVERY_FIXED',
+              '本次恢复的保留结算观察不能替换',
+              409,
+            );
+          return {
+            integrationId: o.id,
+            applicationId: r.applicationId,
+            restorationId: r.id,
+            recoveryId: report.recoveryId,
+            hash: old.hash,
+            receivedAt: old.receivedAt,
+          };
+        }
+        const receivedAt = new Date().toISOString();
+        this.store.db
+          .prepare(
+            'INSERT INTO integration_file_restoration_recoveries(restoration_id,integration_id,recovery_id,hash,received_at,body) VALUES(?,?,?,?,?,?)',
+          )
+          .run(r.id, o.id, report.recoveryId, hash, receivedAt, JSON.stringify(report));
+        this.restorationEvent(o, 'recovery_observed');
+        return {
+          integrationId: o.id,
+          applicationId: r.applicationId,
+          restorationId: r.id,
+          recoveryId: report.recoveryId,
+          hash,
+          receivedAt,
+        };
+      }),
+    );
+  }
   publishRecovery(token: string, input: unknown) {
     const report = parseIntegrationRecoveryReport(input),
       hash = codeHash(report);
-    return this.store.atomic(() => {
-      // This observation releases only an old local claim. Recheck the original target
-      // and Task authority before any receipt, without requiring source material access.
-      const n = this.retained.checkpoints.nodes.settlementIdentity(token);
-      if (n.settlementOnly) throw new DomainError('NODE_REVOKED', '节点或项目权限已撤销', 401);
-      const row = this.store.db
-        .prepare('SELECT task_id,node_id FROM integration_operations WHERE id=?')
-        .get(report.integrationId) as { task_id: string; node_id: string } | undefined;
-      if (!row || row.node_id !== n.id)
-        throw new DomainError('NOT_FOUND', '整合不属于此原目标节点', 404);
-      const user = this.store.db
-        .prepare('SELECT id,name,email FROM collab_people WHERE id=?')
-        .get(n.owner_id) as unknown as IdentityUser | undefined;
-      if (!user) throw new DomainError('NODE_REVOKED', '原目标节点所有者已不可访问', 401);
-      return this.store.as({ user, spaceId: n.space_id }, () => {
-        const o = this.row(row.task_id, report.integrationId),
-          task = this.owner(o),
-          a = o.application,
-          target = o.target.checkpoint;
-        this.checkpointAuthority(o.taskId, target);
+    return this.store.atomic(() =>
+      this.forTargetNode(token, report.integrationId, (o) => {
+        const a = o.application!;
         if (
-          o.id !== report.integrationId ||
-          o.taskId !== row.task_id ||
-          o.projectId !== task.projectId ||
-          o.spaceId !== task.spaceId ||
-          target.request.nodeId !== n.id ||
-          o.inputHash !==
-            codeHash({
-              id: o.id,
-              taskId: o.taskId,
-              source: o.source,
-              target: o.target,
-              material: o.material,
-            }) ||
           o.inputHash !== report.integrationInputHash ||
-          !a ||
           a.id !== report.applicationId ||
           a.inputHash !== report.applicationInputHash ||
-          a.inputHash !==
-            codeHash({
-              integrationId: o.id,
-              applicationId: a.id,
-              reportHash: a.reportHash,
-              paths: a.paths,
-            }) ||
-          !o.report ||
-          a.reportHash !== codeHash(o.report) ||
           report.recordedAddedCount > a.paths.length ||
           report.stoppedConfirmedAt < a.requestedAt ||
           report.releasedAt < report.stoppedConfirmedAt ||
@@ -782,8 +1169,8 @@ export class IntegrationStore {
           hash,
           receivedAt,
         };
-      });
-    });
+      }),
+    );
   }
   publishApplication(token: string, input: unknown) {
     const report = parseIntegrationApplicationReport(input),

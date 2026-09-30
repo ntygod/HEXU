@@ -64,6 +64,16 @@ import {
   readLocalIntegrationRecovery,
 } from './integration-recovery-journal.js';
 
+import {
+  parseLocalIntegrationRestoration,
+  readRestorationOriginal,
+  restorationHasMaterial,
+} from './integration-restoration-record.js';
+import {
+  hasSettledRestorationRecovery,
+  readRestorationRecovery,
+} from './integration-restoration-recovery.js';
+
 const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).digest('hex');
 const inside = (a: string, b: string) => {
   const r = relative(a, b);
@@ -193,6 +203,14 @@ export async function withSettledIntegrationEvidence<T>(
       storage.db.prepare('SELECT 1 FROM integration_recoveries LIMIT 1').get()
     )
       throw new DomainError('INTEGRATION_UNSETTLED', '结算记录缺少原应用证据；保留原凭证');
+    if (
+      !applicationsExist &&
+      storage.db
+        .prepare("SELECT 1 FROM sqlite_schema WHERE name='integration_restoration_recoveries'")
+        .get() &&
+      storage.db.prepare('SELECT 1 FROM integration_restoration_recoveries LIMIT 1').get()
+    )
+      throw new DomainError('INTEGRATION_UNSETTLED', '恢复结算缺少原应用证据；保留原凭证');
     if (applicationsExist) {
       const rows = storage.db.prepare('SELECT id,body FROM applications').all() as {
         id: string;
@@ -202,7 +220,9 @@ export async function withSettledIntegrationEvidence<T>(
         storage.db.prepare("SELECT 1 FROM sqlite_schema WHERE name='integration_recoveries'").get()
       ) {
         const ids = new Set(
-          rows.map((row) => parseLocalApplicationRecord(row.body, row.id).applicationId),
+          rows
+            .filter((row) => !row.id.startsWith('restoration:'))
+            .map((row) => parseLocalApplicationRecord(row.body, row.id).applicationId),
         );
         for (const recovery of storage.db
           .prepare('SELECT application_id FROM integration_recoveries')
@@ -210,7 +230,48 @@ export async function withSettledIntegrationEvidence<T>(
           if (!ids.has(recovery.application_id as string))
             throw new DomainError('INTEGRATION_UNSETTLED', '结算记录缺少原应用证据；保留原凭证');
       }
-      for (const row of rows) {
+      const restorationIds = new Set<string>(),
+        restoredApplications = new Set<string>();
+      for (const row of rows.filter((row) => row.id.startsWith('restoration:'))) {
+        try {
+          const parsed = JSON.parse(row.body);
+          const original = readRestorationOriginal(storage.db, parsed);
+          const r = parseLocalIntegrationRestoration(row.body, row.id, original);
+          if (restorationIds.has(r.request.id) || restoredApplications.has(r.request.applicationId))
+            throw new Error('duplicate restoration');
+          restoredApplications.add(r.request.applicationId);
+          restorationIds.add(r.request.id);
+          if (readRestorationRecovery(storage.db, original, r)) {
+            if (hasSettledRestorationRecovery(storage.db, original, r)) continue;
+            throw new Error('unsettled recovery');
+          }
+          if (
+            r.pending ||
+            r.intent ||
+            (r.phase === 'completed'
+              ? r.acknowledged !== 2
+              : r.phase !== 'failed' || restorationHasMaterial(r))
+          )
+            throw new Error('unsettled restoration');
+        } catch {
+          throw new DomainError(
+            'INTEGRATION_UNSETTLED',
+            '文件恢复或结算仍有未知现场、无效证据或待确认回执；保留原凭证',
+          );
+        }
+      }
+      if (
+        storage.db
+          .prepare("SELECT 1 FROM sqlite_schema WHERE name='integration_restoration_recoveries'")
+          .get()
+      ) {
+        for (const row of storage.db
+          .prepare('SELECT restoration_id FROM integration_restoration_recoveries')
+          .all())
+          if (!restorationIds.has(row.restoration_id as string))
+            throw new DomainError('INTEGRATION_UNSETTLED', '恢复结算缺少原恢复证据；保留原凭证');
+      }
+      for (const row of rows.filter((row) => !row.id.startsWith('restoration:'))) {
         let r: LocalApplication;
         try {
           r = parseLocalApplicationRecord(row.body, row.id);

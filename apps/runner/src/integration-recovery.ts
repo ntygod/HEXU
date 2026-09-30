@@ -9,15 +9,18 @@ async function main() {
     const key = args[i]!,
       value = args[i + 1];
     if (
-      !['--operation', '--state'].includes(key) ||
+      !['--operation', '--state', '--restoration'].includes(key) ||
       options.has(key) ||
       !value ||
       value.startsWith('--')
     )
-      throw new DomainError('INVALID_INPUT', '只接受 --operation ID 与 --state HOME');
+      throw new DomainError(
+        'INVALID_INPUT',
+        '只接受 --operation ID、--state HOME 与可选 --restoration ID',
+      );
     options.set(key, value);
   }
-  if (options.size !== 2)
+  if (!options.has('--operation') || !options.has('--state'))
     throw new DomainError(
       'INVALID_INPUT',
       '用法：npm run runner:integration-recover -- --operation ID --state HOME',
@@ -41,6 +44,8 @@ async function main() {
             if (next.done) throw new DomainError('CONFIRMATION_REQUIRED', '未完成本机停止确认');
             return next.value;
           },
+          console.log,
+          { restorationId: options.get('--restoration') },
         ),
       ),
     );

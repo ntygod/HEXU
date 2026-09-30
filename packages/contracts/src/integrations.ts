@@ -3,6 +3,12 @@ import { exact, nodeId } from './nodes.js';
 import { checkpointHash, commitOid, type CommitCheckpoint } from './checkpoints.js';
 import { retentionDate, type RetentionManifest } from './checkpoint-retention.js';
 import type { CodeFileVersion, ResultCodeReference } from './result-code.js';
+import type { IntegrationFileRestoration } from './integration-restorations.js';
+export type {
+  IntegrationFileRestoration,
+  IntegrationFileRestorationReport,
+  IntegrationFileRestorationReceipt,
+} from './integration-restorations.js';
 
 export const INTEGRATION_LIMITS = { files: 80, reportBytes: 48 * 1024, history: 100 } as const;
 export interface IntegrationSource {
@@ -161,6 +167,10 @@ export interface IntegrationView {
   taskRevision: number;
   reportHash: string | null;
   recovery?: IntegrationRecoveryObservation | null;
+  restoration?: IntegrationFileRestoration | null;
+  completedReportHash?: string | null;
+  canRestoreFiles?: boolean;
+  canCancelFileRestoration?: boolean;
 }
 export interface IntegrationOptions {
   source: IntegrationSource;
@@ -327,7 +337,7 @@ export function parseIntegrationReport(input: unknown): IntegrationReport {
 }
 
 /** Exact relative names only: never turn caller-supplied paths into a write capability. */
-function integrationPaths(input: unknown, allowEmpty: boolean): string[] {
+export function integrationPaths(input: unknown, allowEmpty: boolean): string[] {
   if (
     !Array.isArray(input) ||
     (!allowEmpty && !input.length) ||

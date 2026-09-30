@@ -22,6 +22,7 @@ export function publishIntegrationAddition(
   parent: PinnedRestoreParent,
   entry: RestoreEntry,
   bytes: Buffer,
+  ownerOnly = false,
 ) {
   if (entry.kind !== 'file' || bytes.length !== entry.bytes || entry.gitMode === '40000')
     throw new DomainError('INTEGRATION_UNSUPPORTED', '只能发布已核验的普通文件');
@@ -29,14 +30,18 @@ export function publishIntegrationAddition(
     throw new DomainError('INTEGRATION_UNSUPPORTED', '固定目标与文件名不一致');
   parent.revalidate();
   parent.assertAbsent();
-  const r = spawnSync(helper, [basename(entry.path), entry.gitMode, String(bytes.length)], {
-    stdio: ['pipe', 'pipe', 'pipe', parent.fd],
-    input: bytes,
-    encoding: 'utf8',
-    timeout: 10000,
-    maxBuffer: 4096,
-    env: { LC_ALL: 'C' },
-  });
+  const r = spawnSync(
+    helper,
+    [basename(entry.path), entry.gitMode, String(bytes.length), ...(ownerOnly ? ['owner'] : [])],
+    {
+      stdio: ['pipe', 'pipe', 'pipe', parent.fd],
+      input: bytes,
+      encoding: 'utf8',
+      timeout: 10000,
+      maxBuffer: 4096,
+      env: { LC_ALL: 'C' },
+    },
+  );
   if (!r.error && r.status === 20 && r.stdout.trim() === 'not_published') return null;
   const match = !r.error && r.status === 0 && /^published (\d+:\d+)\n$/.exec(r.stdout);
   if (!match)

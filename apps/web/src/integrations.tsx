@@ -14,6 +14,12 @@ import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { Link, canEditTask, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
 import { IntegrationTrialEditor, IntegrationTrialHistory } from './integration-trials.js';
+import {
+  FileRestorationEditor,
+  FileRestorationStatus,
+  type FileRestorationAction,
+  type FileRestorationEditorState,
+} from './integration-restorations.js';
 import './integrations.css';
 
 const path = (taskId: string) => `/tasks/${taskId}/integrations`;
@@ -117,7 +123,12 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
         </p>
       )}
       {o.state === 'completed' && (
-        <p>节点已确认所选文件写入完成。未自动提交代码，也未标记任务完成；质量检查仍由你决定。</p>
+        <p>
+          {view.restoration
+            ? '这是原应用当时的完成报告，后续文件恢复单独记录，不改写原应用结论。'
+            : '节点已确认所选文件写入完成。'}
+          未自动提交代码，也未标记任务完成；质量检查仍由你决定。
+        </p>
       )}
       {o.state === 'needs_attention' && (
         <p className="work-branch-notice">
@@ -219,6 +230,8 @@ function Record({
   saved,
   apply,
   pendingId,
+  restoration,
+  pendingRestoration,
   trial,
   selectedTrialId,
   selectTrial,
@@ -228,6 +241,8 @@ function Record({
   saved(): void;
   apply?(view: IntegrationView, candidate?: IntegrationTrialDifferenceDetail): void;
   pendingId?: string;
+  restoration?(view: IntegrationView, action: FileRestorationAction): void;
+  pendingRestoration?: FileRestorationEditorState | null;
   trial?(view: IntegrationView): void;
   selectedTrialId?: string;
   selectTrial?(id: string): void;
@@ -289,7 +304,8 @@ function Record({
       </details>
       {!view.available && (
         <p className="work-branch-notice">
-          当前不可继续核验：{view.unavailableReason}。原记录保留。
+          当前预检/候选材料不可继续核验：{view.unavailableReason}
+          。原记录保留，文件恢复权限与状态单独核对。
         </p>
       )}
       {o.state === 'queued' && !o.application && view.available && (
@@ -370,16 +386,19 @@ function Record({
       </p>
       <ApplicationStatus view={view} />
       <RecoveryStatus view={view} />
+      <FileRestorationStatus view={view} />
       <IntegrationTrialHistory
         view={view}
-        applyCandidate={apply ? (candidate) => apply(view, candidate) : undefined}
+        applyCandidate={
+          apply && !pendingRestoration ? (candidate) => apply(view, candidate) : undefined
+        }
         selectedTrialId={selectedTrialId}
         selectTrial={selectTrial}
         denied={denied}
       />
       {trial && view.canTrial && (
         <Button
-          disabled={command.busy || !!command.uncertain || !!pendingId}
+          disabled={command.busy || !!command.uncertain || !!pendingId || !!pendingRestoration}
           onClick={() => trial(view)}
         >
           选择文件试应用
@@ -387,12 +406,58 @@ function Record({
       )}
       {apply && (view.canApply || pendingId === o.id) && (
         <Button
-          disabled={command.busy || !!command.uncertain || (!!pendingId && pendingId !== o.id)}
+          disabled={
+            command.busy ||
+            !!command.uncertain ||
+            !!pendingRestoration ||
+            (!!pendingId && pendingId !== o.id)
+          }
           onClick={() => apply(view)}
         >
           {pendingId === o.id ? '继续确认应用请求' : '选择文件应用'}
         </Button>
       )}
+      {restoration &&
+        (view.canRestoreFiles ||
+          (pendingRestoration?.view.operation.id === o.id &&
+            pendingRestoration.action === 'create')) && (
+          <Button
+            disabled={
+              command.busy ||
+              !!command.uncertain ||
+              !!pendingId ||
+              (!!pendingRestoration &&
+                (pendingRestoration.view.operation.id !== o.id ||
+                  pendingRestoration.action !== 'create'))
+            }
+            onClick={() => restoration(view, 'create')}
+          >
+            {pendingRestoration?.view.operation.id === o.id &&
+            pendingRestoration.action === 'create'
+              ? '继续确认文件恢复请求'
+              : '恢复原应用文件'}
+          </Button>
+        )}
+      {restoration &&
+        (view.canCancelFileRestoration ||
+          (pendingRestoration?.view.operation.id === o.id &&
+            pendingRestoration.action === 'cancel')) &&
+        !(pendingRestoration?.action === 'create') && (
+          <Button
+            disabled={
+              command.busy ||
+              !!command.uncertain ||
+              !!pendingId ||
+              (!!pendingRestoration && pendingRestoration.view.operation.id !== o.id)
+            }
+            onClick={() => restoration(view, 'cancel')}
+          >
+            {pendingRestoration?.view.operation.id === o.id &&
+            pendingRestoration.action === 'cancel'
+              ? '继续确认取消文件恢复请求'
+              : '取消文件恢复请求'}
+          </Button>
+        )}
       <details>
         <summary>操作历史（{o.history.length}）</summary>
         <ol>
@@ -410,7 +475,7 @@ function Record({
           ))}
         </ol>
       </details>
-      {view.canCancel && !pendingId && !command.denied && (
+      {view.canCancel && !pendingId && !pendingRestoration && !command.denied && (
         <Button
           disabled={command.busy || !!command.uncertain}
           onClick={() =>
@@ -940,6 +1005,8 @@ function Records({
   task,
   apply,
   pendingId,
+  restoration,
+  pendingRestoration,
   denied,
   trial,
   selectedTrials,
@@ -948,6 +1015,8 @@ function Records({
   task: Task;
   apply(view: IntegrationView, candidate?: IntegrationTrialDifferenceDetail): void;
   pendingId?: string;
+  restoration(view: IntegrationView, action: FileRestorationAction): void;
+  pendingRestoration: FileRestorationEditorState | null;
   denied(): void;
   trial(view: IntegrationView): void;
   selectedTrials: Record<string, string>;
@@ -960,7 +1029,9 @@ function Records({
   if (read.denied) return <p role="alert">读取权限已失效，预检内容已清除。</p>;
   return (
     <div className="dialog-body integration-form">
-      <p>从固定成果版本的“准备代码整合”选择来源与目标。这里保留每次预检、独立应用与取消记录。</p>
+      <p>
+        从固定成果版本的“准备代码整合”选择来源与目标。这里保留每次预检、独立应用、文件恢复与取消记录。
+      </p>
       {read.error && (
         <p role="alert">
           {read.error}
@@ -976,6 +1047,8 @@ function Records({
               saved={read.retry}
               apply={apply}
               pendingId={pendingId}
+              restoration={restoration}
+              pendingRestoration={pendingRestoration}
               trial={trial}
               selectedTrialId={selectedTrials[v.operation.id]}
               selectTrial={(trialId) => selectTrial(v.operation.id, trialId)}
@@ -996,6 +1069,8 @@ function Entry({ task }: { task: Task }) {
   const [open, setOpen] = useState(false),
     [application, setApplication] = useState<IntegrationView | null>(null),
     [applicationOpen, setApplicationOpen] = useState(false),
+    [restoration, setRestoration] = useState<FileRestorationEditorState | null>(null),
+    [restorationOpen, setRestorationOpen] = useState(false),
     [applicationCandidate, setApplicationCandidate] =
       useState<IntegrationTrialDifferenceDetail | null>(null),
     [trial, setTrial] = useState<IntegrationView | null>(null),
@@ -1007,6 +1082,8 @@ function Entry({ task }: { task: Task }) {
       setApplication(null);
       setApplicationCandidate(null);
       setApplicationOpen(false);
+      setRestoration(null);
+      setRestorationOpen(false);
       setTrial(null);
     }
   }, [editable]);
@@ -1014,6 +1091,8 @@ function Entry({ task }: { task: Task }) {
     setApplication(null);
     setApplicationCandidate(null);
     setApplicationOpen(false);
+    setRestoration(null);
+    setRestorationOpen(false);
     setTrial(null);
     setSelectedTrials({});
     setRevoked(true);
@@ -1032,18 +1111,36 @@ function Entry({ task }: { task: Task }) {
             <Records
               task={task}
               pendingId={application?.operation.id}
+              pendingRestoration={restoration}
+              restoration={(view, action) => {
+                if (
+                  !editable ||
+                  application ||
+                  (restoration &&
+                    (restoration.view.operation.id !== view.operation.id ||
+                      restoration.action !== action))
+                )
+                  return;
+                if (!restoration) setRestoration({ view: structuredClone(view), action });
+                setOpen(false);
+                setRestorationOpen(true);
+              }}
               denied={denied}
               selectedTrials={selectedTrials}
               selectTrial={(operationId, trialId) =>
                 setSelectedTrials((old) => ({ ...old, [operationId]: trialId }))
               }
               trial={(view) => {
-                if (!editable || application) return;
+                if (!editable || application || restoration) return;
                 setTrial(structuredClone(view));
                 setOpen(false);
               }}
               apply={(view, candidate) => {
-                if (!editable || (application && application.operation.id !== view.operation.id))
+                if (
+                  !editable ||
+                  restoration ||
+                  (application && application.operation.id !== view.operation.id)
+                )
                   return;
                 if (!application) {
                   setApplication(structuredClone(view));
@@ -1075,6 +1172,25 @@ function Entry({ task }: { task: Task }) {
             setApplication(null);
             setApplicationCandidate(null);
             setApplicationOpen(false);
+            setOpen(true);
+          }}
+        />
+      )}
+      {restoration && (
+        <FileRestorationEditor
+          key={`${restoration.view.operation.id}:${restoration.action}`}
+          initial={restoration.view}
+          action={restoration.action}
+          open={restorationOpen}
+          denied={denied}
+          close={(keepPending) => {
+            setRestorationOpen(false);
+            if (!keepPending) setRestoration(null);
+            setOpen(true);
+          }}
+          saved={() => {
+            setRestoration(null);
+            setRestorationOpen(false);
             setOpen(true);
           }}
         />
