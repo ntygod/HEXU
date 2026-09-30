@@ -25,6 +25,26 @@ export function attachIntegrations(app: FastifyInstance, store: Store) {
     reply.code(201).send(integrations.create(task(r), r.body, key(r))),
   );
   app.get(path + '/:integrationId', async (r) => integrations.get(task(r), id(r)));
+  app.get(path + '/:integrationId/recompute-options', async (r) => {
+    exact(r.query, []);
+    return integrations.recomputeOptions(task(r), id(r));
+  });
+  app.post(path + '/:integrationId/recompute', async (r, reply) =>
+    reply.code(201).send(integrations.recompute(task(r), id(r), r.body, key(r))),
+  );
+  app.get(path + '/:integrationId/trials', async (r) => integrations.listTrials(task(r), id(r)));
+  app.get(path + '/:integrationId/trials/:trialId', async (r) =>
+    integrations.getTrial(task(r), id(r), nodeId((r.params as { trialId: string }).trialId)),
+  );
+  app.post(path + '/:integrationId/apply', async (r) =>
+    integrations.apply(task(r), id(r), r.body, key(r)),
+  );
+  app.post(path + '/:integrationId/restore', async (r) =>
+    integrations.restoreFiles(task(r), id(r), r.body, key(r)),
+  );
+  app.post(path + '/:integrationId/restore/cancel', async (r) =>
+    integrations.cancelFileRestoration(task(r), id(r), r.body, key(r)),
+  );
   app.post(path + '/:integrationId/cancel', async (r) =>
     integrations.cancel(
       task(r),
@@ -35,6 +55,24 @@ export function attachIntegrations(app: FastifyInstance, store: Store) {
   );
   app.post('/runner/v1/integration-inspect', async (r) =>
     integrations.inspect(token(r), nodeId(exact(r.body, ['integrationId']).integrationId)),
+  );
+  app.post('/runner/v1/integration-restoration-inspect', async (r) =>
+    integrations.inspectRestoration(token(r), r.body),
+  );
+  app.post('/runner/v1/integration-restoration-recovery-publish', async (r) =>
+    integrations.publishRestorationRecovery(token(r), r.body),
+  );
+  app.post('/runner/v1/integration-restoration-publish', async (r) =>
+    integrations.publishRestoration(token(r), r.body),
+  );
+  app.post('/runner/v1/integration-apply-publish', async (r) =>
+    integrations.publishApplication(token(r), r.body),
+  );
+  app.post('/runner/v1/integration-trial-diff-publish', async (r) =>
+    integrations.publishTrialDifference(token(r), r.body),
+  );
+  app.post('/runner/v1/integration-recovery-publish', async (r) =>
+    integrations.publishRecovery(token(r), r.body),
   );
   app.post('/runner/v1/integration-publish', async (r) => integrations.publish(token(r), r.body));
 }

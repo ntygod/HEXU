@@ -1,0 +1,51 @@
+.integration-trial-history,
+.integration-trial-detail,
+.integration-trial-command {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.integration-trial-history {
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+}
+.integration-trial-history select {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.integration-trial-command pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--hx-font-code);
+  font-size: var(--hx-font-code-size);
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+  border-radius: var(--hx-radius-control);
+}
+.integration-trial-command ol,
+.integration-trial-detail ul {
+  margin: 0;
+  padding-left: var(--hx-space-5);
+}
+
+.integration-files li > .integration-conflict-choice,
+.integration-conflict-evidence {
+  display: grid;
+  gap: var(--hx-space-2);
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.integration-conflict-choice .field,
+.integration-conflict-choice select {
+  width: 100%;
+  min-width: 0;
+}
+.integration-conflict-choice p,
+.integration-conflict-evidence p {
+  margin: 0;
+}

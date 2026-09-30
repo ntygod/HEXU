@@ -1,4 +1,9 @@
 import type { Task } from '../../contracts/src/index.js';
+import type { IntegrationView } from '../../contracts/src/integrations.js';
+import type {
+  IntegrationFileRestorationCreate,
+  IntegrationFileRestorationCancel,
+} from '../../contracts/src/integration-restorations.js';
 import type {
   ParticipantChange,
   ParticipantReceipt,
@@ -79,3 +84,32 @@ export async function request<T>(
   if (data == null) throw new ApiError('服务返回了无法读取的数据', 'INVALID_RESPONSE', 502);
   return data as T;
 }
+
+export const integrationFileRestorationPath = (
+  taskId: string,
+  integrationId: string,
+  action: 'create' | 'cancel' = 'create',
+) =>
+  `/tasks/${encodeURIComponent(taskId)}/integrations/${encodeURIComponent(integrationId)}/restore${action === 'cancel' ? '/cancel' : ''}`;
+export const restoreIntegrationFiles = (
+  taskId: string,
+  integrationId: string,
+  body: IntegrationFileRestorationCreate,
+  key: string,
+) =>
+  request<IntegrationView>(integrationFileRestorationPath(taskId, integrationId), {
+    method: 'POST',
+    body,
+    key,
+  });
+export const cancelIntegrationFileRestoration = (
+  taskId: string,
+  integrationId: string,
+  body: IntegrationFileRestorationCancel,
+  key: string,
+) =>
+  request<IntegrationView>(integrationFileRestorationPath(taskId, integrationId, 'cancel'), {
+    method: 'POST',
+    body,
+    key,
+  });

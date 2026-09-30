@@ -1,9 +1,85 @@
 import type {
   ResultCodeReference,
   ResultCodeEvidence,
+  CodeDifferenceSummary,
 } from '../../../packages/contracts/src/result-code.js';
+import type { ReactNode } from 'react';
 import { time } from './state.js';
 import './result-code.css';
+
+/** Text-only presentation shared by result commits and immutable trial candidates. */
+export function CodeDifferencePanel({
+  difference,
+  title = '查看固定代码差异',
+  beforeLabel = '起点文件',
+  afterLabel = '所选文件',
+  emptyLabel = '所选提交相对共同起点没有普通文件变化。',
+  children,
+}: {
+  difference: CodeDifferenceSummary;
+  title?: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+  emptyLabel?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <details className="result-code-diff">
+      <summary>
+        {title}（{difference.changedFiles}个文件）
+      </summary>
+      {children}
+      {difference.omittedFiles > 0 && (
+        <p className="work-branch-notice">
+          受共享预算限制，另有 {difference.omittedFiles} 个变化文件未列出；当前展示不是完整补丁。
+        </p>
+      )}
+      {!difference.changedFiles && <p>{emptyLabel}</p>}
+      {difference.files.map((file) => (
+        <details key={file.path} className="result-code-file">
+          <summary>
+            <span>
+              {!file.before
+                ? '+ 新增'
+                : !file.after
+                  ? '− 删除'
+                  : file.before.objectId === file.after.objectId
+                    ? '模式变化'
+                    : '修改'}
+            </span>{' '}
+            <code>{file.path}</code>
+          </summary>
+          <p>
+            {file.before ? `${file.before.bytes} 字节 / ${file.before.mode}` : '原来不存在'} →{' '}
+            {file.after ? `${file.after.bytes} 字节 / ${file.after.mode}` : '已删除'}
+          </p>
+          {file.display === 'text' ? (
+            <div className="result-code-pair">
+              <section>
+                <h4>− {beforeLabel}</h4>
+                <pre>{file.before ? file.beforeText || '（空文件）' : '（此侧没有文件）'}</pre>
+              </section>
+              <section>
+                <h4>+ {afterLabel}</h4>
+                <pre>{file.after ? file.afterText || '（空文件）' : '（此侧没有文件）'}</pre>
+              </section>
+            </div>
+          ) : (
+            <p>
+              {
+                {
+                  binary: '二进制或非UTF-8文件，仅展示固定对象与大小。',
+                  large: '文件超过单侧8 KiB正文范围，正文未共享。',
+                  budget: '受本次24 KiB共享预算限制，正文未共享。',
+                }[file.display]
+              }
+            </p>
+          )}
+        </details>
+      ))}
+    </details>
+  );
+}
 export function ResultCodePanel({
   code,
   evidence,
@@ -51,62 +127,12 @@ export function ResultCodePanel({
         <p>尚未关联对象副本，提交引用不等于备份或可恢复现场。</p>
       )}
       {difference ? (
-        <details className="result-code-diff">
-          <summary>查看固定代码差异（{difference.changedFiles}个文件）</summary>
+        <CodeDifferencePanel difference={difference}>
           <p>
             {time(difference.comparedAt)}{' '}
             由原节点核验并明确共享；比较两个提交中的文件，不含活动目录或完整Git历史。
           </p>
-          {difference.omittedFiles > 0 && (
-            <p className="work-branch-notice">
-              受共享预算限制，另有 {difference.omittedFiles}{' '}
-              个变化文件未列出；当前展示不是完整补丁。
-            </p>
-          )}
-          {!difference.changedFiles && <p>所选提交相对共同起点没有普通文件变化。</p>}
-          {difference.files.map((file) => (
-            <details key={file.path} className="result-code-file">
-              <summary>
-                <span>
-                  {!file.before
-                    ? '+ 新增'
-                    : !file.after
-                      ? '− 删除'
-                      : file.before.objectId === file.after.objectId
-                        ? '模式变化'
-                        : '修改'}
-                </span>{' '}
-                <code>{file.path}</code>
-              </summary>
-              <p>
-                {file.before ? `${file.before.bytes} 字节 / ${file.before.mode}` : '原来不存在'} →{' '}
-                {file.after ? `${file.after.bytes} 字节 / ${file.after.mode}` : '已删除'}
-              </p>
-              {file.display === 'text' ? (
-                <div className="result-code-pair">
-                  <section>
-                    <h4>− 起点文件</h4>
-                    <pre>{file.before ? file.beforeText || '（空文件）' : '（此侧没有文件）'}</pre>
-                  </section>
-                  <section>
-                    <h4>+ 所选文件</h4>
-                    <pre>{file.after ? file.afterText || '（空文件）' : '（此侧没有文件）'}</pre>
-                  </section>
-                </div>
-              ) : (
-                <p>
-                  {
-                    {
-                      binary: '二进制或非UTF-8文件，仅展示固定对象与大小。',
-                      large: '文件超过单侧8 KiB正文范围，正文未共享。',
-                      budget: '受本次24 KiB共享预算限制，正文未共享。',
-                    }[file.display]
-                  }
-                </p>
-              )}
-            </details>
-          ))}
-        </details>
+        </CodeDifferencePanel>
       ) : (
         <>
           <p>此版本尚未共享可读差异，不能仅凭提交引用推断文件内容。</p>

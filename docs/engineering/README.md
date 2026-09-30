@@ -43,6 +43,14 @@
 | 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |
 | 选定成果后，在原目录明确开始下一轮 | [方案接续](branch-continuation.md) |
 | 固定成果到本人目标提交的只读冲突检查 | [整合预检](integration-preflight.md) |
+| 本人确认选择新增普通文件、持久写锁与中断证据 | [整合应用](integration-application.md) |
+| 明确停止旧应用及子进程后，保留全部文件并结算原占用 | [本机结算](integration-recovery.md) |
+| 原已完成应用的全部文件，从精确原备份另行确认恢复 | [原应用文件恢复](integration-file-restoration.md) |
+| 选中新增/修改/删除，在新私有目录核对完整候选文件 | [独立目录试应用](integration-trial.md) |
+| 逐项明确采用来源/保留目标，生成固定候选并另行写回 | [整文件冲突选择](integration-conflict-choices.md) |
+| 明确停止后只处置归属完整的未发布试应用暂存 | [试应用暂存处置](integration-trial-cleanup.md) |
+| 保持原成果与同一目录，选择新检查点创建另一条只读预检 | [新目标重新预检](integration-target-recompute.md) |
+| 本机核对候选差异，另行共享并在Task查看不可变历史 | [候选差异](integration-trial-differences.md) |
 
 ## 架构决策
 

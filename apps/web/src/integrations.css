@@ -53,3 +53,31 @@
   min-width: 0;
   text-overflow: ellipsis;
 }
+.integration-application-status {
+  display: grid;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-raised);
+}
+.integration-selection {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.integration-selection .integration-consent > span {
+  min-width: 0;
+}
+.integration-baseline {
+  margin: 0;
+}
+.integration-baseline dt {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-secondary);
+}
+.integration-baseline dd {
+  margin: 0;
+}

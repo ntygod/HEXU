@@ -4,7 +4,7 @@
 
 ## 1. 状态口径
 
-2026-09-30：**2 项已完成、78 项部分实现、22 项未实现**。包含本轮统一交付main的成果/比较/接续与整合预检切片，交付位置见21。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
+2026-09-30：**2 项已完成、78 项部分实现、22 项未实现**。包含主线成果/比较/接续与整合预检，以及本地选择新增文件应用、保留现场结算与独立目录试应用切片；交付位置和验证边界见21。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
 
 当前能力与最近验证看 [21](21-implementation-status.md)，下一项只看 [22](22-next-delivery.md)，详细批次证据与旧状态叙述看 [实现历史](history/2026-09-28-implementation.md)。本页不重复 CI 日志。M0—M4 是产品目标阶段，E0—E2c2 是历史代码批次，不能互相替代。
 
@@ -92,7 +92,7 @@
 | HX-DEV-13-02 | 分支独立现场与并发执行 | RN/BE | 部分实现 | 同机Linux原本人副本独立恢复/Git、新节点登记、首轮真实文件/树复核及同组不同现场的Claude/Codex协议进程并发已接入；单独授权/停止，原目录/凭证保持。组级预算/资源队列、跨成员/远程准备和完整拓扑仍缺。 | [事务](../../packages/db/src/work-branch-workspaces.ts) / [本机](../../apps/runner/src/agent/branch-workspace.ts) / [用法](../engineering/branch-workspaces.md) |
 | HX-DEV-13-03 | 分支成果绑定与部分失败 | BE | 部分实现 | 终态Run/真实方案关联、固定输入/共享输出、说明/限制及不可变版本已有；可选本人同目录的结束后提交引用/有效对象副本，节点另行核验并明确共享有界文件对比。失败/取消保留原状态，旧版/反馈/选择不漂移。未提交快照、完整文件/预览与日志仍缺。 | [固定成果](../../packages/db/src/work-branch-results.ts) / [代码关联](../../packages/db/src/result-code.ts) |
 | HX-DEV-13-04 | 方案对比与选择继续 | FE/BE | 部分实现 | 同组版本/来源/只读代码比较、固定选择/替换/取消与历史已有；本人可另行确认所选代码在原目录的新会话Run，固定选择/来源/材料并在许可前后核验实际文件，旧结果/反馈不变。当前要求干净匹配提交；方案等待/原生恢复、脏现场、完整diff/预览及AI差异建议仍缺。 | [比较事务](../../packages/db/src/branch-comparison.ts) / [接续](../../packages/db/src/branch-continuation.ts) / [用法](../engineering/branch-continuation.md) |
-| HX-DEV-13-05 | 固定版本的选择性整合 | RN/BE | 部分实现 | 已固定一个源成果版本、本人目标提交/恢复副本，复用完整保留/接收对象与共同起点，记录文件级三方预检、冲突/省略、不可变报告和取消历史；目标现场/权限/回执重新核验。尚无实际应用、文件/提交选择、冲突解决、多来源编排或部分写入恢复。 | [整合事务](../../packages/db/src/integrations.ts) / [预检](../../apps/runner/src/agent/integration-preflight.ts) / [用法](../engineering/integration-preflight.md) |
+| HX-DEV-13-05 | 固定版本的选择性整合 | RN/BE | 部分实现 | 已固定源成果版本、原共同起点和本人目标检查点/恢复副本；完整对象只读预检、冲突/省略和原报告不可变。支持明确新增/必要新父目录，以及固定私有候选的普通增改删写回和原文件备份；候选差异须独立确认共享，旧候选/请求不漂移。本机只读状态、未知现场留锁、明确停止后的保留结算、原完整已确认应用的全部文件恢复已接，原应用/恢复/Task结果分开。精确head539a521通过858/858工程和158/158 Chromium，尚未合并。版本2整文件both_changed采用来源/保留目标已通过精确head c5fe8fd的883/883工程、163/163 Chromium与汇总检查，完整决策与真实变化路径分开、0变化不可应用。固定原来源/同目录新目标重新预检已在b17f5c4通过896/896工程、167/167 Chromium与汇总CI。已知未发布暂存明确处置的15条新增检查通过，首轮CI工程910/911因既有只读收据短事务竞争失败，浏览器167/167；窄修正后本地915/915工程通过，最终精确head CI以PR29门禁为准。有限普通文件/Linux本人节点核心按原工作包已实现，验收以最终精确head全部门禁通过为准；结构/文本冲突、多来源、特殊文件/权限/ACL、已发布/未知材料处置及部分/未知原应用恢复保留为明确边界和后续扩展，不宣称完整版。完整独审未完成。 | [整合事务](../../packages/db/src/integrations.ts) / [应用](../engineering/integration-application.md) / [私有候选](../engineering/integration-trial.md) / [原文件恢复](../engineering/integration-file-restoration.md) / [明确冲突选择](../engineering/integration-conflict-choices.md) / [新目标重新预检](../engineering/integration-target-recompute.md) / [暂存处置](../engineering/integration-trial-cleanup.md) |
 | HX-DEV-13-06 | 分支停止、丢弃与清理保护 | RN/FE | 部分实现 | 未持有现场的planned可放弃；准备可取消/处置失败材料，已发布代码保留。首轮及选定成果后的Run可独立停止；准备失败可重新预览并明确发起，未知进程不解锁，不重放付费执行。已登记目录清理、待发包处置、脏现场与完整恢复仍缺。 | [本机](../../apps/runner/src/agent/branch-workspace.ts) / [接续回归](../../tests/branch-continuation-runner.test.ts) |
 | HX-DEV-14-01 | Result/Revision 与基础产物 | BE | 部分实现 | Result/不可变Revision及旧版兼容已有；方案可关联固定提交/副本，追加每版本一份的不可变代码对比报告，文本blob哈希和发布预算受控。文件下载/托管、未提交捕获、完整diff、真实预览与多附件模型仍缺。 | [版本仓储](../../packages/db/src/result-revisions.ts) / [代码契约](../../packages/contracts/src/result-code.ts) |
 | HX-DEV-14-02 | 成果卡、版本与说明编辑 | FE | 部分实现 | W1成果入口、版本切换/深链接、历史正文/来源与方案追加版本已有；代码引用选择、副本当前状态、节点共享的两侧文件正文和省略项可查看。故障保留、撤权清除、未知回执对账；非方案编辑、完整文件/diff/真实预览仍缺。 | [成果](../../apps/web/src/results.tsx) / [代码对比](../../apps/web/src/result-code.tsx) |
