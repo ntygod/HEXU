@@ -23,7 +23,9 @@ jobs:
       - run: npm run check
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 143 real browser flows exceed the former 124-flow job's ~15 minute budget.
+    # Individual test/assertion timeouts and retry policy remain unchanged.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

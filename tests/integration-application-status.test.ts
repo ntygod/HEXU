@@ -155,8 +155,15 @@ test(
   { skip: process.platform === 'win32' },
   () => {
     const f = fixture(),
-      lease = new WorkspaceLease(f.root, `integration:${f.base.applicationId}`);
+      originalHome = process.env.HOME;
+    // Other test files legitimately write the machine-wide registry in parallel.
+    // Snapshot this fixture's own registry, not their shared HOME or activity.
+    const ownerHome = join(f.dir, 'owner-home');
+    mkdirSync(ownerHome, { mode: 0o700 });
+    process.env.HOME = ownerHome;
+    let lease: WorkspaceLease | undefined;
     try {
+      lease = new WorkspaceLease(f.root, `integration:${f.base.applicationId}`);
       const records: LocalApplication[] = [
         f.base,
         { ...f.base, pending: packet(f.base, 'applying', 1) },
@@ -211,7 +218,9 @@ test(
       lease.assertHeld();
       assert.throws(() => new AgentStorage(f.journalHome), code('RUNNER_ALREADY_STARTED'));
     } finally {
-      lease.release();
+      lease?.release();
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       f.close();
     }
   },
