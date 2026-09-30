@@ -169,7 +169,7 @@ test('重新预检丢创建ACK关闭重开仍确认相同body/key，不重复创
     await expect(editor(page).getByRole('region', { name: '重新预检请求待确认' })).toBeVisible();
     await expect(target(page)).toBeDisabled();
     await expect(submit(page)).toBeDisabled();
-    await editor(page).getByRole('button', { name: '关闭', exact: true }).click();
+    await editor(page).locator('form').getByRole('button', { name: '关闭', exact: true }).click();
     await records(page).getByRole('button', { name: '继续确认重新预检请求', exact: true }).click();
     await expect(target(page)).toHaveValue(f.retention.request.id);
     await editor(page).getByRole('button', { name: '确认上次重新预检请求', exact: true }).click();
