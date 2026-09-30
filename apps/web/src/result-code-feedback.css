@@ -4,6 +4,9 @@
   min-width: 0;
   padding: var(--hx-panel-padding);
 }
+.code-feedback-form .field {
+  margin: 0;
+}
 .code-feedback-form p,
 .code-feedback-origin,
 .code-feedback-notice,

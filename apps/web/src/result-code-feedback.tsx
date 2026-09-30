@@ -43,17 +43,19 @@ export function CodeFeedbackEntry({
   evidence?: ResultCodeEvidence;
   children: (open?: (file: CodeFileDifference) => void) => ReactNode;
 }) {
-  const { data, refresh, notice, readDraft, saveDraft } = useApp();
+  const { data, version: accessVersion, refresh, notice, readDraft, saveDraft } = useApp();
   const purpose = `code-feedback:${version.resultId}:${version.id}`;
   const [stored, setStored] = useTaskDraft(task.id, purpose);
   const draft = decode(stored);
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [denied, setDenied] = useState(false),
+    [deniedAt, setDeniedAt] = useState<number | null>(null),
     [saved, setSaved] = useState<Message | null>(null);
   const alive = useRef(true),
-    inFlight = useRef(false);
+    inFlight = useRef(false),
+    currentAccessVersion = useRef(accessVersion);
+  currentAccessVersion.current = accessVersion;
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -61,7 +63,7 @@ export function CodeFeedbackEntry({
     };
   }, []);
   const currentTask = data.tasks.find((t) => t.id === task.id),
-    editable = !!currentTask && canEditTask(data, currentTask) && !denied;
+    editable = !!currentTask && canEditTask(data, currentTask) && deniedAt !== accessVersion;
   useEffect(() => {
     if (!editable) {
       setOpen(false);
@@ -109,7 +111,8 @@ export function CodeFeedbackEntry({
         `/results/${version.resultId}/versions/${version.id}/code-feedback`,
         { method: 'POST', body: attempt.input, key: attempt.key },
       );
-      if (matches()) saveDraft(task.id, purpose, '');
+      if (!matches()) return;
+      saveDraft(task.id, purpose, '');
       if (!alive.current) return;
       put(null);
       setOpen(false);
@@ -117,9 +120,12 @@ export function CodeFeedbackEntry({
       notice(`反馈已保存到原任务的v${version.revision}`);
       await refresh().catch(() => {});
     } catch (cause) {
+      // Revocation may have cleared this request while its response was in flight.
+      // A late response must not restore that draft through an older editable closure.
+      if (!matches()) return;
       const known = cause instanceof ApiError && cause.status >= 400 && cause.status < 500;
       const revoked = cause instanceof ApiError && [401, 403, 404].includes(cause.status);
-      if (matches() && (known || revoked))
+      if (known || revoked)
         saveDraft(
           task.id,
           purpose,
@@ -128,7 +134,7 @@ export function CodeFeedbackEntry({
       if (!alive.current) return;
       if (revoked) {
         put(null);
-        setDenied(true);
+        setDeniedAt(currentAccessVersion.current);
         setOpen(false);
       } else if (known) put({ ...original, attempt: undefined });
       setError(cause instanceof Error ? cause.message : '代码反馈发送失败');

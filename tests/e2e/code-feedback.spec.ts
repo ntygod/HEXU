@@ -83,6 +83,9 @@ test('固定代码反馈明确范围与作者，键盘发送、深浅手机确�
     await e.screenshot({ path: 'artifacts/148-code-feedback-editor-mobile-light.png' });
     expect(await e.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
     expect((await e.getByLabel('固定代码反馈内容').boundingBox())!.width).toBeGreaterThan(240);
+    const start = await e.getByLabel('反馈开始行').boundingBox();
+    const end = await e.getByLabel('反馈结束行').boundingBox();
+    expect(Math.abs(start!.y - end!.y)).toBeLessThan(2);
     await e.getByLabel('固定代码反馈内容').press('Control+Enter');
     await expect(e).toHaveCount(0);
     await expect.poll(() => messages(f).length).toBe(1);
@@ -278,6 +281,139 @@ test('复杂diff回退时仍从原共享正文定位固定行段，权限撤销�
     await expect(page.getByRole('heading', { name: '无法打开成果' })).toBeVisible();
     await expect(code(page)).toHaveCount(0);
   } finally {
+    await close(page, f);
+  }
+});
+
+test('降权清除后晚到的已知失败不会复活原草稿', async ({ page }) => {
+  const f = await codeFeedbackFixture(origin);
+  let release = () => {};
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let observe = () => {};
+  const sent = new Promise<void>((resolve) => {
+    observe = resolve;
+  });
+  try {
+    await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
+      role: 'edit',
+    });
+    const endpoint = `${origin}/api/v1/${f.feedbackPath}`;
+    await page.route(endpoint, async (route) => {
+      observe();
+      await blocked;
+      await route.fulfill({ status: 409, json: { error: { message: '晚到的原请求失败' } } });
+    });
+    await open(page, f, true);
+    await edit(page);
+    await fill(page, '撤权后不可复活的旧草稿');
+    await editor(page).getByRole('button', { name: '发送代码反馈' }).click();
+    await sent;
+    await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
+      role: 'view',
+    });
+    await expect(editor(page)).toHaveCount(0);
+    await expect(page.getByLabel('固定代码反馈草稿')).toHaveCount(0);
+    await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
+      role: 'edit',
+    });
+    await file(page).getByRole('button', { name: '对这个文件提出反馈' }).click();
+    await expect(editor(page).getByLabel('固定代码反馈内容')).toHaveValue('');
+    await expect(editor(page).getByLabel('固定代码反馈内容')).toBeDisabled();
+    const replied = page.waitForResponse((r) => r.url() === endpoint && r.status() === 409);
+    release();
+    await (await replied).finished();
+    // Enabled proves the old request's finally block has completed, without an arbitrary sleep.
+    await expect(editor(page).getByLabel('固定代码反馈内容')).toBeEnabled();
+    await expect(editor(page).getByLabel('固定代码反馈内容')).toHaveValue('');
+    await expect(editor(page).getByLabel('反馈代码侧')).toHaveValue('');
+    await expect(page.getByText('晚到的原请求失败', { exact: true })).toHaveCount(0);
+    expect(messages(f)).toHaveLength(0);
+  } finally {
+    release();
+    await close(page, f);
+  }
+});
+
+test('仅文件模式变化的非空正文仍可展开并定位原反馈行', async ({ page }) => {
+  const text = Array.from({ length: 25 }, (_, index) => `unchanged line ${index + 1}`).join('\n');
+  const f = await codeFeedbackFixture(origin, {
+    before: await codeSnapshot([{ name: 'README.md', text }]),
+    after: await codeSnapshot([{ name: 'README.md', text, mode: '100755' }]),
+  });
+  try {
+    await open(page, f);
+    await edit(page);
+    await fill(page, '模式变化时仍需核对这两行');
+    await editor(page).getByLabel('反馈开始行').fill('10');
+    await editor(page).getByLabel('反馈结束行').fill('11');
+    await editor(page).getByRole('button', { name: '发送代码反馈' }).click();
+    await expect(editor(page)).toHaveCount(0);
+    const m = messages(f)[0]!;
+    expect(m.codeAnchor!.range).toEqual({ start: 10, end: 11 });
+    await page.getByRole('link', { name: '查看已保存反馈的代码位置', exact: true }).click();
+    await expect(page).toHaveURL(url(f) + `/feedback/${m.id}`);
+    await expect(file(page).getByLabel('文本变化行数')).toHaveText('+0 / −0 行');
+    const focused = file(page).locator('[data-code-feedback-focus]');
+    await expect(focused).toBeFocused();
+    await expect(focused).toContainText('unchanged line 10');
+    await expect(file(page).locator('.code-diff-feedback-focus')).toHaveCount(2);
+    await expect(file(page).getByRole('button', { name: '收起 19 行未变内容' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(
+      file(page).getByRole('cell', { name: 'unchanged line 11', exact: true }),
+    ).toBeVisible();
+  } finally {
+    await close(page, f);
+  }
+});
+
+test('发送先返回403时清除草稿，后续明确重新获得编辑权可再次反馈', async ({ page }) => {
+  const f = await codeFeedbackFixture(origin);
+  let release = () => {};
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
+      role: 'edit',
+    });
+    await open(page, f, true);
+    await edit(page);
+    await fill(page, '旧权限不应保留的内容');
+    // Hold workbench refresh so the real POST denial arrives before the new role snapshot.
+    await page.route(`${origin}/api/v1/workbench`, async (route) => {
+      await blocked;
+      await route.continue();
+    });
+    await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
+      role: 'view',
+    });
+    const denied = page.waitForResponse(
+      (r) => r.url() === `${origin}/api/v1/${f.feedbackPath}` && r.status() === 403,
+    );
+    await editor(page).getByRole('button', { name: '发送代码反馈' }).click();
+    await denied;
+    await expect(editor(page)).toHaveCount(0);
+    await expect(page.getByLabel('固定代码反馈草稿')).toHaveCount(0);
+    await expect(file(page).getByRole('button', { name: '对这个文件提出反馈' })).toHaveCount(0);
+    release();
+    await expect(
+      page.getByText('你可以查看此项目，修改和回复需要编辑权限。', { exact: true }),
+    ).toBeVisible();
+    await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
+      role: 'edit',
+    });
+    await file(page).getByRole('button', { name: '对这个文件提出反馈' }).click();
+    await expect(editor(page).getByLabel('固定代码反馈内容')).toBeEnabled();
+    await expect(editor(page).getByLabel('固定代码反馈内容')).toHaveValue('');
+    await expect(editor(page).getByLabel('反馈代码侧')).toHaveValue('');
+    expect(messages(f)).toHaveLength(0);
+  } finally {
+    release();
     await close(page, f);
   }
 });

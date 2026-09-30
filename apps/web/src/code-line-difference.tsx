@@ -174,7 +174,7 @@ export function CodeLineDifference({
               原行：{beforeLabel} · 新行：{afterLabel}。+ 新增，−
               删除；保留空白与换行，未标记的换行为 LF。此视图不是可应用补丁。
             </p>
-            {!comparison.added && !comparison.removed ? (
+            {!comparison.added && !comparison.removed && !feedback?.range ? (
               <p>
                 {beforeExists && afterExists
                   ? '正文相同；文件模式变化以上方记录为准。'
