@@ -1,10 +1,11 @@
+import { codeFeedbackHref } from './result-code-feedback.js';
 import { RequestAiAssistance } from './ai-assistance.js';
 import { RequestAssistance } from './assistance-create.js';
 import { useState, type FormEvent } from 'react';
 import type { Message, Run } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Avatar, Button, Icon, ToolMark } from '../../../packages/ui/src/index.js';
-import { useApp, canEditTask, time, useTaskDraft } from './state.js';
+import { useApp, canEditTask, time, useTaskDraft, Link } from './state.js';
 import './discussion.css';
 import { PublishAgreement } from './agreement-create.js';
 import { DraftFromMessage } from './ai-drafts.js';
@@ -97,7 +98,13 @@ export function MessageList({ messages }: { messages: Message[] }) {
       {messages.map((message) => (
         <article className="message" key={message.id}>
           {message.actorType === 'human' ? (
-            <Avatar user={data.members.find((member) => member.name === message.actorName)} />
+            <Avatar
+              user={data.members.find((member) =>
+                message.createdByUserId
+                  ? member.id === message.createdByUserId
+                  : member.name === message.actorName,
+              )}
+            />
           ) : message.actorType === 'agent' ? (
             <ToolMark tool={message.actorName.startsWith('Claude') ? 'claude-code' : 'codex'} />
           ) : (
@@ -119,6 +126,17 @@ export function MessageList({ messages }: { messages: Message[] }) {
                 </span>
               )}
             </div>
+            {message.codeAnchor && message.resultId && message.resultRevisionId && (
+              <p className="message-code-anchor">
+                <Link to={codeFeedbackHref(message)}>
+                  查看固定代码反馈位置：{message.codeAnchor.path} ·{' '}
+                  {message.codeAnchor.side === 'before' ? '起点文件' : '所选文件'} ·{' '}
+                  {message.codeAnchor.range
+                    ? `第${message.codeAnchor.range.start}–${message.codeAnchor.range.end}行`
+                    : '整个文件'}
+                </Link>
+              </p>
+            )}
             <p>{message.body}</p>
             <PublishAgreement message={message} />
             <DraftFromMessage message={message} />

@@ -1,3 +1,4 @@
+import type { ResultCodeFeedbackAnchor } from './result-code-feedback.js';
 import type { NativeRunConfig } from './native.js';
 export const taskStatuses = ['todo', 'in_progress', 'done', 'cancelled'] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
@@ -64,6 +65,9 @@ export interface Message {
   createdAt: string;
   resultId: string | null;
   resultRevisionId?: string;
+  codeAnchor?: ResultCodeFeedbackAnchor;
+  /** Explicit author for new anchored feedback; legacy names are not retroactively resolved. */
+  createdByUserId?: string;
 }
 export interface Run {
   /** Assist runs never replace the main coding run or mutate task business state. */

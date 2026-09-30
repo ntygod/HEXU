@@ -1,3 +1,8 @@
+import {
+  parseResultCodeFeedback,
+  type ResultCodeFeedbackAnchor,
+} from '../../contracts/src/result-code-feedback.js';
+import { resolveCodeFeedbackAnchor } from './result-code-feedback.js';
 import { AssistanceAdoptionsStore } from './assistance-adoption.js';
 import { ResultRevisions } from './result-revisions.js';
 import { AssistanceStore } from './assistance.js';
@@ -444,6 +449,7 @@ export class Store {
     actorName: string,
     resultId: string | null = null,
     resultRevisionId?: string,
+    codeAnchor?: ResultCodeFeedbackAnchor,
   ) {
     const item: Message = {
       id: randomUUID(),
@@ -453,6 +459,7 @@ export class Store {
       actorName,
       resultId,
       ...(resultRevisionId ? { resultRevisionId } : {}),
+      ...(codeAnchor ? { codeAnchor, createdByUserId: this.actorId } : {}),
       createdAt: now(),
     };
     this.db
@@ -481,6 +488,25 @@ export class Store {
       { body, resultId, ...(resultRevisionId ? { resultRevisionId } : {}) },
       () => this.insertMessage(taskId, body, 'human', this.actorName(), resultId, resultRevisionId),
     );
+  }
+  addCodeFeedback(resultId: string, revisionId: string, value: unknown, key: string) {
+    const input = parseResultCodeFeedback(value);
+    const version = new ResultRevisions(this).get(resultId, revisionId);
+    // Current Task access and the immutable source are checked before old receipts.
+    resolveCodeFeedbackAnchor(this, version, input);
+    return this.mutate(`result.code-feedback:${revisionId}`, key, input, () => {
+      const current = new ResultRevisions(this).get(resultId, revisionId);
+      const anchor = resolveCodeFeedbackAnchor(this, current, input);
+      return this.insertMessage(
+        current.taskId,
+        input.body,
+        'human',
+        this.actorName(),
+        resultId,
+        revisionId,
+        anchor,
+      );
+    });
   }
   runs(taskId: string): Run[] {
     this.getTask(taskId);

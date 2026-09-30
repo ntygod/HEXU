@@ -50,6 +50,7 @@ export function App() {
             <ResultPage
               id={segment[1]}
               revisionId={segment[2] === 'versions' ? segment[3] : undefined}
+              feedbackId={segment[4] === 'feedback' ? segment[5] : undefined}
               key={path}
             />
           ) : (

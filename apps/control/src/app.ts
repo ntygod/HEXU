@@ -745,6 +745,18 @@ export async function createApp(
       param(request.params, 'revisionId'),
     ),
   );
+  app.post('/api/v1/results/:resultId/versions/:revisionId/code-feedback', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        store.addCodeFeedback(
+          param(request.params, 'resultId'),
+          param(request.params, 'revisionId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
   app.post('/api/v1/tasks/:taskId/results', async (request, reply) => {
     const body = record(request.body);
     return reply

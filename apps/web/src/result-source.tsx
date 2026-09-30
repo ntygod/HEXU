@@ -1,5 +1,9 @@
+import type { ResultCodeFeedbackAnchor } from '../../../packages/contracts/src/result-code-feedback.js';
 import type { BranchResultSource } from '../../../packages/contracts/src/results.js';
-import type { ResultCodeEvidence } from '../../../packages/contracts/src/result-code.js';
+import type {
+  ResultCodeEvidence,
+  CodeFileDifference,
+} from '../../../packages/contracts/src/result-code.js';
 import { ResultCodePanel } from './result-code.js';
 import { time } from './state.js';
 import './result-versions.css';
@@ -8,10 +12,14 @@ export function ResultSource({
   source,
   evidence,
   revisionId,
+  onCodeFeedback,
+  focusAnchor,
 }: {
   source: BranchResultSource;
   evidence?: ResultCodeEvidence;
   revisionId?: string;
+  onCodeFeedback?: (file: CodeFileDifference) => void;
+  focusAnchor?: ResultCodeFeedbackAnchor;
 }) {
   const run = source.run;
   return (
@@ -38,7 +46,13 @@ export function ResultSource({
           本版本固定文字与来源。代码文件尚未固定，共同起点提交不是本轮代码产物。
         </p>
       ) : (
-        <ResultCodePanel code={source.code} evidence={evidence} revisionId={revisionId} />
+        <ResultCodePanel
+          code={source.code}
+          evidence={evidence}
+          revisionId={revisionId}
+          onFeedback={onCodeFeedback}
+          focusAnchor={focusAnchor}
+        />
       )}
       <details>
         <summary>查看来源执行与实际输入</summary>
