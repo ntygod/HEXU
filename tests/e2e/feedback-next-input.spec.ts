@@ -117,7 +117,10 @@ test('反馈原文与编辑要求分开，手机键盘保存不启动；方案�
     const d = await continuation(page, f);
     const selected = d.getByRole('checkbox', { name: '带入：EDITED_REQUEST_ONLY', exact: true });
     await expect(selected).not.toBeChecked();
-    const option = d.locator('.node-input-option').filter({ has: selected });
+    const option = d.locator('.node-input-option').filter({
+      has: page.getByRole('checkbox', { name: '带入：EDITED_REQUEST_ONLY', exact: true }),
+    });
+    await expect(option).toHaveCount(1);
     await option.getByText('原反馈来源 · 方案 A · v1', { exact: true }).click();
     await expect(selected).not.toBeChecked();
     await expect(option).toContainText(source.body);

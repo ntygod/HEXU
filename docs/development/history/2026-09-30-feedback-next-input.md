@@ -18,3 +18,11 @@ PR29/30此前被中止的私有候选材料/写盘独审未重开；本切片独
 普通入口修正已完成：generic selected/attach拒绝带固定反馈origin的要求，合法方案通过branchSelected/attachBranch重验；原无origin手工Task队列语义保持。回归真实配对第三个未绑定目录、完成普通Run后分别请求direct及wait/request_stop Operation，使用各自正确preview/hash并断言具体BRANCH_INPUT_SCOPE_CHANGED，均不留Run/Operation或队列副作用。最终62/62通过（反馈7、分支选择9、既有node-execution42、增强真实Git/双协议runner4），服务构建和差异检查通过；生产源20:27:16 UTC、测试20:28:09 UTC冻结。独立复读确认绕行闭合，完整本地检查已开始。
 
 最终完整本地check 1011/1011通过，0失败/取消/跳过，160.11秒，类型/UI token/服务与Web构建通过。全量格式、差异、308个修改文档相对文件链接和CI YAML核对通过，208条/33文件页面发现和严格类型通过。独立复读确认普通入口修正与正确waiting preview的目标错误码断言；5条新增真实浏览器流程与153–155像素仍待精确head CI。不因本地全绿或前置PR通过提升浏览器状态。
+
+## 首轮CI与页面定位修正
+
+PR34首个head6cb5c15a的[CI144](https://github.com/ntygod/HEXU/actions/runs/36774026748)工程1011/1011通过（407.58秒），Chromium207通过/1失败（18.8分钟），汇总失败。仅首个保存→方案选材→协议启动长流程达到原30秒超时，其finally关闭报错遮住具体等待位置；其他4条新增页面通过。没有加重试或放宽超时。
+
+静态检查发现该用例的has过滤使用包含dialog祖先的locator，导致在选项内部再查找dialog；与[Playwright相对locator规则](https://playwright.dev/docs/api/class-locator#locator-filter-option-has)不符。改为仅相对checkbox并新增唯一匹配断言。这是明确测试定位错误；是否解释整条超时仍待新head CI，不称已由trace证实。完整归档36.1MB超本地标准读取器32MiB上限，临时URL只读请求403后已停止该路线；后续CI单独保留失败用例小归档，原完整报告照常保存。
+
+首轮153/154小图核验SHA256 b75856abe2d58736d689d935991670021cbd1b4235f7c82521d01a6bcc7c1df9后实际看过，深浅手机原文与编辑要求分开、输入可读；155未产出，不能宣称主流程或完整像素验收。修正只涉及测试定位/工件与记录，产品代码未改，工程1011无需本地重复。
