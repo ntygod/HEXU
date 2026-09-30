@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import {
   mkdtempSync,
   mkdirSync,
@@ -321,6 +323,94 @@ test(
       const request = { ...f.request, root: f.home },
         before = readFileSync(f.registry);
       assert.throws(() => releaseWorkspaceClaim(request), /不一致/);
+      assert.deepEqual(readFileSync(f.registry), before);
+      assert(f.claim());
+    } finally {
+      f.close();
+    }
+  },
+);
+
+/** A child owns the lock before the synchronous reader starts. It releases
+ * independently of the blocked parent, or only after the timeout assertion. */
+async function duringRegistryTransaction(path: string, short: boolean, check: () => void) {
+  const child = spawn(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+    import { DatabaseSync } from 'node:sqlite';
+    const db = new DatabaseSync(process.argv[1]);
+    db.exec('PRAGMA busy_timeout=5000; BEGIN EXCLUSIVE');
+    console.log('LOCKED');
+    process.stdin.once('data', () => setTimeout(() => {
+      db.exec('COMMIT'); db.close(); process.stdin.destroy();
+    }, ${short ? 250 : 0}));
+  `,
+      path,
+    ],
+    { stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  const exited = once(child, 'exit');
+  try {
+    const [signal] = await once(child.stdout, 'data');
+    assert.equal(String(signal).trim(), 'LOCKED');
+    if (short) child.stdin.write('release shortly\n');
+    check();
+    if (!short) child.stdin.write('release after failed-closed read\n');
+    assert.deepEqual(await exited, [0, null]);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    await exited;
+  }
+}
+for (const kind of ['missing', 'recorded', 'mismatch'] as const)
+  test(
+    `只读结算收据等待真实短事务：${kind}不改写回执或后来写入者`,
+    { skip: process.platform !== 'linux' },
+    async () => {
+      const f = fixture();
+      let later: WorkspaceLease | undefined;
+      try {
+        const receipt = kind === 'missing' ? null : releaseWorkspaceClaim(f.request);
+        if (receipt) {
+          later = new WorkspaceLease(f.root, 'later-receipt-reader-fixture');
+          renameSync(f.root, f.root + '-moved');
+        }
+        const before = readFileSync(f.registry);
+        await duringRegistryTransaction(f.registry, true, () => {
+          if (kind === 'mismatch')
+            assert.throws(
+              () => workspaceReleaseReceipt({ ...f.request, evidenceHash: 'b'.repeat(64) }),
+              { code: 'WORKSPACE_RELEASE_MISMATCH' },
+            );
+          else assert.deepEqual(workspaceReleaseReceipt(f.request), receipt);
+        });
+        assert.deepEqual(readFileSync(f.registry), before);
+        if (receipt) {
+          renameSync(f.root + '-moved', f.root);
+          later!.assertHeld();
+        } else assert(f.claim());
+      } finally {
+        try {
+          renameSync(f.root + '-moved', f.root);
+        } catch {}
+        later?.release();
+        f.close();
+      }
+    },
+  );
+test(
+  '持续写事务超过只读等待边界仍拒绝，不把锁错误当缺失回执或释放原claim',
+  { skip: process.platform !== 'linux' },
+  async () => {
+    const f = fixture();
+    try {
+      const before = readFileSync(f.registry);
+      await duringRegistryTransaction(f.registry, false, () => {
+        assert.throws(() => workspaceReleaseReceipt(f.request), { errcode: 5 });
+      });
       assert.deepEqual(readFileSync(f.registry), before);
       assert(f.claim());
     } finally {

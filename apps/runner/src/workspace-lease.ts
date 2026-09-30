@@ -248,6 +248,10 @@ export function workspaceReleaseReceipt(
   }
   const db = new DatabaseSync(path, { readOnly: true });
   try {
+    // Match the registry's bounded transaction wait. A short unrelated commit
+    // is not evidence that an immutable release receipt is missing or invalid.
+    // Timeout still throws; never convert an unreadable registry into no receipt.
+    db.exec('PRAGMA busy_timeout=5000');
     return recordedRelease(db, request);
   } finally {
     db.close();
