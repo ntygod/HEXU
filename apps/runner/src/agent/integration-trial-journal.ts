@@ -19,6 +19,14 @@ import { parseIntegrationConflictSelection } from '../../../../packages/contract
 
 export const trialHash = (value: unknown) =>
   createHash('sha256').update(canonicalJson(value)).digest('hex');
+export interface IntegrationTrialCleanup {
+  version: 1;
+  kind: 'discard_known_unpublished_trial_stage';
+  phase: 'cleaning' | 'cleaned' | 'needs_attention';
+  originalEvidenceHash: string;
+  stoppedConfirmedAt: string;
+  completedAt: string | null;
+}
 export interface IntegrationTrialProgress {
   id: string;
   integrationId: string;
@@ -43,6 +51,7 @@ export interface IntegrationTrialProgress {
   trialOnly: true;
   applied: false;
   writeAuthorized: false;
+  cleanup?: IntegrationTrialCleanup;
 }
 export interface IntegrationTrialRecord {
   version: 1 | 2;
@@ -114,7 +123,37 @@ function decode(body: string, target: string): IntegrationTrialRecord {
     if (canonicalJson(decision.conflictChoices) !== canonicalJson(r.manifest.conflictChoices))
       throw invalid();
   }
+  if (p.cleanup) {
+    const c = exact(p.cleanup, [
+      'version',
+      'kind',
+      'phase',
+      'originalEvidenceHash',
+      'stoppedConfirmedAt',
+      'completedAt',
+    ]);
+    if (
+      c.version !== 1 ||
+      c.kind !== 'discard_known_unpublished_trial_stage' ||
+      !['cleaning', 'cleaned', 'needs_attention'].includes(String(c.phase)) ||
+      c.originalEvidenceHash !== integrationTrialCleanupEvidence(r) ||
+      !['failed', 'interrupted'].includes(p.state) ||
+      p.materialState !== 'staging' ||
+      !p.stageIdentity ||
+      p.intent !== null ||
+      p.publishedAt !== null ||
+      (c.phase === 'cleaned') !== (c.completedAt !== null)
+    )
+      throw invalid();
+    retentionDate(c.stoppedConfirmedAt);
+    if (c.completedAt !== null) retentionDate(c.completedAt);
+  }
   return r;
+}
+/** Original historical state and ownership are never rewritten as cleanup success. */
+export function integrationTrialCleanupEvidence(record: IntegrationTrialRecord) {
+  const { cleanup: _cleanup, updatedAt: _updatedAt, ...progress } = record.progress;
+  return trialHash({ ...record, progress });
 }
 
 /** Separate local process guard and durable, private evidence. There is no
@@ -376,6 +415,7 @@ export async function withSettledIntegrationTrials<T>(
       const p = record.progress;
       const settled =
         p.state === 'ready' ||
+        p.cleanup?.phase === 'cleaned' ||
         (['failed', 'interrupted'].includes(p.state) &&
           p.materialState === 'none' &&
           p.stageIdentity === null &&

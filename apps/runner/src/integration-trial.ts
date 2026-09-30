@@ -78,8 +78,13 @@ async function main() {
       { signal: controller.signal, conflictSelection },
     );
     console.log(JSON.stringify(result));
-    if (result.state !== 'ready') process.exitCode = 1;
-    else
+    if (result.state !== 'ready') {
+      process.exitCode = 1;
+      if (result.materialState === 'staging' && result.intent === null)
+        console.log(
+          `仅已知未发布暂存可另行核对并明确清理：npm run runner:integration-trial-cleanup -- --operation ${shellQuote(options.get('--operation')!)} --trial ${shellQuote(result.id)} --state ${shellQuote(options.get('--state')!)}`,
+        );
+    } else
       console.log(
         `另行只读核验并选择共享候选差异：npm run runner:integration-trial-diff -- --operation ${shellQuote(options.get('--operation')!)} --state ${shellQuote(options.get('--state')!)} --trial ${shellQuote(result.id)}`,
       );
