@@ -88,7 +88,9 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
           {view.available && !view.recovery && (
             <>
               {a.candidate ? (
-                <pre>{integrationCandidateApplicationCommand(o.id)}</pre>
+                <section className="integration-trial-command" aria-label="本机候选写回命令">
+                  <pre>{integrationCandidateApplicationCommand(o.id)}</pre>
+                </section>
               ) : (
                 <code>
                   npm run runner:integration-apply -- --operation {o.id} --state

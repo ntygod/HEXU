@@ -601,6 +601,14 @@ test('完整候选另外确认新增修改删除，取消不提交、重复点�
     );
     await expect(status).toContainText('全部写入者已停止');
     await expect(status).toContainText('备份路径不上传');
+    await expect
+      .poll(() => status.evaluate((e) => e.scrollWidth - e.clientWidth))
+      .toBeLessThanOrEqual(1);
+    await expect
+      .poll(() => records(page).evaluate((e) => e.scrollWidth - e.clientWidth))
+      .toBeLessThanOrEqual(1);
+    await status.locator('pre').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'artifacts/128-integration-candidate-command-mobile-light.png' });
   } finally {
     await close(page, f);
   }

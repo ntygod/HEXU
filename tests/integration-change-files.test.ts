@@ -15,6 +15,7 @@ import {
   linkSync,
   chmodSync,
   readlinkSync,
+  renameSync,
   rmSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -141,10 +142,16 @@ for (const change of [
     const f = fixture();
     try {
       if (change === 'bytes') writeFileSync(f.path, 'USER');
-      if (change === 'inode' || change === 'symlink' || change === 'directory') {
+      if (change === 'inode') {
+        // Keep the original allocated: unlink+recreate may reuse its inode on
+        // CI and would not exercise the different-inode rejection at all.
+        renameSync(f.path, join(f.root, 'retained-original'));
+        writeFileSync(f.path, f.before);
+        assert.notEqual(inode(lstatSync(f.path)), inode(f.original));
+      }
+      if (change === 'symlink' || change === 'directory') {
         // Disposable fixture only; product paths never use unlink/rm.
         rmSync(f.path);
-        if (change === 'inode') writeFileSync(f.path, f.before);
         if (change === 'symlink') symlinkSync('/missing-fixture', f.path);
         if (change === 'directory') mkdirSync(f.path);
       }
@@ -159,6 +166,11 @@ for (const change of [
         assert.equal(r.status, 20, r.stdout + r.stderr);
         assert.equal(inode(lstatSync(f.path)), inode(beforeStat));
         assert.deepEqual(readdirSync(f.backup), names);
+      }
+      if (change === 'inode') {
+        assert.equal(inode(lstatSync(join(f.root, 'retained-original'))), inode(f.original));
+        assert.deepEqual(readFileSync(join(f.root, 'retained-original')), f.before);
+        assert.deepEqual(readFileSync(f.path), f.before);
       }
       if (change === 'bytes') assert.equal(readFileSync(f.path, 'utf8'), 'USER');
       if (change === 'backup-occupied')
