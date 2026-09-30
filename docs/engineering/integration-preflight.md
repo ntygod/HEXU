@@ -39,6 +39,6 @@ npm run runner:integration-plan -- --operation <预检ID> --state <节点状态�
 
 创建/取消使用固定请求体、预期修订和幂等键。节点共享前将固定包写入私有持久日志；回复丢失只重发原包，不重新读取代码或替换报告。若服务端确认这条操作已取消且报告从未保存，本机对账结束该待发包，不能改投另一操作。已保存的报告不可覆盖，取消也不擦除它。若身份已被撤销，不能借旧回执读取/发布；无法确认的原包保持在原私有日志。
 
-本地已实现独立的新增文件选择/本人确认应用，见[应用指南](integration-application.md)。修改/删除/新目录、提交选择、冲突解决、文本自动合并、未知写入恢复与多来源编排仍未实现。实际应用另行授权、重新核验材料/目标、持有持久写锁并保留恢复点；不能把本页预检、48 KiB清单或成果24 KiB显示差异当成可应用补丁。
+普通新增/必要新父目录和固定候选的已有文件修改/移出见[应用指南](integration-application.md)，明确整文件冲突选择见[冲突指南](integration-conflict-choices.md)，已完成应用的全部文件恢复见[恢复指南](integration-file-restoration.md)。目标变化后可[固定原来源选择新目标重新预检](integration-target-recompute.md)，旧报告不变，新试应用/写回仍需新确认。提交/patch选择、结构/文本冲突、未知/部分原应用恢复与多来源编排仍未实现。实际应用另行授权、重新核验材料/目标、持有持久写锁并保留恢复点；不能把本页预检、48 KiB清单或成果24 KiB显示差异当成可应用补丁。
 
 代码：[契约](../../packages/contracts/src/integrations.ts)、[事务](../../packages/db/src/integrations.ts)、[节点](../../apps/runner/src/agent/integration-preflight.ts)、[三方比较](../../apps/runner/src/agent/integration-plan.ts)、[界面](../../apps/web/src/integrations.tsx)。实际验证与限制见[本轮记录](../development/history/2026-09-30-integration-preflight.md)，后续只看[22](../development/22-next-delivery.md)。

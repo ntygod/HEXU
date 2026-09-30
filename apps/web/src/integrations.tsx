@@ -24,6 +24,7 @@ import {
   type FileRestorationAction,
   type FileRestorationEditorState,
 } from './integration-restorations.js';
+import { IntegrationRecomputeEditor } from './integration-recompute.js';
 import './integrations.css';
 
 const path = (taskId: string) => `/tasks/${taskId}/integrations`;
@@ -236,6 +237,9 @@ function Record({
   pendingId,
   restoration,
   pendingRestoration,
+  recompute,
+  pendingRecomputeId,
+  inspect,
   trial,
   selectedTrialId,
   selectTrial,
@@ -247,6 +251,9 @@ function Record({
   pendingId?: string;
   restoration?(view: IntegrationView, action: FileRestorationAction): void;
   pendingRestoration?: FileRestorationEditorState | null;
+  recompute?(view: IntegrationView): void;
+  pendingRecomputeId?: string;
+  inspect?(id: string): void;
   trial?(view: IntegrationView): void;
   selectedTrialId?: string;
   selectTrial?(id: string): void;
@@ -282,6 +289,24 @@ function Record({
       <p>
         {o.createdBy.name} · {time(o.createdAt)}
       </p>
+      {o.recomputedFrom && (
+        <section aria-label="重新预检来源记录">
+          <p>
+            基于原预检 <code>{o.recomputedFrom}</code>{' '}
+            创建；原来源版本保持，新目标独立确认，不继承原选择或候选。
+          </p>
+          {inspect && (
+            <Button
+              disabled={
+                !!pendingId || !!pendingRestoration || !!pendingRecomputeId || !!pendingRecomputeId
+              }
+              onClick={() => inspect(o.recomputedFrom!)}
+            >
+              查看原预检记录
+            </Button>
+          )}
+        </section>
+      )}
       <details>
         <summary>固定来源、目标与恢复点</summary>
         <dl>
@@ -394,7 +419,9 @@ function Record({
       <IntegrationTrialHistory
         view={view}
         applyCandidate={
-          apply && !pendingRestoration ? (candidate) => apply(view, candidate) : undefined
+          apply && !pendingRestoration && !pendingRecomputeId
+            ? (candidate) => apply(view, candidate)
+            : undefined
         }
         selectedTrialId={selectedTrialId}
         selectTrial={selectTrial}
@@ -402,7 +429,13 @@ function Record({
       />
       {trial && view.canTrial && (
         <Button
-          disabled={command.busy || !!command.uncertain || !!pendingId || !!pendingRestoration}
+          disabled={
+            command.busy ||
+            !!command.uncertain ||
+            !!pendingId ||
+            !!pendingRestoration ||
+            !!pendingRecomputeId
+          }
           onClick={() => trial(view)}
         >
           选择文件试应用
@@ -414,6 +447,7 @@ function Record({
             command.busy ||
             !!command.uncertain ||
             !!pendingRestoration ||
+            !!pendingRecomputeId ||
             (!!pendingId && pendingId !== o.id)
           }
           onClick={() => apply(view)}
@@ -430,6 +464,7 @@ function Record({
               command.busy ||
               !!command.uncertain ||
               !!pendingId ||
+              !!pendingRecomputeId ||
               (!!pendingRestoration &&
                 (pendingRestoration.view.operation.id !== o.id ||
                   pendingRestoration.action !== 'create'))
@@ -452,6 +487,7 @@ function Record({
               command.busy ||
               !!command.uncertain ||
               !!pendingId ||
+              !!pendingRecomputeId ||
               (!!pendingRestoration && pendingRestoration.view.operation.id !== o.id)
             }
             onClick={() => restoration(view, 'cancel')}
@@ -461,6 +497,27 @@ function Record({
               ? '继续确认取消文件恢复请求'
               : '取消文件恢复请求'}
           </Button>
+        )}
+      {recompute && (view.canRecompute || pendingRecomputeId === o.id) && (
+        <Button
+          disabled={
+            command.busy ||
+            !!command.uncertain ||
+            !!pendingId ||
+            !!pendingRestoration ||
+            (!!pendingRecomputeId && pendingRecomputeId !== o.id)
+          }
+          onClick={() => recompute(view)}
+        >
+          {pendingRecomputeId === o.id ? '继续确认重新预检请求' : '使用新目标重新预检'}
+        </Button>
+      )}
+      {recompute &&
+        report &&
+        !view.canRecompute &&
+        !pendingRecomputeId &&
+        view.recomputeUnavailableReason && (
+          <p role="status">暂不能使用新目标重新预检：{view.recomputeUnavailableReason}</p>
         )}
       <details>
         <summary>操作历史（{o.history.length}）</summary>
@@ -479,16 +536,22 @@ function Record({
           ))}
         </ol>
       </details>
-      {view.canCancel && !pendingId && !pendingRestoration && !command.denied && (
-        <Button
-          disabled={command.busy || !!command.uncertain}
-          onClick={() =>
-            void command.send(`${path(o.taskId)}/${o.id}/cancel`, { expectedRevision: o.revision })
-          }
-        >
-          {o.application ? '取消应用请求' : '取消此预检'}
-        </Button>
-      )}
+      {view.canCancel &&
+        !pendingId &&
+        !pendingRestoration &&
+        !pendingRecomputeId &&
+        !command.denied && (
+          <Button
+            disabled={command.busy || !!command.uncertain}
+            onClick={() =>
+              void command.send(`${path(o.taskId)}/${o.id}/cancel`, {
+                expectedRevision: o.revision,
+              })
+            }
+          >
+            {o.application ? '取消应用请求' : '取消此预检'}
+          </Button>
+        )}
       <Feedback command={command} applicationCancel={!!o.application} />
     </article>
   );
@@ -1019,6 +1082,10 @@ function Records({
   pendingId,
   restoration,
   pendingRestoration,
+  recompute,
+  pendingRecomputeId,
+  inspect,
+  inspectId,
   denied,
   trial,
   selectedTrials,
@@ -1029,38 +1096,56 @@ function Records({
   pendingId?: string;
   restoration(view: IntegrationView, action: FileRestorationAction): void;
   pendingRestoration: FileRestorationEditorState | null;
+  recompute(view: IntegrationView): void;
+  pendingRecomputeId?: string;
+  inspect(id: string | null): void;
+  inspectId: string | null;
   denied(): void;
   trial(view: IntegrationView): void;
   selectedTrials: Record<string, string>;
   selectTrial(operationId: string, trialId: string): void;
 }) {
-  const read = useAssistanceRead<{ items: IntegrationView[] }>(path(task.id), 5000);
+  const read = useAssistanceRead<{ items: IntegrationView[] }>(
+    inspectId ? null : path(task.id),
+    5000,
+  );
+  const fixed = useAssistanceRead<IntegrationView>(
+    inspectId ? `${path(task.id)}/${encodeURIComponent(inspectId)}` : null,
+    5000,
+  );
+  const visible = inspectId
+    ? { ...fixed, value: fixed.value ? { items: [fixed.value] } : null }
+    : read;
   useEffect(() => {
-    if (read.denied) denied();
-  }, [read.denied]);
-  if (read.denied) return <p role="alert">读取权限已失效，预检内容已清除。</p>;
+    if (visible.denied) denied();
+  }, [visible.denied]);
+  if (visible.denied) return <p role="alert">读取权限已失效，预检内容已清除。</p>;
   return (
     <div className="dialog-body integration-form">
+      {inspectId && <Button onClick={() => inspect(null)}>返回全部预检记录</Button>}
       <p>
         从固定成果版本的“准备代码整合”选择来源与目标。这里保留每次预检、独立应用、文件恢复与取消记录。
       </p>
-      {read.error && (
+      {visible.error && (
         <p role="alert">
-          {read.error}
-          <Button onClick={read.retry}>重读整合预检</Button>
+          {visible.error}
+          <Button onClick={visible.retry}>重读整合预检</Button>
         </p>
       )}
-      {read.value ? (
-        read.value.items.length ? (
-          read.value.items.map((v) => (
+      {visible.value ? (
+        visible.value.items.length ? (
+          visible.value.items.map((v) => (
             <Record
               key={v.operation.id}
               view={v}
-              saved={read.retry}
+              saved={visible.retry}
               apply={apply}
               pendingId={pendingId}
               restoration={restoration}
               pendingRestoration={pendingRestoration}
+              recompute={recompute}
+              pendingRecomputeId={pendingRecomputeId}
+              inspect={inspect}
               trial={trial}
               selectedTrialId={selectedTrials[v.operation.id]}
               selectTrial={(trialId) => selectTrial(v.operation.id, trialId)}
@@ -1079,6 +1164,9 @@ function Records({
 function Entry({ task }: { task: Task }) {
   const { data } = useApp();
   const [open, setOpen] = useState(false),
+    [recompute, setRecompute] = useState<IntegrationView | null>(null),
+    [recomputeOpen, setRecomputeOpen] = useState(false),
+    [inspectId, setInspectId] = useState<string | null>(null),
     [application, setApplication] = useState<IntegrationView | null>(null),
     [applicationOpen, setApplicationOpen] = useState(false),
     [restoration, setRestoration] = useState<FileRestorationEditorState | null>(null),
@@ -1091,6 +1179,8 @@ function Entry({ task }: { task: Task }) {
   const editable = canEditTask(data, task);
   useEffect(() => {
     if (!editable) {
+      setRecompute(null);
+      setRecomputeOpen(false);
       setApplication(null);
       setApplicationCandidate(null);
       setApplicationOpen(false);
@@ -1100,6 +1190,9 @@ function Entry({ task }: { task: Task }) {
     }
   }, [editable]);
   const denied = () => {
+    setRecompute(null);
+    setRecomputeOpen(false);
+    setInspectId(null);
     setApplication(null);
     setApplicationCandidate(null);
     setApplicationOpen(false);
@@ -1124,9 +1217,25 @@ function Entry({ task }: { task: Task }) {
               task={task}
               pendingId={application?.operation.id}
               pendingRestoration={restoration}
+              pendingRecomputeId={recompute?.operation.id}
+              inspectId={inspectId}
+              inspect={setInspectId}
+              recompute={(view) => {
+                if (
+                  !editable ||
+                  application ||
+                  restoration ||
+                  (recompute && recompute.operation.id !== view.operation.id)
+                )
+                  return;
+                if (!recompute) setRecompute(structuredClone(view));
+                setOpen(false);
+                setRecomputeOpen(true);
+              }}
               restoration={(view, action) => {
                 if (
                   !editable ||
+                  recompute ||
                   application ||
                   (restoration &&
                     (restoration.view.operation.id !== view.operation.id ||
@@ -1143,13 +1252,14 @@ function Entry({ task }: { task: Task }) {
                 setSelectedTrials((old) => ({ ...old, [operationId]: trialId }))
               }
               trial={(view) => {
-                if (!editable || application || restoration) return;
+                if (!editable || application || restoration || recompute) return;
                 setTrial(structuredClone(view));
                 setOpen(false);
               }}
               apply={(view, candidate) => {
                 if (
                   !editable ||
+                  recompute ||
                   restoration ||
                   (application && application.operation.id !== view.operation.id)
                 )
@@ -1164,6 +1274,25 @@ function Entry({ task }: { task: Task }) {
             />
           )}
         </Dialog>
+      )}
+      {recompute && (
+        <IntegrationRecomputeEditor
+          key={recompute.operation.id}
+          initial={recompute}
+          open={recomputeOpen}
+          denied={denied}
+          close={(keepPending) => {
+            setRecomputeOpen(false);
+            if (!keepPending) setRecompute(null);
+            setOpen(true);
+          }}
+          saved={(created) => {
+            setRecompute(null);
+            setRecomputeOpen(false);
+            setInspectId(created.operation.id);
+            setOpen(true);
+          }}
+        />
       )}
       {application && (
         <ApplicationEditor

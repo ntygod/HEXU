@@ -25,6 +25,13 @@ export function attachIntegrations(app: FastifyInstance, store: Store) {
     reply.code(201).send(integrations.create(task(r), r.body, key(r))),
   );
   app.get(path + '/:integrationId', async (r) => integrations.get(task(r), id(r)));
+  app.get(path + '/:integrationId/recompute-options', async (r) => {
+    exact(r.query, []);
+    return integrations.recomputeOptions(task(r), id(r));
+  });
+  app.post(path + '/:integrationId/recompute', async (r, reply) =>
+    reply.code(201).send(integrations.recompute(task(r), id(r), r.body, key(r))),
+  );
   app.get(path + '/:integrationId/trials', async (r) => integrations.listTrials(task(r), id(r)));
   app.get(path + '/:integrationId/trials/:trialId', async (r) =>
     integrations.getTrial(task(r), id(r), nodeId((r.params as { trialId: string }).trialId)),

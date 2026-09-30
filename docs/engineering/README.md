@@ -48,6 +48,7 @@
 | 原已完成应用的全部文件，从精确原备份另行确认恢复 | [原应用文件恢复](integration-file-restoration.md) |
 | 选中新增/修改/删除，在新私有目录核对完整候选文件 | [独立目录试应用](integration-trial.md) |
 | 逐项明确采用来源/保留目标，生成固定候选并另行写回 | [整文件冲突选择](integration-conflict-choices.md) |
+| 保持原成果与同一目录，选择新检查点创建另一条只读预检 | [新目标重新预检](integration-target-recompute.md) |
 | 本机核对候选差异，另行共享并在Task查看不可变历史 | [候选差异](integration-trial-differences.md) |
 
 ## 架构决策

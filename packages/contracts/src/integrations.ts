@@ -156,6 +156,8 @@ export interface IntegrationOperation {
   applied: boolean;
   /** Absent in historical preflight-only records. */
   application?: IntegrationApplication | null;
+  /** Server-created historical link; never an execution permit or supersession. */
+  recomputedFrom?: string;
 }
 export interface IntegrationView {
   operation: IntegrationOperation;
@@ -171,6 +173,8 @@ export interface IntegrationView {
   completedReportHash?: string | null;
   canRestoreFiles?: boolean;
   canCancelFileRestoration?: boolean;
+  canRecompute?: boolean;
+  recomputeUnavailableReason?: string | null;
 }
 export interface IntegrationOptions {
   source: IntegrationSource;

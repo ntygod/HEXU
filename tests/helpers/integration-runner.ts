@@ -205,6 +205,8 @@ export async function integrationRunnerFixture(
       tr,
       base,
       targetCommit,
+      checkpoint,
+      retain,
       create,
       read,
       ask,

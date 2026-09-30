@@ -267,6 +267,7 @@ test('文件恢复固定原应用全量范围，过期材料不阻断目标权�
           .evaluate((el) => el.scrollWidth - el.clientWidth),
       )
       .toBeLessThanOrEqual(1);
+    await status(page).getByLabel('本机文件恢复命令').scrollIntoViewIfNeeded();
     await page.screenshot({
       path: 'artifacts/130-integration-file-restoration-command-mobile-light.png',
       fullPage: true,

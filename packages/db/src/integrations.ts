@@ -40,6 +40,10 @@ import {
   type IntegrationFileRestorationRecoveryObservation,
   type IntegrationFileRestorationRecoveryReceipt,
 } from '../../contracts/src/integration-restorations.js';
+import {
+  parseIntegrationRecomputeCreate,
+  type IntegrationRecomputeOptions,
+} from '../../contracts/src/integration-recompute.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import {
   evaluateIntegrationConflictSelection,
@@ -277,6 +281,169 @@ export class IntegrationStore {
       }
     return { source, taskRevision: task.revision, targets };
   }
+  private recomputeAuthority(o: IntegrationOperation) {
+    const task = this.owner(o);
+    if (
+      !o.report ||
+      o.report.integrationId !== o.id ||
+      o.report.inputHash !== o.inputHash ||
+      o.projectId !== task.projectId ||
+      o.spaceId !== task.spaceId ||
+      o.inputHash !==
+        codeHash({
+          id: o.id,
+          taskId: o.taskId,
+          source: o.source,
+          target: o.target,
+          material: o.material,
+        })
+    )
+      throw new DomainError(
+        'INTEGRATION_RECOMPUTE_UNAVAILABLE',
+        '需要原不可变预检报告与原固定范围',
+        409,
+      );
+    const source = this.source(o.taskId, o.source.resultId, o.source.revisionId);
+    const checkpoint = this.retained.checkpoints.get(o.taskId, o.target.checkpoint.id, true);
+    this.checkpointAuthority(o.taskId, checkpoint);
+    if (
+      canonicalJson(source) !== canonicalJson(o.source) ||
+      canonicalJson(checkpoint) !== canonicalJson(o.target.checkpoint)
+    )
+      throw new DomainError('INTEGRATION_SCOPE_CHANGED', '原来源版本或原目标目录授权已变化', 409);
+    return { task, source };
+  }
+  private recomputeEligible(o: IntegrationOperation) {
+    if (
+      o.application &&
+      ['queued', 'applying', 'needs_attention'].includes(o.state) &&
+      !this.recovery(o.id)
+    )
+      throw new DomainError(
+        'INTEGRATION_RECOMPUTE_BUSY',
+        '原应用仍待确认、进行中或需要处理；先明确取消或在原节点核对并结算，不能用新预检绕过',
+        409,
+      );
+    const restoration = this.restoration(o.id);
+    if (
+      restoration &&
+      ['queued', 'restoring', 'needs_attention'].includes(restoration.state) &&
+      !restoration.recovery
+    )
+      throw new DomainError(
+        'INTEGRATION_RECOMPUTE_BUSY',
+        '原文件恢复仍待确认或需要处理；先核对其独立状态与占用',
+        409,
+      );
+    this.idle(o.target);
+  }
+  private recomputeTarget(o: IntegrationOperation, target: IntegrationTarget) {
+    const old = o.target.checkpoint,
+      newer = target.checkpoint;
+    if (
+      newer.id === old.id ||
+      target.retentionId === o.target.retentionId ||
+      newer.request.nodeId !== old.request.nodeId ||
+      newer.request.workspaceId !== old.request.workspaceId ||
+      newer.request.requestedBy.id !== old.request.requestedBy.id ||
+      newer.request.nodeRevision !== old.request.nodeRevision ||
+      newer.manifest.objectFormat !== old.manifest.objectFormat ||
+      newer.manifest.repositoryIdentity !== old.manifest.repositoryIdentity
+    )
+      throw new DomainError(
+        'INTEGRATION_RECOMPUTE_TARGET',
+        '请选择原本人节点/同一目录的新检查点和恢复副本，不替换仓库身份',
+        409,
+      );
+  }
+  recomputeOptions(taskId: string, id: string): IntegrationRecomputeOptions {
+    const o = this.row(taskId, id),
+      { task, source } = this.recomputeAuthority(o);
+    this.recomputeEligible(o);
+    const cps = this.store.db
+      .prepare(
+        "SELECT id FROM commit_checkpoints WHERE task_id=? AND id!=? AND json_extract(body,'$.request.requestedBy.id')=? AND json_extract(body,'$.request.nodeId')=? AND json_extract(body,'$.request.workspaceId')=? ORDER BY rowid DESC LIMIT 50",
+      )
+      .all(
+        taskId,
+        o.target.checkpoint.id,
+        this.store.actorId,
+        o.target.checkpoint.request.nodeId,
+        o.target.checkpoint.request.workspaceId,
+      ) as { id: string }[];
+    const retained = this.retained.list(taskId, source.code.checkpoint.id).items,
+      transfers = this.store.db
+        .prepare(
+          'SELECT id FROM checkpoint_transfers WHERE task_id=? ORDER BY rowid DESC LIMIT 100',
+        )
+        .all(taskId) as { id: string }[];
+    const targets: IntegrationOptions['targets'] = [];
+    candidates: for (const cp of cps)
+      for (const r of this.retained.list(taskId, cp.id).items) {
+        if (targets.length >= 50) break candidates;
+        try {
+          const target = this.target(taskId, cp.id, r.request.id, true);
+          this.recomputeTarget(o, target);
+          this.idle(target);
+          const materials = [
+            ...retained.map((r) => ({ kind: 'retention' as const, id: r.request.id })),
+            ...transfers.map((t) => ({ kind: 'transfer' as const, id: t.id })),
+          ].flatMap((m) => {
+            try {
+              return [this.material(taskId, source, target, m, true)];
+            } catch (e) {
+              if (e instanceof DomainError) return [];
+              throw e;
+            }
+          });
+          if (materials.length) targets.push({ target, materials });
+        } catch (e) {
+          if (!(e instanceof DomainError)) throw e;
+        }
+      }
+    return {
+      source,
+      taskRevision: task.revision,
+      originalRevision: o.revision,
+      reportHash: codeHash(o.report),
+      originalTarget: o.target,
+      targets,
+    };
+  }
+  recompute(taskId: string, id: string, input: unknown, key: string) {
+    const data = parseIntegrationRecomputeCreate(input),
+      o = this.row(taskId, id);
+    this.recomputeAuthority(o);
+    const create = {
+      resultId: o.source.resultId,
+      resultRevisionId: o.source.revisionId,
+      targetCheckpointId: data.targetCheckpointId,
+      targetRetentionId: data.targetRetentionId,
+      sourceMaterial: data.sourceMaterial,
+      expectedTaskRevision: data.expectedTaskRevision,
+      confirmPreflight: true as const,
+    };
+    // Current original + newly selected authority before even an exact receipt;
+    // expiry or a later original revision does not replay creation.
+    const inspected = this.inputs(taskId, create, false);
+    this.recomputeTarget(o, inspected.target);
+    const receipt = this.store.mutate(`integration.recompute:${id}`, key, data, () => {
+      const original = this.row(taskId, id),
+        { task } = this.recomputeAuthority(original);
+      assertRevision(original.revision, data.expectedRevision);
+      assertRevision(task.revision, data.expectedTaskRevision);
+      if (codeHash(original.report) !== data.reportHash)
+        throw new DomainError('INTEGRATION_REPORT_MISMATCH', '需明确核对原不可变预检报告', 409);
+      this.recomputeEligible(original);
+      const inputs = this.inputs(taskId, create, true);
+      this.recomputeTarget(original, inputs.target);
+      this.idle(inputs.target);
+      if (canonicalJson(inputs.source) !== canonicalJson(original.source))
+        throw new DomainError('INTEGRATION_SCOPE_CHANGED', '新预检不能改用最新或其他来源版本', 409);
+      return this.insertQueued(taskId, inputs, id);
+    });
+    return this.get(taskId, receipt.id);
+  }
   private row(taskId: string, id: string): IntegrationOperation {
     this.task(taskId);
     const r = this.store.db
@@ -292,7 +459,9 @@ export class IntegrationStore {
       canApply = false,
       canTrial = false,
       canRestoreFiles = false,
-      canCancelFileRestoration = false;
+      canCancelFileRestoration = false,
+      canRecompute = false,
+      recomputeUnavailableReason: string | null = null;
     const taskRevision = this.task(o.taskId).revision,
       recovery = this.recovery(o.id),
       restoration = this.restoration(o.id);
@@ -355,6 +524,16 @@ export class IntegrationStore {
     } catch (e) {
       if (!(e instanceof DomainError)) throw e;
     }
+    if (!targetOnly) {
+      try {
+        this.recomputeAuthority(o);
+        this.recomputeEligible(o);
+        canRecompute = true;
+      } catch (e) {
+        if (!(e instanceof DomainError)) throw e;
+        recomputeUnavailableReason = e.message;
+      }
+    }
     return {
       operation: o,
       available,
@@ -369,6 +548,8 @@ export class IntegrationStore {
       completedReportHash,
       canRestoreFiles,
       canCancelFileRestoration,
+      canRecompute,
+      recomputeUnavailableReason,
     };
   }
   private trialHistoryAccess(taskId: string, id: string) {
@@ -569,43 +750,53 @@ export class IntegrationStore {
       const task = this.task(taskId, true);
       assertRevision(task.revision, data.expectedTaskRevision);
       const inputs = this.inputs(taskId, data, true);
-      const n = this.store.db
-        .prepare('SELECT COUNT(*) AS n FROM integration_operations WHERE task_id=?')
-        .get(taskId) as { n: number };
-      if (n.n >= INTEGRATION_LIMITS.history)
-        throw new DomainError('INTEGRATION_LIMIT', '本任务已达100条预检记录', 409);
-      const createdAt = new Date().toISOString(),
-        id = randomUUID();
-      const o: IntegrationOperation = {
-        id,
-        taskId,
-        projectId: task.projectId!,
-        spaceId: task.spaceId,
-        ...inputs,
-        inputHash: codeHash({ id, taskId, ...inputs }),
-        createdBy: { id: this.store.actorId, name: this.store.actorName() },
-        createdAt,
-        revision: 1,
-        state: 'queued',
-        report: null,
-        application: null,
-        history: [{ revision: 1, state: 'queued', at: createdAt, actorId: this.store.actorId }],
-        applied: false,
-      };
-      this.store.db
-        .prepare('INSERT INTO integration_operations VALUES(?,?,?,?,?,?)')
-        .run(
-          id,
-          taskId,
-          inputs.target.checkpoint.request.nodeId,
-          o.state,
-          o.revision,
-          JSON.stringify(o),
-        );
-      this.save(o);
-      return { id };
+      return this.insertQueued(taskId, inputs);
     });
     return this.get(taskId, receipt.id);
+  }
+  /** Called only inside the caller's mutation; no nested transaction. */
+  private insertQueued(
+    taskId: string,
+    inputs: { source: IntegrationSource; target: IntegrationTarget; material: IntegrationMaterial },
+    recomputedFrom?: string,
+  ) {
+    const task = this.task(taskId, true);
+    const n = this.store.db
+      .prepare('SELECT COUNT(*) AS n FROM integration_operations WHERE task_id=?')
+      .get(taskId) as { n: number };
+    if (n.n >= INTEGRATION_LIMITS.history)
+      throw new DomainError('INTEGRATION_LIMIT', '本任务已达100条预检记录', 409);
+    const createdAt = new Date().toISOString(),
+      id = randomUUID();
+    const o: IntegrationOperation = {
+      id,
+      taskId,
+      projectId: task.projectId!,
+      spaceId: task.spaceId,
+      ...inputs,
+      inputHash: codeHash({ id, taskId, ...inputs }),
+      createdBy: { id: this.store.actorId, name: this.store.actorName() },
+      createdAt,
+      revision: 1,
+      state: 'queued',
+      report: null,
+      application: null,
+      history: [{ revision: 1, state: 'queued', at: createdAt, actorId: this.store.actorId }],
+      applied: false,
+      ...(recomputedFrom ? { recomputedFrom } : {}),
+    };
+    this.store.db
+      .prepare('INSERT INTO integration_operations VALUES(?,?,?,?,?,?)')
+      .run(
+        id,
+        taskId,
+        inputs.target.checkpoint.request.nodeId,
+        o.state,
+        o.revision,
+        JSON.stringify(o),
+      );
+    this.save(o);
+    return { id };
   }
   private owner(o: IntegrationOperation) {
     const task = this.task(o.taskId, true);

@@ -54,3 +54,10 @@
 全保留目标可形成0变化候选并共享决策，但不创建空application、取原目标写锁或伪报completed。保留目标项不进入实际备份/恢复；未知或未选冲突仍未处理。原path_collision及最终并集的目录/大小写/NFC碰撞继续拒绝。界面重新核对不是目标重算；后续新目标需新固定检查点/恢复副本、新操作和新确认，不覆写旧预检，不自动commit/reset/stash。
 
 核心：[决策契约](../../packages/contracts/src/integration-conflict-selection.ts)、[纯有效变更](../../packages/domain/src/integration-conflict-selection.ts)、[完整候选](../../apps/runner/src/agent/integration-trial-plan.ts)。检查：[纯规则](../../tests/integration-conflict-selection.test.ts)、[服务](../../tests/integration-conflict-service.test.ts)、[真实流程](../../tests/integration-conflict-runner.test.ts)、[重放](../../tests/integration-conflict-replay.test.ts)、[页面](../../tests/e2e/integration-conflict-selection.spec.ts)。
+
+
+## 固定原来源的新目标重新预检
+
+[专用入口](../engineering/integration-target-recompute.md)从原不可变报告派生精确原来源/共同起点与原本人节点/目录身份，只允许选择新的检查点/恢复副本及当前兼容来源材料。旧材料到期与当前授权分开；当前原来源/目标、新材料授权先于精确回执，创建事务内再核对修订、未结算应用/恢复和新鲜材料。新queued操作、事件/outbox/回执原子，原历史/候选/选择/应用/恢复/Task均不改写。recomputedFrom仅作历史链接，不改现有执行输入hash或升级写入许可。
+
+不新增节点协议、锁接管或恢复系统。原待发预检包必须先原样对账，新ID不改投旧包；原应用/恢复的明确保留结算不等于目录当前空闲，既有本机占用/身份/完整对象/干净提交检查继续阻止后来写入者和用户修改。界面两个材料选项不默认，未知请求跨关闭保留body/key，临时失败保留但禁提交，明确重核清除确认，撤权清除；新候选与写回重新选择。验证入口：[服务](../../tests/integration-recompute.test.ts)、[真实Git](../../tests/integration-recompute-runner.test.ts)、[页面](../../tests/e2e/integration-recompute.spec.ts)。
