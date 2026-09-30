@@ -3,6 +3,7 @@ import { attachHandoffs } from './handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
+import { MemberResultVersions } from '../../../packages/db/src/member-result-versions.js';
 import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-inputs.js';
 import { ResultFeedbackFollowUps } from '../../../packages/db/src/result-feedback-followups.js';
 import { attachAssistance } from './assistance.js';
@@ -741,6 +742,20 @@ export async function createApp(
   app.get('/api/v1/results/:resultId', async (request) => {
     return new ResultRevisions(store).detail(param(request.params, 'resultId'));
   });
+  app.get('/api/v1/results/:resultId/member-version-preview', async (request) =>
+    new MemberResultVersions(store).preview(param(request.params, 'resultId')),
+  );
+  app.post('/api/v1/results/:resultId/versions', { bodyLimit: 96 * 1024 }, async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        new MemberResultVersions(store).save(
+          param(request.params, 'resultId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
   app.get('/api/v1/results/:resultId/versions/:revisionId', async (request) =>
     new ResultRevisions(store).detail(
       param(request.params, 'resultId'),

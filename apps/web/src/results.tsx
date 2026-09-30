@@ -1,4 +1,5 @@
 import type { BranchResultSource } from '../../../packages/contracts/src/results.js';
+import { MemberResultVersions } from './member-result-versions.js';
 import { CodeFeedbackEntry } from './result-code-feedback.js';
 import { useEffect, useState } from 'react';
 import type { ResultDetail } from '../../../packages/contracts/src/results.js';
@@ -123,6 +124,7 @@ export function ResultPage({
           </p>
         </div>
         <div className="flex-line">
+          <MemberResultVersions detail={value} />
           <Link className="button secondary" to={`/tasks/${task.id}`}>
             <Icon name="arrow" />
             继续处理

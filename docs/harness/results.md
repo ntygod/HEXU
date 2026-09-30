@@ -4,7 +4,7 @@
 
 ## 入口与不变量
 
-- [契约](../../packages/contracts/src/results.ts)、[版本仓储](../../packages/db/src/result-revisions.ts)与[成果页](../../apps/web/src/results.tsx)复用现有 Result。Result 是当前投影，ResultRevision 不可变；普通分享创建初始版本，方案后续保存追加版本，不覆盖正文历史。
+- [契约](../../packages/contracts/src/results.ts)、[版本仓储](../../packages/db/src/result-revisions.ts)与[成果页](../../apps/web/src/results.tsx)复用现有 Result。Result 是当前投影，ResultRevision 不可变；普通分享创建初始版本；[普通文字修订](../engineering/member-result-versions.md)和方案后续保存分别明确追加版本，不覆盖正文历史。普通修订保留原Result，固定revisionId/版本号基线、当前编辑者署名，不剥离方案来源；沿用100版上限，原幂等回执仍指向原不可变版本。
 - [方案保存](../../packages/db/src/work-branch-results.ts)核对 Task/分支/Run/dispatch/已登记现场。只接受明确终态与终止确认；来源取固定命令及已共享事件，不用 Task 的混合消息列表推断来源 Run。失败和取消保留原状态，不改成工具成功。
 - [只读来源预览](../../packages/db/src/work-branch-result-source.ts)保留兼容接口和24 KiB共享输出前缀，与固定成果的6000字符/终态文本优先展示分别表述。两者共用持久结算边界和`shared:false`排除；旧边界未知时不补推输出，预览不是保存回执。合并修改复用[接口一致性检查](../../tests/work-branch-result-merge.test.ts)。
 - `terminal_sequence` 固定结算边界；`shared:false` 的撤权/迟到事件不采用。没有可靠旧边界时保留缺失事实，不追认未知历史输出。输出有预算和截取标志，不等同完整日志。
