@@ -116,8 +116,42 @@ test('固定代码行号和增删定位、键盘展开上下文、两侧全文�
     await d.screenshot({ path: 'artifacts/144-readable-line-diff-dark.png' });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
     await page.setViewportSize({ width: 390, height: 844 });
-    await table.scrollIntoViewIfNeeded();
-    await d.screenshot({ path: 'artifacts/145-readable-line-diff-mobile-light.png' });
+    // An element screenshot of a file taller than the viewport scrolls the
+    // element's top under fixed navigation. Check normal viewport interaction
+    // and capture the controls and changed lines as two actual mobile views.
+    const lineButton = d.getByRole('button', { name: '行级差异', exact: true });
+    const fullButton = d.getByRole('button', { name: '两侧全文', exact: true });
+    await lineButton.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    for (const button of [lineButton, fullButton]) {
+      expect(
+        await button.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const inset = Math.min(8, box.height / 4, box.width / 4);
+          const points = [
+            [box.x + box.width / 2, box.y + inset],
+            [box.x + box.width / 2, box.bottom - inset],
+            [box.x + inset, box.y + box.height / 2],
+            [box.right - inset, box.y + box.height / 2],
+            [box.x + box.width / 2, box.y + box.height / 2],
+          ];
+          return (
+            box.top >= 0 &&
+            box.bottom <= innerHeight &&
+            points.every(([x, y]) => element.contains(document.elementFromPoint(x!, y!)))
+          );
+        }),
+      ).toBe(true);
+    }
+    await fullButton.click();
+    await expect(d.locator('pre').last()).toHaveText(after);
+    await lineButton.click();
+    await lineButton.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: 'artifacts/145-readable-line-diff-mobile-light.png' });
+    await table
+      .locator('.code-diff-addition')
+      .last()
+      .evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: 'artifacts/146-readable-line-diff-mobile-changes.png' });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
