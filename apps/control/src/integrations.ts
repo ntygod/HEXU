@@ -42,5 +42,8 @@ export function attachIntegrations(app: FastifyInstance, store: Store) {
   app.post('/runner/v1/integration-apply-publish', async (r) =>
     integrations.publishApplication(token(r), r.body),
   );
+  app.post('/runner/v1/integration-recovery-publish', async (r) =>
+    integrations.publishRecovery(token(r), r.body),
+  );
   app.post('/runner/v1/integration-publish', async (r) => integrations.publish(token(r), r.body));
 }

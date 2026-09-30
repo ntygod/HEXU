@@ -9,6 +9,7 @@ import {
   parseIntegrationCreate,
   parseIntegrationApply,
   parseIntegrationApplicationReport,
+  parseIntegrationRecoveryReport,
   parseIntegrationReport,
   type IntegrationOperation,
   type IntegrationSource,
@@ -16,6 +17,7 @@ import {
   type IntegrationMaterial,
   type IntegrationView,
   type IntegrationOptions,
+  type IntegrationRecoveryObservation,
 } from '../../contracts/src/integrations.js';
 import { assertRevision, canonicalJson } from '../../domain/src/index.js';
 import { CheckpointTransferStore } from './checkpoint-transfer.js';
@@ -263,7 +265,8 @@ export class IntegrationStore {
       unavailableReason: string | null = null,
       canCancel = false,
       canApply = false;
-    const taskRevision = this.task(o.taskId).revision;
+    const taskRevision = this.task(o.taskId).revision,
+      recovery = this.recovery(o.id);
     // Metadata/history remains readable after material expiry or node revocation.
     try {
       this.authority(o, true);
@@ -276,6 +279,7 @@ export class IntegrationStore {
       this.owner(o);
       this.authority(o, false);
       canCancel =
+        !recovery &&
         ['queued', 'awaiting_choice', 'conflict'].includes(o.state) &&
         !o.application?.reports.length;
       canApply =
@@ -296,7 +300,18 @@ export class IntegrationStore {
       canApply,
       taskRevision,
       reportHash: o.report ? codeHash(o.report) : null,
+      recovery,
     };
+  }
+  private recovery(id: string): IntegrationRecoveryObservation | null {
+    const row = this.store.db
+      .prepare(
+        'SELECT body,hash,received_at FROM integration_recovery_observations WHERE integration_id=?',
+      )
+      .get(id) as { body: string; hash: string; received_at: string } | undefined;
+    return row
+      ? { report: JSON.parse(row.body), hash: row.hash, receivedAt: row.received_at }
+      : null;
   }
   get(taskId: string, id: string) {
     return this.view(this.row(taskId, id));
@@ -447,6 +462,12 @@ export class IntegrationStore {
       this.owner(o);
       this.authority(o, false);
       assertRevision(o.revision, expectedRevision);
+      if (this.recovery(o.id))
+        throw new DomainError(
+          'INTEGRATION_RECOVERY_FIXED',
+          '本次应用已记录本机结算观察，不能再以未进入写入阶段取消',
+          409,
+        );
       if (
         !['queued', 'awaiting_choice', 'conflict'].includes(o.state) ||
         o.application?.reports.length
@@ -484,6 +505,97 @@ export class IntegrationStore {
   }
   inspect(token: string, id: string) {
     return this.forNode(token, id, (o) => this.view(o));
+  }
+  publishRecovery(token: string, input: unknown) {
+    const report = parseIntegrationRecoveryReport(input),
+      hash = codeHash(report);
+    return this.store.atomic(() => {
+      // This observation releases only an old local claim. Recheck the original target
+      // and Task authority before any receipt, without requiring source material access.
+      const n = this.retained.checkpoints.nodes.settlementIdentity(token);
+      if (n.settlementOnly) throw new DomainError('NODE_REVOKED', '节点或项目权限已撤销', 401);
+      const row = this.store.db
+        .prepare('SELECT task_id,node_id FROM integration_operations WHERE id=?')
+        .get(report.integrationId) as { task_id: string; node_id: string } | undefined;
+      if (!row || row.node_id !== n.id)
+        throw new DomainError('NOT_FOUND', '整合不属于此原目标节点', 404);
+      const user = this.store.db
+        .prepare('SELECT id,name,email FROM collab_people WHERE id=?')
+        .get(n.owner_id) as unknown as IdentityUser | undefined;
+      if (!user) throw new DomainError('NODE_REVOKED', '原目标节点所有者已不可访问', 401);
+      return this.store.as({ user, spaceId: n.space_id }, () => {
+        const o = this.row(row.task_id, report.integrationId),
+          task = this.owner(o),
+          a = o.application,
+          target = o.target.checkpoint;
+        this.checkpointAuthority(o.taskId, target);
+        if (
+          o.id !== report.integrationId ||
+          o.taskId !== row.task_id ||
+          o.projectId !== task.projectId ||
+          o.spaceId !== task.spaceId ||
+          target.request.nodeId !== n.id ||
+          o.inputHash !==
+            codeHash({
+              id: o.id,
+              taskId: o.taskId,
+              source: o.source,
+              target: o.target,
+              material: o.material,
+            }) ||
+          o.inputHash !== report.integrationInputHash ||
+          !a ||
+          a.id !== report.applicationId ||
+          a.inputHash !== report.applicationInputHash ||
+          a.inputHash !==
+            codeHash({
+              integrationId: o.id,
+              applicationId: a.id,
+              reportHash: a.reportHash,
+              paths: a.paths,
+            }) ||
+          !o.report ||
+          a.reportHash !== codeHash(o.report) ||
+          report.recordedAddedCount > a.paths.length ||
+          report.stoppedConfirmedAt < a.requestedAt ||
+          report.releasedAt < report.stoppedConfirmedAt ||
+          Date.parse(report.releasedAt) > Date.now() + 60000
+        )
+          throw new DomainError(
+            'INTEGRATION_RECOVERY_MISMATCH',
+            '结算观察与原整合、应用范围或时间不匹配',
+            409,
+          );
+        const old = this.recovery(o.id);
+        if (old) {
+          if (old.hash !== hash || canonicalJson(old.report) !== canonicalJson(report))
+            throw new DomainError('INTEGRATION_RECOVERY_FIXED', '原应用的结算观察不能替换', 409);
+          return {
+            integrationId: o.id,
+            applicationId: a.id,
+            recoveryId: report.recoveryId,
+            hash: old.hash,
+            receivedAt: old.receivedAt,
+          };
+        }
+        const receivedAt = new Date().toISOString();
+        this.store.db
+          .prepare(
+            'INSERT INTO integration_recovery_observations(integration_id,application_id,recovery_id,hash,received_at,body) VALUES(?,?,?,?,?,?)',
+          )
+          .run(o.id, a.id, report.recoveryId, hash, receivedAt, JSON.stringify(report));
+        this.store.db
+          .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')
+          .run(o.taskId, 'integration.recovery_observed', receivedAt, o.spaceId);
+        return {
+          integrationId: o.id,
+          applicationId: a.id,
+          recoveryId: report.recoveryId,
+          hash,
+          receivedAt,
+        };
+      });
+    });
   }
   publishApplication(token: string, input: unknown) {
     const report = parseIntegrationApplicationReport(input),

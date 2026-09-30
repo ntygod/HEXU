@@ -24,90 +24,31 @@ import { verifyCleanCommit } from './committed-workspace.js';
 import { assertCodeQuiescent } from './result-code.js';
 import { buildIntegrationPlan } from './integration-plan.js';
 import { integrationAdditions } from './integration-application-plan.js';
-import { inspectRestoreTarget, type RestoreEntry } from './checkpoint-restore-plan.js';
+import { inspectRestoreTarget } from './checkpoint-restore-plan.js';
 import { PinnedRestoreParent } from './checkpoint-restore-files.js';
 import { checkIntegrationAddHelper, publishIntegrationAddition } from './integration-add-files.js';
 import { WorkspaceLease } from '../workspace-lease.js';
 import { terminalLabel } from './terminal-label.js';
+import {
+  validateLocalShape,
+  parseLocalApplicationRecord,
+  type LocalApplication,
+} from './integration-application-record.js';
+export { validateLocalShape, type LocalApplication } from './integration-application-record.js';
+import {
+  freezeIntegrationRecoveryContext,
+  validateRecoveryContextBinding,
+} from './integration-recovery-context.js';
+import {
+  hasSettledIntegrationRecovery,
+  readLocalIntegrationRecovery,
+} from './integration-recovery-journal.js';
 
 const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).digest('hex');
 const inside = (a: string, b: string) => {
   const r = relative(a, b);
   return !r || (!isAbsolute(r) && r !== '..' && !r.startsWith('..' + sep));
 };
-type Added = RestoreEntry & { identity: string };
-export interface LocalApplication {
-  binding: string;
-  integrationId: string;
-  applicationId: string;
-  inputHash: string;
-  root: string;
-  phase: 'prepared' | 'applying' | 'completed' | 'failed' | 'needs_attention';
-  added: Added[];
-  intent: string | null;
-  pending: IntegrationApplicationReport | null;
-  acknowledged: number;
-}
-export function validateLocalShape(record: LocalApplication) {
-  const invalid = () =>
-    new DomainError('INTEGRATION_JOURNAL_INVALID', '本机应用证据不完整或不一致；保留原凭证和写锁');
-  const path = (value: unknown) =>
-    typeof value === 'string' &&
-    Buffer.byteLength(value) <= 4096 &&
-    !/[\\\p{Cc}\p{Cf}]/u.test(value) &&
-    !value.split('/').some((p) => !p || p === '.' || p === '..' || p.toLowerCase() === '.git');
-  if (
-    !record ||
-    typeof record !== 'object' ||
-    typeof record.root !== 'string' ||
-    !isAbsolute(record.root) ||
-    resolve(record.root) !== record.root ||
-    Buffer.byteLength(record.root) > 4096 ||
-    /[\p{Cc}\p{Cf}]/u.test(record.root) ||
-    typeof record.binding !== 'string' ||
-    typeof record.inputHash !== 'string' ||
-    !/^[a-f0-9]{64}$/.test(record.binding) ||
-    !/^[a-f0-9]{64}$/.test(record.inputHash) ||
-    !['prepared', 'applying', 'completed', 'failed', 'needs_attention'].includes(record.phase) ||
-    !Array.isArray(record.added) ||
-    record.added.length > 80 ||
-    ![0, 1, 2].includes(record.acknowledged) ||
-    (record.intent !== null && !path(record.intent))
-  )
-    throw invalid();
-  try {
-    nodeId(record.integrationId);
-    nodeId(record.applicationId);
-  } catch {
-    throw invalid();
-  }
-  const seen = new Set<string>();
-  for (const entry of record.added) {
-    if (
-      !entry ||
-      !path(entry.path) ||
-      seen.has(entry.path) ||
-      entry.kind !== 'file' ||
-      !['100644', '100755'].includes(entry.gitMode) ||
-      typeof entry.objectId !== 'string' ||
-      !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(entry.objectId) ||
-      !Number.isSafeInteger(entry.bytes) ||
-      entry.bytes < 0 ||
-      entry.bytes > 8 * 1024 * 1024 ||
-      typeof entry.identity !== 'string' ||
-      !/^\d+:\d+$/.test(entry.identity)
-    )
-      throw invalid();
-    seen.add(entry.path);
-  }
-  if (record.pending !== null) {
-    try {
-      parseIntegrationApplicationReport(record.pending);
-    } catch {
-      throw invalid();
-    }
-  }
-}
 function validateLocalApplication(record: LocalApplication, operation: IntegrationOperation) {
   validateLocalShape(record);
   const application = operation.application!;
@@ -194,19 +135,50 @@ export async function withSettledIntegrationEvidence<T>(
 ): Promise<T> {
   const storage = new AgentStorage(join(home, 'integration-application'));
   try {
-    if (storage.db.prepare("SELECT 1 FROM sqlite_master WHERE name='applications'").get()) {
+    const applicationsExist = storage.db
+      .prepare("SELECT 1 FROM sqlite_master WHERE name='applications'")
+      .get();
+    const recoveriesExist = storage.db
+      .prepare("SELECT 1 FROM sqlite_master WHERE name='integration_recoveries'")
+      .get();
+    if (
+      !applicationsExist &&
+      recoveriesExist &&
+      storage.db.prepare('SELECT 1 FROM integration_recoveries LIMIT 1').get()
+    )
+      throw new DomainError('INTEGRATION_UNSETTLED', '结算记录缺少原应用证据；保留原凭证');
+    if (applicationsExist) {
       const rows = storage.db.prepare('SELECT id,body FROM applications').all() as {
         id: string;
         body: string;
       }[];
+      if (
+        storage.db.prepare("SELECT 1 FROM sqlite_schema WHERE name='integration_recoveries'").get()
+      ) {
+        const ids = new Set(
+          rows.map((row) => parseLocalApplicationRecord(row.body, row.id).applicationId),
+        );
+        for (const recovery of storage.db
+          .prepare('SELECT application_id FROM integration_recoveries')
+          .all())
+          if (!ids.has(recovery.application_id as string))
+            throw new DomainError('INTEGRATION_UNSETTLED', '结算记录缺少原应用证据；保留原凭证');
+      }
       for (const row of rows) {
         let r: LocalApplication;
         try {
-          r = JSON.parse(row.body) as LocalApplication;
-          validateLocalShape(r);
+          r = parseLocalApplicationRecord(row.body, row.id);
           if (r.integrationId !== row.id) throw new Error('Journal identity mismatch');
         } catch {
           throw new DomainError('INTEGRATION_UNSETTLED', '应用日志无效，不能删除原凭证');
+        }
+        const recovery = readLocalIntegrationRecovery(storage.db, r);
+        if (recovery) {
+          if (hasSettledIntegrationRecovery(storage.db, r)) continue;
+          throw new DomainError(
+            'INTEGRATION_UNSETTLED',
+            '本机结算或原应用仍有未确认回执；保留原凭证',
+          );
         }
         if (
           !r ||
@@ -381,6 +353,7 @@ export async function applyIntegration(
     };
     if (record) {
       validateLocalApplication(record, o);
+      if (record.recoveryContext) validateRecoveryContextBinding(record, c);
       if (
         record.binding !== binding ||
         record.applicationId !== a.id ||
@@ -389,6 +362,17 @@ export async function applyIntegration(
       )
         throw new DomainError('INTEGRATION_SCOPE_CHANGED', '本机应用日志与原身份或目标不一致');
       log('只对账原应用证据；不会再次写入、续写、删除文件或自动回滚。');
+      if (readLocalIntegrationRecovery(journal.db, record)) {
+        // A recovery freezes original history separately. Reconcile only the
+        // already-durable application packet; never synthesize new stages or
+        // inspect/release any current workspace claim.
+        await publish();
+        return {
+          integrationId,
+          state: record.phase,
+          appliedPaths: record.added.map((entry) => entry.path),
+        };
+      }
       if (record.phase === 'prepared' || record.phase === 'applying') {
         // First reconcile the original start packet, then record the interruption.
         // If cancellation definitively won before start, no write ever began.
@@ -423,6 +407,14 @@ export async function applyIntegration(
       await publish();
       return { integrationId, state: record.phase, appliedPaths: record.added.map((e) => e.path) };
     }
+    if (
+      journal.db.prepare("SELECT 1 FROM sqlite_schema WHERE name='integration_recoveries'").get() &&
+      journal.db.prepare('SELECT 1 FROM integration_recoveries WHERE application_id=?').get(a.id)
+    )
+      throw new DomainError(
+        'INTEGRATION_RECOVERY_INVALID',
+        '原结算存在但原应用记录缺失；不重新建立写入',
+      );
     if (!original.available || o.state !== 'queued' || a.reports.length)
       throw new DomainError(
         'INTEGRATION_UNAVAILABLE',
@@ -531,6 +523,7 @@ export async function applyIntegration(
         intent: null,
         pending: null,
         acknowledged: 0,
+        recoveryContext: freezeIntegrationRecoveryContext(o, c),
       };
       try {
         save();

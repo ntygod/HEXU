@@ -3,11 +3,13 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import { nodeId } from '../../../../packages/contracts/src/nodes.js';
-import { parseIntegrationApplicationReport } from '../../../../packages/contracts/src/integrations.js';
-import { canonicalJson } from '../../../../packages/domain/src/index.js';
 import { readCredentials } from './storage.js';
 import { restoreBinding, restorePrivatePath } from './checkpoint-restore-preflight.js';
-import { validateLocalShape, type LocalApplication } from './integration-application.js';
+import {
+  parseLocalApplicationRecord,
+  type LocalApplication,
+} from './integration-application-record.js';
+import { validateRecoveryContextBinding } from './integration-recovery-context.js';
 
 const invalid = () =>
   new DomainError('INTEGRATION_JOURNAL_INVALID', '本机应用证据不完整或不一致；保留原凭证和写锁');
@@ -17,83 +19,6 @@ const inside = (parent: string, child: string) => {
   const path = relative(parent, child);
   return !path || (!isAbsolute(path) && path !== '..' && !path.startsWith('..' + sep));
 };
-const exact = (value: object, keys: string[]) =>
-  Object.keys(value).length === keys.length &&
-  Object.keys(value).every((key) => keys.includes(key));
-
-/** Validate only what the journal actually records. There is no saved operation
- * plan here, so this cannot establish current directory contents or permissions. */
-function parseRecord(body: unknown, integrationId: string): LocalApplication {
-  try {
-    if (typeof body !== 'string') throw invalid();
-    const record = JSON.parse(body) as LocalApplication;
-    validateLocalShape(record);
-    if (
-      !exact(record, [
-        'binding',
-        'integrationId',
-        'applicationId',
-        'inputHash',
-        'root',
-        'phase',
-        'added',
-        'intent',
-        'pending',
-        'acknowledged',
-      ]) ||
-      record.integrationId !== integrationId ||
-      nodeId(record.applicationId) !== record.applicationId ||
-      record.added.some(
-        (entry) => !exact(entry, ['path', 'kind', 'objectId', 'gitMode', 'bytes', 'identity']),
-      ) ||
-      record.added.some((entry) => entry.path === record.intent)
-    )
-      throw invalid();
-
-    const pending = record.pending && parseIntegrationApplicationReport(record.pending);
-    if (
-      pending &&
-      (pending.integrationId !== record.integrationId ||
-        pending.applicationId !== record.applicationId ||
-        pending.inputHash !== record.inputHash ||
-        pending.sequence !== record.acknowledged + 1 ||
-        pending.stage !== (record.phase === 'prepared' ? 'applying' : record.phase) ||
-        canonicalJson(pending.appliedPaths) !==
-          canonicalJson(record.added.map((entry) => entry.path).sort()))
-    )
-      throw invalid();
-
-    switch (record.phase) {
-      case 'prepared':
-        // The start ACK is persisted before the following phase update, so a
-        // concurrent observer can legitimately see prepared + acknowledged=1.
-        if (record.added.length || record.intent !== null || record.acknowledged > 1)
-          throw invalid();
-        break;
-      case 'applying':
-        if (record.acknowledged !== 1 || pending) throw invalid();
-        break;
-      case 'completed':
-        if (
-          !record.added.length ||
-          record.intent !== null ||
-          (pending ? record.acknowledged !== 1 : record.acknowledged !== 2)
-        )
-          throw invalid();
-        break;
-      case 'failed':
-        if (record.added.length || record.intent !== null) throw invalid();
-        break;
-      case 'needs_attention':
-        if (pending ? record.acknowledged !== 1 : record.acknowledged !== 2) throw invalid();
-        break;
-    }
-    return record;
-  } catch {
-    throw invalid();
-  }
-}
-
 /** Opening a read-only WAL database can create a shared-memory sidecar. The
  * application writer uses rollback journals; reject other formats before SQLite
  * opens anything. Never use immutable=1: it would ignore an active writer. */
@@ -200,7 +125,8 @@ export function readIntegrationApplicationStatus(home: string, integrationId: st
         '原本机日志中没有该整合应用；没有创建记录',
       );
     if (row.id !== integrationId) throw invalid();
-    record = parseRecord(row.body, integrationId);
+    record = parseLocalApplicationRecord(row.body, integrationId);
+    if (record.recoveryContext) validateRecoveryContextBinding(record, credentials);
     const registered = credentials.directories.filter((entry) => entry.root === record.root);
     if (
       record.binding !== binding ||

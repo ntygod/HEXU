@@ -69,8 +69,12 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
       </p>
       {o.state === 'queued' && (
         <>
-          <p>等待本人在目标节点确认应用。请求已保存，尚未收到写入阶段声明。</p>
-          {view.available && (
+          <p>
+            {view.recovery
+              ? '原应用请求仍为排队状态，服务端尚未收到写入阶段声明；下方本机结算观察不改写原应用记录。'
+              : '等待本人在目标节点确认应用。请求已保存，尚未收到写入阶段声明。'}
+          </p>
+          {view.available && !view.recovery && (
             <>
               <code>
                 npm run runner:integration-apply -- --operation {o.id} --state &lt;节点状态目录&gt;
@@ -84,7 +88,9 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
       )}
       {o.state === 'applying' && (
         <p className="work-branch-notice">
-          节点已进入应用阶段，可能已经写入。请等待或在原节点核对结果；不能取消、重复写入或自动回滚。
+          {view.recovery
+            ? '原应用报告停留在应用阶段，可能已经写入；尚无原应用终态报告，不能据本机结算观察推断应用成功。'
+            : '节点已进入应用阶段，可能已经写入。请等待或在原节点核对结果；不能取消、重复写入或自动回滚。'}
         </p>
       )}
       {o.state === 'completed' && (
@@ -92,14 +98,20 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
       )}
       {o.state === 'needs_attention' && (
         <p className="work-branch-notice">
-          可能已部分写入，目录锁仍需在原节点核对处理。不要重试写入或自动回滚；已确认的路径不能代表全部现场。
+          {view.recovery
+            ? '原应用报告仍为需要本机处理，可能已部分写入；原已确认路径不能代表全部现场。本机结算观察单独保留在下方。'
+            : '可能已部分写入，目录锁仍需在原节点核对处理。不要重试写入或自动回滚；已确认的路径不能代表全部现场。'}
         </p>
       )}
       {o.state === 'failed' && (
         <p>节点报告应用失败，未确认任何文件写入。请在原节点核对现场与记录。</p>
       )}
       {o.state === 'cancelled' && (
-        <p>已在节点进入应用阶段前取消此应用请求，固定预检与所选范围保留。</p>
+        <p>
+          {view.recovery
+            ? '此处保留原应用取消记录与历史；不能据此断言本机未开始写入。固定预检与所选范围保留，本机结算观察单独列出。'
+            : '已在节点进入应用阶段前取消此应用请求，固定预检与所选范围保留。'}
+        </p>
       )}
       {latest?.reason && <p role="status">{applicationReasons[latest.reason]}</p>}
       {latest && (
@@ -118,6 +130,30 @@ function ApplicationStatus({ view }: { view: IntegrationView }) {
           )}
         </>
       )}
+    </section>
+  );
+}
+function RecoveryStatus({ view }: { view: IntegrationView }) {
+  const recovery = view.recovery;
+  if (!recovery) return null;
+  const r = recovery.report;
+  return (
+    <section className="work-branch-notice" aria-label="本机保留文件结算观察">
+      <strong>本次应用占用已在本机明确结算 · 历史观察</strong>
+      <p>
+        原目标节点所有者当时明确确认原应用进程及其子进程、孤立的 integration-add 进程均已停止：
+        {time(r.stoppedConfirmedAt)}
+      </p>
+      <p>仅本次应用的占用已释放：{time(r.releasedAt)}</p>
+      <p>
+        本次结算保留全部文件，未重新核验文件内容或应用成功。原应用状态和报告保持不变；此历史观察不代表目录当前可用，也不授权再次应用。
+      </p>
+      <p>
+        原本机记录含 {r.recordedAddedCount} 个新增文件记录；
+        {r.unresolvedWriteIntent ? '仍有未决写入意图' : '原记录未含未决写入意图'}。
+        这些数量不是当前文件验证结果。
+      </p>
+      <p>服务端收到此观察：{time(recovery.receivedAt)}</p>
     </section>
   );
 }
@@ -292,6 +328,7 @@ function Record({
           : '仅记录只读预检，代码尚未应用。后续写入需要独立确认并重新核对现场。'}
       </p>
       <ApplicationStatus view={view} />
+      <RecoveryStatus view={view} />
       {apply && (view.canApply || pendingId === o.id) && (
         <Button
           disabled={command.busy || !!command.uncertain || (!!pendingId && pendingId !== o.id)}

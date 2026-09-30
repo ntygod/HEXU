@@ -90,6 +90,31 @@ export interface IntegrationApplication {
   requestedBy: { id: string; name: string };
   reports: IntegrationApplicationReport[];
 }
+/** Metadata-only historical observation; it does not verify files or settle application state. */
+export interface IntegrationRecoveryReport {
+  version: 1;
+  kind: 'local_integration_settlement';
+  integrationId: string;
+  applicationId: string;
+  recoveryId: string;
+  integrationInputHash: string;
+  applicationInputHash: string;
+  originalApplicationEvidenceHash: string;
+  stoppedConfirmedAt: string;
+  releasedAt: string;
+  disposition: 'preserve_files';
+  processEvidence: 'operator_confirmed_stopped';
+  lease: 'released';
+  filesVerified: false;
+  recordedAddedCount: number;
+  unresolvedWriteIntent: boolean;
+  confirmPublication: true;
+}
+export interface IntegrationRecoveryObservation {
+  report: IntegrationRecoveryReport;
+  hash: string;
+  receivedAt: string;
+}
 export type IntegrationState =
   | 'queued'
   | 'awaiting_choice'
@@ -126,6 +151,7 @@ export interface IntegrationView {
   canApply: boolean;
   taskRevision: number;
   reportHash: string | null;
+  recovery?: IntegrationRecoveryObservation | null;
 }
 export interface IntegrationOptions {
   source: IntegrationSource;
@@ -380,4 +406,63 @@ export function parseIntegrationApplicationReport(input: unknown): IntegrationAp
   if (new TextEncoder().encode(JSON.stringify(result)).length > INTEGRATION_LIMITS.reportBytes)
     throw new DomainError('INVALID_INPUT', '应用报告超出48 KiB');
   return result;
+}
+
+export function parseIntegrationRecoveryReport(input: unknown): IntegrationRecoveryReport {
+  const b = exact(input, [
+    'version',
+    'kind',
+    'integrationId',
+    'applicationId',
+    'recoveryId',
+    'integrationInputHash',
+    'applicationInputHash',
+    'originalApplicationEvidenceHash',
+    'stoppedConfirmedAt',
+    'releasedAt',
+    'disposition',
+    'processEvidence',
+    'lease',
+    'filesVerified',
+    'recordedAddedCount',
+    'unresolvedWriteIntent',
+    'confirmPublication',
+  ]);
+  if (b.confirmPublication !== true)
+    throw new DomainError('CONFIRMATION_REQUIRED', '需本人明确确认共享本次保留文件结算观察');
+  if (
+    b.version !== 1 ||
+    b.kind !== 'local_integration_settlement' ||
+    b.disposition !== 'preserve_files' ||
+    b.processEvidence !== 'operator_confirmed_stopped' ||
+    b.lease !== 'released' ||
+    b.filesVerified !== false ||
+    typeof b.unresolvedWriteIntent !== 'boolean' ||
+    !Number.isSafeInteger(b.recordedAddedCount) ||
+    (b.recordedAddedCount as number) < 0 ||
+    (b.recordedAddedCount as number) > INTEGRATION_LIMITS.files
+  )
+    throw new DomainError(
+      'INVALID_INPUT',
+      '仅接受保留文件、本人确认进程停止且本次占用已释放的有界观察',
+    );
+  return {
+    version: 1,
+    kind: 'local_integration_settlement',
+    integrationId: nodeId(b.integrationId),
+    applicationId: nodeId(b.applicationId),
+    recoveryId: nodeId(b.recoveryId),
+    integrationInputHash: checkpointHash(b.integrationInputHash),
+    applicationInputHash: checkpointHash(b.applicationInputHash),
+    originalApplicationEvidenceHash: checkpointHash(b.originalApplicationEvidenceHash),
+    stoppedConfirmedAt: retentionDate(b.stoppedConfirmedAt),
+    releasedAt: retentionDate(b.releasedAt),
+    disposition: 'preserve_files',
+    processEvidence: 'operator_confirmed_stopped',
+    lease: 'released',
+    filesVerified: false,
+    recordedAddedCount: b.recordedAddedCount as number,
+    unresolvedWriteIntent: b.unresolvedWriteIntent,
+    confirmPublication: true,
+  };
 }

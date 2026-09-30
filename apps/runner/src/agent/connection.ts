@@ -61,6 +61,7 @@ export async function nodeRequest<T>(
       'integration-inspect',
       'integration-publish',
       'integration-apply-publish',
+      'integration-recovery-publish',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');

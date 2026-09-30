@@ -649,4 +649,19 @@ CREATE TRIGGER integration_application_immutable BEFORE UPDATE ON integration_op
  BEGIN SELECT RAISE(ABORT,'integration application and reports are immutable'); END;
 `,
   },
+  {
+    version: 33,
+    sql: `
+-- A separate historical observation never relabels the original application evidence.
+CREATE TABLE integration_recovery_observations (
+ integration_id TEXT PRIMARY KEY REFERENCES integration_operations(id),
+ application_id TEXT NOT NULL UNIQUE, recovery_id TEXT NOT NULL UNIQUE,
+ hash TEXT NOT NULL, received_at TEXT NOT NULL, body TEXT NOT NULL
+);
+CREATE TRIGGER integration_recovery_immutable_update BEFORE UPDATE ON integration_recovery_observations
+ BEGIN SELECT RAISE(ABORT,'integration recovery observations are immutable'); END;
+CREATE TRIGGER integration_recovery_immutable_delete BEFORE DELETE ON integration_recovery_observations
+ BEGIN SELECT RAISE(ABORT,'integration recovery observations are immutable'); END;
+`,
+  },
 ];
