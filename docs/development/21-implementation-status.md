@@ -1,6 +1,6 @@
 # 21｜当前实现进度
 
-更新：2026-09-30。main 基线为 `c37b730`（PR #26），与完整 CI 验证的 `a0fe988` 功能树一致。用户已授权将新增成果版本/反馈、比较选择、固定代码引用/只读对比、选定方案新会话接续与整合预检统一提交推送，通过 `codex/branch-result-versions` 功能分支交付；**尚未合入 main**。下表包含该分支实现；原工作项见 [19](19-work-items.md)，下一项见 [22](22-next-delivery.md)。
+更新：2026-09-30。main已合入PR #27的只读成果来源预览，基线为`87d795e`。`codex/branch-result-versions`已统一成果版本/反馈、比较选择、固定代码引用/只读对比、选定方案新会话接续与整合预检，并保留来源预览接口；本批按用户要求整合验证后合入main。下表包含整合分支实现；原工作项见 [19](19-work-items.md)，下一项见 [22](22-next-delivery.md)。
 
 ## 当前能力
 
@@ -39,12 +39,13 @@
 | PR #24：接手现场研发，`83a4d5a` | [Linux CI 36527456468](https://github.com/ntygod/HEXU/actions/runs/36527456468)：**511/511工程测试、110/110Chromium流程**，工程/浏览器/汇总check全部通过；类型、UI token、格式与构建通过。此前80/80工程、7/7浏览器定向验证亦通过，详见[现场研发记录](history/2026-09-29-handoff-workspace.md) |
 | PR #25：方案定义，`adf5c79` | [Linux CI 36529715672](https://github.com/ntygod/HEXU/actions/runs/36529715672)：**519/519工程、112/112Chromium流程**，类型、UI token、格式和构建通过；此前17工程/2浏览器定向通过。详见[方案定义记录](history/2026-09-29-work-branch-plans.md) |
 | PR #26：方案独立现场，`a0fe988` | [Linux CI 36548541717](https://github.com/ntygod/HEXU/actions/runs/36548541717)：**533/533工程、114/114Chromium流程**，工程/浏览器/汇总check均成功；已合入main `c37b730`，失败修正见[现场记录](history/2026-09-29-branch-workspaces.md) |
+| PR #27：成果来源预览，`0f4c70d` | [Linux CI 36555794206](https://github.com/ntygod/HEXU/actions/runs/36555794206)的engineering/browser/check均成功；业务代码此前由[CI 36554077449](https://github.com/ntygod/HEXU/actions/runs/36554077449)验证545/545工程、114/114Chromium。已合入main `87d795e`，原范围和修正见[来源记录](history/2026-09-29-branch-result-sources.md) |
 | 本地成果版本与比较选择 | Windows Node24.19.0：**75/75相关工程用例**（含14项新增），7条相关Chromium流程均已有通过记录；类型、UI token、格式与构建通过，深色桌面/浅色390px截图实际查看。仅控制层协议夹具，无真实模型或Linux原生执行复测；尚未触发新CI。过程见[本地记录](history/2026-09-29-branch-results.md) |
 | 本地固定代码引用与对比 | Node24.19.0：Windows相关38项与Linux相关29项均已有通过记录，交集19项，合计48项不同用例；Linux最后7/7新增代码用例复测通过。8条相关Chromium流程均已有通过记录；类型、UI token、格式和构建通过。真实Git/HTTP及明确协议事件，不调用模型；失败修正、范围见[代码记录](history/2026-09-29-result-code.md) |
 | 本地选定方案接续 | Linux97项相关用例均已有通过记录，最后4/4新真实Git/进程用例复测通过；Windows相关25/25，交集6项，共116项不同工程用例。5/5相关Chromium流程、类型/UI token/格式/构建通过；有Claude与切换到Codex的实际协议进程，没有真实模型调用。范围与夹具修正见[接续记录](history/2026-09-30-branch-continuation.md) |
 | 本地整合预检 | Windows12/12控制/纯规则；Linux初轮32/32、最后6/6新流程复测，合计45个不同工程用例有通过记录。两条新增Chromium流程、类型/UI token/格式/构建检查；真实Git/完整副本/HTTP，没有目标写入或模型调用。范围、失败断言修正与最后验证见[预检记录](history/2026-09-30-integration-preflight.md) |
 
-PR #20—#26 的代码已合入 main；主线树与被测功能树核对相同，没有丢弃前序实现或替换原传输协议。新增内容通过 `codex/branch-result-versions` 交付，接手核对所在分支；不要在旧 main 上重做已实现范围。远端另有 `codex/work-branch-result-versions` 的成果来源预览切片，本次未覆盖或合并该分支。提交前检查见[预检记录](history/2026-09-30-integration-preflight.md#提交交付)，继承范围与早期合并见 [邀请记录](history/2026-09-29-handoff-offers.md)。
+PR #20—#27已合入main；本批在`codex/branch-result-versions`保留两支历史并整合全部代码、测试和文档。来源预览仍只读，固定成果保存独立记录不可变版本；二者均遵守持久结算边界和`shared:false`过滤。统一过程与交付检查见[分支整合记录](history/2026-09-30-result-branch-merge.md)，原提交检查见[预检记录](history/2026-09-30-integration-preflight.md#提交交付)，早期合并见[邀请记录](history/2026-09-29-handoff-offers.md)。
 
 旧证据保留在 [UI 与初始实现](history/2026-09-28-implementation.md)、[恢复预检](history/2026-09-28-restore-preflight.md)、[实际恢复](history/2026-09-28-restore-write.md)、[恢复结果](history/2026-09-28-restore-results.md)。分别包括 336/95、366/95、402/95、425/98 的历史基线，不再把历次长日志复制到本页。
 

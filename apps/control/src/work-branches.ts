@@ -7,6 +7,7 @@ import { WorkBranchResults } from '../../../packages/db/src/work-branch-results.
 import { BranchComparisons } from '../../../packages/db/src/branch-comparison.js';
 import { ResultCodeStore } from '../../../packages/db/src/result-code.js';
 import { BranchWorkspaceStore } from '../../../packages/db/src/work-branch-workspaces.js';
+import { WorkBranchResultSourceStore } from '../../../packages/db/src/work-branch-result-source.js';
 import { DomainError, revision } from '../../../packages/contracts/src/index.js';
 import { exact, nodeSecret } from '../../../packages/contracts/src/nodes.js';
 import type { Store } from '../../../packages/db/src/store.js';
@@ -18,6 +19,7 @@ export function attachWorkBranches(app: FastifyInstance, store: Store) {
   const results = new WorkBranchResults(store);
   const comparisons = new BranchComparisons(store);
   const code = new ResultCodeStore(store);
+  const resultSources = new WorkBranchResultSourceStore(store);
   const taskId = (r: FastifyRequest) => nodeId((r.params as { taskId: string }).taskId);
   const branchId = (r: FastifyRequest) => nodeId((r.params as { branchId: string }).branchId);
   const key = (r: FastifyRequest) => text(r.headers['idempotency-key'], '操作标识', 128);
@@ -55,6 +57,10 @@ export function attachWorkBranches(app: FastifyInstance, store: Store) {
   app.post(path + '/:branchId/results', async (r, reply) =>
     reply.code(201).send(results.save(taskId(r), branchId(r), r.body, key(r))),
   );
+  app.get(path + '/:branchId/result-source', async (r, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return resultSources.get(taskId(r), branchId(r));
+  });
   app.post(path + '/:branchId/discard', async (r) =>
     branches.discard(taskId(r), branchId(r), r.body, key(r)),
   );

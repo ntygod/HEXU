@@ -6,6 +6,7 @@
 
 - [契约](../../packages/contracts/src/results.ts)、[版本仓储](../../packages/db/src/result-revisions.ts)与[成果页](../../apps/web/src/results.tsx)复用现有 Result。Result 是当前投影，ResultRevision 不可变；普通分享创建初始版本，方案后续保存追加版本，不覆盖正文历史。
 - [方案保存](../../packages/db/src/work-branch-results.ts)核对 Task/分支/Run/dispatch/已登记现场。只接受明确终态与终止确认；来源取固定命令及已共享事件，不用 Task 的混合消息列表推断来源 Run。失败和取消保留原状态，不改成工具成功。
+- [只读来源预览](../../packages/db/src/work-branch-result-source.ts)保留兼容接口和24 KiB共享输出前缀，与固定成果的6000字符/终态文本优先展示分别表述。两者共用持久结算边界和`shared:false`排除；旧边界未知时不补推输出，预览不是保存回执。合并修改复用[接口一致性检查](../../tests/work-branch-result-merge.test.ts)。
 - `terminal_sequence` 固定结算边界；`shared:false` 的撤权/迟到事件不采用。没有可靠旧边界时保留缺失事实，不追认未知历史输出。输出有预算和截取标志，不等同完整日志。
 - 默认版本只固定文字、来源与限制，代码状态为 `not_captured`；选填代码引用必须来自同一方案节点/目录，且由本人在来源Run结束后明确记录。初始 checkpoint、WorkingCopy 变更数量、模拟预览和终态成功不能充当本轮代码产物。提交引用、对象副本、共享差异与可恢复现场分别记录。
 - Result、不可变版本、分支关联/修订/历史、outbox 和回执同事务。先验证当前父任务权限再读旧回执；原回执固定原版本，不返回最新版本冒充原保存结果。ready 仅表示存在可查看成果。
