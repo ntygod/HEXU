@@ -70,8 +70,23 @@ export class WorkBranchStore {
             'SELECT body FROM work_branch_workspaces WHERE branch_id=? ORDER BY rowid DESC LIMIT 1',
           )
           .get(b.id) as Row | undefined;
+        const preservation = this.store.db
+          .prepare(
+            'SELECT id,state FROM branch_preservations WHERE branch_id=? ORDER BY rowid DESC LIMIT 1',
+          )
+          .get(b.id) as
+          | { id: string; state: NonNullable<WorkBranch['preservation']>['state'] }
+          | undefined;
         return {
           ...b,
+          ...(preservation
+            ? {
+                preservation: {
+                  ...preservation,
+                  executionRegistrationClosed: preservation.state === 'preserved',
+                },
+              }
+            : {}),
           state: selection?.branchId === b.id ? 'selected' : b.state,
           ...(workspace
             ? { workspace: JSON.parse(workspace.body) as BranchWorkspaceOperation }
@@ -146,7 +161,13 @@ export class WorkBranchStore {
     action: WorkBranchEvent['action'],
     actor?: WorkBranchEvent['actor'],
   ) {
-    const { workspace: _workspace, run: _run, result: _result, ...saved } = branch;
+    const {
+      workspace: _workspace,
+      run: _run,
+      result: _result,
+      preservation: _preservation,
+      ...saved
+    } = branch;
     const next = { ...saved, revision: saved.revision + 1, updatedAt: new Date().toISOString() };
     this.store.db
       .prepare('UPDATE work_branches SET state=?,revision=?,body=? WHERE id=? AND task_id=?')

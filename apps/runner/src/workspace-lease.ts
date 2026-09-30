@@ -198,6 +198,8 @@ function releaseRegistry(root: string) {
   if (!r || (!isAbsolute(r) && r !== '..' && !r.startsWith('..' + sep))) throw releaseInvalid();
   return path;
 }
+/** Existing private registry only; does not initialize it or grant a release. */
+export const workspaceClaimRegistryPath = releaseRegistry;
 const releaseHash = (r: WorkspaceReleaseRequest) =>
   createHash('sha256').update(canonicalJson(r)).digest('hex');
 function recordedRelease(

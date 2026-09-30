@@ -57,6 +57,8 @@ export async function nodeRequest<T>(
       'handoff-acceptance',
       'work-branch-workspace',
       'branch-cleanup-inspect',
+      'branch-preservation-inspect',
+      'branch-preservation-publish',
       'result-code-inspect',
       'result-code-publish',
       'integration-inspect',

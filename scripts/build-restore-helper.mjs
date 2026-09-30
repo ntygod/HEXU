@@ -6,7 +6,12 @@ import { dirname } from 'node:path';
 // No runtime compiler/download fallback. Non-Linux clients retain the explicit
 // unsupported response; source builds on Linux need a local C compiler + libc headers.
 if (process.platform === 'linux')
-  for (const name of ['restore-publish', 'integration-add', 'integration-change']) {
+  for (const name of [
+    'restore-publish',
+    'integration-add',
+    'integration-change',
+    'workspace-preserve',
+  ]) {
     const source = fileURLToPath(new URL(`../apps/runner/src/native/${name}.c`, import.meta.url));
     const output = fileURLToPath(
       new URL(`../dist/apps/runner/src/native/${name}`, import.meta.url),

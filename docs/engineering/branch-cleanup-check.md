@@ -27,7 +27,7 @@ npm run runner:branch-cleanup-check -- --branch BRANCH_ID --revision N --task-re
 
 成功中的 `cleanSnapshotVerified` / `retainedSnapshotVerified` 只是本次观察；`deletionAuthorized`、`directoryDeleted`、`bindingReleased`、`workspaceReserved` 和 `unmanagedProcessesStopped` 均为false。没有停止非受管写入者，之后用户仍可继续编辑，旧输出不能用作未来删除凭据。
 
-保留范围仅是所选提交的文件快照，不含 Git 祖先历史、其他分支/标签/未提交文件、外部LFS/子模块实体或任意私有数据。即使本次核对通过，也不能据此删除整个 `.git` 或现场。已登记目录的实际处置/解绑仍需后续独立明确流程；本切片不宣称13-06全部完成。
+保留范围仅是所选提交的文件快照，不含 Git 祖先历史、其他分支/标签/未提交文件、外部LFS/子模块实体或任意私有数据。即使本次核对通过，也不能据此删除整个 `.git` 或现场。已登记目录的移动另走[完整现场移出并保留](branch-preservation.md)的新请求与两次本机确认，不复用此检查的同意；该流程不永久删除或自动授予保留位置执行权。本检查不宣称13-06全部完成。
 
 ## 实现与验证
 

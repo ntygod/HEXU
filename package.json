@@ -56,7 +56,8 @@
     "runner:integration-trial": "node dist/apps/runner/src/integration-trial.js",
     "runner:integration-plan": "node dist/apps/runner/src/integration-preflight.js",
     "runner:integration-trial-cleanup": "node dist/apps/runner/src/integration-trial-cleanup.js",
-    "runner:branch-cleanup-check": "node dist/apps/runner/src/branch-cleanup-check.js"
+    "runner:branch-cleanup-check": "node dist/apps/runner/src/branch-cleanup-check.js",
+    "runner:branch-preserve": "node dist/apps/runner/src/branch-preservation.js"
   },
   "dependencies": {
     "better-auth": "1.7.6",

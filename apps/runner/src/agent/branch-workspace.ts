@@ -49,6 +49,7 @@ import {
   type BranchOrigin,
 } from './branch-origin.js';
 import { WorkspaceLease } from '../workspace-lease.js';
+import { parseLocalBranchPreservation } from './branch-preservation-record.js';
 
 interface LocalPreparation {
   id: string;
@@ -155,8 +156,26 @@ export function assertBranchEvidenceSettled(home: string) {
     const db = new DatabaseSync(file, { readOnly: true });
     try {
       if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table))
-        for (const row of db.prepare(`SELECT body FROM ${table}`).all() as { body: string }[]) {
+        for (const row of db.prepare(`SELECT id,body FROM ${table}`).all() as {
+          id: string;
+          body: string;
+        }[]) {
           const p = JSON.parse(row.body);
+          if (
+            table === 'branch_binding' &&
+            (row.id.startsWith('preservation:') || p.kind === 'branch_directory_preservation')
+          ) {
+            const preservation = parseLocalBranchPreservation(
+              p,
+              undefined,
+              existsSync(join(home, 'credentials.json')) ? readCredentials(home) : undefined,
+            );
+            if (row.id !== 'preservation:' + preservation.id)
+              throw new DomainError(
+                'BRANCH_PRESERVATION_JOURNAL_INVALID',
+                '移出保留记录标识不一致，保留凭证',
+              );
+          }
           if (p.phase !== 'settled')
             throw new DomainError(
               'WORK_BRANCH_UNSETTLED',

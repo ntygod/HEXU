@@ -261,7 +261,11 @@ export function BranchWorkspace({
     <section className="work-branch-workspace" aria-label="方案独立现场">
       {op ? (
         <>
-          <strong>{labels[op.state]}</strong>
+          <strong>
+            {branch.preservation?.executionRegistrationClosed
+              ? '原路径执行登记已关闭 · 完整现场已保留'
+              : labels[op.state]}
+          </strong>
           <p>最后记录 {time(op.updatedAt)}；准备/登记不代表模型已启动。</p>
           {op.reason && <p>{op.reason}</p>}
           {op.proof && (

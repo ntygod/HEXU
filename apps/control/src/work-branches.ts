@@ -12,6 +12,7 @@ import { DomainError, revision } from '../../../packages/contracts/src/index.js'
 import { exact, nodeSecret } from '../../../packages/contracts/src/nodes.js';
 import type { Store } from '../../../packages/db/src/store.js';
 import { BranchCleanupChecks } from '../../../packages/db/src/branch-cleanup-check.js';
+import { BranchPreservations } from '../../../packages/db/src/branch-preservation.js';
 
 export function attachWorkBranches(app: FastifyInstance, store: Store) {
   if (!store.teamMode) return;
@@ -22,6 +23,7 @@ export function attachWorkBranches(app: FastifyInstance, store: Store) {
   const code = new ResultCodeStore(store);
   const resultSources = new WorkBranchResultSourceStore(store);
   const cleanupChecks = new BranchCleanupChecks(store);
+  const preservations = new BranchPreservations(store);
   const taskId = (r: FastifyRequest) => nodeId((r.params as { taskId: string }).taskId);
   const branchId = (r: FastifyRequest) => nodeId((r.params as { branchId: string }).branchId);
   const key = (r: FastifyRequest) => text(r.headers['idempotency-key'], '操作标识', 128);
@@ -37,6 +39,12 @@ export function attachWorkBranches(app: FastifyInstance, store: Store) {
   app.post('/runner/v1/result-code-publish', async (r) => code.publish(token(r), r.body));
   app.post('/runner/v1/branch-cleanup-inspect', async (r) =>
     cleanupChecks.inspect(token(r), r.body),
+  );
+  app.post('/runner/v1/branch-preservation-inspect', async (r) =>
+    preservations.inspect(token(r), nodeId(exact(r.body, ['preservationId']).preservationId)),
+  );
+  app.post('/runner/v1/branch-preservation-publish', async (r) =>
+    preservations.publish(token(r), r.body),
   );
   app.get(path, async (r) => branches.list(taskId(r), parseCheckpointCursor(r.query)));
   app.get(path + '/options', async (r) => branches.options(taskId(r)));
@@ -74,6 +82,27 @@ export function attachWorkBranches(app: FastifyInstance, store: Store) {
     exact(r.query, []);
     return cleanupChecks.options(taskId(r), branchId(r));
   });
+  app.get(path + '/:branchId/preservations', async (r) => {
+    exact(r.query, []);
+    return preservations.list(taskId(r), branchId(r));
+  });
+  app.post(path + '/:branchId/preservations', async (r, reply) =>
+    reply.code(201).send(preservations.create(taskId(r), branchId(r), r.body, key(r))),
+  );
+  const preservationId = (r: FastifyRequest) =>
+    nodeId((r.params as { preservationId: string }).preservationId);
+  app.get(path + '/:branchId/preservations/:preservationId', async (r) =>
+    preservations.get(taskId(r), branchId(r), preservationId(r)),
+  );
+  app.post(path + '/:branchId/preservations/:preservationId/cancel', async (r) =>
+    preservations.cancel(
+      taskId(r),
+      branchId(r),
+      preservationId(r),
+      revision(exact(r.body, ['expectedRevision']).expectedRevision),
+      key(r),
+    ),
+  );
   app.post(path + '/:branchId/discard-preserving', async (r) =>
     branches.discardPreserving(taskId(r), branchId(r), r.body, key(r)),
   );

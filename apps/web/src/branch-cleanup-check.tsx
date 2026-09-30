@@ -169,6 +169,7 @@ export function BranchCleanupEntry({ branch }: { branch: WorkBranch }) {
     [revoked, setRevoked] = useState(false);
   if (
     branch.state !== 'discarded' ||
+    branch.preservation?.executionRegistrationClosed ||
     !branch.workingCopyId ||
     branch.workspace?.ticket.ownerId !== data.user.id
   )

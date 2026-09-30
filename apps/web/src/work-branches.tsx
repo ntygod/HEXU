@@ -16,6 +16,11 @@ import { BranchWorkspace } from './work-branch-workspaces.js';
 import { BranchResult } from './work-branch-results.js';
 import { BranchDiscardEditor } from './work-branch-lifecycle.js';
 import { BranchCleanupEntry } from './branch-cleanup-check.js';
+import {
+  BranchPreservationEditor,
+  BranchPreservationRecords,
+  type BranchPreservationDraft,
+} from './branch-preservation.js';
 
 const base = (taskId: string) => `/tasks/${encodeURIComponent(taskId)}/work-branches`;
 function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
@@ -305,6 +310,9 @@ function Branch({
   saved,
   discardPreserving,
   discardPending,
+  preserve,
+  preservationPending,
+  focusPreservationId,
 }: {
   task: Task;
   startHash: string;
@@ -314,6 +322,9 @@ function Branch({
   saved(): void;
   discardPreserving(branch: WorkBranch): void;
   discardPending: boolean;
+  preserve(draft: BranchPreservationDraft): void;
+  preservationPending: boolean;
+  focusPreservationId: string | null;
 }) {
   const [history, setHistory] = useState(false);
   return (
@@ -323,7 +334,9 @@ function Branch({
         <span className="badge neutral">
           {branch.state === 'discarded'
             ? branch.workingCopyId
-              ? '已放弃 · 现场保留'
+              ? branch.preservation?.executionRegistrationClosed
+                ? '已放弃 · 现场已移出保留'
+                : '已放弃 · 现场保留'
               : '已放弃'
             : branch.state === 'selected'
               ? '已选用固定版本'
@@ -352,6 +365,15 @@ function Branch({
           方案已放弃；现场、成果与原执行历史保留。放弃不代表进程已停止或文件已删除，原执行状态和停止动作仍独立显示。
         </p>
       )}
+      {branch.state === 'discarded' && branch.workingCopyId && (
+        <BranchPreservationRecords
+          branch={branch}
+          editable={editable}
+          disabled={preservationPending}
+          edit={preserve}
+          focusId={focusPreservationId}
+        />
+      )}
       <div className="work-branch-actions">
         {editable && <BranchCleanupEntry branch={branch} />}
         {editable &&
@@ -379,6 +401,10 @@ function Panel({
   discardRevoked,
   fixedGroupId,
   showAll,
+  preserve,
+  pendingPreservation,
+  preservationRevoked,
+  focusPreservation,
 }: {
   task: Task;
   discardPreserving(branch: WorkBranch): void;
@@ -386,6 +412,10 @@ function Panel({
   discardRevoked: boolean;
   fixedGroupId: string | null;
   showAll(): void;
+  preserve(draft: BranchPreservationDraft): void;
+  pendingPreservation: BranchPreservationDraft | null;
+  preservationRevoked: boolean;
+  focusPreservation: { branchId: string; id: string } | null;
 }) {
   const { data } = useApp();
   const path = base(task.id),
@@ -422,12 +452,21 @@ function Panel({
           <Button onClick={() => discardPreserving(pendingDiscard)}>继续确认放弃请求</Button>
         </section>
       )}
+      {pendingPreservation && (
+        <section className="work-branch-notice" aria-label="未确认的移出操作">
+          <p>“{pendingPreservation.branch.name}”的原移出操作待确认，关闭或分页不会撤回。</p>
+          <Button onClick={() => preserve(pendingPreservation)}>继续确认移出操作</Button>
+        </section>
+      )}
+      {preservationRevoked && <p role="alert">移出编辑权限已失效，确认内容已清除。</p>}
       {discardRevoked && <p role="alert">方案编辑权限已失效，放弃确认已清除，重新打开不会恢复。</p>}
       {revoked && <p role="alert">编辑权限已失效，临时方案已清除；请核对权限后重新打开窗口。</p>}
       {editable && !creating && (
         <Button
           variant="primary"
-          disabled={revoked || !!read.error || !read.value || !!pendingDiscard}
+          disabled={
+            revoked || !!read.error || !read.value || !!pendingDiscard || !!pendingPreservation
+          }
           onClick={() => setCreating(true)}
         >
           定义一组方案
@@ -494,7 +533,14 @@ function Panel({
                   editable={editable}
                   saved={read.retry}
                   discardPreserving={discardPreserving}
-                  discardPending={!!pendingDiscard || discardRevoked}
+                  discardPending={!!pendingDiscard || discardRevoked || !!pendingPreservation}
+                  preserve={preserve}
+                  preservationPending={
+                    !!pendingPreservation || preservationRevoked || !!pendingDiscard
+                  }
+                  focusPreservationId={
+                    focusPreservation?.branchId === b.id ? focusPreservation.id : null
+                  }
                 />
               ))}
             </section>
@@ -521,11 +567,19 @@ function Entry({ task }: { task: Task }) {
     [discard, setDiscard] = useState<WorkBranch | null>(null),
     [discardOpen, setDiscardOpen] = useState(false),
     [discardRevoked, setDiscardRevoked] = useState(false),
+    [preservation, setPreservation] = useState<BranchPreservationDraft | null>(null),
+    [preservationOpen, setPreservationOpen] = useState(false),
+    [preservationRevoked, setPreservationRevoked] = useState(false),
+    [focusPreservation, setFocusPreservation] = useState<{ branchId: string; id: string } | null>(
+      null,
+    ),
     [fixedGroupId, setFixedGroupId] = useState<string | null>(null);
   useEffect(() => {
     if (!editable) {
       setDiscard(null);
       setDiscardOpen(false);
+      setPreservation(null);
+      setPreservationOpen(false);
     }
   }, [editable]);
   return (
@@ -538,15 +592,66 @@ function Entry({ task }: { task: Task }) {
             pendingDiscard={discard}
             discardRevoked={discardRevoked}
             fixedGroupId={fixedGroupId}
-            showAll={() => setFixedGroupId(null)}
+            showAll={() => {
+              setFixedGroupId(null);
+              setFocusPreservation(null);
+            }}
+            pendingPreservation={preservation}
+            preservationRevoked={preservationRevoked}
+            focusPreservation={focusPreservation}
+            preserve={(draft) => {
+              if (
+                !editable ||
+                preservationRevoked ||
+                discard ||
+                (preservation &&
+                  (preservation.branch.id !== draft.branch.id ||
+                    preservation.cancel?.request.id !== draft.cancel?.request.id))
+              )
+                return;
+              if (!preservation) setPreservation(structuredClone(draft));
+              setOpen(false);
+              setPreservationOpen(true);
+            }}
             discardPreserving={(branch) => {
-              if (!editable || discardRevoked || (discard && discard.id !== branch.id)) return;
+              if (
+                !editable ||
+                discardRevoked ||
+                preservation ||
+                (discard && discard.id !== branch.id)
+              )
+                return;
               if (!discard) setDiscard(structuredClone(branch));
               setOpen(false);
               setDiscardOpen(true);
             }}
           />
         </Dialog>
+      )}
+      {preservation && (
+        <BranchPreservationEditor
+          key={`${preservation.branch.id}:${preservation.cancel?.request.id ?? 'new'}`}
+          draft={preservation}
+          open={preservationOpen}
+          close={(keep) => {
+            setPreservationOpen(false);
+            if (!keep) setPreservation(null);
+            setOpen(true);
+          }}
+          saved={(view) => {
+            setFixedGroupId(preservation.branch.groupId);
+            setFocusPreservation({ branchId: preservation.branch.id, id: view.request.id });
+            setPreservation(null);
+            setPreservationOpen(false);
+            setOpen(true);
+          }}
+          denied={() => {
+            setPreservation(null);
+            setPreservationOpen(false);
+            setPreservationRevoked(true);
+            setOpen(true);
+          }}
+        />
       )}
       {discard && (
         <BranchDiscardEditor

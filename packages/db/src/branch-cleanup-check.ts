@@ -21,7 +21,7 @@ export class BranchCleanupChecks {
     this.branches = new WorkBranchStore(store);
     this.retained = new CheckpointRetentionStore(store);
   }
-  private context(taskId: string, branchId: string) {
+  ownerContext(taskId: string, branchId: string) {
     const task = this.store.getTask(taskId, true),
       raw = this.branches.branch(taskId, branchId),
       branch = this.branches.get(taskId, raw.groupId).branches.find((b) => b.id === branchId)!;
@@ -45,7 +45,22 @@ export class BranchCleanupChecks {
       throw new DomainError('BRANCH_CLEANUP_SCOPE_CHANGED', '原本人、方案或目录授权已变化', 409);
     return { task, branch, op, node };
   }
-  private eligible(c: ReturnType<BranchCleanupChecks['context']>) {
+  private eligible(c: ReturnType<BranchCleanupChecks['ownerContext']>, ownPreservationId?: string) {
+    const preservation = this.store.db
+      .prepare(
+        "SELECT state FROM branch_preservations WHERE branch_id=? AND id!=? AND state IN ('requested','moving','preserved','needs_attention')",
+      )
+      .get(c.branch.id, ownPreservationId ?? '') as { state: string } | undefined;
+    if (preservation)
+      throw new DomainError(
+        preservation.state === 'preserved'
+          ? 'BRANCH_WORKSPACE_PRESERVED'
+          : 'BRANCH_PRESERVATION_PENDING',
+        preservation.state === 'preserved'
+          ? '原路径已移出并保留，执行登记已关闭；原副本与历史仍保留'
+          : '先核对原移出请求与本机现场，不能越过待确认移动建立另一条检查',
+        409,
+      );
     if (c.branch.state !== 'discarded')
       throw new DomainError(
         'BRANCH_NOT_DISCARDED',
@@ -70,7 +85,7 @@ export class BranchCleanupChecks {
       );
   }
   private material(
-    c: ReturnType<BranchCleanupChecks['context']>,
+    c: ReturnType<BranchCleanupChecks['ownerContext']>,
     checkpointId: string,
     retentionId: string,
   ): BranchCleanupMaterial {
@@ -104,7 +119,7 @@ export class BranchCleanupChecks {
     return { checkpoint, retention };
   }
   options(taskId: string, branchId: string): BranchCleanupOptions {
-    const c = this.context(taskId, branchId);
+    const c = this.ownerContext(taskId, branchId);
     let canInspect = true,
       unavailableReason: string | null = null;
     try {
@@ -144,6 +159,39 @@ export class BranchCleanupChecks {
       deletionAuthorized: false,
     };
   }
+  inspectForOwner(
+    taskId: string,
+    input: unknown,
+    ownPreservationId?: string,
+  ): BranchCleanupInspection {
+    const data = parseBranchCleanupSelection(input),
+      c = this.ownerContext(taskId, data.branchId);
+    this.eligible(c, ownPreservationId);
+    assertRevision(c.branch.revision, data.expectedRevision);
+    assertRevision(c.task.revision, data.expectedTaskRevision);
+    const r = this.store.db
+      .prepare(
+        'SELECT checkpoint_id FROM checkpoint_retentions WHERE id=? AND task_id=? AND node_id=?',
+      )
+      .get(data.retentionId, c.task.id, c.node.id) as { checkpoint_id: string } | undefined;
+    if (!r) throw new DomainError('NOT_FOUND', '副本不属于原方案节点', 404);
+    return {
+      branch: {
+        id: c.branch.id,
+        taskId: c.branch.taskId,
+        groupId: c.branch.groupId,
+        name: c.branch.name,
+        revision: c.branch.revision,
+        state: c.branch.state,
+        workingCopyId: c.branch.workingCopyId,
+      },
+      taskRevision: c.task.revision,
+      nodeId: c.node.id,
+      originHash: c.op.proof!.originHash,
+      material: this.material(c, r.checkpoint_id, data.retentionId),
+      deletionAuthorized: false,
+    };
+  }
   inspect(token: string, input: unknown): BranchCleanupInspection {
     const data = parseBranchCleanupSelection(input),
       node = this.retained.checkpoints.nodes.settlementIdentity(token);
@@ -156,33 +204,9 @@ export class BranchCleanupChecks {
       .prepare('SELECT id,name,email FROM collab_people WHERE id=?')
       .get(node.owner_id) as unknown as IdentityUser;
     return this.store.as({ user, spaceId: node.space_id }, () => {
-      const c = this.context(row.task_id, data.branchId);
+      const c = this.ownerContext(row.task_id, data.branchId);
       if (c.node.id !== node.id) throw new DomainError('NOT_FOUND', '不是原方案本人节点', 404);
-      this.eligible(c);
-      assertRevision(c.branch.revision, data.expectedRevision);
-      assertRevision(c.task.revision, data.expectedTaskRevision);
-      const r = this.store.db
-        .prepare(
-          'SELECT checkpoint_id FROM checkpoint_retentions WHERE id=? AND task_id=? AND node_id=?',
-        )
-        .get(data.retentionId, c.task.id, node.id) as { checkpoint_id: string } | undefined;
-      if (!r) throw new DomainError('NOT_FOUND', '副本不属于原方案节点', 404);
-      return {
-        branch: {
-          id: c.branch.id,
-          taskId: c.branch.taskId,
-          groupId: c.branch.groupId,
-          name: c.branch.name,
-          revision: c.branch.revision,
-          state: c.branch.state,
-          workingCopyId: c.branch.workingCopyId,
-        },
-        taskRevision: c.task.revision,
-        nodeId: node.id,
-        originHash: c.op.proof!.originHash,
-        material: this.material(c, r.checkpoint_id, data.retentionId),
-        deletionAuthorized: false,
-      };
+      return this.inspectForOwner(row.task_id, data);
     });
   }
 }
