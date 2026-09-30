@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, writeFile, readFile, rename, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rename, rm, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { branchResultFixture } from './branch-results.js';
 import { saveResultCode } from './result-code.js';
@@ -25,7 +25,13 @@ export async function integrationRunnerFixture(
   format: 'sha1' | 'sha256' = 'sha1',
   transfer = false,
   conflict = false,
-  extraFiles: Record<string, string> = {},
+  extraFiles: Record<string, string | Buffer> = {},
+  changes: {
+    baseFiles?: Record<string, string>;
+    sourceDeletePaths?: string[];
+    sourceExecutablePaths?: string[];
+    targetFiles?: Record<string, string>;
+  } = {},
 ) {
   const dir = await mkdtemp(join(tmpdir(), 'hexu-integration-')),
     root = join(dir, 'source-repo');
@@ -47,6 +53,10 @@ export async function integrationRunnerFixture(
   };
   await writeFile(join(root, 'README.md'), 'BASE\n');
   await writeFile(join(root, '.gitignore'), 'ignored/\n');
+  for (const [path, body] of Object.entries(changes.baseFiles ?? {})) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), body);
+  }
   const base = commit(root, 'base'),
     tree = git(root, 'rev-parse', 'HEAD^{tree}');
   const f = await branchResultFixture(undefined, { objectFormat: format, commit: base, tree });
@@ -115,7 +125,12 @@ export async function integrationRunnerFixture(
     };
     await writeFile(join(root, 'README.md'), 'SOURCE_COMMITTED_SECRET\n');
     await writeFile(join(root, 'new.txt'), 'NEW_COMMITTED_SECRET\n');
-    for (const [path, body] of Object.entries(extraFiles)) await writeFile(join(root, path), body);
+    for (const [path, body] of Object.entries(extraFiles)) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), body);
+    }
+    for (const path of changes.sourceDeletePaths ?? []) await rm(join(root, path));
+    for (const path of changes.sourceExecutablePaths ?? []) await chmod(join(root, path), 0o755);
     const sourceCommit = commit(root, 'source'),
       sourceCp = await checkpoint(source, sourceCommit),
       sr = await retain(source, sourceCp, sourceCommit);
@@ -129,6 +144,10 @@ export async function integrationRunnerFixture(
     git(target.root, 'checkout', '--detach', '-q', base);
     await writeFile(join(target.root, 'target.txt'), 'TARGET_PRIVATE_ONLY\n');
     if (conflict) await writeFile(join(target.root, 'README.md'), 'TARGET_DIFFERENT\n');
+    for (const [path, body] of Object.entries(changes.targetFiles ?? {})) {
+      await mkdir(dirname(join(target.root, path)), { recursive: true });
+      await writeFile(join(target.root, path), body);
+    }
     const targetCommit = commit(target.root, 'target'),
       targetCp = await checkpoint(target, targetCommit),
       tr = await retain(target, targetCp, targetCommit);

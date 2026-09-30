@@ -10,6 +10,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { assertHandoffEvidenceSettled } from './agent/handoff-acceptance.js';
 import { assertGitWorkspaceSettled } from './agent/handoff-workspace.js';
 import { assertBranchEvidenceSettled } from './agent/branch-workspace.js';
+import { withSettledIntegrationTrials } from './agent/integration-trial-journal.js';
 import { withSettledIntegrationEvidence } from './agent/integration-application.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -289,35 +290,39 @@ async function main() {
       if (!options['--config'])
         throw new DomainError('USAGE', 'connect 需要 --config 本地配置路径');
       await withSettledIntegrationEvidence(storage.home, () =>
-        connect(storage, String(options['--config'])),
+        withSettledIntegrationTrials(storage.home, () =>
+          connect(storage, String(options['--config'])),
+        ),
       );
       return;
     }
     if (command === 'disconnect') {
-      await withSettledIntegrationEvidence(storage.home, async () => {
-        new ExecutionJournal(storage).assertCanDisconnect();
-        assertHandoffEvidenceSettled(storage.home);
-        assertGitWorkspaceSettled(storage.home);
-        assertBranchEvidenceSettled(storage.home);
-        const c = readCredentials(storage.home);
-        if (!options['--local-only']) {
-          try {
-            await nodeRequest(c.controlUrl, 'disconnect', {}, c.nodeToken);
-          } catch (error) {
-            if (
-              !(error instanceof DomainError) ||
-              !['NODE_REVOKED', 'NODE_AUTH_REQUIRED'].includes(error.code)
-            )
-              throw error;
+      await withSettledIntegrationEvidence(storage.home, () =>
+        withSettledIntegrationTrials(storage.home, async () => {
+          new ExecutionJournal(storage).assertCanDisconnect();
+          assertHandoffEvidenceSettled(storage.home);
+          assertGitWorkspaceSettled(storage.home);
+          assertBranchEvidenceSettled(storage.home);
+          const c = readCredentials(storage.home);
+          if (!options['--local-only']) {
+            try {
+              await nodeRequest(c.controlUrl, 'disconnect', {}, c.nodeToken);
+            } catch (error) {
+              if (
+                !(error instanceof DomainError) ||
+                !['NODE_REVOKED', 'NODE_AUTH_REQUIRED'].includes(error.code)
+              )
+                throw error;
+            }
           }
-        }
-        forgetCredentials(storage.home);
-        say(
-          options['--local-only']
-            ? '仅删除本机凭证，未确认服务端撤销。请在网页撤销原节点；日志仍保留。'
-            : '节点已撤销并删除本机凭证；摘要日志仍保留。',
-        );
-      });
+          forgetCredentials(storage.home);
+          say(
+            options['--local-only']
+              ? '仅删除本机凭证，未确认服务端撤销。请在网页撤销原节点；日志仍保留。'
+              : '节点已撤销并删除本机凭证；摘要日志仍保留。',
+          );
+        }),
+      );
       return;
     }
     const agent = new AgentConnection(storage, say),

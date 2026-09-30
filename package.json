@@ -51,6 +51,7 @@
     "runner:integration-apply": "node dist/apps/runner/src/integration-application.js",
     "runner:integration-recover": "node dist/apps/runner/src/integration-recovery.js",
     "runner:integration-status": "node dist/apps/runner/src/integration-application-status.js",
+    "runner:integration-trial": "node dist/apps/runner/src/integration-trial.js",
     "runner:integration-plan": "node dist/apps/runner/src/integration-preflight.js"
   },
   "dependencies": {

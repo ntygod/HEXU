@@ -25,6 +25,83 @@ const changed = () =>
     '当前目录、HEAD或文件与所选提交不一致；保留现场，请先明确处理本机修改再继续',
     409,
   );
+/** A short-lived synchronous observation check for a caller's final publish
+ * boundary. It checks the exact tree plus HEAD/ref/index identity and stamps;
+ * it never replaces full commit verification or establishes a writer lock. */
+function recheckObservedCommit(
+  directory: LocalDirectory,
+  rootIdentity: string,
+  gitIdentity: string,
+  files: ReadonlyMap<string, string>,
+  metadata: ReadonlyMap<string, string>,
+) {
+  let root: number | undefined, git: number | undefined;
+  const flags = F.O_RDONLY | F.O_DIRECTORY | F.O_NOFOLLOW;
+  try {
+    if (realpathSync(directory.root) !== directory.root) throw changed();
+    root = openSync(directory.root, flags);
+    git = openSync(fdPath(root, '.git'), flags);
+    if (
+      identity(fstatSync(root, { bigint: true })) !== rootIdentity ||
+      identity(fstatSync(git, { bigint: true })) !== gitIdentity
+    )
+      throw changed();
+    const remaining = new Map(files);
+    const walk = (fd: number, prefix = '') => {
+      for (const name of readdirSync(fdPath(fd))) {
+        if (!prefix && name === '.git') {
+          if (identity(lstatSync(fdPath(fd, name), { bigint: true })) !== gitIdentity)
+            throw changed();
+          continue;
+        }
+        const path = prefix ? `${prefix}/${name}` : name;
+        const s = lstatSync(fdPath(fd, name), { bigint: true });
+        if (remaining.get(path) !== identity(s) + ':' + stamp(s) || s.isSymbolicLink())
+          throw changed();
+        remaining.delete(path);
+        if (s.isDirectory()) {
+          const child = openSync(fdPath(fd, name), flags);
+          try {
+            if (identity(fstatSync(child, { bigint: true })) !== identity(s)) throw changed();
+            walk(child, path);
+          } finally {
+            closeSync(child);
+          }
+        }
+      }
+    };
+    walk(root);
+    if (remaining.size) throw changed();
+    for (const [path, expected] of metadata) {
+      const opened: number[] = [];
+      let fd = git;
+      try {
+        const parts = path.split('/');
+        for (const part of parts.slice(0, -1)) {
+          fd = openSync(fdPath(fd, part), flags);
+          opened.push(fd);
+        }
+        const file = openSync(fdPath(fd, parts.at(-1)!), F.O_RDONLY | F.O_NOFOLLOW | F.O_NONBLOCK);
+        opened.push(file);
+        const s = fstatSync(file, { bigint: true });
+        if (!s.isFile() || identity(s) + ':' + stamp(s) !== expected) throw changed();
+      } finally {
+        for (const fd of opened.reverse()) closeSync(fd);
+      }
+    }
+    if (
+      identity(lstatSync(directory.root, { bigint: true })) !== rootIdentity ||
+      identity(lstatSync(directory.gitDir, { bigint: true })) !== gitIdentity
+    )
+      throw changed();
+  } catch {
+    throw changed();
+  } finally {
+    if (git !== undefined) closeSync(git);
+    if (root !== undefined) closeSync(root);
+  }
+}
+
 /** Verify an ordinary registered Linux repository against a fixed commit, without writes. */
 export async function verifyCleanCommit(
   home: string,
@@ -32,6 +109,7 @@ export async function verifyCleanCommit(
   directory: LocalDirectory,
   expected: Pick<CheckpointManifest, 'commit' | 'tree' | 'objectFormat' | 'repositoryIdentity'>,
   additions: readonly (RestoreEntry & { identity: string })[] = [],
+  observe?: (assertUnchanged: () => void) => void,
 ) {
   let root: number | undefined, git: number | undefined;
   try {
@@ -48,6 +126,9 @@ export async function verifyCleanCommit(
       gitIdentity = identity(fstatSync(git, { bigint: true }));
     const indexBefore = lstatSync(fdPath(git, 'index'), { bigint: true });
     if (!indexBefore.isFile() || indexBefore.nlink !== 1n) throw changed();
+    const observedMetadata = new Map<string, string>([
+      ['index', identity(indexBefore) + ':' + stamp(indexBefore)],
+    ]);
     const metadata = (path: string, max: number) => {
       const parts = path.split('/'),
         opened: number[] = [];
@@ -73,6 +154,7 @@ export async function verifyCleanCommit(
         const raw = bytes.subarray(0, count),
           value = raw.toString('utf8');
         if (!Buffer.from(value).equals(raw)) throw changed();
+        observedMetadata.set(path, identity(s) + ':' + stamp(s));
         return value;
       } finally {
         for (const fd of opened.reverse()) closeSync(fd);
@@ -186,6 +268,7 @@ export async function verifyCleanCommit(
     };
     walk(root);
     if (observed.size !== entries.size) throw changed();
+    const exactFiles = observe ? new Map(observed) : undefined;
     // Re-open only observed paths without following links and recheck after traversal.
     const revisit = (fd: number, prefix = '') => {
       for (const name of readdirSync(fdPath(fd))) {
@@ -224,6 +307,9 @@ export async function verifyCleanCommit(
       stamp(lstatSync(fdPath(git, 'index'), { bigint: true })) !== stamp(indexBefore)
     )
       throw changed();
+    observe?.(() =>
+      recheckObservedCommit(directory, rootIdentity, gitIdentity, exactFiles!, observedMetadata),
+    );
     return snapshot!;
   } catch (cause) {
     if (cause instanceof DomainError && cause.code === 'WORKSPACE_COMMIT_CHANGED') throw cause;

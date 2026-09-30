@@ -45,6 +45,7 @@
 | 固定成果到本人目标提交的只读冲突检查 | [整合预检](integration-preflight.md) |
 | 本人确认选择新增普通文件、持久写锁与中断证据 | [整合应用](integration-application.md) |
 | 明确停止旧应用及子进程后，保留全部文件并结算原占用 | [本机结算](integration-recovery.md) |
+| 选中新增/修改/删除，在新私有目录核对完整候选文件 | [独立目录试应用](integration-trial.md) |
 
 ## 架构决策
 
