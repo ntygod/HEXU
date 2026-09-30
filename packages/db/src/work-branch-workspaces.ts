@@ -370,6 +370,12 @@ export class BranchWorkspaceStore {
     )
       throw new DomainError('WORK_BRANCH_BINDING_CHANGED', '方案与本人已登记现场不匹配', 409);
     if (!allowExisting) {
+      if (b.state === 'discarded')
+        throw new DomainError(
+          'WORK_BRANCH_DISCARDED',
+          '方案已放弃，不能创建新的执行；原执行和现场仍保留',
+          409,
+        );
       assertRevision(b.revision, selection.expectedRevision);
       if (!selection.continueFrom && (b.state !== 'planned' || b.runId))
         throw new DomainError('WORK_BRANCH_ALREADY_RUN', '此方案首轮已创建，不能隐式重试', 409);
@@ -438,7 +444,8 @@ export class BranchWorkspaceStore {
     const b = JSON.parse(row.body);
     if (b.runId !== run.id)
       throw new DomainError('WORK_BRANCH_BINDING_CHANGED', '方案执行关联不一致');
-    if (b.state !== 'active')
+    // A late acknowledgement belongs to the existing Run, not a request to reopen the branch.
+    if (b.state !== 'active' && b.state !== 'discarded')
       this.branches.change(task, { ...b, state: 'active' }, 'run_started', {
         id: run.createdByUserId!,
         name:

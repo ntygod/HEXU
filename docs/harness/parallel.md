@@ -50,3 +50,12 @@
 ## 验证与跨边界
 
 复用[方案定义](../../tests/work-branches.test.ts)、[真实现场与并发](../../tests/branch-workspaces.test.ts)和[浏览器流程](../../tests/e2e/checkpoint-retention.spec.ts)。检查原仓库/旧凭证不变、不同实际目录、Claude/Codex协议进程、固定输入、独立停止、权限/重复回执、部分失败和预算。浏览器需通过构建后的实际CLI运行需要Linux组件的路径，不绕过原生发布助手或放宽文件边界。Git/写入读[检查点](checkpoints.md)，实际调度读[执行](execution.md)与[节点](nodes.md)，界面读[UI](ui.md)，权限读[身份](identity.md)。
+
+
+## 保留现场的明确放弃
+
+[生命周期入口](../engineering/branch-lifecycle.md)独立于原planned-only discard，只接受已登记现场、当前Task编辑权、固定Task/分支修订和明确保留现场/不停止执行确认；当前选用必须先明确取消或替换，不暗中清除选择。分支状态/历史/outbox/回执同事务变化，原Task/Run/dispatch/节点/现场/成果/选择不改写，不调用文件或停止逻辑。
+
+已放弃分支仍展示原Run活动/未知状态和已有独立停止入口，后续启动报告不能改回active；已确认终态仍可明确保存新成果版本但保持discarded，不能伪造终止或采集未知来源。新执行和新选用拒绝，旧回执不重放动作；当前权限先于回执。界面基线固定，未知保存跨关闭/重开/分页保留body/key并返回固定原组，旧读取被取消后不得清除新确认；当前撤权清除，临时失败保留但禁新提交。已打开的比较选择遇放弃时保留说明而禁止新选择。
+
+保留处置不证明当前文件完整或目录空闲；目录实际删除、解绑、用户脏文件处置仍需后续明确实现，不能借此绕过租约或自动停模型。检查：[服务](../../tests/branch-lifecycle.test.ts)、[真实目录/协议进程](../../tests/branch-lifecycle-runner.test.ts)、[页面](../../tests/e2e/branch-lifecycle.spec.ts)。

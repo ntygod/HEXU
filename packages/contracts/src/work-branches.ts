@@ -59,6 +59,7 @@ export interface WorkBranchEvent {
   action:
     | 'plan'
     | 'discard'
+    | 'discard_preserving'
     | 'workspace_requested'
     | 'workspace_prepared'
     | 'workspace_bound'

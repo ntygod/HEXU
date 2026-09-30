@@ -61,6 +61,13 @@ export function attachWorkBranches(app: FastifyInstance, store: Store) {
     reply.header('Cache-Control', 'no-store');
     return resultSources.get(taskId(r), branchId(r));
   });
+  app.get(path + '/:branchId/discard-preview', async (r) => {
+    exact(r.query, []);
+    return branches.discardPreview(taskId(r), branchId(r));
+  });
+  app.post(path + '/:branchId/discard-preserving', async (r) =>
+    branches.discardPreserving(taskId(r), branchId(r), r.body, key(r)),
+  );
   app.post(path + '/:branchId/discard', async (r) =>
     branches.discard(taskId(r), branchId(r), r.body, key(r)),
   );

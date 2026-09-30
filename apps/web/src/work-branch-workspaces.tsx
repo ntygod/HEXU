@@ -197,7 +197,7 @@ function Actions({
             取消此现场准备
           </Button>
         )}
-      {op?.state === 'bound' && mine && !branch.runId && (
+      {op?.state === 'bound' && mine && !branch.runId && branch.state !== 'discarded' && (
         <Button
           variant="primary"
           onClick={() =>

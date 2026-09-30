@@ -52,3 +52,27 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.work-branch-lifecycle {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.work-branch-lifecycle code,
+.work-branch-lifecycle dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.work-branch-lifecycle dl,
+.work-branch-lifecycle dd {
+  margin: 0;
+}
+.work-branch-lifecycle dt {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-text-secondary);
+}
+.work-branch-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+}

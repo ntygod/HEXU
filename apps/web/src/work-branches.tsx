@@ -14,6 +14,7 @@ import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js'
 import './work-branches.css';
 import { BranchWorkspace } from './work-branch-workspaces.js';
 import { BranchResult } from './work-branch-results.js';
+import { BranchDiscardEditor } from './work-branch-lifecycle.js';
 
 const base = (taskId: string) => `/tasks/${encodeURIComponent(taskId)}/work-branches`;
 function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
@@ -249,6 +250,7 @@ function BranchHistory({ path }: { path: string }) {
                 {
                   plan: '定义方案',
                   discard: '放弃方案',
+                  discard_preserving: '放弃方案并保留现场',
                   workspace_requested: '请求独立现场',
                   workspace_prepared: '报告现场准备',
                   workspace_bound: '登记独立现场',
@@ -300,6 +302,8 @@ function Branch({
   path,
   editable,
   saved,
+  discardPreserving,
+  discardPending,
 }: {
   task: Task;
   startHash: string;
@@ -307,6 +311,8 @@ function Branch({
   path: string;
   editable: boolean;
   saved(): void;
+  discardPreserving(branch: WorkBranch): void;
+  discardPending: boolean;
 }) {
   const [history, setHistory] = useState(false);
   return (
@@ -315,7 +321,9 @@ function Branch({
         <strong>{branch.name}</strong>
         <span className="badge neutral">
           {branch.state === 'discarded'
-            ? '已放弃'
+            ? branch.workingCopyId
+              ? '已放弃 · 现场保留'
+              : '已放弃'
             : branch.state === 'selected'
               ? '已选用固定版本'
               : branch.state === 'ready'
@@ -328,7 +336,7 @@ function Branch({
         </span>
       </header>
       <p className="work-branch-text">{branch.goal}</p>
-      {branch.state !== 'discarded' && (
+      {(branch.state !== 'discarded' || branch.workspace || branch.run) && (
         <BranchWorkspace
           task={task}
           branch={branch}
@@ -338,7 +346,20 @@ function Branch({
           saved={saved}
         />
       )}
+      {branch.state === 'discarded' && branch.workingCopyId && (
+        <p className="work-branch-notice">
+          方案已放弃；现场、成果与原执行历史保留。放弃不代表进程已停止或文件已删除，原执行状态和停止动作仍独立显示。
+        </p>
+      )}
       <div className="work-branch-actions">
+        {editable &&
+          branch.workingCopyId &&
+          branch.workspace?.state === 'bound' &&
+          branch.state !== 'discarded' && (
+            <Button disabled={discardPending} onClick={() => discardPreserving(branch)}>
+              放弃方案并保留现场
+            </Button>
+          )}
         {editable && <Discard branch={branch} path={path} saved={saved} />}
         <Button onClick={() => setHistory((v) => !v)}>
           {history ? '收起方案历史' : '查看方案历史'}
@@ -349,20 +370,43 @@ function Branch({
     </article>
   );
 }
-function Panel({ task }: { task: Task }) {
+function Panel({
+  task,
+  discardPreserving,
+  pendingDiscard,
+  discardRevoked,
+  fixedGroupId,
+  showAll,
+}: {
+  task: Task;
+  discardPreserving(branch: WorkBranch): void;
+  pendingDiscard: WorkBranch | null;
+  discardRevoked: boolean;
+  fixedGroupId: string | null;
+  showAll(): void;
+}) {
   const { data } = useApp();
   const path = base(task.id),
     editable = canEditTask(data, task);
   const [creating, setCreating] = useState(false),
     [revoked, setRevoked] = useState(false),
     [cursor, setCursor] = useState<number | null>(null);
-  const read = useAssistanceRead<WorkBranchPage>(path + (cursor ? `?cursor=${cursor}` : ''));
+  const list = useAssistanceRead<WorkBranchPage>(
+    fixedGroupId ? null : path + (cursor ? `?cursor=${cursor}` : ''),
+  );
+  const fixed = useAssistanceRead<WorkBranchView>(
+    fixedGroupId ? `${path}/groups/${encodeURIComponent(fixedGroupId)}` : null,
+  );
+  const read = fixedGroupId
+    ? { ...fixed, value: fixed.value ? { items: [fixed.value], nextCursor: null } : null }
+    : list;
   useEffect(() => {
     if (!editable || read.denied) setCreating(false);
   }, [editable, read.denied]);
   if (read.denied) return <p role="alert">方案读取权限已失效，内容与编辑已清除。</p>;
   return (
     <div className="work-branches-panel">
+      {fixedGroupId && <Button onClick={showAll}>返回全部方案组</Button>}
       <p>为同一任务记录不同实现目标，固定共同说明与代码提交。方案定义不会自动开始并行执行。</p>
       {read.error && (
         <p role="alert">
@@ -370,11 +414,18 @@ function Panel({ task }: { task: Task }) {
           <Button onClick={read.retry}>重读方案组</Button>
         </p>
       )}
+      {pendingDiscard && (
+        <section className="work-branch-notice" aria-label="未确认的方案放弃">
+          <p>“{pendingDiscard.name}”的放弃请求尚待确认，原范围保留；分页或关闭列表不会撤回请求。</p>
+          <Button onClick={() => discardPreserving(pendingDiscard)}>继续确认放弃请求</Button>
+        </section>
+      )}
+      {discardRevoked && <p role="alert">方案编辑权限已失效，放弃确认已清除，重新打开不会恢复。</p>}
       {revoked && <p role="alert">编辑权限已失效，临时方案已清除；请核对权限后重新打开窗口。</p>}
       {editable && !creating && (
         <Button
           variant="primary"
-          disabled={revoked || !!read.error || !read.value}
+          disabled={revoked || !!read.error || !read.value || !!pendingDiscard}
           onClick={() => setCreating(true)}
         >
           定义一组方案
@@ -440,6 +491,8 @@ function Panel({ task }: { task: Task }) {
                   path={`${path}/${b.id}`}
                   editable={editable}
                   saved={read.retry}
+                  discardPreserving={discardPreserving}
+                  discardPending={!!pendingDiscard || discardRevoked}
                 />
               ))}
             </section>
@@ -460,14 +513,62 @@ function Panel({ task }: { task: Task }) {
   );
 }
 function Entry({ task }: { task: Task }) {
-  const [open, setOpen] = useState(false);
+  const { data } = useApp(),
+    editable = canEditTask(data, task);
+  const [open, setOpen] = useState(false),
+    [discard, setDiscard] = useState<WorkBranch | null>(null),
+    [discardOpen, setDiscardOpen] = useState(false),
+    [discardRevoked, setDiscardRevoked] = useState(false),
+    [fixedGroupId, setFixedGroupId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!editable) {
+      setDiscard(null);
+      setDiscardOpen(false);
+    }
+  }, [editable]);
   return (
     <>
       <Button onClick={() => setOpen(true)}>方案分支</Button>
       {open && (
         <Dialog title="任务方案分支" drawer onClose={() => setOpen(false)}>
-          <Panel task={task} />
+          <Panel
+            task={task}
+            pendingDiscard={discard}
+            discardRevoked={discardRevoked}
+            fixedGroupId={fixedGroupId}
+            showAll={() => setFixedGroupId(null)}
+            discardPreserving={(branch) => {
+              if (!editable || discardRevoked || (discard && discard.id !== branch.id)) return;
+              if (!discard) setDiscard(structuredClone(branch));
+              setOpen(false);
+              setDiscardOpen(true);
+            }}
+          />
         </Dialog>
+      )}
+      {discard && (
+        <BranchDiscardEditor
+          key={discard.id}
+          initial={discard}
+          open={discardOpen}
+          close={(keepPending) => {
+            setDiscardOpen(false);
+            if (!keepPending) setDiscard(null);
+            setOpen(true);
+          }}
+          saved={() => {
+            setFixedGroupId(discard.groupId);
+            setDiscard(null);
+            setDiscardOpen(false);
+            setOpen(true);
+          }}
+          denied={() => {
+            setDiscard(null);
+            setDiscardOpen(false);
+            setDiscardRevoked(true);
+            setOpen(true);
+          }}
+        />
       )}
     </>
   );
