@@ -104,6 +104,21 @@ jobs:
           name: hexu-feedback-followup-failures
           path: test-results/feedback-followups-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-member-version-previews
+          path: |
+            artifacts/159-member-version-editor-dark.png
+            artifacts/160-member-version-editor-mobile-light.png
+            artifacts/161-member-version-history-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-member-version-failures
+          path: test-results/member-result-versions-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
