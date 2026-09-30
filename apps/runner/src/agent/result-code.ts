@@ -24,7 +24,12 @@ const inside = (a: string, b: string) => {
   const r = relative(a, b);
   return !r || (!isAbsolute(r) && r !== '..' && !r.startsWith('..' + sep));
 };
-export function assertCodeQuiescent(home: string, root: string, rootIdentity: string) {
+export function assertCodeQuiescent(
+  home: string,
+  root: string,
+  rootIdentity: string,
+  ownClaim?: string,
+) {
   const journal = join(home, 'journal.sqlite');
   if (existsSync(journal)) {
     restorePrivatePath(journal, false);
@@ -48,13 +53,21 @@ export function assertCodeQuiescent(home: string, root: string, rootIdentity: st
     restorePrivatePath(registry, false);
     const db = new DatabaseSync(registry, { readOnly: true });
     try {
-      const claims = db.prepare('SELECT root,identity FROM claims').all() as {
+      const claims = db.prepare('SELECT root,identity,dispatch_id FROM claims').all() as {
         root: string;
         identity: string;
+        dispatch_id: string;
       }[];
       if (
         claims.some(
-          (c) => c.identity === rootIdentity || inside(c.root, root) || inside(root, c.root),
+          (c) =>
+            !(
+              ownClaim &&
+              c.dispatch_id === ownClaim &&
+              c.root === root &&
+              c.identity === rootIdentity
+            ) &&
+            (c.identity === rootIdentity || inside(c.root, root) || inside(root, c.root)),
         )
       )
         throw new DomainError(

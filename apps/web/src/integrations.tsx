@@ -5,6 +5,8 @@ import type {
   IntegrationView,
   IntegrationOptions,
   IntegrationReason,
+  IntegrationFile,
+  IntegrationApplicationReport,
 } from '../../../packages/contracts/src/integrations.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { Link, canEditTask, time, useApp } from './state.js';
@@ -18,6 +20,9 @@ const stateLabels = {
   conflict: '有冲突或清单省略',
   failed: '预检受阻',
   cancelled: '已取消预检',
+  applying: '应用进行中 · 等待节点结算',
+  completed: '所选文件已应用',
+  needs_attention: '应用需要本机处理',
 };
 const reasons: Record<IntegrationReason, string> = {
   target_changed: '目标HEAD、索引或文件与固定提交不一致',
@@ -27,33 +32,135 @@ const reasons: Record<IntegrationReason, string> = {
   budget_exceeded: '完整对象超过本轮预检预算',
   preflight_failed: '本机预检未完成，请核对材料与连接',
 };
-function Feedback({ command }: { command: ReturnType<typeof useAssistanceCommand> }) {
+const fileLabels = {
+  add: '新增',
+  modify: '修改',
+  delete: '删除',
+  already_present: '目标已有',
+  conflict: '冲突',
+};
+const selectable = (file: IntegrationFile) =>
+  file.action === 'add' && !!file.source && !file.base && !file.target && !file.conflict;
+const applicationReasons: Record<NonNullable<IntegrationApplicationReport['reason']>, string> = {
+  target_changed: '目标现场已变化',
+  workspace_busy: '目录仍有活动或未知写入',
+  objects_unavailable: '完整对象缺失、损坏或到期',
+  unsupported_snapshot: '文件类型、父目录或路径不支持本轮写入',
+  application_failed: '本机应用未完成',
+  interrupted: '应用被中断或上次结果不明',
+};
+function ApplicationStatus({ view }: { view: IntegrationView }) {
+  const o = view.operation,
+    a = o.application;
+  if (!a) return null;
+  const latest = a.reports.at(-1);
+  return (
+    <section className="integration-application-status" aria-label="文件应用状态">
+      <strong>所选应用范围 · {a.paths.length} 个新增文件</strong>
+      <ul>
+        {a.paths.map((name) => (
+          <li key={name}>
+            <code>{name}</code>
+          </li>
+        ))}
+      </ul>
+      <p>
+        {a.requestedBy.name} · {time(a.requestedAt)}
+      </p>
+      {o.state === 'queued' && (
+        <>
+          <p>等待本人在目标节点确认应用。请求已保存，尚未收到写入阶段声明。</p>
+          {view.available && (
+            <>
+              <code>
+                npm run runner:integration-apply -- --operation {o.id} --state &lt;节点状态目录&gt;
+              </code>
+              <p>
+                仅在本人Linux节点执行；会再次核对所选路径、完整对象、目标现场与恢复点。所有父目录必须已存在。
+              </p>
+            </>
+          )}
+        </>
+      )}
+      {o.state === 'applying' && (
+        <p className="work-branch-notice">
+          节点已进入应用阶段，可能已经写入。请等待或在原节点核对结果；不能取消、重复写入或自动回滚。
+        </p>
+      )}
+      {o.state === 'completed' && (
+        <p>节点已确认所选文件写入完成。未自动提交代码，也未标记任务完成；质量检查仍由你决定。</p>
+      )}
+      {o.state === 'needs_attention' && (
+        <p className="work-branch-notice">
+          可能已部分写入，目录锁仍需在原节点核对处理。不要重试写入或自动回滚；已确认的路径不能代表全部现场。
+        </p>
+      )}
+      {o.state === 'failed' && (
+        <p>节点报告应用失败，未确认任何文件写入。请在原节点核对现场与记录。</p>
+      )}
+      {o.state === 'cancelled' && (
+        <p>已在节点进入应用阶段前取消此应用请求，固定预检与所选范围保留。</p>
+      )}
+      {latest?.reason && <p role="status">{applicationReasons[latest.reason]}</p>}
+      {latest && (
+        <>
+          <p>
+            节点最新报告：{time(latest.observedAt)} · 已确认写入 {latest.appliedPaths.length} 个文件
+          </p>
+          {!!latest.appliedPaths.length && (
+            <ul aria-label="已确认写入路径">
+              {latest.appliedPaths.map((name) => (
+                <li key={name}>
+                  <code>{name}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+function Feedback({
+  command,
+  applicationCancel = false,
+}: {
+  command: ReturnType<typeof useAssistanceCommand>;
+  applicationCancel?: boolean;
+}) {
   return (
     <>
       {command.error && <p role="alert">{command.error}</p>}
       {command.uncertain && (
-        <section className="work-branch-notice" aria-label="整合预检请求待确认">
+        <section
+          className="work-branch-notice"
+          aria-label={applicationCancel ? '取消应用请求待确认' : '整合预检请求待确认'}
+        >
           <p>结果尚未确认。只会重发原来源、目标与操作标识；关闭窗口不会撤回已保存记录。</p>
           <Button type="button" busy={command.busy} onClick={() => void command.confirm()}>
-            确认上次预检请求
+            {applicationCancel ? '确认上次取消请求' : '确认上次预检请求'}
           </Button>
         </section>
       )}
     </>
   );
 }
-function Record({ view, saved }: { view: IntegrationView; saved(): void }) {
+function Record({
+  view,
+  saved,
+  apply,
+  pendingId,
+}: {
+  view: IntegrationView;
+  saved(): void;
+  apply?(view: IntegrationView): void;
+  pendingId?: string;
+}) {
   const o = view.operation,
     report = o.report,
     plan = report?.plan;
   const command = useAssistanceCommand(saved);
-  const labels = {
-    add: '新增',
-    modify: '修改',
-    delete: '删除',
-    already_present: '目标已有',
-    conflict: '冲突',
-  };
+  if (command.denied) return <p role="alert">操作权限已失效，整合内容已清除。</p>;
   return (
     <article className="integration-record" aria-label={`整合预检：${o.source.title}`}>
       <header>
@@ -61,9 +168,15 @@ function Record({ view, saved }: { view: IntegrationView; saved(): void }) {
           {o.source.title} · v{o.source.revision}
         </strong>
         <span
-          className={`badge ${o.state === 'conflict' || o.state === 'failed' ? 'warning' : 'neutral'}`}
+          className={`badge ${['conflict', 'failed', 'needs_attention'].includes(o.state) ? 'warning' : 'neutral'}`}
         >
-          {stateLabels[o.state]}
+          {o.application && o.state === 'queued'
+            ? '等待本人本机确认应用'
+            : o.application && o.state === 'cancelled'
+              ? '已取消应用请求'
+              : o.application && o.state === 'failed'
+                ? '应用失败'
+                : stateLabels[o.state]}
         </span>
       </header>
       <p>
@@ -102,7 +215,7 @@ function Record({ view, saved }: { view: IntegrationView; saved(): void }) {
           当前不可继续核验：{view.unavailableReason}。原记录保留。
         </p>
       )}
-      {o.state === 'queued' && view.available && (
+      {o.state === 'queued' && !o.application && view.available && (
         <details>
           <summary>在本人节点上生成预检</summary>
           <p>
@@ -137,7 +250,7 @@ function Record({ view, saved }: { view: IntegrationView; saved(): void }) {
               <li key={f.path}>
                 <div>
                   <span className={`badge ${f.action === 'conflict' ? 'warning' : 'neutral'}`}>
-                    {labels[f.action]}
+                    {fileLabels[f.action]}
                   </span>
                   <code>{f.path}</code>
                 </div>
@@ -173,28 +286,48 @@ function Record({ view, saved }: { view: IntegrationView; saved(): void }) {
           {!plan.changedFiles && <p>来源相对共同起点没有文件变化。</p>}
         </section>
       )}
-      <p>仅记录只读预检，代码尚未应用。后续写入需要独立确认并重新核对现场。</p>
+      <p>
+        {o.application
+          ? '以上为历史只读预检；原计划保持不变，实际写入以独立应用报告为准。'
+          : '仅记录只读预检，代码尚未应用。后续写入需要独立确认并重新核对现场。'}
+      </p>
+      <ApplicationStatus view={view} />
+      {apply && (view.canApply || pendingId === o.id) && (
+        <Button
+          disabled={command.busy || !!command.uncertain || (!!pendingId && pendingId !== o.id)}
+          onClick={() => apply(view)}
+        >
+          {pendingId === o.id ? '继续确认应用请求' : '选择文件应用'}
+        </Button>
+      )}
       <details>
         <summary>操作历史（{o.history.length}）</summary>
         <ol>
           {o.history.map((e) => (
             <li key={e.revision}>
-              {stateLabels[e.state]} · {time(e.at)}
+              {o.application && e.revision > 1 && e.state === 'queued'
+                ? '等待本人本机确认应用'
+                : o.application && e.state === 'cancelled'
+                  ? '已取消应用请求'
+                  : o.application && e.state === 'failed'
+                    ? '应用失败'
+                    : stateLabels[e.state]}{' '}
+              · {time(e.at)}
             </li>
           ))}
         </ol>
       </details>
-      {view.canCancel && !command.denied && (
+      {view.canCancel && !pendingId && !command.denied && (
         <Button
           disabled={command.busy || !!command.uncertain}
           onClick={() =>
             void command.send(`${path(o.taskId)}/${o.id}/cancel`, { expectedRevision: o.revision })
           }
         >
-          取消此预检
+          {o.application ? '取消应用请求' : '取消此预检'}
         </Button>
       )}
-      <Feedback command={command} />
+      <Feedback command={command} applicationCancel={!!o.application} />
     </article>
   );
 }
@@ -433,12 +566,243 @@ export function PrepareIntegration({ version }: { version: ResultRevision }) {
     </>
   );
 }
-function Records({ task }: { task: Task }) {
+function ApplicationEditor({
+  initial,
+  open,
+  close,
+  saved,
+  denied,
+}: {
+  initial: IntegrationView;
+  open: boolean;
+  close(keepPending: boolean): void;
+  saved(): void;
+  denied(): void;
+}) {
+  const [baseline, setBaseline] = useState(() => structuredClone(initial)),
+    [paths, setPaths] = useState<string[]>([]),
+    [confirmed, setConfirmed] = useState(false);
+  const o = baseline.operation,
+    read = useAssistanceRead<IntegrationView>(`${path(o.taskId)}/${o.id}`, 5000),
+    command = useAssistanceCommand<IntegrationView>(saved);
+  useEffect(() => {
+    if (command.denied || read.denied) denied();
+  }, [command.denied, read.denied]);
+  const locked = command.busy || !!command.uncertain,
+    stale =
+      !!read.value &&
+      (read.value.taskRevision !== baseline.taskRevision ||
+        read.value.operation.revision !== o.revision ||
+        read.value.reportHash !== baseline.reportHash ||
+        read.value.canApply !== baseline.canApply ||
+        read.value.available !== baseline.available);
+  if (!open || command.denied || read.denied) return null;
+  return (
+    <Dialog
+      title="确认选择性应用"
+      drawer
+      onClose={() => !command.busy && close(!!command.uncertain)}
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (
+            !paths.length ||
+            !confirmed ||
+            locked ||
+            stale ||
+            !read.value ||
+            read.error ||
+            !baseline.canApply ||
+            !baseline.reportHash
+          )
+            return;
+          void command.send(`${path(o.taskId)}/${o.id}/apply`, {
+            expectedRevision: o.revision,
+            expectedTaskRevision: baseline.taskRevision,
+            reportHash: baseline.reportHash,
+            paths,
+            confirmApplication: true,
+          });
+        }}
+      >
+        <div className="dialog-body integration-form">
+          <section aria-label="固定应用基线">
+            <strong>
+              {o.source.title} · v{o.source.revision}
+            </strong>
+            <p>此选择固定到当前预检报告，不跟随后续成果、任务修订或方案选择。</p>
+            <dl className="integration-baseline">
+              <dt>来源提交</dt>
+              <dd>
+                <code>{o.material.manifest.commit}</code>
+              </dd>
+              <dt>目标节点与目录</dt>
+              <dd>
+                {o.target.checkpoint.request.nodeName} / {o.target.checkpoint.request.workspaceName}
+              </dd>
+              <dt>目标提交</dt>
+              <dd>
+                <code>{o.target.manifest.commit}</code>
+              </dd>
+              <dt>恢复副本</dt>
+              <dd>
+                <code>{o.target.retentionId}</code> · 到期 {time(o.target.manifest.expiresAt)}
+              </dd>
+              <dt>固定预检报告</dt>
+              <dd>
+                <code>{baseline.reportHash}</code>
+              </dd>
+            </dl>
+          </section>
+          <p className="work-branch-notice">
+            本轮仅支持无冲突的新增普通文件，且目标父目录必须已存在。修改、删除、冲突、目标已有文件与有省略的清单均不能选择；不会创建目录或自动合并文本。
+          </p>
+          <fieldset className="integration-selection" disabled={locked}>
+            <legend>选择新增文件</legend>
+            <ul className="integration-files">
+              {o.report?.plan?.files.map((file) => (
+                <li key={file.path}>
+                  <label className="integration-consent">
+                    <input
+                      type="checkbox"
+                      aria-label={`选择 ${file.path}`}
+                      checked={paths.includes(file.path)}
+                      disabled={locked || !selectable(file) || !!o.report?.plan?.omittedFiles}
+                      onChange={(event) => {
+                        setPaths((old) =>
+                          event.target.checked
+                            ? [...old, file.path].sort()
+                            : old.filter((name) => name !== file.path),
+                        );
+                        setConfirmed(false);
+                      }}
+                    />
+                    <span>
+                      <span className="badge neutral">{fileLabels[file.action]}</span>{' '}
+                      <code>{file.path}</code>
+                      {!selectable(file) && <span> · 本轮不可应用</span>}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+          <section aria-label="本次应用路径">
+            <strong>本次明确选择 {paths.length} 个文件</strong>
+            <ul>
+              {paths.map((name) => (
+                <li key={name}>
+                  <code>{name}</code>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <p>
+            保存后仍需本人在目标节点确认，重新核对完整对象与目标现场并取得目录锁。不会自动提交代码、调用模型或标记任务完成。
+          </p>
+          <label className="integration-consent">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              disabled={locked || !paths.length}
+              onChange={(event) => setConfirmed(event.target.checked)}
+            />
+            我已核对固定来源、目标、恢复点与所选路径，确认仅应用这些新增文件
+          </label>
+          {stale && !command.uncertain && (
+            <p className="work-branch-notice">
+              任务修订、预检状态或可用权限已变化，选择已保留。明确重新核对后才能提交。
+            </p>
+          )}
+          {stale && read.value && !command.uncertain && (
+            <Button
+              type="button"
+              disabled={locked || !!read.error}
+              onClick={() => {
+                const next = structuredClone(read.value!);
+                setBaseline(next);
+                setPaths((old) =>
+                  old.filter((name) =>
+                    next.operation.report?.plan?.files.some(
+                      (file) => file.path === name && selectable(file),
+                    ),
+                  ),
+                );
+                setConfirmed(false);
+              }}
+            >
+              重新核对应用基线
+            </Button>
+          )}
+          {!baseline.canApply && !command.uncertain && (
+            <p role="status">当前记录不可提交应用，请查看最新操作状态和材料可用性。</p>
+          )}
+          {read.error && (
+            <p role="alert">
+              {read.error}
+              <Button type="button" onClick={read.retry}>
+                重读应用状态
+              </Button>
+            </p>
+          )}
+          {command.error && <p role="alert">{command.error}</p>}
+          {command.uncertain && (
+            <section className="work-branch-notice" aria-label="应用请求待确认">
+              <p>
+                请求可能已保存。确认只会重发原报告、原路径、原修订和同一操作标识；关闭不会撤回请求，重新打开后可继续确认。
+              </p>
+              <Button type="button" busy={command.busy} onClick={() => void command.confirm()}>
+                确认上次应用请求
+              </Button>
+            </section>
+          )}
+        </div>
+        <div className="dialog-footer">
+          <Button type="button" disabled={command.busy} onClick={() => close(!!command.uncertain)}>
+            关闭
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            busy={command.busy}
+            disabled={
+              !paths.length ||
+              !confirmed ||
+              locked ||
+              stale ||
+              !read.value ||
+              !!read.error ||
+              !baseline.canApply ||
+              !baseline.reportHash
+            }
+          >
+            确认所选应用范围
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+function Records({
+  task,
+  apply,
+  pendingId,
+  denied,
+}: {
+  task: Task;
+  apply(view: IntegrationView): void;
+  pendingId?: string;
+  denied(): void;
+}) {
   const read = useAssistanceRead<{ items: IntegrationView[] }>(path(task.id), 5000);
+  useEffect(() => {
+    if (read.denied) denied();
+  }, [read.denied]);
   if (read.denied) return <p role="alert">读取权限已失效，预检内容已清除。</p>;
   return (
     <div className="dialog-body integration-form">
-      <p>从固定成果版本的“准备代码整合”选择来源与目标。这里保留每次预检和取消记录。</p>
+      <p>从固定成果版本的“准备代码整合”选择来源与目标。这里保留每次预检、独立应用与取消记录。</p>
       {read.error && (
         <p role="alert">
           {read.error}
@@ -447,7 +811,15 @@ function Records({ task }: { task: Task }) {
       )}
       {read.value ? (
         read.value.items.length ? (
-          read.value.items.map((v) => <Record key={v.operation.id} view={v} saved={read.retry} />)
+          read.value.items.map((v) => (
+            <Record
+              key={v.operation.id}
+              view={v}
+              saved={read.retry}
+              apply={apply}
+              pendingId={pendingId}
+            />
+          ))
         ) : (
           <p>尚无整合预检。</p>
         )
@@ -458,14 +830,66 @@ function Records({ task }: { task: Task }) {
   );
 }
 function Entry({ task }: { task: Task }) {
-  const [open, setOpen] = useState(false);
+  const { data } = useApp();
+  const [open, setOpen] = useState(false),
+    [application, setApplication] = useState<IntegrationView | null>(null),
+    [applicationOpen, setApplicationOpen] = useState(false),
+    [revoked, setRevoked] = useState(false);
+  const editable = canEditTask(data, task);
+  useEffect(() => {
+    if (!editable) {
+      setApplication(null);
+      setApplicationOpen(false);
+    }
+  }, [editable]);
+  const denied = () => {
+    setApplication(null);
+    setApplicationOpen(false);
+    setRevoked(true);
+    setOpen(true);
+  };
   return (
     <>
       <Button onClick={() => setOpen(true)}>整合预检</Button>
       {open && (
         <Dialog title="任务整合预检" drawer onClose={() => setOpen(false)}>
-          <Records task={task} />
+          {revoked ? (
+            <p role="alert" className="dialog-body">
+              读取或操作权限已失效，整合内容已清除。
+            </p>
+          ) : (
+            <Records
+              task={task}
+              pendingId={application?.operation.id}
+              denied={denied}
+              apply={(view) => {
+                if (!editable || (application && application.operation.id !== view.operation.id))
+                  return;
+                if (!application) setApplication(structuredClone(view));
+                setOpen(false);
+                setApplicationOpen(true);
+              }}
+            />
+          )}
         </Dialog>
+      )}
+      {application && (
+        <ApplicationEditor
+          key={application.operation.id}
+          initial={application}
+          open={applicationOpen}
+          denied={denied}
+          close={(keepPending) => {
+            setApplicationOpen(false);
+            if (!keepPending) setApplication(null);
+            setOpen(true);
+          }}
+          saved={() => {
+            setApplication(null);
+            setApplicationOpen(false);
+            setOpen(true);
+          }}
+        />
       )}
     </>
   );

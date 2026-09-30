@@ -50,11 +50,17 @@ export class WorkspaceLease {
       this.db.exec(
         'PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS claims(root TEXT PRIMARY KEY,dispatch_id TEXT NOT NULL,identity TEXT NOT NULL); BEGIN IMMEDIATE;',
       );
-      const claims = this.db.prepare('SELECT root,dispatch_id FROM claims').all() as {
+      const claims = this.db.prepare('SELECT root,dispatch_id,identity FROM claims').all() as {
         root: string;
         dispatch_id: string;
+        identity: string;
       }[];
-      const overlap = claims.filter((c) => within(c.root, canonical) || within(canonical, c.root));
+      const overlap = claims.filter(
+        (c) =>
+          c.identity === `${stat.dev}:${stat.ino}` ||
+          within(c.root, canonical) ||
+          within(canonical, c.root),
+      );
       if (overlap.some((c) => !recover || c.dispatch_id !== dispatchId || c.root !== canonical))
         throw new DomainError(
           'LOCAL_WORKSPACE_BUSY',
@@ -73,6 +79,15 @@ export class WorkspaceLease {
       this.db.close();
       throw e;
     }
+  }
+  assertHeld() {
+    if (this.closed) throw new DomainError('LOCAL_WORKSPACE_BUSY', '工作区写锁已关闭', 409);
+    const stat = statSync(this.root);
+    const row = this.db
+      .prepare('SELECT dispatch_id,identity FROM claims WHERE root=?')
+      .get(this.root) as { dispatch_id: string; identity: string } | undefined;
+    if (!row || row.dispatch_id !== this.dispatchId || row.identity !== `${stat.dev}:${stat.ino}`)
+      throw new DomainError('LOCAL_WORKSPACE_BUSY', '原持久工作区写锁或目录身份已变化', 409);
   }
   release() {
     if (this.closed) return;

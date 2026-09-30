@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { buildIntegrationPlan } from '../apps/runner/src/agent/integration-plan.js';
+import { integrationAdditions } from '../apps/runner/src/agent/integration-application-plan.js';
 import {
   objectHash,
   verifySnapshot,
@@ -207,5 +208,56 @@ test('Git空子树不能被文件清单静默省略成无变化', async () => {
         '/fixture',
       ),
     /空子树/,
+  );
+});
+
+test('所选新增范围重新核对完整目标树，不能借未选删除绕过大小写/NFC碰撞', async () => {
+  for (const [oldName, newName] of [
+    ['Name', 'name'],
+    ['é', 'e\u0301'],
+  ]) {
+    const base = await snapshot({ [oldName!]: 'x' }),
+      source = await snapshot({ [newName!]: 'x' }),
+      target = base;
+    const plan = buildIntegrationPlan(
+      'sha1',
+      { base: base.tree, source: source.tree, target: target.tree },
+      { base, source, target },
+      '/fixture',
+    );
+    assert.equal(plan.conflicts, 0);
+    assert.throws(
+      () => integrationAdditions('sha1', target.tree, target, plan, [newName!], '/fixture'),
+      /碰撞/,
+    );
+  }
+});
+test('只选已有父目录中的新增文件，保留其他修改；新目录/重复/未列出或省略计划拒绝', async () => {
+  const base = await snapshot({ 'src/keep': 'base' }),
+    source = await snapshot({ 'src/keep': 'changed', 'src/new': 'new', 'brand-new/file': 'new' }),
+    target = base;
+  const plan = buildIntegrationPlan(
+    'sha1',
+    { base: base.tree, source: source.tree, target: target.tree },
+    { base, source, target },
+    '/fixture',
+  );
+  assert.deepEqual(
+    integrationAdditions('sha1', target.tree, target, plan, ['src/new'], '/fixture').map(
+      (e) => e.path,
+    ),
+    ['src/new'],
+  );
+  for (const paths of [['src/keep'], ['brand-new/file'], ['unknown'], ['src/new', 'src/new'], []])
+    assert.throws(() => integrationAdditions('sha1', target.tree, target, plan, paths, '/fixture'));
+  assert.throws(() =>
+    integrationAdditions(
+      'sha1',
+      target.tree,
+      target,
+      { ...plan, omittedFiles: 1 },
+      ['src/new'],
+      '/fixture',
+    ),
   );
 });

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { DomainError } from '../../../../packages/contracts/src/index.js';
 import type { CheckpointManifest } from '../../../../packages/contracts/src/checkpoints.js';
 import { fdPath, inode, identity, stamp } from './checkpoint-restore-files.js';
-import { snapshotEntries } from './checkpoint-restore-plan.js';
+import { snapshotEntries, type RestoreEntry } from './checkpoint-restore-plan.js';
 import { captureCommitReference } from './checkpoints.js';
 import { verifySnapshot, objectHash } from './checkpoint-objects.js';
 
@@ -31,6 +31,7 @@ export async function verifyCleanCommit(
   credentials: NodeCredentials,
   directory: LocalDirectory,
   expected: Pick<CheckpointManifest, 'commit' | 'tree' | 'objectFormat' | 'repositoryIdentity'>,
+  additions: readonly (RestoreEntry & { identity: string })[] = [],
 ) {
   let root: number | undefined, git: number | undefined;
   try {
@@ -127,6 +128,11 @@ export async function verifyCleanCommit(
       throw changed();
     const plan = snapshotEntries(expected.objectFormat, expected.tree, snapshot!, directory.root);
     const entries = new Map(plan.entries.map((e) => [e.path, e]));
+    for (const entry of additions) {
+      if (entry.kind !== 'file' || entries.has(entry.path)) throw changed();
+      entries.set(entry.path, entry);
+    }
+    const additionIdentities = new Map(additions.map((e) => [e.path, e.identity]));
     const observed = new Map<string, string>();
     const walk = (fd: number, prefix = '') => {
       for (const name of readdirSync(fdPath(fd))) {
@@ -147,6 +153,8 @@ export async function verifyCleanCommit(
         );
         try {
           const s = fstatSync(handle, { bigint: true });
+          if (additionIdentities.has(path) && additionIdentities.get(path) !== inode(s))
+            throw changed();
           observed.set(path, identity(s) + ':' + stamp(s));
           if (entry.kind === 'directory') walk(handle, path);
           else {

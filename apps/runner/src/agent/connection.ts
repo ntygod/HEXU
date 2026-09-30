@@ -60,6 +60,7 @@ export async function nodeRequest<T>(
       'result-code-publish',
       'integration-inspect',
       'integration-publish',
+      'integration-apply-publish',
     ].includes(path)
   )
     throw new Error('Unsupported node endpoint');
@@ -88,11 +89,13 @@ export async function nodeRequest<T>(
       length += value.length;
       if (
         length >
-        (path.startsWith('execution-') || path === 'checkpoint-transfer'
-          ? 131072
-          : path === 'handoff-acceptance'
-            ? 65536
-            : 32768)
+        (path === 'integration-inspect'
+          ? 262144
+          : path.startsWith('execution-') || path === 'checkpoint-transfer'
+            ? 131072
+            : path === 'handoff-acceptance'
+              ? 65536
+              : 32768)
       ) {
         await reader.cancel();
         throw new DomainError('INVALID_RESPONSE', '节点响应超出上限');

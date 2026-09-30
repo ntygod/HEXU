@@ -7,6 +7,8 @@ import type { TransferTicket } from '../../contracts/src/checkpoint-transfer.js'
 import {
   INTEGRATION_LIMITS,
   parseIntegrationCreate,
+  parseIntegrationApply,
+  parseIntegrationApplicationReport,
   parseIntegrationReport,
   type IntegrationOperation,
   type IntegrationSource,
@@ -22,7 +24,7 @@ import { WorkBranchStore } from './work-branches.js';
 import { codeHash } from './result-code.js';
 import type { Store } from './store.js';
 
-/** An explicit read-only operation. No Run, writer permission or Task completion. */
+/** Frozen read-only preflight plus a separately authorized, one-shot bounded application. */
 export class IntegrationStore {
   readonly transfers: CheckpointTransferStore;
   constructor(readonly store: Store) {
@@ -259,7 +261,9 @@ export class IntegrationStore {
   private view(o: IntegrationOperation): IntegrationView {
     let available = true,
       unavailableReason: string | null = null,
-      canCancel = false;
+      canCancel = false,
+      canApply = false;
+    const taskRevision = this.task(o.taskId).revision;
     // Metadata/history remains readable after material expiry or node revocation.
     try {
       this.authority(o, true);
@@ -269,14 +273,30 @@ export class IntegrationStore {
       unavailableReason = e.message;
     }
     try {
-      this.task(o.taskId, true);
+      this.owner(o);
+      this.authority(o, false);
       canCancel =
-        this.store.actorId === o.createdBy.id &&
-        ['queued', 'awaiting_choice', 'conflict'].includes(o.state);
+        ['queued', 'awaiting_choice', 'conflict'].includes(o.state) &&
+        !o.application?.reports.length;
+      canApply =
+        available &&
+        !o.application &&
+        ['awaiting_choice', 'conflict'].includes(o.state) &&
+        !!o.report?.plan &&
+        !o.report.plan.omittedFiles &&
+        o.report.plan.files.some((f) => f.action === 'add' && f.source && !f.target && !f.base);
     } catch {
       /* read-only viewer */
     }
-    return { operation: o, available, unavailableReason, canCancel };
+    return {
+      operation: o,
+      available,
+      unavailableReason,
+      canCancel,
+      canApply,
+      taskRevision,
+      reportHash: o.report ? codeHash(o.report) : null,
+    };
   }
   get(taskId: string, id: string) {
     return this.view(this.row(taskId, id));
@@ -328,6 +348,7 @@ export class IntegrationStore {
         revision: 1,
         state: 'queued',
         report: null,
+        application: null,
         history: [{ revision: 1, state: 'queued', at: createdAt, actorId: this.store.actorId }],
         applied: false,
       };
@@ -346,15 +367,91 @@ export class IntegrationStore {
     });
     return this.get(taskId, receipt.id);
   }
+  private owner(o: IntegrationOperation) {
+    const task = this.task(o.taskId, true);
+    if (
+      o.createdBy.id !== this.store.actorId ||
+      o.target.checkpoint.request.requestedBy.id !== this.store.actorId ||
+      (o.application && o.application.requestedBy.id !== this.store.actorId)
+    )
+      throw new DomainError('NODE_OWNER_REQUIRED', '只有原目标节点本人和整合发起者可操作', 403);
+    return task;
+  }
+  apply(taskId: string, id: string, input: unknown, key: string) {
+    const data = parseIntegrationApply(input),
+      original = this.row(taskId, id);
+    this.owner(original);
+    this.authority(original, false); // Authority before old receipts; expiry is not erasure.
+    this.store.mutate(`integration.apply:${id}`, key, data, () => {
+      const o = this.row(taskId, id),
+        task = this.owner(o);
+      assertRevision(o.revision, data.expectedRevision);
+      assertRevision(task.revision, data.expectedTaskRevision);
+      this.authority(o, true);
+      if (o.application || !['awaiting_choice', 'conflict'].includes(o.state))
+        throw new DomainError(
+          'INTEGRATION_APPLICATION_FIXED',
+          '本次整合已选择应用或已关闭，不能再次应用',
+          409,
+        );
+      if (!o.report?.plan || codeHash(o.report) !== data.reportHash)
+        throw new DomainError('INTEGRATION_REPORT_MISMATCH', '需选择当前固定预检报告', 409);
+      const plan = o.report.plan;
+      if (
+        plan.omittedFiles ||
+        data.paths.some((path) => {
+          const f = plan.files.find((f) => f.path === path);
+          return !f || f.action !== 'add' || !f.source || !!f.base || !!f.target || !!f.conflict;
+        })
+      )
+        throw new DomainError(
+          'INTEGRATION_APPLICATION_UNSUPPORTED',
+          '当前仅支持完整预检中无冲突的新增普通文件，不支持修改、删除、已存在文件或省略清单',
+          409,
+        );
+      const applicationId = randomUUID(),
+        requestedAt = new Date().toISOString();
+      o.application = {
+        id: applicationId,
+        reportHash: data.reportHash,
+        paths: data.paths,
+        inputHash: codeHash({
+          integrationId: o.id,
+          applicationId,
+          reportHash: data.reportHash,
+          paths: data.paths,
+        }),
+        requestedAt,
+        requestedBy: { id: this.store.actorId, name: this.store.actorName() },
+        reports: [],
+      };
+      o.state = 'queued';
+      o.revision++;
+      o.history.push({
+        revision: o.revision,
+        state: o.state,
+        at: requestedAt,
+        actorId: this.store.actorId,
+      });
+      this.save(o);
+      return { id };
+    });
+    return this.get(taskId, id);
+  }
   cancel(taskId: string, id: string, expectedRevision: number, key: string) {
-    this.task(taskId, true);
-    if (this.row(taskId, id).createdBy.id !== this.store.actorId)
-      throw new DomainError('NODE_OWNER_REQUIRED', '只有预检发起者可取消', 403);
+    const original = this.row(taskId, id);
+    this.owner(original);
+    this.authority(original, false);
     this.store.mutate(`integration.cancel:${id}`, key, { expectedRevision }, () => {
       const o = this.row(taskId, id);
+      this.owner(o);
+      this.authority(o, false);
       assertRevision(o.revision, expectedRevision);
-      if (!['queued', 'awaiting_choice', 'conflict'].includes(o.state))
-        throw new DomainError('INTEGRATION_CLOSED', '预检已关闭', 409);
+      if (
+        !['queued', 'awaiting_choice', 'conflict'].includes(o.state) ||
+        o.application?.reports.length
+      )
+        throw new DomainError('INTEGRATION_CLOSED', '整合已关闭或已进入写入阶段，不能取消', 409);
       o.state = 'cancelled';
       o.revision++;
       o.history.push({
@@ -387,6 +484,72 @@ export class IntegrationStore {
   }
   inspect(token: string, id: string) {
     return this.forNode(token, id, (o) => this.view(o));
+  }
+  publishApplication(token: string, input: unknown) {
+    const report = parseIntegrationApplicationReport(input),
+      digest = codeHash(report);
+    return this.store.atomic(() =>
+      this.forNode(token, report.integrationId, (o) => {
+        this.owner(o);
+        const a = o.application;
+        if (
+          !a ||
+          a.id !== report.applicationId ||
+          a.inputHash !== report.inputHash ||
+          !o.report ||
+          a.reportHash !== codeHash(o.report) ||
+          report.observedAt < a.requestedAt ||
+          Date.parse(report.observedAt) > Date.now() + 60000 ||
+          report.appliedPaths.some((path) => !a.paths.includes(path)) ||
+          (report.stage === 'completed' &&
+            canonicalJson(report.appliedPaths) !== canonicalJson(a.paths))
+        )
+          throw new DomainError(
+            'INTEGRATION_APPLICATION_MISMATCH',
+            '应用记录、选择范围或观察时间不匹配',
+            409,
+          );
+        // Applying is a current-authority claim before writes, including a lost-ACK retry.
+        // A no-write abort or terminal evidence may settle after expiry, never revocation.
+        if (report.stage === 'applying') this.authority(o, true);
+        const old = a.reports.find((r) => r.sequence === report.sequence);
+        if (old) {
+          if (codeHash(old) !== digest)
+            throw new DomainError('INTEGRATION_APPLICATION_FIXED', '同阶段应用证据不能替换', 409);
+        } else {
+          if (
+            report.sequence !== a.reports.length + 1 ||
+            (report.sequence === 1 ? o.state !== 'queued' : o.state !== 'applying') ||
+            (report.sequence === 2 &&
+              (a.reports[0]!.stage !== 'applying' || report.observedAt < a.reports[0]!.observedAt))
+          )
+            throw new DomainError(
+              'INTEGRATION_APPLICATION_SEQUENCE',
+              '应用阶段已关闭、缺少写入声明或时间顺序不符',
+              409,
+            );
+          a.reports.push(report);
+          o.state = report.stage;
+          o.applied = report.stage === 'completed';
+          o.revision++;
+          o.history.push({
+            revision: o.revision,
+            state: o.state,
+            at: new Date().toISOString(),
+            actorId: this.store.actorId,
+          });
+          this.save(o);
+        }
+        return {
+          integrationId: o.id,
+          applicationId: a.id,
+          hash: digest,
+          sequence: report.sequence,
+          state: o.state,
+          revision: o.revision,
+        };
+      }),
+    );
   }
   publish(token: string, input: unknown) {
     const report = parseIntegrationReport(input),

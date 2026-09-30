@@ -43,6 +43,7 @@
 | 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |
 | 选定成果后，在原目录明确开始下一轮 | [方案接续](branch-continuation.md) |
 | 固定成果到本人目标提交的只读冲突检查 | [整合预检](integration-preflight.md) |
+| 本人确认选择新增普通文件、持久写锁与中断证据 | [整合应用](integration-application.md) |
 
 ## 架构决策
 

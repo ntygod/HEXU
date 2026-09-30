@@ -23,6 +23,7 @@ import { captureCommitReference } from './checkpoints.js';
 import { verifyCleanCommit } from './committed-workspace.js';
 import { assertCodeQuiescent } from './result-code.js';
 import { buildIntegrationPlan } from './integration-plan.js';
+import { terminalLabel } from './terminal-label.js';
 
 const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).digest('hex');
 const inside = (a: string, b: string) => {
@@ -146,7 +147,7 @@ export async function preflightIntegration(
         assertCodeQuiescent(home, w.root, w.rootIdentity);
       };
       log(
-        `成果 ${o.source.title} · v${o.source.revision}\n共同起点 ${o.source.code.base.commit}\n来源 ${o.material.manifest.commit}\n目标 ${o.target.manifest.commit}\n恢复副本 ${o.target.retentionId}\n本机目标 ${w.root}`,
+        `成果 ${terminalLabel(o.source.title)} · v${o.source.revision}\n共同起点 ${o.source.code.base.commit}\n来源 ${o.material.manifest.commit}\n目标 ${o.target.manifest.commit}\n恢复副本 ${o.target.retentionId}\n本机目标 ${terminalLabel(w.root)}`,
       );
       log(
         '只读取完整提交对象并核对目标HEAD、索引和文件。双方修改同一文件会列为冲突，不自动合并文本，不改动目录或调用模型。',
