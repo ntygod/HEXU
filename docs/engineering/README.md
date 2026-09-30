@@ -43,6 +43,7 @@
 | 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |
 | 固定成果文件/行位置的反馈与旧版跳转 | [代码反馈](result-code-feedback.md) |
 | 回复具体成果反馈、保留直接来源与原版本 | [反馈回复](result-feedback-replies.md) |
+| 编辑反馈为待选要求，再于原方案明确选入接续 | [反馈采用](feedback-next-input.md) |
 | 选定成果后，在原目录明确开始下一轮 | [方案接续](branch-continuation.md) |
 | 固定成果到本人目标提交的只读冲突检查 | [整合预检](integration-preflight.md) |
 | 本人确认选择新增普通文件、持久写锁与中断证据 | [整合应用](integration-application.md) |

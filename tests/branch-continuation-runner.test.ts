@@ -145,12 +145,29 @@ for (const format of ['sha1', 'sha256'] as const)
           git(f.p.target, 'pack-refs', '--all'); // Continuation permits a normal packed branch reference.
         }
         const before = (await f.api.call(`results/${f.saved.resultId}`, f.alice)).json().version;
-        await f.api.call(`tasks/${f.task.id}/messages`, f.alice, {
+        const feedback = await f.api.call(`tasks/${f.task.id}/messages`, f.alice, {
           body: 'UNSELECTED_LATE_FEEDBACK',
           resultId: f.saved.resultId,
           resultRevisionId: f.saved.revisionId,
         });
-        const body = await f.body(prompt),
+        assert.equal(feedback.statusCode, 201, feedback.body);
+        const note = await f.api.call(
+          `results/${f.saved.resultId}/versions/${f.saved.revisionId}/feedback/${feedback.json().id}/next-inputs`,
+          f.alice,
+          { body: 'EXPLICIT_EDITED_FEEDBACK_REQUIREMENT' },
+        );
+        assert.equal(note.statusCode, 201, note.body);
+        const draft = await f.body(prompt);
+        const body = {
+            ...draft,
+            workBranch: {
+              ...draft.workBranch,
+              continueFrom: {
+                ...draft.workBranch.continueFrom!,
+                inputs: [{ id: note.json().id, revision: note.json().revision }],
+              },
+            },
+          },
           key = randomUUID();
         const r = await f.api.call(`tasks/${f.task.id}/runs`, f.alice, body, key);
         assert.equal(r.statusCode, 201, r.body);
@@ -163,8 +180,14 @@ for (const format of ['sha1', 'sha256'] as const)
         assert(text.includes('SELECTED_VERSION_SCOPE'));
         assert(text.includes(f.commit));
         assert(text.includes(prompt));
+        assert(text.includes('EXPLICIT_EDITED_FEEDBACK_REQUIREMENT'));
         assert(!text.includes('UNSELECTED_LATE_FEEDBACK'));
         assert(!text.includes('BETA_ONLY'));
+        const inputs = await f.api.call(`tasks/${f.task.id}/next-inputs`, f.alice);
+        assert.equal(
+          inputs.json().items.find((i: { id: string }) => i.id === note.json().id).state,
+          'started',
+        );
         assert.deepEqual(
           (await f.api.call(`results/${f.saved.resultId}`, f.alice)).json().version,
           before,

@@ -37,7 +37,9 @@
 
 [本机所选起点](../../apps/runner/src/agent/branch-continuation-origin.ts)保留原节点登记/目录身份，单独检查所选提交的HEAD、完整实际文件/模式与原始对象，不使用原首轮文件清单假装匹配。必须干净匹配，额外/忽略/暂存文件和未知占用不清理、不重置；许可前后复核，启动前再核对本机策略与期限。首轮原检查保持原样。
 
-只带固定共同说明、方案目标、所选成果/限制/代码和本次要求，超限拒绝；不借旧会话、后来输出或其他方案补材料。当前仅新会话、已确认终态和同一本人目录；普通接续入口继续拒绝方案Run，不能移除保护绕过。用法见[方案接续](../engineering/branch-continuation.md)，验证见[控制层](../../tests/branch-continuation.test.ts)、[真实Git/双协议进程](../../tests/branch-continuation-runner.test.ts)和[浏览器](../../tests/e2e/branch-results.spec.ts)。
+只带固定共同说明、方案目标、所选成果/限制/代码、本次要求，以及用户明确勾选的同方案下一轮要求，超限拒绝；不借旧会话、后来输出或其他方案补材料。当前仅新会话、已确认终态和同一本人目录；普通接续入口继续拒绝方案Run，不能移除保护绕过。用法见[方案接续](../engineering/branch-continuation.md)，验证见[控制层](../../tests/branch-continuation.test.ts)、[真实Git/双协议进程](../../tests/branch-continuation-runner.test.ts)和[浏览器](../../tests/e2e/branch-results.spec.ts)。
+
+反馈来源要求须保持同Task/branch/group/固定ResultRevision，原反馈原文与编辑后的要求分开；普通接续拒绝这类来源，不能借Task级队列绕过方案选择。可选`continueFrom.inputs`固定id/revision，未传保持原行为；原Run事务内核对queued/修订并绑定，许可前复查attached归属，实际running才started，未知不重排。预览与派发复用同一正文函数，未勾选及原反馈全文不自动加入。用法与检查见[反馈采用](../engineering/feedback-next-input.md)。
 
 ## 继续开发时保持
 

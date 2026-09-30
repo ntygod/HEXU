@@ -4,8 +4,17 @@ import { nextInputLabels, type NextInput } from '../../../packages/contracts/src
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Empty } from '../../../packages/ui/src/index.js';
 import { useApp, useLoad, useTaskDraft, time } from './state.js';
+import { FeedbackInputOrigin } from './feedback-next-input.js';
 
-export function NextInputPanel({ run, editable }: { run: Run; editable: boolean }) {
+export function NextInputPanel({
+  run,
+  editable,
+  allowCreate = true,
+}: {
+  run: Run;
+  editable: boolean;
+  allowCreate?: boolean;
+}) {
   const { data, refresh, notice } = useApp();
   const { value, error } = useLoad<{ items: NextInput[] }>(`/tasks/${run.taskId}/next-inputs`);
   const [busy, setBusy] = useState(false);
@@ -46,7 +55,7 @@ export function NextInputPanel({ run, editable }: { run: Run; editable: boolean 
           {error}
         </p>
       )}
-      {editable ? (
+      {editable && (allowCreate || editing) ? (
         <form
           className="next-input-compose"
           onSubmit={(event) => {
@@ -92,6 +101,11 @@ export function NextInputPanel({ run, editable }: { run: Run; editable: boolean 
       <p className="prompt-delivery">
         {pending.length} 条待处理 · 保存后由节点所有者在接续时明确选择，不会自动执行。
       </p>
+      {!allowCreate && (
+        <p className="prompt-delivery">
+          方案要求从固定成果反馈下整理保存，再从所选方案继续时明确选入。
+        </p>
+      )}
       {queueOpen && (
         <Dialog title="下一轮要求与记录" drawer onClose={() => !busy && setQueueOpen(false)}>
           <div className="next-input-queue">
@@ -111,6 +125,7 @@ export function NextInputPanel({ run, editable }: { run: Run; editable: boolean 
                   </span>
                 </div>
                 <p>{item.body}</p>
+                {item.origin && <FeedbackInputOrigin origin={item.origin} />}
                 {item.targetRunId && (
                   <small>
                     关联执行：{item.targetRunId}

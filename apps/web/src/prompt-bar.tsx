@@ -20,7 +20,8 @@ export function PromptBar({
   onConfigure(): void;
   onContinue(): void;
 }) {
-  const node = run?.provider === 'node' && !run.node?.workBranch;
+  const hasNodeRun = run?.provider === 'node';
+  const node = hasNodeRun && !run.node?.workBranch;
   const [intent, setIntent] = useState(node ? 'next' : 'discussion');
   useEffect(() => setIntent(node ? 'next' : 'discussion'), [node]);
   return (
@@ -29,7 +30,7 @@ export function PromptBar({
         <button aria-pressed={intent === 'discussion'} onClick={() => setIntent('discussion')}>
           任务讨论
         </button>
-        {node && (
+        {hasNodeRun && (
           <button aria-pressed={intent === 'next'} onClick={() => setIntent('next')}>
             下一轮要求
           </button>
@@ -47,9 +48,9 @@ export function PromptBar({
         <MessageComposer taskId={task.id} />
         <p className="prompt-delivery">保存到任务讨论，不会作为即时输入发送给执行工具。</p>
       </div>
-      {node && (
+      {hasNodeRun && (
         <div hidden={intent !== 'next'}>
-          <NextInputPanel run={run} editable={editable} />
+          <NextInputPanel run={run} editable={editable} allowCreate={!run.node?.workBranch} />
         </div>
       )}
       {node && (

@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { DomainError } from '../../contracts/src/index.js';
-import type { NextInput, NodeContinuationSelection } from '../../contracts/src/next-input.js';
+import type {
+  NextInput,
+  NextInputRef,
+  NodeContinuationSelection,
+} from '../../contracts/src/next-input.js';
+import type { ResultFeedbackInputOrigin } from '../../contracts/src/result-feedback-inputs.js';
+import type { WorkBranch } from '../../contracts/src/work-branches.js';
+import { ResultRevisions } from './result-revisions.js';
+import { feedbackInputSourceRun } from './result-feedback-inputs.js';
 import { assertRevision } from '../../domain/src/index.js';
 import type { Store } from './store.js';
 const stamp = () => new Date().toISOString();
@@ -15,6 +23,11 @@ export class NextInputs {
       | undefined;
     if (!row) throw new DomainError('NOT_FOUND', '下一轮要求不存在或不可访问', 404);
     return JSON.parse(row.body) as NextInput;
+  }
+  get(id: string) {
+    const input = this.read(id);
+    this.store.getTask(input.taskId);
+    return input;
   }
   private write(input: NextInput) {
     this.store.db
@@ -49,29 +62,40 @@ export class NextInputs {
     if (source.provider !== 'node')
       throw new DomainError('CAPABILITY_UNAVAILABLE', '此队列只用于独立节点任务', 422);
     const result = this.store.mutate(`next_input.create:${sourceRunId}`, key, { body }, () => {
-      const count = this.store.db
-        .prepare(
-          "SELECT COUNT(*) AS n FROM task_next_inputs WHERE task_id=? AND state IN ('queued','attached')",
-        )
-        .get(source.taskId)!.n as number;
-      if (count >= 20)
-        throw new DomainError('INPUT_QUEUE_FULL', '最多保留 20 条待使用要求，请先处理或撤回');
-      const now = stamp();
-      return this.write({
-        id: randomUUID(),
-        taskId: source.taskId,
-        sourceRunId,
-        body,
-        authorId: this.store.actorId,
-        authorName: this.store.actorName(),
-        revision: 1,
-        state: 'queued',
-        targetRunId: null,
-        createdAt: now,
-        updatedAt: now,
-      });
+      return this.insertQueued(source.taskId, sourceRunId, body);
     });
     return this.read(result.id);
+  }
+  /** Caller owns the transaction, receipt and source validation. Reuses the one queue. */
+  insertQueued(
+    taskId: string,
+    sourceRunId: string,
+    body: string,
+    origin?: ResultFeedbackInputOrigin,
+  ) {
+    this.store.getTask(taskId, true);
+    const count = this.store.db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM task_next_inputs WHERE task_id=? AND state IN ('queued','attached')",
+      )
+      .get(taskId)!.n as number;
+    if (count >= 20)
+      throw new DomainError('INPUT_QUEUE_FULL', '最多保留 20 条待使用要求，请先处理或撤回');
+    const now = stamp();
+    return this.write({
+      id: randomUUID(),
+      taskId,
+      sourceRunId,
+      body,
+      authorId: this.store.actorId,
+      authorName: this.store.actorName(),
+      revision: 1,
+      state: 'queued',
+      targetRunId: null,
+      createdAt: now,
+      updatedAt: now,
+      ...(origin ? { origin } : {}),
+    });
   }
   edit(id: string, expectedRevision: number, body: string | null, key: string) {
     const input = this.read(id);
@@ -95,12 +119,18 @@ export class NextInputs {
           updatedAt: stamp(),
         });
       },
+      () => {
+        const current = this.read(id);
+        this.store.getTask(current.taskId, true);
+        if (current.authorId !== this.store.actorId)
+          throw new DomainError('INPUT_AUTHOR_REQUIRED', '只能修改或撤回自己保存的要求', 403);
+      },
     );
     return this.read(result.id);
   }
-  selected(taskId: string, selection: NodeContinuationSelection) {
+  private selectedQueued(taskId: string, refs: NextInputRef[]) {
     this.store.getTask(taskId, true);
-    return selection.inputs.map((ref) => {
+    return refs.map((ref) => {
       const input = this.read(ref.id);
       if (input.taskId !== taskId)
         throw new DomainError('INVALID_CONTINUATION', '所选要求不属于当前任务', 409);
@@ -110,9 +140,24 @@ export class NextInputs {
       return input;
     });
   }
+  selected(taskId: string, selection: Pick<NodeContinuationSelection, 'inputs'>) {
+    const inputs = this.selectedQueued(taskId, selection.inputs);
+    for (const input of inputs) {
+      if (input.origin)
+        throw new DomainError(
+          'BRANCH_INPUT_SCOPE_CHANGED',
+          '方案要求只能在对应方案的所选固定版本中明确选用',
+          409,
+        );
+    }
+    return inputs;
+  }
   /** Inside NodeExecution.create's existing transaction, never start another transaction here. */
-  attach(taskId: string, selection: NodeContinuationSelection, runId: string) {
-    for (const input of this.selected(taskId, selection))
+  attach(taskId: string, selection: Pick<NodeContinuationSelection, 'inputs'>, runId: string) {
+    this.attachInputs(this.selected(taskId, selection), runId);
+  }
+  private attachInputs(inputs: NextInput[], runId: string) {
+    for (const input of inputs)
       this.write({
         ...input,
         state: 'attached',
@@ -120,6 +165,99 @@ export class NextInputs {
         revision: input.revision + 1,
         updatedAt: stamp(),
       });
+  }
+  private branchScope(
+    input: NextInput,
+    taskId: string,
+    branch: WorkBranch,
+    resultRevisionId: string,
+  ) {
+    if (input.taskId !== taskId) return false;
+    const source = this.store.run(input.sourceRunId);
+    if (
+      source.taskId !== taskId ||
+      source.provider !== 'node' ||
+      source.purpose ||
+      source.node?.workBranch?.branchId !== branch.id ||
+      source.node.workBranch.groupId !== branch.groupId ||
+      source.node.workingCopyId !== branch.workingCopyId
+    )
+      return false;
+    const version = new ResultRevisions(this.store).get(branch.resultId!, resultRevisionId);
+    if (version.source.kind !== 'work_branch' || version.source.run.nodeId !== source.node.nodeId)
+      return false;
+    const origin = input.origin;
+    if (!origin) return true;
+    if (
+      origin.kind !== 'result_feedback' ||
+      origin.version !== 1 ||
+      origin.branchId !== branch.id ||
+      origin.groupId !== branch.groupId ||
+      origin.sourceRunId !== source.id ||
+      origin.resultId !== branch.resultId ||
+      origin.resultRevisionId !== resultRevisionId
+    )
+      return false;
+    return (
+      version.taskId === taskId &&
+      version.revision === origin.resultRevision &&
+      feedbackInputSourceRun(this.store, version)?.id === source.id
+    );
+  }
+  branchOptions(taskId: string, branch: WorkBranch, resultRevisionId: string) {
+    return this.list(taskId).filter((input) => {
+      try {
+        return this.branchScope(input, taskId, branch, resultRevisionId);
+      } catch {
+        return false;
+      }
+    });
+  }
+  branchSelected(
+    taskId: string,
+    branch: WorkBranch,
+    resultRevisionId: string,
+    refs: NextInputRef[],
+    allowReceipt = false,
+  ) {
+    this.store.getTask(taskId, true);
+    const inputs = allowReceipt
+      ? refs.map((ref) => this.read(ref.id))
+      : this.selectedQueued(taskId, refs);
+    for (const input of inputs) {
+      if (!this.branchScope(input, taskId, branch, resultRevisionId))
+        throw new DomainError(
+          'BRANCH_INPUT_SCOPE_CHANGED',
+          '所选要求不属于此方案及固定成果版本',
+          409,
+        );
+    }
+    return inputs;
+  }
+  attachBranch(
+    taskId: string,
+    branch: WorkBranch,
+    resultRevisionId: string,
+    refs: NextInputRef[],
+    runId: string,
+  ) {
+    this.attachInputs(this.branchSelected(taskId, branch, resultRevisionId, refs), runId);
+  }
+  /** Internal permit barrier; queue edits cannot mutate an attached input. */
+  attachedCurrent(taskId: string, runId: string, refs: NextInputRef[]) {
+    return refs.every((ref) => {
+      const row = this.store.db
+        .prepare('SELECT body FROM task_next_inputs WHERE id=? AND task_id=? AND target_run_id=?')
+        .get(ref.id, taskId, runId) as Row | undefined;
+      if (!row) return false;
+      const input = JSON.parse(row.body) as NextInput;
+      return (
+        input.taskId === taskId &&
+        input.targetRunId === runId &&
+        input.state === 'attached' &&
+        input.revision === ref.revision + 1
+      );
+    });
   }
   /** Actual spawn is not proof the model read the prompt. UI says started, never delivered. */
   started(runId: string) {

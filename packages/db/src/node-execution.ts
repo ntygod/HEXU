@@ -24,7 +24,10 @@ import type { IdentityUser } from '../../contracts/src/identity.js';
 import { appendProjectMaterials } from '../../contracts/src/project-materials.js';
 import type { NodeRegistry } from './nodes.js';
 import { BranchWorkspaceStore } from './work-branch-workspaces.js';
-import { branchContext } from '../../contracts/src/work-branch-workspaces.js';
+import {
+  branchContext,
+  branchContinuationContext,
+} from '../../contracts/src/work-branch-workspaces.js';
 import type { BranchContinuationPreview } from '../../contracts/src/work-branch-workspaces.js';
 import { BranchContinuations } from './branch-continuation.js';
 
@@ -566,184 +569,224 @@ export class NodeExecution {
     this.store.projectMaterials.assertAccess(taskId, input.projectMaterials);
     const workspaces = new BranchWorkspaceStore(this.store);
     workspaces.execution(taskId, input, true); // Bound directory/owner checked before receipt replay.
-    const response = this.store.mutate(`node.run.create:${taskId}`, key, input, () => {
-      const task = this.store.projectLifecycle.assertExecution(taskId);
-      const branch = workspaces.execution(taskId, input);
-      if (branch && operation)
-        throw new DomainError('WORK_BRANCH_MANUAL', '方案执行需单独明确发起', 409);
-      if (task.projectId !== node.project_id)
-        throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务项目已变化', 409);
-      if (
-        input.expectedTaskContextHash &&
-        executionHash(this.humanContext(task)) !== input.expectedTaskContextHash
-      )
-        throw new DomainError('CONTEXT_CHANGED', '任务说明或人工讨论已变化，请重新查看材料', 409);
-      const materialSnapshot = operation
-        ? this.store.projectMaterials.forOperation(taskId, operation.operationId)?.snapshot
-        : this.store.projectMaterials.prepare(taskId, input.projectMaterials);
-      this.store.projectMaterials.verify(taskId, input.projectMaterials, materialSnapshot);
-      assertNoPendingNodeContinuation(this.store, taskId, input.nodeId, operation?.operationId);
-      assertRevision(task.revision, input.expectedRevision);
-      if (input.sessionMode && operation)
-        throw new DomainError('SESSION_RESUME_MANUAL', '原生恢复暂不接受自动等待安排', 409);
-      const session = input.sessionMode === 'resume' ? this.resumeSource(taskId, input) : undefined;
-      const continuation = input.continuation;
-      let continuationContext: string | null = operation ? operation.context() : null;
-      if (continuation && !operation) {
-        const preview = this.continuationPreview(taskId, continuation.sourceRunId);
-        if (!preview.ready)
-          throw new DomainError(preview.blockers[0]!.code, preview.blockers[0]!.message, 409);
-        if (preview.nodeId !== input.nodeId || preview.workingCopyId !== input.workingCopyId)
+    const response = this.store.mutate(
+      `node.run.create:${taskId}`,
+      key,
+      input,
+      () => {
+        const task = this.store.projectLifecycle.assertExecution(taskId);
+        const branch = workspaces.execution(taskId, input);
+        if (branch && operation)
+          throw new DomainError('WORK_BRANCH_MANUAL', '方案执行需单独明确发起', 409);
+        if (task.projectId !== node.project_id)
+          throw new DomainError('PROJECT_SCOPE_MISMATCH', '任务项目已变化', 409);
+        if (
+          input.expectedTaskContextHash &&
+          executionHash(this.humanContext(task)) !== input.expectedTaskContextHash
+        )
+          throw new DomainError('CONTEXT_CHANGED', '任务说明或人工讨论已变化，请重新查看材料', 409);
+        const materialSnapshot = operation
+          ? this.store.projectMaterials.forOperation(taskId, operation.operationId)?.snapshot
+          : this.store.projectMaterials.prepare(taskId, input.projectMaterials);
+        this.store.projectMaterials.verify(taskId, input.projectMaterials, materialSnapshot);
+        assertNoPendingNodeContinuation(this.store, taskId, input.nodeId, operation?.operationId);
+        assertRevision(task.revision, input.expectedRevision);
+        if (input.sessionMode && operation)
+          throw new DomainError('SESSION_RESUME_MANUAL', '原生恢复暂不接受自动等待安排', 409);
+        const session =
+          input.sessionMode === 'resume' ? this.resumeSource(taskId, input) : undefined;
+        const continuation = input.continuation;
+        let continuationContext: string | null = operation ? operation.context() : null;
+        if (continuation && !operation) {
+          const preview = this.continuationPreview(taskId, continuation.sourceRunId);
+          if (!preview.ready)
+            throw new DomainError(preview.blockers[0]!.code, preview.blockers[0]!.message, 409);
+          if (preview.nodeId !== input.nodeId || preview.workingCopyId !== input.workingCopyId)
+            throw new DomainError(
+              'CONTINUATION_SCOPE_CHANGED',
+              '接续必须保留原节点和原目录；跨节点需要独立接手能力',
+              409,
+            );
+          if (preview.contextHash !== continuation.expectedContextHash)
+            throw new DomainError('CONTEXT_CHANGED', '接续材料已变化，请重新查看并确认', 409);
+          continuationContext = nodeContinuationContext(
+            preview.contextText,
+            input.prompt,
+            new NextInputs(this.store).selected(taskId, continuation),
+            input.sessionMode,
+          );
+        }
+        const option = this.options(
+          taskId,
+          undefined,
+          operation?.operationId,
+          input.workBranch?.branchId,
+          !!input.workBranch?.continueFrom,
+        ).items.find((n) => n.nodeId === input.nodeId);
+        if (!option?.available || option.policyHash !== input.policyHash)
           throw new DomainError(
-            'CONTINUATION_SCOPE_CHANGED',
-            '接续必须保留原节点和原目录；跨节点需要独立接手能力',
+            'EXECUTION_UNAVAILABLE',
+            option?.reason ?? '没有本机明确发布的执行授权',
             409,
           );
-        if (preview.contextHash !== continuation.expectedContextHash)
-          throw new DomainError('CONTEXT_CHANGED', '接续材料已变化，请重新查看并确认', 409);
-        continuationContext = nodeContinuationContext(
-          preview.contextText,
-          input.prompt,
-          new NextInputs(this.store).selected(taskId, continuation),
-          input.sessionMode,
-        );
-      }
-      const option = this.options(
-        taskId,
-        undefined,
-        operation?.operationId,
-        input.workBranch?.branchId,
-        !!input.workBranch?.continueFrom,
-      ).items.find((n) => n.nodeId === input.nodeId);
-      if (!option?.available || option.policyHash !== input.policyHash)
-        throw new DomainError(
-          'EXECUTION_UNAVAILABLE',
-          option?.reason ?? '没有本机明确发布的执行授权',
-          409,
-        );
-      const workspace = option.workspaces.find((w) => w.id === input.workingCopyId);
-      if (!workspace || (input.mode === 'edit' && option.policy.mode !== 'edit'))
-        throw new DomainError('WORKSPACE_SCOPE_MISMATCH', '目录或编辑能力超出本机授权', 409);
-      if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
-        throw new DomainError('TASK_REOPEN_REQUIRED', '请明确重新打开任务后执行', 409);
-      workspaces.assertParallel(taskId, branch?.binding);
-      let taskRevision = task.revision;
-      if (task.status === 'done') {
-        taskRevision++;
-        this.store.db
-          .prepare('UPDATE tasks SET body=? WHERE id=?')
-          .run(
-            JSON.stringify({ ...task, status: 'todo', revision: taskRevision, updatedAt: stamp() }),
+        const workspace = option.workspaces.find((w) => w.id === input.workingCopyId);
+        if (!workspace || (input.mode === 'edit' && option.policy.mode !== 'edit'))
+          throw new DomainError('WORKSPACE_SCOPE_MISMATCH', '目录或编辑能力超出本机授权', 409);
+        if (task.status === 'cancelled' || (task.status === 'done' && !input.reopenTask))
+          throw new DomainError('TASK_REOPEN_REQUIRED', '请明确重新打开任务后执行', 409);
+        workspaces.assertParallel(taskId, branch?.binding);
+        let taskRevision = task.revision;
+        if (task.status === 'done') {
+          taskRevision++;
+          this.store.db.prepare('UPDATE tasks SET body=? WHERE id=?').run(
+            JSON.stringify({
+              ...task,
+              status: 'todo',
+              revision: taskRevision,
+              updatedAt: stamp(),
+            }),
             taskId,
           );
-      }
-      const id = randomUUID(),
-        runId = randomUUID(),
-        now = stamp();
-      const context = this.humanContext(task);
-      const baseContext =
-        continuationContext ??
-        `${branch?.context ?? context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`;
-      const command: DispatchCommand = {
-        ...(branch ? { workBranch: branch.binding } : {}),
-        ...(session ? { session } : {}),
-        id,
-        generation: randomUUID(),
-        runId,
-        taskId,
-        projectId: node.project_id,
-        workspaceId: workspace.id,
-        policyHash: input.policyHash,
-        policy: option.policy,
-        mode: input.mode,
-        context: operation ? baseContext : appendProjectMaterials(baseContext, materialSnapshot),
-        expiresAt: new Date(Date.now() + 60000).toISOString(),
-      };
-      if (branch) text(command.context, '方案执行材料', 20000);
-      const run: Run = {
-        createdByUserId: this.store.actorId,
-        id: runId,
-        taskId,
-        provider: 'node',
-        state: 'queued',
-        observation: 'fresh',
-        requestedTool: option.policy.tool,
-        scenario: 'success',
-        previousRunId:
-          input.workBranch?.continueFrom?.sourceRunId ?? input.continuation?.sourceRunId ?? null,
-        prompt: input.prompt,
-        createdAt: now,
-        updatedAt: now,
-        revision: 1,
-        node: {
+        }
+        const id = randomUUID(),
+          runId = randomUUID(),
+          now = stamp();
+        const context = this.humanContext(task);
+        const baseContext =
+          continuationContext ??
+          (branch?.binding.continueFrom
+            ? branchContinuationContext(
+                branch.context,
+                input.prompt,
+                input.workBranch?.continueFrom?.inputs === undefined
+                  ? undefined
+                  : new NextInputs(this.store).branchSelected(
+                      taskId,
+                      branch.branch,
+                      branch.binding.continueFrom.resultRevisionId,
+                      input.workBranch.continueFrom.inputs,
+                    ),
+              )
+            : `${branch?.context ?? context}\n\n# 本次要求\n${input.prompt}\n\n只使用已授权文件工具。不得执行 Shell、MCP 或仓库脚本；缺少能力时如实说明。`);
+        const command: DispatchCommand = {
           ...(branch ? { workBranch: branch.binding } : {}),
-          nodeId: node.id,
-          nodeName: node.name,
-          workingCopyId: workspace.id,
-          workingCopyName: workspace.name,
-          dispatchId: id,
-          policyHash: input.policyHash,
-          mode: input.mode,
-          model: option.policy.model,
-          timeoutSeconds: option.policy.timeoutSeconds,
-          maxBudgetUsd: option.policy.maxBudgetUsd,
-          phase: 'queued',
-          terminationConfirmed: false,
-          ...(input.sessionMode ? { sessionMode: input.sessionMode } : {}),
-          ...(input.continuation
-            ? { continuationInputIds: input.continuation.inputs.map((i) => i.id) }
-            : {}),
-        },
-      };
-      this.store.db
-        .prepare('INSERT INTO runs VALUES(?,?,?)')
-        .run(runId, taskId, JSON.stringify(run));
-      if (materialSnapshot) {
-        run.materialBundleId = this.store.projectMaterials.bindRun(
-          taskId,
-          runId,
-          materialSnapshot,
-          command.context,
-          operation?.operationId,
-        );
-        this.store.db.prepare('UPDATE runs SET body=? WHERE id=?').run(JSON.stringify(run), runId);
-      }
-      this.store.db
-        .prepare(
-          'INSERT INTO node_dispatches(id,run_id,task_id,node_id,space_id,workspace_id,owner_id,command,context_hash,task_revision,stage,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-        )
-        .run(
+          ...(session ? { session } : {}),
           id,
+          generation: randomUUID(),
           runId,
           taskId,
-          node.id,
-          node.space_id,
-          workspace.id,
-          node.owner_id,
-          JSON.stringify(command),
-          executionHash(context),
-          taskRevision,
-          'queued',
-          now,
-        );
-      if (input.continuation) {
-        new NextInputs(this.store).attach(taskId, input.continuation, runId);
+          projectId: node.project_id,
+          workspaceId: workspace.id,
+          policyHash: input.policyHash,
+          policy: option.policy,
+          mode: input.mode,
+          context: operation ? baseContext : appendProjectMaterials(baseContext, materialSnapshot),
+          expiresAt: new Date(Date.now() + 60000).toISOString(),
+        };
+        if (branch) text(command.context, '方案执行材料', 20000);
+        const run: Run = {
+          createdByUserId: this.store.actorId,
+          id: runId,
+          taskId,
+          provider: 'node',
+          state: 'queued',
+          observation: 'fresh',
+          requestedTool: option.policy.tool,
+          scenario: 'success',
+          previousRunId:
+            input.workBranch?.continueFrom?.sourceRunId ?? input.continuation?.sourceRunId ?? null,
+          prompt: input.prompt,
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+          node: {
+            ...(branch ? { workBranch: branch.binding } : {}),
+            nodeId: node.id,
+            nodeName: node.name,
+            workingCopyId: workspace.id,
+            workingCopyName: workspace.name,
+            dispatchId: id,
+            policyHash: input.policyHash,
+            mode: input.mode,
+            model: option.policy.model,
+            timeoutSeconds: option.policy.timeoutSeconds,
+            maxBudgetUsd: option.policy.maxBudgetUsd,
+            phase: 'queued',
+            terminationConfirmed: false,
+            ...(input.sessionMode ? { sessionMode: input.sessionMode } : {}),
+            ...(input.continuation
+              ? { continuationInputIds: input.continuation.inputs.map((i) => i.id) }
+              : input.workBranch?.continueFrom?.inputs
+                ? { continuationInputIds: input.workBranch.continueFrom.inputs.map((i) => i.id) }
+                : {}),
+          },
+        };
         this.store.db
-          .prepare('INSERT INTO node_continuation_links VALUES(?,?,?,?)')
-          .run(
+          .prepare('INSERT INTO runs VALUES(?,?,?)')
+          .run(runId, taskId, JSON.stringify(run));
+        if (materialSnapshot) {
+          run.materialBundleId = this.store.projectMaterials.bindRun(
+            taskId,
             runId,
-            input.continuation.sourceRunId,
-            input.continuation.expectedContextHash,
-            JSON.stringify(input.continuation.inputs.map((i) => i.id)),
+            materialSnapshot,
+            command.context,
+            operation?.operationId,
           );
-      }
-      const d = this.row(id);
-      this.message(d, '已保存节点派发；尚未确认接单或启动。输出将共享到当前项目任务。');
-      this.event(d, 'run.created');
-      if (branch) workspaces.attach(task, run);
-      operation?.attach(run);
-      return { id: runId };
-    });
+          this.store.db
+            .prepare('UPDATE runs SET body=? WHERE id=?')
+            .run(JSON.stringify(run), runId);
+        }
+        this.store.db
+          .prepare(
+            'INSERT INTO node_dispatches(id,run_id,task_id,node_id,space_id,workspace_id,owner_id,command,context_hash,task_revision,stage,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+          )
+          .run(
+            id,
+            runId,
+            taskId,
+            node.id,
+            node.space_id,
+            workspace.id,
+            node.owner_id,
+            JSON.stringify(command),
+            executionHash(context),
+            taskRevision,
+            'queued',
+            now,
+          );
+        if (input.continuation) {
+          new NextInputs(this.store).attach(taskId, input.continuation, runId);
+          this.store.db
+            .prepare('INSERT INTO node_continuation_links VALUES(?,?,?,?)')
+            .run(
+              runId,
+              input.continuation.sourceRunId,
+              input.continuation.expectedContextHash,
+              JSON.stringify(input.continuation.inputs.map((i) => i.id)),
+            );
+        }
+        if (branch?.binding.continueFrom && input.workBranch?.continueFrom?.inputs)
+          new NextInputs(this.store).attachBranch(
+            taskId,
+            branch.branch,
+            branch.binding.continueFrom.resultRevisionId,
+            input.workBranch.continueFrom.inputs,
+            runId,
+          );
+        const d = this.row(id);
+        this.message(d, '已保存节点派发；尚未确认接单或启动。输出将共享到当前项目任务。');
+        this.event(d, 'run.created');
+        if (branch) workspaces.attach(task, run);
+        operation?.attach(run);
+        return { id: runId };
+      },
+      () => {
+        // Current authorization and branch identity apply inside the transaction before old receipts.
+        this.store.projectLifecycle.assertExecution(taskId);
+        this.nodes.ownedExecutionNode(input.nodeId);
+        workspaces.execution(taskId, input, true);
+      },
+    );
     return this.store.run(response.id);
   }
   private requestStopRow(d: Row, reason: string) {
