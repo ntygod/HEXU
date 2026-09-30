@@ -106,7 +106,7 @@ async function expectObservation(page: Page) {
   const section = observation(page);
   await expect(section).toBeVisible();
   await expect(section).toContainText(
-    '原目标节点所有者当时明确确认原应用进程及其子进程、孤立的 integration-add',
+    '原目标节点所有者当时明确确认原应用进程及全部子进程、遗留孤儿进程均已停止',
   );
   await expect(section).toContainText('进程均已停止');
   await expect(section).toContainText('仅本次应用的占用已释放');
