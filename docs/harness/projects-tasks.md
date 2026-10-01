@@ -27,6 +27,8 @@ Keep the edit baseline fixed while the drawer is open. SSE updates show a compar
 
 历史抽屉只读：有新内容时提示并保留已读页/展开状态，明确刷新才替换；当前拒绝或工作台移除Task时清空，关闭与身份/空间/Task切换取消旧请求，迟到成功或拒绝均不能影响新会话。分页绑定同一Task已有修订且SQL有界，不把旧权限延长为读取权。见[操作方法](../engineering/task-content-history.md)、[事务/API回归](../../tests/task-content-history.test.ts)与[浏览器流程](../../tests/e2e/task-content-history.spec.ts)。
 
+两版对照只使用当前已读的同Task快照，双方固定且要求较早/较新修订顺序；分页、SSE和明确重读不得静默切换所选版本或正在显示的对照。当前拒绝同样卸载选择与全文，不另建历史权限或恢复操作。复用有界纯文本比较，超字符/行数/计算预算回退两版全文，不能称可应用补丁；legacy来源/作者/时间未知保持。见[只读对照](../engineering/task-content-comparison.md)与[定向语义测试](../../tests/task-content-comparison.test.ts)。
+
 ## 项目归档与恢复
 
 Archive is a barrier for new model work, not deletion or a blanket read-only state for human collaboration. Require current project manage permission before replay and inside the revision-checked transaction. Commit project state/history/outbox, cancellation of never-permitted node dispatches and suspension of every pending preview/node Operation together. Preserve fixed Operation material; immediate restore never revives old plans. Only unpermitted cancellation returns selected notes to queued.

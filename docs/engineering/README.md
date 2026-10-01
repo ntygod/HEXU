@@ -21,6 +21,7 @@
 | 项目名称/说明与角色 | [项目设置入口](team-local.md#项目基本设置与修订) |
 | 工作说明固定编辑基线、并发冲突与原请求确认 | [安全编辑](task-edit-baseline.md) |
 | 工作说明不可变历史、分页阅读与旧数据边界 | [工作说明历史](task-content-history.md) |
+| 同Task固定两版的标题/关注/说明只读变化 | [工作说明对照](task-content-comparison.md) |
 | 归档/恢复及运行影响 | [项目归档](project-archive.md) |
 | 改派与参与者/筛选 | [负责人](task-assignment.md)、[参与](task-participants.md) |
 | 文本/链接资料、版本与删除恢复 | [项目资料](project-sources.md) |
