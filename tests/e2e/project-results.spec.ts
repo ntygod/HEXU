@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { teamFixture, type Account } from '../helpers/team.js';
@@ -422,7 +422,10 @@ test('初次失败不冒充空项目，短暂故障明确保留旧摘要，拒�
 
 test('切换分页后晚到的旧页成功或拒绝均不覆盖当前页，读取中的URL可后退', async ({ page }) => {
   const f = await fixture(21),
-    releases: Array<ReturnType<typeof gate>> = [];
+    releases: Array<ReturnType<typeof gate>> = [],
+    sessions: Array<{ holding: boolean }> = [],
+    allReads: Promise<void>[] = [];
+  let failed = false;
   try {
     const first = await f.list(),
       second = await f.list(first.nextCursor!);
@@ -431,34 +434,51 @@ test('切换分页后晚到的旧页成功或拒绝均不覆盖当前页，读�
     for (const status of [200, 403]) {
       const held = gate(),
         reached = gate(),
-        finished = gate();
+        pending: Promise<void>[] = [],
+        pattern = `${endpoint(f)}?cursor=*`;
       releases.push(held);
-      await page.route(
-        `${endpoint(f)}?cursor=*`,
-        async (route) => {
-          reached.resolve();
-          await held.promise;
-          try {
-            await route.fulfill({
-              status,
-              json: status === 200 ? second : { error: { message: '晚到旧页已拒绝' } },
-            });
-          } finally {
-            finished.resolve();
-          }
-        },
-        { times: 1 },
-      );
+      const session = { holding: true };
+      sessions.push(session);
+      const delayOldPage = async (route: Route) => {
+        if (!session.holding) return route.continue();
+        // A Workbench version refresh can replace an in-flight GET. Hold this
+        // whole old-page session, not only the first request that reaches it.
+        const response = held.promise.then(() =>
+          route.fulfill({
+            status,
+            json: status === 200 ? second : { error: { message: '晚到旧页已拒绝' } },
+          }),
+        );
+        pending.push(response);
+        allReads.push(response);
+        reached.resolve();
+        await response;
+      };
+      await page.route(pattern, delayOldPage);
       await section(page).getByRole('link', { name: '较早成果' }).click();
       await reached.promise;
       await expect(page).toHaveURL(url(f, first.nextCursor!));
+      const beforeRefresh = pending.length;
+      // Exercise the replacement deterministically through a real scoped SSE
+      // update. A Task discussion message does not change either result page.
+      const message = await f.api.call(`tasks/${f.task.id}/messages`, f.alice, {
+        body: `分页读取期间的工作台刷新 ${status}`,
+      });
+      expect(message.statusCode, message.body).toBe(201);
+      await expect.poll(() => pending.length).toBeGreaterThan(beforeRefresh);
       await expect(section(page).getByRole('status')).toContainText('正在读取项目成果');
       await expect(rows(page)).toHaveCount(0);
       await page.goBack();
       await expect(page).toHaveURL(url(f));
       await expect(rows(page)).toHaveCount(20);
+      // Stop capturing new reads, but retain the interceptor until its pending
+      // Routes settle. Unrouting first handles those Routes in Playwright and a
+      // later fulfill would fail before the old-response assertions can run.
+      session.holding = false;
       held.resolve();
-      await finished.promise;
+      await Promise.all(pending);
+      // Forward now performs a real read, never this old session's 403 fixture.
+      await page.unroute(pattern, delayOldPage);
       await expect(section(page).getByRole('alert')).toHaveCount(0);
       expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
       await expect(rows(page)).toHaveCount(20);
@@ -467,8 +487,24 @@ test('切换分页后晚到的旧页成功或拒绝均不覆盖当前页，读�
     await expect(page).toHaveURL(url(f, first.nextCursor!));
     await expect(rows(page)).toHaveCount(1);
     expect(await pageIds(page)).toEqual(second.items.map((item) => item.id));
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    for (const session of sessions) session.holding = false;
     for (const held of releases) held.resolve();
-    await close(page, f);
+    try {
+      const settled = await Promise.allSettled(allReads);
+      const errors = settled.filter((item) => item.status === 'rejected');
+      if (errors.length && !failed) {
+        failed = true;
+        throw new AggregateError(
+          errors.map((item) => item.reason),
+          '旧分页读取未完成',
+        );
+      }
+    } finally {
+      await close(page, f, failed);
+    }
   }
 });
