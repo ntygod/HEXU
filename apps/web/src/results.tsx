@@ -2,6 +2,7 @@ import type { BranchResultSource } from '../../../packages/contracts/src/results
 import { ResultReferences } from './result-references.js';
 import { MemberResultVersions } from './member-result-versions.js';
 import { CodeFeedbackEntry } from './result-code-feedback.js';
+import { ResultTaskActivity } from './result-task-activity.js';
 import { useEffect, useState } from 'react';
 import type { ResultDetail } from '../../../packages/contracts/src/results.js';
 import { Button, Empty, Icon, Skeleton, StatusBadge } from '../../../packages/ui/src/index.js';
@@ -64,7 +65,7 @@ export function ResultPage({
   useEffect(() => {
     if (!pinned && value) setPinned(value.version.id);
   }, [pinned, value]);
-  const { data, changeStatus } = useApp();
+  const { data, changeStatus, connected } = useApp();
   if (read.denied) return <Empty title="无法打开成果" description={error} />;
   if (!value && error)
     return (
@@ -83,7 +84,8 @@ export function ResultPage({
       </div>
     );
   const { result, task, version, messages, revisions, unversionedMessages } = value;
-  const editable = canEditTask(data, task);
+  const currentTask = data.tasks.find((item) => item.id === task.id);
+  const editable = !!currentTask && canEditTask(data, currentTask);
   return (
     <div className="work-page result-workspace">
       {messageId && !messages.some((message) => message.id === messageId) && (
@@ -107,7 +109,12 @@ export function ResultPage({
         <Link to={`/tasks/${task.id}`}>
           {task.shortId} · {task.title}
         </Link>
-        <StatusBadge status={task.status} />
+        <span>任务状态{!connected && '（上次读取）'}</span>
+        {currentTask ? (
+          <StatusBadge status={currentTask.status} />
+        ) : (
+          <span className="badge neutral">当前状态不可用</span>
+        )}
       </div>
       <header className="work-page-heading">
         <div>
@@ -133,12 +140,22 @@ export function ResultPage({
           <Button
             variant="primary"
             disabled={!editable}
-            onClick={() => void changeStatus(task, task.status === 'done' ? 'todo' : 'done')}
+            onClick={() => {
+              if (currentTask)
+                void changeStatus(currentTask, currentTask.status === 'done' ? 'todo' : 'done');
+            }}
           >
-            {task.status === 'done' ? '重新打开' : '标记完成'}
+            {currentTask?.status === 'done' ? '重新打开' : '标记完成'}
           </Button>
         </div>
       </header>
+      <ResultTaskActivity
+        key={task.id}
+        taskId={task.id}
+        currentTask={currentTask}
+        runs={data.runs}
+        connected={connected}
+      />
       <label className="field result-version-picker">
         查看固定版本
         <select

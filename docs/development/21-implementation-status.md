@@ -1,6 +1,6 @@
 # 21｜当前实现进度
 
-更新：2026-10-01。main仍为PR28整合后的 `a3ae2e8`。选择性整合草稿[PR29](https://github.com/ntygod/HEXU/pull/29)固定在 `5624a71`，工程915/915、Chromium167/167与汇总CI通过；独立相依[PR30](https://github.com/ntygod/HEXU/pull/30)固定在 `00a6984b8ded1bcfcaa865df3fe59dc05a8180b8`，含放弃、保护核对和完整现场移出保留，工程973/973、Chromium186/186及汇总通过。相依[PR31](https://github.com/ntygod/HEXU/pull/31)固定1097ba0，行级阅读完成977/977工程、189/189 Chromium及汇总CI，手机视口已核对。三者均未合并或部署，完整安全独审未完成。相依[PR32](https://github.com/ntygod/HEXU/pull/32)冻结fa59d0db完成984/984工程、198/198 Chromium及汇总，147–149手机/深浅截图实际核验。相依[PR33](https://github.com/ntygod/HEXU/pull/33)冻结ef6dd8bb完成995/995工程、203/203 Chromium及汇总，150–152已核验。相依[PR34](https://github.com/ntygod/HEXU/pull/34)冻结d8f83b00完成1011/1011工程、208/208 Chromium及汇总，153–155已核验。相依[PR35](https://github.com/ntygod/HEXU/pull/35)冻结53da309c完成1028/1028工程、213/213 Chromium及汇总，156–158已核验。相依[PR36](https://github.com/ntygod/HEXU/pull/36)冻结7fde992完成1041/1041工程、220/220 Chromium及汇总，159–161实际核验。相依[PR37](https://github.com/ntygod/HEXU/pull/37)冻结25e2f49e，CI150完成1057/1057工程、226/226 Chromium及汇总通过，162–164和163b实际核验。当前独立相依增量为项目内有界成果摘要、取消任务历史与固定版本入口，完整本地1071/1071通过，自身页面/像素待验收。原工作项见[19](19-work-items.md)，下一项见[22](22-next-delivery.md)。
+更新：2026-10-01。main仍为PR28整合后的 `a3ae2e8`。选择性整合草稿[PR29](https://github.com/ntygod/HEXU/pull/29)固定在 `5624a71`，工程915/915、Chromium167/167与汇总CI通过；独立相依[PR30](https://github.com/ntygod/HEXU/pull/30)固定在 `00a6984b8ded1bcfcaa865df3fe59dc05a8180b8`，含放弃、保护核对和完整现场移出保留，工程973/973、Chromium186/186及汇总通过。相依[PR31](https://github.com/ntygod/HEXU/pull/31)固定1097ba0，行级阅读完成977/977工程、189/189 Chromium及汇总CI，手机视口已核对。三者均未合并或部署，完整安全独审未完成。相依[PR32](https://github.com/ntygod/HEXU/pull/32)冻结fa59d0db完成984/984工程、198/198 Chromium及汇总，147–149手机/深浅截图实际核验。相依[PR33](https://github.com/ntygod/HEXU/pull/33)冻结ef6dd8bb完成995/995工程、203/203 Chromium及汇总，150–152已核验。相依[PR34](https://github.com/ntygod/HEXU/pull/34)冻结d8f83b00完成1011/1011工程、208/208 Chromium及汇总，153–155已核验。相依[PR35](https://github.com/ntygod/HEXU/pull/35)冻结53da309c完成1028/1028工程、213/213 Chromium及汇总，156–158已核验。相依[PR36](https://github.com/ntygod/HEXU/pull/36)冻结7fde992完成1041/1041工程、220/220 Chromium及汇总，159–161实际核验。相依[PR37](https://github.com/ntygod/HEXU/pull/37)冻结25e2f49e，CI150完成1057/1057工程、226/226 Chromium及汇总通过，162–164和163b实际核验。相依[PR38](https://github.com/ntygod/HEXU/pull/38)冻结30b9fd55，CI152工程1071/1071、232/232 Chromium及汇总通过，165–167实际核验。当前独立相依增量为成果页当前Task与全部活动/unknown执行分别呈现，11项纯逻辑及完整本地1082/1082通过，自身页面与像素待验收。原工作项见[19](19-work-items.md)，下一项见[22](22-next-delivery.md)。
 
 ## 当前能力
 
@@ -39,7 +39,9 @@
 
 | 固定版本的报告/发布链接（PR37） | 手动登记标题、HTTP(S)稳定链接、环境说明与当前作者；原版本固定，分页读取，明确撤下仅改变登记状态，保留不可变原文与事件 | 外部可用性/发布状态保持未核验，不读取URL或部署；完成无需链接，项目汇总和外部状态同步待补；精确25e2f49e的CI150工程1057/1057、Chromium226/226与汇总通过，162–164/163b实际核验；手机原图裁剪已补正常滚动/指针验证，生产代码未因截图改变 |
 
-| 项目成果摘要（本地增量） | SQL有界字段投影、当前项目/Task权限先过滤再分页、取消任务历史与归档阅读；卡片固定所见版本并另链原Task，URL游标/失败/撤权真实呈现 | 仅项目成果标签，既有/workbench全量正文读取不变；14项新增工程、相关43/43及完整本地1071/1071通过；6条页面与165–167像素待验收，不新增完成/执行或外部同步 |
+| 项目成果摘要（PR38） | SQL有界字段投影、当前项目/Task权限先过滤再分页、取消任务历史与归档阅读；卡片固定所见版本并另链原Task，URL游标/失败/撤权真实呈现 | 仅项目成果标签，既有/workbench全量正文读取不变；精确30b9fd55的CI152工程1071/1071、Chromium232/232与汇总通过，165–167实际核验；首次两处夹具竞态按trace修正，生产不变，不新增完成/执行或外部同步 |
+
+| 成果页当前任务执行（本地增量） | 固定版本之外独立呈现当前Task状态、全部活动/unknown普通/方案/协助Run与分页；状态/写基线和执行共用Workbench快照，unknown/停止中与实际终止分开 | 11项纯逻辑与完整本地1082/1082通过，6条页面和168–170像素待验收；不改完成/停止服务，不新增执行权，既有Workbench传输预算不变 |
 
 ## 模式与验证边界
 
