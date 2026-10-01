@@ -98,9 +98,25 @@ async function synchronizeNodes(f: Fixture) {
     expect(sync.statusCode, sync.body).toBe(200);
   }
 }
-async function open(page: Page, f: Fixture, version: ResultRevision, account: Account = f.alice) {
+type LiveEvidence = { send(kind: 'unknown' | 'running'): unknown };
+async function open(
+  page: Page,
+  f: Fixture,
+  version: ResultRevision,
+  account: Account = f.alice,
+  live: LiveEvidence[] = [],
+) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await synchronizeNodes(f);
+  // The app's 250ms reconciliation can observe the fixture registry's old epoch
+  // during setup or the per-node handshake. A handshake alone must NOT turn an
+  // unknown process into fresh. Only explicitly live protocol substitutes report
+  // fresh running evidence after every node has joined the real app's epoch.
+  // Deliberately unknown and terminal records are not recovered here.
+  for (const execution of live) {
+    execution.send('unknown');
+    execution.send('running');
+  }
   await f.api.app.listen({ port: 4334, host: '127.0.0.1' });
   await page.context().addCookies(
     account.cookie.split('; ').map((cookie) => {
@@ -125,9 +141,14 @@ async function open(page: Page, f: Fixture, version: ResultRevision, account: Ac
   await expect(activity(page)).toBeVisible();
 }
 async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
+  // Browser teardown failures must never skip service shutdown or mask the
+  // original test assertion with a second navigation/context error.
+  try {
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  } catch {}
+  try {
+    await page.context().close();
+  } catch {}
   await f.close();
 }
 async function complete(page: Page, keep: boolean) {
@@ -260,6 +281,7 @@ async function extraRun(f: Fixture, assist = false, taskId = f.task.id) {
   send('running');
   return {
     run,
+    send,
     finish: (state: 'succeeded' | 'failed' | 'cancelled' = 'succeeded') => send('terminal', state),
   };
 }
@@ -273,7 +295,7 @@ test('成果页完成保留执行，重新打开不派发；请求停止后等�
       peer = f.begin(1, 'codex');
     peer.start();
     const count = f.as(() => f.api.store.runs(f.task.id)).length;
-    await open(page, f, version);
+    await open(page, f, version, f.alice, [peer]);
     await expect(row(page, peer.run.id)).toContainText('节点运行中');
     await expect(activity(page)).toContainText(
       '共 1 项 · 连接未知 0 项 · 正在停止 0 项 · 其他活动 1 项',
@@ -380,7 +402,7 @@ test('普通与方案及AI协助均进入五项分页，手机按钮可触达，
     // the UI without granting unsupported concurrent ordinary/assist dispatches.
     for (const item of [ordinary, ...assists.slice(0, 3)]) observe(f, item.run.id, 'unknown');
     const all = [ordinary, a, b, ...assists];
-    await open(page, f, version);
+    await open(page, f, version, f.alice, [a, b, assists[3]!]);
     await expect(rows(page)).toHaveCount(5);
     await expect(activity(page)).toContainText(
       '共 7 项 · 连接未知 4 项 · 正在停止 0 项 · 其他活动 3 项',
@@ -475,7 +497,7 @@ test('手机历史成果的正文来源反馈和链接固定，完成及重新�
     expect(newer.statusCode, newer.body).toBe(201);
     const peer = f.begin(1);
     peer.start();
-    await open(page, f, version);
+    await open(page, f, version, f.alice, [peer]);
     await page.setViewportSize({ width: 390, height: 844 });
     const sourcePanel = page.getByRole('region', { name: '固定成果来源' });
     const sourceToggle = sourcePanel.getByText('查看来源执行与实际输入', { exact: true });
@@ -539,7 +561,7 @@ test('只读成员可看当前执行但不能完成，撤权后成果与活动�
       ).statusCode,
     ).toBe(200);
     const before = taskState(f);
-    await open(page, f, version, f.bob);
+    await open(page, f, version, f.bob, [active]);
     await expect(row(page, active.run.id)).toContainText('节点运行中');
     await expect(page.getByRole('button', { name: '标记完成', exact: true })).toBeDisabled();
     const deniedWrite = await f.api.call(`tasks/${f.task.id}/complete`, f.bob, {
