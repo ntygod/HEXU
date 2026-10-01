@@ -468,7 +468,7 @@ export async function createApp(
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
       throw new DomainError('INVALID_INPUT', 'limit 必须为 1–100');
     let items = store.tasks();
-    if (query.projectId) {
+    if (query.projectId !== undefined) {
       const id = text(query.projectId, '项目', 100);
       store.project(id);
       items = items.filter((task) => task.projectId === id);
@@ -476,8 +476,9 @@ export async function createApp(
     items = items
       .map((task) => store.taskParticipants.decorate(task))
       .filter((task) => matchesTaskPeopleFilters(task, peopleFilters));
-    if (query.cursor) {
-      const position = items.findIndex((task) => task.id === query.cursor);
+    if (query.cursor !== undefined) {
+      const cursor = text(query.cursor, '任务游标', 100);
+      const position = items.findIndex((task) => task.id === cursor);
       if (position < 0) throw new DomainError('INVALID_CURSOR', '列表已变化，请重新加载');
       items = items.slice(position + 1);
     }

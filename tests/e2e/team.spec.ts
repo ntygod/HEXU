@@ -316,6 +316,10 @@ test('只读成员自行参与不增加任务权限；编辑降权关闭管理�
 }) => {
   const context = await browser.newContext(),
     member = await context.newPage();
+  let holdReads = false,
+    releaseReads = () => {},
+    failed = false;
+  const pending: Promise<PromiseSettledResult<void>>[] = [];
   try {
     const f = await preparedPair(page, member, 'participants');
     const setRole = (role: 'view' | 'edit' | null) =>
@@ -342,8 +346,62 @@ test('只读成员自行参与不增加任务权限；编辑降权关闭管理�
     await member.getByLabel('查找参与成员', { exact: true }).fill('不应恢复的选择');
     await setRole('view');
     await expect(drawer).toHaveCount(0);
+    // A closed editor proves Workbench permission changed, but its independent
+    // participants read may still be pending. Observe that projection in a new
+    // read-only drawer before exercising a deliberately delayed promotion.
+    await open();
+    await expect(member.getByLabel('当前参与者', { exact: true })).toContainText('当前只读成员');
+    await expect(member.getByLabel('查找参与成员', { exact: true })).toHaveCount(0);
+    await drawer.getByRole('button', { name: '完成', exact: true }).click();
+    await expect(drawer).toHaveCount(0);
+    const held = new Promise<void>((resolve) => {
+      releaseReads = resolve;
+    });
+    holdReads = true;
+    let captured = 0;
+    const path = `${origin}/api/v1/tasks/${f.task.id}/participants`;
+    const delayPermissionRead = async (route: import('@playwright/test').Route) => {
+      if (!holdReads || route.request().method() !== 'GET') return route.continue();
+      // Hold every replacement GET in this permission transition, not just the
+      // first one. Fetch the real current response after releasing the gate.
+      const response = held.then(async () => {
+        const actual = await route.fetch();
+        expect(actual.ok(), await actual.text()).toBe(true);
+        const body = await actual.json();
+        expect(body.canManage).toBe(true);
+        console.info(
+          'Participants permission read:',
+          JSON.stringify({
+            canManage: body.canManage,
+            revision: body.revision,
+          }),
+        );
+        await route.fulfill({ response: actual });
+      });
+      // Observe rejection immediately, and surface it when draining below.
+      pending.push(
+        response.then(
+          () => ({ status: 'fulfilled' as const, value: undefined }),
+          (reason: unknown) => ({ status: 'rejected' as const, reason }),
+        ),
+      );
+      captured++;
+      await response;
+    };
+    await member.route(path, delayPermissionRead);
     await setRole('edit');
     await expect(member.getByRole('button', { name: '更改负责人', exact: true })).toBeVisible();
+    await expect.poll(() => captured).toBeGreaterThan(0);
+    await open();
+    await expect(drawer).toBeVisible();
+    await expect(member.getByLabel('查找参与成员', { exact: true })).toHaveCount(0);
+    holdReads = false;
+    releaseReads();
+    const completed = await Promise.all(pending);
+    const errors = completed.filter((result) => result.status === 'rejected');
+    if (errors.length) throw new AggregateError(errors.map((result) => result.reason));
+    await member.unroute(path, delayPermissionRead);
+    await expect(drawer).toHaveCount(0);
     await open();
     await expect(member.getByLabel('查找参与成员', { exact: true })).toHaveValue('');
     await setRole(null);
@@ -362,8 +420,26 @@ test('只读成员自行参与不增加任务权限；编辑降权关闭管理�
     await expect(member.getByLabel('参与变更历史', { exact: true })).toContainText(
       '因访问撤销结束参与',
     );
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
-    await context.close();
+    holdReads = false;
+    releaseReads();
+    const errors = (await Promise.all(pending))
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason);
+    try {
+      await context.close();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length) {
+      if (!failed) throw new AggregateError(errors, 'Participants fixture cleanup failed');
+      test
+        .info()
+        .annotations.push({ type: 'cleanup failure', description: errors.map(String).join('\n') });
+    }
   }
 });
 

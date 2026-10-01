@@ -47,6 +47,20 @@ jobs:
           retention-days: 7
       # Keep the full report/trace artifact above. These focused previews remain
       # small enough to inspect even when the complete ZIP exceeds reader limits.
+      # The two cross-service regressions also need individually retrievable
+      # traces/screenshots if their original test still fails in a future run.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-node-summary-failure
+          path: test-results/nodes-*-CLI*/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-participant-permission-failure
+          path: test-results/team-只读成员自行参与*/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -179,6 +193,21 @@ jobs:
         with:
           name: hexu-task-edit-failures
           path: test-results/task-edit-baseline-*/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-filter-previews
+          path: |
+            artifacts/174-task-state-filters-dark.png
+            artifacts/175-task-state-filters-mobile-light.png
+            artifacts/176-task-state-filters-cancelled-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-filter-failures
+          path: test-results/task-state-filters-*/
           retention-days: 7
   check:
     needs: [engineering, browser]
