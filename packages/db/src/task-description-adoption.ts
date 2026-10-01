@@ -34,6 +34,7 @@ export function applyTaskDescriptionAdoption(
   store.db
     .prepare('UPDATE tasks SET body=? WHERE id=? AND space_id=?')
     .run(JSON.stringify(next), taskId, task.spaceId);
+  store.taskContentHistory.changed(task, next, 'adopted');
   const event = (kind: string) =>
     store.db
       .prepare('INSERT INTO outbox(task_id,kind,created_at,space_id) VALUES(?,?,?,?)')

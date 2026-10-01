@@ -1,13 +1,13 @@
 # 21｜当前实现进度
 
-更新：2026-10-01。main仍为PR28整合后的 `a3ae2e8`。选择性整合草稿[PR29](https://github.com/ntygod/HEXU/pull/29)固定在 `5624a71`，工程915/915、Chromium167/167与汇总CI通过；独立相依[PR30](https://github.com/ntygod/HEXU/pull/30)固定在 `00a6984b8ded1bcfcaa865df3fe59dc05a8180b8`，含放弃、保护核对和完整现场移出保留，工程973/973、Chromium186/186及汇总通过。相依[PR31](https://github.com/ntygod/HEXU/pull/31)固定1097ba0，行级阅读完成977/977工程、189/189 Chromium及汇总CI，手机视口已核对。三者均未合并或部署，完整安全独审未完成。相依[PR32](https://github.com/ntygod/HEXU/pull/32)冻结fa59d0db完成984/984工程、198/198 Chromium及汇总，147–149手机/深浅截图实际核验。相依[PR33](https://github.com/ntygod/HEXU/pull/33)冻结ef6dd8bb完成995/995工程、203/203 Chromium及汇总，150–152已核验。相依[PR34](https://github.com/ntygod/HEXU/pull/34)冻结d8f83b00完成1011/1011工程、208/208 Chromium及汇总，153–155已核验。相依[PR35](https://github.com/ntygod/HEXU/pull/35)冻结53da309c完成1028/1028工程、213/213 Chromium及汇总，156–158已核验。相依[PR36](https://github.com/ntygod/HEXU/pull/36)冻结7fde992完成1041/1041工程、220/220 Chromium及汇总，159–161实际核验。相依[PR37](https://github.com/ntygod/HEXU/pull/37)冻结25e2f49e，CI150完成1057/1057工程、226/226 Chromium及汇总通过，162–164和163b实际核验。相依[PR38](https://github.com/ntygod/HEXU/pull/38)冻结30b9fd55，CI152工程1071/1071、232/232 Chromium及汇总通过，165–167实际核验。PR39/40/41已分别冻结并验收；PR42冻结faf7c036，CI161完成1109/1109工程、252/252 Chromium与汇总，174–176原图逐张核验。当前优先补29/30文件操作与跨阶段安全审阅；已定位两个rename原语把EIO误标为明确未改名的证据问题，独立修正与7项真实CLI故障模型回归、完整本地1116/1116通过，远端精确CI仍待完成，不宣称整个链已完成独审。原工作项见[19](19-work-items.md)，下一项见[22](22-next-delivery.md)。
+更新：2026-10-01。main仍为PR28整合后的 `a3ae2e8`。选择性整合草稿[PR29](https://github.com/ntygod/HEXU/pull/29)固定在 `5624a71`，工程915/915、Chromium167/167与汇总CI通过；独立相依[PR30](https://github.com/ntygod/HEXU/pull/30)固定在 `00a6984b8ded1bcfcaa865df3fe59dc05a8180b8`，含放弃、保护核对和完整现场移出保留，工程973/973、Chromium186/186及汇总通过。相依[PR31](https://github.com/ntygod/HEXU/pull/31)固定1097ba0，行级阅读完成977/977工程、189/189 Chromium及汇总CI，手机视口已核对。三者均未合并或部署，完整安全独审未完成。相依[PR32](https://github.com/ntygod/HEXU/pull/32)冻结fa59d0db完成984/984工程、198/198 Chromium及汇总，147–149手机/深浅截图实际核验。相依[PR33](https://github.com/ntygod/HEXU/pull/33)冻结ef6dd8bb完成995/995工程、203/203 Chromium及汇总，150–152已核验。相依[PR34](https://github.com/ntygod/HEXU/pull/34)冻结d8f83b00完成1011/1011工程、208/208 Chromium及汇总，153–155已核验。相依[PR35](https://github.com/ntygod/HEXU/pull/35)冻结53da309c完成1028/1028工程、213/213 Chromium及汇总，156–158已核验。相依[PR36](https://github.com/ntygod/HEXU/pull/36)冻结7fde992完成1041/1041工程、220/220 Chromium及汇总，159–161实际核验。相依[PR37](https://github.com/ntygod/HEXU/pull/37)冻结25e2f49e，CI150完成1057/1057工程、226/226 Chromium及汇总通过，162–164和163b实际核验。相依[PR38](https://github.com/ntygod/HEXU/pull/38)冻结30b9fd55，CI152工程1071/1071、232/232 Chromium及汇总通过，165–167实际核验。PR39/40/41已分别冻结并验收；PR42冻结faf7c036，CI161完成1109/1109工程、252/252 Chromium与汇总，174–176原图逐张核验。PR43冻结bba47d63，两处rename EIO证据修正已在CI162完成1116/1116工程、252/252 Chromium与汇总；较广文件操作独审仍未完成且保持暂停。当前独立推进原Task工作说明历史：完整本地1124/1124、类型/UI tokens/构建通过，精确远端CI与177–179像素验收待完成，不借父片结果计入本片验收。原工作项见[19](19-work-items.md)，下一项见[22](22-next-delivery.md)。
 
 ## 当前能力
 
 | 范围 | 已接入的实际范围 | 仍需区分的限制 |
 | --- | --- | --- |
 | Workbench W1 | 现有页面完成重建，旧呈现层删除；深浅色、密度、窄屏、动效与输入/抽屉保护 | 桌面宿主/安装包未交付；演示不供给真实状态 |
-| 项目与任务 | 创建、说明、状态、成果讨论、项目设置/归档、负责人/参与关系及人员筛选 | 独立需求、子任务/依赖/里程碑、完整筛选排序仍缺 |
+| 项目与任务 | 创建、说明及不可变内容历史、状态、成果讨论、项目设置/归档、负责人/参与关系及人员筛选 | 独立需求、子任务/依赖/里程碑、完整筛选排序仍缺 |
 | 真实账号 | team-local 账号、个人/团队空间、手动邀请、项目角色和撤权 | 仅同机回环；邮件验证、找回密码、正式服务未交付 |
 | 资料与内容 | 文本/链接、修订、约定、明确选材与 Run/Operation 快照、草稿/协助建议局部采用 | 不抓取链接；附件、自动总结/推荐、更多采用目标仍缺 |
 | 原生 coding | preview 与本人独立节点的受限 Claude/Codex 进程、结构化事件、停止与工作区锁 | 实验性代码路径；真实账户模型生成尚未联调 |
@@ -49,6 +49,8 @@
 
 | 项目任务状态与关注筛选（PR42） | 原状态与实际关注文字有/无，与负责人/当前参与者/搜索取交集；URL严格输入与恢复，显式取消只读列 | 保留UI默认不含取消/API默认全部当前可见状态、权限后过滤分页和全局工作台；冻结faf7c036的CI161完成1109/1109工程、252/252页面和汇总；7条新流程及174–176原图已验收。旧节点/参与读取通过明确阶段修正，原CI160 trace缺口保留；标签/排序/结构化attention仍缺 |
 
+| Task工作说明历史（本地） | 原Task创建/内容编辑/明确采用及清除关注的内容快照；当前权限的有界历史与原Task只读抽屉；旧库作者/时间未知 | 完整本地1124/1124及类型/UI tokens/构建通过；精确CI与177–179像素待验收。无独立Requirement、恢复旧版或新执行；见[记录](history/2026-10-01-task-content-history.md) |
+
 ## 模式与验证边界
 
 - 默认 `preview` 是虚构单用户示例；mock 不启动命令或调用模型。显式配置的原生路径仍属实验接入。
@@ -56,6 +58,8 @@
 - 原生/节点完整工程回归以 Linux 为准；macOS 未实测，Windows 原生执行不支持。Web 页面通过不代表进程/凭证边界跨平台完成。
 - 协议替身测试、官方程序无模型兼容检查、有效账户真实互操作是三类证据；前两类不能证明真实模型生成/费用/历史恢复。已核验工具版本和过程看历史及 [Claude](../engineering/claude-sessions.md) / [Codex](../engineering/codex-sessions.md) 说明。
 - 完整跨成员代码接手、完整方案代码产物/扩展接续/整合、通用项目预览、外部 Git/PR 集成、模板/自动化、正式远程部署与安装升级仍待交付。项目仓库使用 GitHub/CI，不等于产品已经实现这些集成。
+
+
 
 
 ## 最近验证与交付位置
@@ -100,4 +104,4 @@ PR #20—#28统一进入main，两支历史及全部源码、测试、用法和C
 
 能力及验证更新本页和 19；下一项只改 22；用法放工程指南，开发约束放相应 harness。不会根据节点连通、协议替身或历史报告声称跨电脑产品或真实模型联调完成。
 
-本轮安全审阅与EIO修正依据见[故障模型与覆盖范围](history/2026-10-01-native-rename-io-uncertainty.md)。这不是新文件能力，也不重写冻结PR29/30/42；完整恢复/DB/UI/跨操作审阅仍在进行。
+本轮安全审阅与EIO修正依据见[故障模型与覆盖范围](history/2026-10-01-native-rename-io-uncertainty.md)。这不是新文件能力，也不重写冻结PR29/30/42；完整恢复/DB/UI/跨操作审阅未完成且保持暂停；当前Task内容历史不涉及该范围。

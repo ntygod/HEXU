@@ -173,6 +173,15 @@ test('真实 HTTP 局部采用保留来源与完整前后记录，有限接收�
     const after = (await f.call(`tasks/${f.task.id}`, f.alice)).json();
     assert.equal(after.task.description, record.target.afterContent);
     assert.equal(after.task.revision, before.task.revision + 1);
+    const contentHistory = await f.call(`tasks/${f.task.id}/content-history`, f.alice);
+    assert.equal(contentHistory.statusCode, 200, contentHistory.body);
+    assert.equal(contentHistory.json().items[0].source, 'adopted');
+    assert.equal(contentHistory.json().items[0].description, record.target.afterContent);
+    assert.equal(contentHistory.json().items[0].actorId, f.alice.user.id);
+    const hiddenHistory = await f.call(`tasks/${f.task.id}/content-history`, f.bob);
+    assert.equal(hiddenHistory.statusCode, 404);
+    assert.equal(hiddenHistory.body.includes(record.target.afterContent), false);
+
     assert.equal(after.task.ownerUserId, before.task.ownerUserId);
     assert.equal(after.task.status, before.task.status);
     assert.deepEqual(after.messages, before.messages);

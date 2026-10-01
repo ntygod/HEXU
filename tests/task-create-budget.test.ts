@@ -12,7 +12,13 @@ const headers = (key: string = randomUUID()) => ({
   'idempotency-key': key,
 });
 const maximum = { title: '题'.repeat(160), description: '文'.repeat(12000) };
-const writeTables = ['tasks', 'metadata', 'outbox', 'idempotency_records'];
+const writeTables = [
+  'tasks',
+  'task_content_revisions',
+  'metadata',
+  'outbox',
+  'idempotency_records',
+];
 function snapshot(store: Store, except: string[] = []) {
   const tables = store.db
     .prepare(
@@ -98,6 +104,15 @@ test('真实HTTP接受最大原文及全JSON转义，保持私有/项目归属�
           assert.equal(created.attention, null);
           assert.equal(created.revision, 1);
           assert.equal(created.feedbackOrigin, undefined);
+          const history = store.taskContentHistory.history(created.id, {
+            limit: 10,
+            before: null,
+          }).items;
+          assert.equal(history.length, 1);
+          assert.equal(history[0]!.title, payload.title);
+          assert.equal(history[0]!.description, payload.description);
+          assert.equal(history[0]!.actorId, store.actorId);
+          assert.equal(history[0]!.source, 'created');
           assert.equal(store.tasks().length, count + 1);
           assert.deepEqual(
             store.events(cursor).events.map((event) => [event.taskId, event.kind]),
@@ -388,6 +403,7 @@ test('大正文创建的计数、Task、通知和回执仍原子提交，故障�
       ['tasks', 'INSERT'],
       ['outbox', 'INSERT'],
       ['idempotency_records', 'INSERT'],
+      ['task_content_revisions', 'INSERT'],
     ]) {
       const key = randomUUID();
       const before = snapshot(store);

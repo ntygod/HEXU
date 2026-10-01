@@ -79,6 +79,7 @@ WorkingCopyLease 使用 writerType=run/terminal/integration、writerId、generat
 | 03 | `POST /spaces/:spaceId/invitations`；`POST /invitations/:token/accept` | 短期邀请；日志脱敏 token |
 | 03 | `GET,POST /spaces/:spaceId/projects`；`GET,PATCH /projects/:projectId` | 项目成员/仓库子资源同范围 |
 | 04 | `GET,POST /spaces/:spaceId/tasks`；`GET,PATCH /tasks/:taskId` | title 最小创建；projectId 可选 |
+| 04 | `GET /tasks/:taskId/content-history` | 已接入原Task内容历史；当前读取权限、limit1–50、同任务before修订游标，旧库作者/时间未知；不等同独立Requirement |
 | 04 | `POST /tasks/:taskId/complete`、`reopen`、`cancel`、`archive` | expectedRevision；activeRunAction |
 | 04 | `GET,POST /projects/:projectId/requirements`；`PATCH /requirements/:id` | 可选需求与修订 |
 | 04 | `POST /tasks/:taskId/dependencies`；`GET,POST /projects/:projectId/milestones` | 依赖循环提示、轻量目标 |

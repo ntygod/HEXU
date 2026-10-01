@@ -1047,9 +1047,10 @@ test('迁移37保留既有成果/版本/反馈和任务状态，不推断报告�
     f.api.store.db.prepare('VACUUM INTO ?').run(path);
     const db = new DatabaseSync(path);
     try {
-      // Migration 37 is additive; removing only its empty objects recreates the prior schema.
+      // Remove this and later additive migrations from the disposable copy to
+      // recreate schema 36, while retaining all preexisting result/Task data.
       db.exec(
-        'DROP TABLE result_reference_events; DROP TABLE result_references; DELETE FROM schema_migrations WHERE version=37;',
+        'DROP TABLE task_content_revisions; DROP TABLE result_reference_events; DROP TABLE result_references; DELETE FROM schema_migrations WHERE version>=37;',
       );
       assert.equal(
         db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()!.version,

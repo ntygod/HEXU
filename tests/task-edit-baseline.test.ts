@@ -37,7 +37,7 @@ function snapshot(store: Store, except: string[] = []) {
   );
 }
 
-test('任务内容编辑只写Task、通知和原回执，保留执行、等待接续、材料及下一轮要求', () => {
+test('任务内容编辑只写Task、内容历史、通知和原回执，保留执行、等待接续、材料及下一轮要求', () => {
   const store = new Store();
   try {
     const original = task(store);
@@ -102,7 +102,12 @@ test('任务内容编辑只写Task、通知和原回执，保留执行、等待�
     const nextInputs = new NextInputs(store);
     store.atomic(() => nextInputs.insertQueued(original.id, run.id, '保留待用要求'));
     const before = store.getTask(original.id);
-    const unaffected = snapshot(store, ['tasks', 'outbox', 'idempotency_records']);
+    const unaffected = snapshot(store, [
+      'tasks',
+      'task_content_revisions',
+      'outbox',
+      'idempotency_records',
+    ]);
     const events = store.events(0).cursor;
     const next = store.patchTask(
       original.id,
@@ -129,7 +134,10 @@ test('任务内容编辑只写Task、通知和原回执，保留执行、等待�
     assert.equal(next.title, '新标题');
     assert.equal(next.description, '新说明');
     assert.equal(next.attention, '等反馈');
-    assert.deepEqual(snapshot(store, ['tasks', 'outbox', 'idempotency_records']), unaffected);
+    assert.deepEqual(
+      snapshot(store, ['tasks', 'task_content_revisions', 'outbox', 'idempotency_records']),
+      unaffected,
+    );
     assert.deepEqual(
       store.events(events).events.map((event) => [event.taskId, event.kind]),
       [[original.id, 'task.updated']],
