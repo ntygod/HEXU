@@ -92,11 +92,27 @@ async function open(page: Page, f: Fixture, account = f.alice) {
   await page.goto(url(f));
   await expect(section(page)).toBeVisible();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.api.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  // Timeout teardown may already have closed the page. Still release the browser
+  // context (including SSE) before the HTTP fixture, even when a cleanup step fails.
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.api.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '项目成果浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 
 test('项目成果按首次分享顺序分页，URL刷新与前后退保留游标，新版本不移动当前页', async ({
@@ -181,7 +197,11 @@ test('摘要限制160个Unicode字符，任务与固定版本链接独立，键�
     await section(page).screenshot({ path: 'artifacts/165-project-results-dark.png' });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
-    await section(page).screenshot({ path: 'artifacts/166-project-results-mobile-light.png' });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: 'artifacts/166-project-results-mobile-light.png',
+      fullPage: true,
+    });
     expect((await row(page, result.id).boundingBox())!.width).toBeGreaterThan(280);
     expect(
       await section(page).evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
@@ -323,8 +343,24 @@ test('初次失败不冒充空项目，短暂故障明确保留旧摘要，拒�
   page,
 }) => {
   const f = await fixture();
+  let failed = false;
   try {
     let status = 503;
+    let successfulRead: Promise<void> | undefined;
+    async function retrySuccessfully() {
+      const held = gate();
+      successfulRead = held.promise;
+      status = 0;
+      try {
+        // SSE or polling can issue a read while Playwright waits for actionability.
+        // Keep success pending so it cannot remove the retry button before the click.
+        await section(page).getByRole('button', { name: '重读项目成果' }).click();
+      } finally {
+        successfulRead = undefined;
+        held.resolve();
+      }
+      await expect(rows(page)).toHaveCount(1);
+    }
     await page.route(`${endpoint(f)}*`, async (route) => {
       if (status)
         await route.fulfill({
@@ -341,7 +377,10 @@ test('初次失败不冒充空项目，短暂故障明确保留旧摘要，拒�
             },
           },
         });
-      else await route.continue();
+      else {
+        await successfulRead;
+        await route.continue();
+      }
     });
     await open(page, f);
     await expect(section(page).getByRole('alert')).toContainText('项目成果读取失败');
@@ -350,9 +389,7 @@ test('初次失败不冒充空项目，短暂故障明确保留旧摘要，拒�
       section(page).getByRole('heading', { name: '这个项目还没有可见成果' }),
     ).toHaveCount(0);
     await expect(section(page)).not.toContainText(f.results[0]!.body);
-    status = 0;
-    await section(page).getByRole('button', { name: '重读项目成果' }).click();
-    await expect(rows(page)).toHaveCount(1);
+    await retrySuccessfully();
     status = 409;
     await expect(section(page).getByRole('alert')).toContainText('下面保留上次读取的摘要');
     await expect(section(page).getByRole('alert')).toContainText('当前成果缺少固定版本');
@@ -366,9 +403,7 @@ test('初次失败不冒充空项目，短暂故障明确保留旧摘要，拒�
     await expect(section(page).getByRole('alert')).toContainText('此页摘要已清空');
     await expect(rows(page)).toHaveCount(0);
     await expect(section(page)).not.toContainText(f.results[0]!.body);
-    status = 0;
-    await section(page).getByRole('button', { name: '重读项目成果' }).click();
-    await expect(rows(page)).toHaveCount(1);
+    await retrySuccessfully();
     await page.goto(url(f, 'not-a-result'));
     await expect(section(page).getByRole('alert')).toBeVisible();
     await expect(rows(page)).toHaveCount(0);
@@ -377,8 +412,11 @@ test('初次失败不冒充空项目，短暂故障明确保留旧摘要，拒�
     );
     await section(page).getByRole('link', { name: '返回第一页' }).click();
     await expect(rows(page)).toHaveCount(1);
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
-    await close(page, f);
+    await close(page, f, failed);
   }
 });
 
