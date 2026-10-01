@@ -391,9 +391,9 @@ test('取消旧预览的晚到拒绝不关闭新编辑，挂起写入后SPA转�
   let releaseRead = () => {},
     releaseWrite = () => {},
     readReached = () => {},
-    readDone = () => {},
     writeReached = () => {},
     writeDone = () => {};
+  const pendingReads: Promise<void>[] = [];
   const heldRead = new Promise<void>((r) => {
       releaseRead = r;
     }),
@@ -401,11 +401,8 @@ test('取消旧预览的晚到拒绝不关闭新编辑，挂起写入后SPA转�
       releaseWrite = r;
     });
   const sawRead = new Promise<void>((r) => {
-      readReached = r;
-    }),
-    doneRead = new Promise<void>((r) => {
-      readDone = r;
-    });
+    readReached = r;
+  });
   const sawWrite = new Promise<void>((r) => {
       writeReached = r;
     }),
@@ -416,19 +413,21 @@ test('取消旧预览的晚到拒绝不关闭新编辑，挂起写入后SPA转�
     const second = f.as(() =>
       f.api.store.createResult(f.task.id, '另一份成果', 'SECOND_UNSAVED_SOURCE', randomUUID()),
     );
-    let first = true;
+    let holdReads = true;
     await page.route(
       `${origin}/api/v1/results/${f.result.id}/member-version-preview`,
       async (route) => {
-        if (!first) {
+        if (!holdReads) {
           await route.continue();
           return;
         }
-        first = false;
         readReached();
-        await heldRead;
-        await route.fulfill({ status: 403, json: { error: { message: '已取消旧读取的拒绝' } } });
-        readDone();
+        // SSE 刷新可在首次打开期间取消并重发预览；这一轮所有读取都必须保持挂起。
+        const pending = heldRead.then(() =>
+          route.fulfill({ status: 403, json: { error: { message: '已取消旧读取的拒绝' } } }),
+        );
+        pendingReads.push(pending);
+        await pending;
       },
     );
     await page.route(endpoint(f), async (route) => {
@@ -443,10 +442,12 @@ test('取消旧预览的晚到拒绝不关闭新编辑，挂起写入后SPA转�
     await sawRead;
     await expect(dialog(page).getByLabel('新版本说明')).toHaveCount(0);
     await page.keyboard.press('Escape');
+    await expect(dialog(page)).toHaveCount(0);
+    holdReads = false;
     await edit(page);
     await dialog(page).getByLabel('新版本说明').fill('PENDING_VERSION_TWO');
     releaseRead();
-    await doneRead;
+    await Promise.all(pendingReads);
     await expect(dialog(page).getByLabel('新版本说明')).toHaveValue('PENDING_VERSION_TWO');
     await dialog(page).getByRole('button', { name: '保存为新版本', exact: true }).click();
     await sawWrite;

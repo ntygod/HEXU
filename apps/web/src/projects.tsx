@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
 import { ProjectAgreements } from './project-agreements.js';
+import { ProjectResults } from './project-results.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
 import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
@@ -9,7 +10,7 @@ import { Avatar, Button, Empty, Icon, StatusBadge } from '../../../packages/ui/s
 import { Link, useApp, canEditTask } from './state.js';
 import { NewProject, NewTask } from './forms.js';
 import { ProjectAccess } from './team.js';
-import { ResultCard, TaskRow } from './work-cards.js';
+import { TaskRow } from './work-cards.js';
 import './work-pages.css';
 
 export function Projects() {
@@ -106,10 +107,11 @@ export function ProjectPage({ id }: { id: string }) {
         : 'tasks',
       sourceId: query.get('source') ?? '',
       agreementId: query.get('agreement') ?? '',
+      resultsCursor: query.get('resultsCursor') ?? '',
     };
   };
   const [projectLocation, setProjectLocation] = useState(readLocation);
-  const { tab, sourceId, agreementId } = projectLocation;
+  const { tab, sourceId, agreementId, resultsCursor } = projectLocation;
   useEffect(() => {
     const update = () => setProjectLocation(readLocation());
     window.addEventListener('popstate', update);
@@ -121,6 +123,7 @@ export function ProjectPage({ id }: { id: string }) {
     else url.searchParams.set('tab', tab);
     url.searchParams.delete('source');
     url.searchParams.delete('agreement');
+    url.searchParams.delete('resultsCursor');
     if (source && tab === 'sources') url.searchParams.set('source', source);
     if (source && tab === 'agreements') url.searchParams.set('agreement', source);
     history.pushState({}, '', url);
@@ -155,9 +158,6 @@ export function ProjectPage({ id }: { id: string }) {
     (task) => task.projectId === id && task.status !== 'cancelled',
   );
   const tasks = allTasks.filter((task) => matchesTaskPeopleFilters(task, filters));
-  const results = data.results.filter((result) =>
-    allTasks.some((task) => task.id === result.taskId),
-  );
   const editable = project.access !== 'view';
   return (
     <div className="work-page">
@@ -220,29 +220,7 @@ export function ProjectPage({ id }: { id: string }) {
           onSelect={(source) => setTab('sources', source)}
         />
       ) : tab === 'results' ? (
-        <div className="work-result-grid stagger">
-          {results.map((result) => (
-            <ResultCard key={result.id} result={result} />
-          ))}
-          {!results.length && (
-            <Empty
-              icon="box"
-              title="这个项目还没有成果"
-              description="在任务里把进展分享出来，反馈会留在原任务上。"
-              action={
-                <Button
-                  variant="primary"
-                  disabled={!editable}
-                  onClick={() => {
-                    setTab('tasks');
-                  }}
-                >
-                  去任务里推进
-                </Button>
-              }
-            />
-          )}
-        </div>
+        <ProjectResults key={id} projectId={id} cursor={resultsCursor} />
       ) : tab === 'overview' ? (
         <div className="project-overview">
           <section className="work-section">

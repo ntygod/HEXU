@@ -5,6 +5,8 @@ import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
 import { MemberResultVersions } from '../../../packages/db/src/member-result-versions.js';
 import { ResultReferences } from '../../../packages/db/src/result-references.js';
+import { ProjectResults } from '../../../packages/db/src/project-results.js';
+import { parseProjectResultListQuery } from '../../../packages/contracts/src/project-results.js';
 import { parseResultReferenceListQuery } from '../../../packages/contracts/src/result-references.js';
 import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-inputs.js';
 import { ResultFeedbackFollowUps } from '../../../packages/db/src/result-feedback-followups.js';
@@ -323,6 +325,12 @@ export async function createApp(
   });
   app.get('/api/v1/projects/:projectId', async (request) =>
     store.project(param(request.params, 'projectId')),
+  );
+  app.get('/api/v1/projects/:projectId/results', async (request) =>
+    new ProjectResults(store).list(
+      param(request.params, 'projectId'),
+      parseProjectResultListQuery(request.query),
+    ),
   );
   app.get('/api/v1/tasks/:taskId/messages/:messageId/agreement-preview', async (request) =>
     store.projectAgreements.preview(
