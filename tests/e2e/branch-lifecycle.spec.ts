@@ -41,11 +41,25 @@ async function open(page: Page, f: Fixture) {
 async function edit(page: Page, name = '方案 A') {
   await card(page, name).getByRole('button', { name: '放弃方案并保留现场', exact: true }).click();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '方案放弃浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 
 test('已登记方案明确放弃但不删现场；取消不提交，暗色和手机确认范围清楚', async ({ page }) => {
@@ -306,29 +320,41 @@ test('放弃临时读错保留确认，Task新修订需明确重核且重新同�
 });
 test('旧已取消读取的403不卸载新确认，当前撤权清除输入且不因重开恢复', async ({ page }) => {
   const f = await branchResultFixture(origin);
+  let failed = false;
+  let holdReads = true;
   let release = () => {};
+  const pendingReads: Promise<void>[] = [];
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   try {
     const url = previewUrl(f);
-    let seen = 0;
     await page.route(url, async (route) => {
-      if (++seen === 1) {
-        await gate;
-        await route
-          .fulfill({ status: 403, json: { error: { message: '旧读取拒绝' } } })
-          .catch(() => {});
-      } else await route.continue();
+      if (!holdReads || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      // SSE 刷新可取消并重发读取；关闭旧编辑器前，所有旧读取都必须保持挂起。
+      const pending = gate.then(() =>
+        route.fulfill({ status: 403, json: { error: { message: '旧读取拒绝' } } }),
+      );
+      pendingReads.push(pending);
+      await pending;
     });
     await open(page, f);
     await edit(page);
-    await expect.poll(() => seen).toBe(1);
+    await expect.poll(() => pendingReads.length).toBeGreaterThan(0);
+    await expect(submit(page)).toBeDisabled();
     await page.keyboard.press('Escape');
+    await expect(editor(page)).toHaveCount(0);
+    holdReads = false;
     await edit(page);
     await consent(page).check();
     release();
+    await Promise.all(pendingReads);
+    await expect(consent(page)).toBeChecked();
     await expect(submit(page)).toBeEnabled();
+    await expect(editor(page)).not.toContainText('旧读取拒绝');
     await page.unroute(url);
     await page.route(url, (route) =>
       route.fulfill({ status: 403, json: { error: { message: '当前放弃权限拒绝' } } }),
@@ -341,9 +367,14 @@ test('旧已取消读取的403不卸载新确认，当前撤权清除输入且�
     await page.getByRole('button', { name: '方案分支', exact: true }).click();
     await expect(card(page).getByRole('button', { name: '放弃方案并保留现场' })).toBeDisabled();
     expect(f.read().branches[0]!.state).toBe('planned');
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     release();
-    await close(page, f);
+    await Promise.allSettled(pendingReads);
+    await close(page, f, failed);
   }
 });
 

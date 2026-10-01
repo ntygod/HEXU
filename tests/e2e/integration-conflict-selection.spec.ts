@@ -92,11 +92,25 @@ async function choose(page: Page) {
   await consent(page).check();
   await expect(generate(page)).toBeEnabled();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '冲突选择浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 async function publish(
   f: Fixture,
@@ -316,28 +330,41 @@ test('冲突选择与命令在短暂读取失败和旧修订下保留，重核�
 
 test('旧读取迟到撤权不卸载重开的冲突编辑器；当前撤权清除决策与命令', async ({ page }) => {
   const f = await integrationFixture(origin, 'sha1', { targetText: 'USER TARGET VERSION' });
+  let failed = false;
+  let holdReads = true;
   let release = () => {};
+  const pendingReads: Promise<void>[] = [];
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   try {
     const v = await ready(f),
       url = viewUrl(f, v);
-    let seen = 0;
     await page.route(url, async (route) => {
-      if (++seen === 1) {
-        await gate;
-        await error(route, 403, '旧读取撤权').catch(() => {});
-      } else await route.continue();
+      if (!holdReads || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      // SSE 刷新可取消并重发读取；关闭旧编辑器前，所有旧读取都必须保持挂起。
+      const pending = gate.then(() => error(route, 403, '旧读取撤权'));
+      pendingReads.push(pending);
+      await pending;
     });
     await open(page, f);
     await records(page).getByRole('button', { name: '选择文件试应用', exact: true }).click();
-    await expect.poll(() => seen).toBe(1);
+    await expect.poll(() => pendingReads.length).toBeGreaterThan(0);
+    await expect(generate(page)).toBeDisabled();
     await page.keyboard.press('Escape');
+    await expect(editor(page)).toHaveCount(0);
+    holdReads = false;
     await choose(page);
     release();
+    await Promise.all(pendingReads);
+    await expect(choice(page, 'README.md')).toHaveValue('take_source');
     await expect(choice(page, oddPath)).toHaveValue('keep_target');
+    await expect(consent(page)).toBeChecked();
     await expect(generate(page)).toBeEnabled();
+    await expect(editor(page)).not.toContainText('旧读取撤权');
     await generate(page).click();
     await page.unroute(url);
     await page.route(url, (route) => error(route, 403, '当前冲突选择权限已撤销'));
@@ -351,9 +378,14 @@ test('旧读取迟到撤权不卸载重开的冲突编辑器；当前撤权清�
     await expect(
       records(page).getByRole('button', { name: '选择文件试应用', exact: true }),
     ).toHaveCount(0);
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     release();
-    await close(page, f);
+    await Promise.allSettled(pendingReads);
+    await close(page, f, failed);
   }
 });
 

@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Request } from '@playwright/test';
+import { test, expect, type Page, type Request, type Route } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { teamFixture, type Account } from '../helpers/team.js';
@@ -154,11 +154,22 @@ async function switchVersion(page: Page, f: Fixture, version: ResultRevision) {
   await expect(page).toHaveURL(url(f, version));
   await expect(section(page)).toContainText(`只关联当前v${version.revision}`);
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.api.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    () => page.unrouteAll({ behavior: 'ignoreErrors' }),
+    () => page.context().close(),
+    () => f.api.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (!errors.length) return;
+  if (!preserveFailure) throw new AggregateError(errors, '链接登记浏览器夹具清理失败');
+  test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
 }
 
 test('成员明确登记与撤下固定v1的发布链接，新v2不抢来源；键盘、明暗色与手机可用且不执行部署', async ({
@@ -603,8 +614,10 @@ test('链接分页真实读取前后页，撤下记录保留；旧页晚到拒�
 }) => {
   const f = await fixture(),
     held = gate(),
-    reached = gate(),
-    finished = gate();
+    reached = gate();
+  const pendingReads: Promise<void>[] = [];
+  let failed = false,
+    holdReads = true;
   try {
     const references: ResultReference[] = [];
     for (let index = 1; index <= 23; index++)
@@ -623,28 +636,28 @@ test('链接分页真实读取前后页，撤下记录保留；旧页晚到拒�
     await expect(row(page, references[0]!)).toBeVisible();
     await pagination.getByRole('button', { name: '较新的登记' }).click();
     await expect(section(page).locator('[data-reference-id]')).toHaveCount(20);
-    let holdNext = true;
-    await page.route(`${endpoint(f)}?cursor=*`, async (route) => {
-      if (!holdNext) {
-        await route.continue();
-        return;
-      }
-      holdNext = false;
+    const pattern = `${endpoint(f)}?cursor=*`;
+    const delayOldPage = async (route: Route) => {
+      if (!holdReads) return route.continue();
+      const response = held.promise.then(() =>
+        route.fulfill({ status: 403, json: { error: { message: '旧分页读取已取消' } } }),
+      );
+      pendingReads.push(response);
       reached.resolve();
-      await held.promise;
-      try {
-        await route.fulfill({ status: 403, json: { error: { message: '旧分页读取已取消' } } });
-      } finally {
-        finished.resolve();
-      }
-    });
+      await response;
+    };
+    await page.route(pattern, delayOldPage);
     await pagination.getByRole('button', { name: '较早的登记' }).click();
     await reached.promise;
+    await expect(section(page).getByRole('status')).toContainText('正在读取此版本的链接');
+    await expect(section(page).locator('[data-reference-id]')).toHaveCount(0);
     await switchVersion(page, f, v2);
+    holdReads = false;
+    await page.unroute(pattern, delayOldPage);
     await edit(page);
     await fill(page, 'NEW_VERSION_DRAFT_SURVIVES_OLD_READ');
     held.resolve();
-    await finished.promise;
+    await Promise.all(pendingReads);
     await expect(editor(page).getByLabel('链接标题', { exact: true })).toHaveValue(
       'NEW_VERSION_DRAFT_SURVIVES_OLD_READ',
     );
@@ -659,9 +672,25 @@ test('链接分页真实读取前后页，撤下记录保留；旧页晚到拒�
     await edit(page);
     await expect(editor(page).getByLabel('链接标题', { exact: true })).toHaveValue('');
     expect((await f.list()).items).toHaveLength(23);
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     held.resolve();
-    await close(page, f);
+    try {
+      const settled = await Promise.allSettled(pendingReads);
+      const errors = settled.filter((item) => item.status === 'rejected');
+      if (errors.length && !failed) {
+        failed = true;
+        throw new AggregateError(
+          errors.map((item) => item.reason),
+          '旧链接分页读取未完成',
+        );
+      }
+    } finally {
+      await close(page, f, failed);
+    }
   }
 });
 

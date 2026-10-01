@@ -52,11 +52,25 @@ async function choose(page: Page, f: Fixture) {
   await selected(page).selectOption(f.material.request.id);
   await consent(page).check();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '移出保留浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 const body = (f: Fixture) => {
   const { branchId: _id, ...s } = f.selection();
@@ -369,30 +383,43 @@ test('节点开始后当前取消确认不能生效；未知观察保留原命�
 });
 test('旧已取消403不能擦掉新移出确认，当前撤权清空后重开不恢复原许可', async ({ page }) => {
   const f = await branchCleanupFixture(origin);
+  let failed = false;
+  let holdReads = true;
   let release = () => {};
+  const pendingReads: Promise<void>[] = [];
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   try {
     await f.discard();
     const url = `${origin}/api/v1/${f.path()}/cleanup-options`;
-    let seen = 0;
     await page.route(url, async (route) => {
-      if (++seen === 1) {
-        await gate;
-        await route
-          .fulfill({ status: 403, json: { error: { message: '旧拒绝' } } })
-          .catch(() => {});
-      } else await route.continue();
+      if (!holdReads || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      // SSE 刷新可取消并重发读取；关闭旧编辑器前，所有旧读取都必须保持挂起。
+      const pending = gate.then(() =>
+        route.fulfill({ status: 403, json: { error: { message: '旧拒绝' } } }),
+      );
+      pendingReads.push(pending);
+      await pending;
     });
     await open(page, f);
     await edit(page);
-    await expect.poll(() => seen).toBe(1);
+    await expect.poll(() => pendingReads.length).toBeGreaterThan(0);
+    await expect(submit(page)).toBeDisabled();
     await editor(page).getByRole('button', { name: '返回方案记录' }).click();
+    await expect(editor(page)).toHaveCount(0);
+    holdReads = false;
     await edit(page);
     await choose(page, f);
     release();
+    await Promise.all(pendingReads);
+    await expect(selected(page)).toHaveValue(f.material.request.id);
+    await expect(consent(page)).toBeChecked();
     await expect(submit(page)).toBeEnabled();
+    await expect(editor(page)).not.toContainText('旧拒绝');
     await page.unroute(url);
     await page.route(url, (route) =>
       route.fulfill({ status: 403, json: { error: { message: '当前权限已撤销' } } }),
@@ -407,8 +434,13 @@ test('旧已取消403不能擦掉新移出确认，当前撤权清空后重开�
       card(page).getByRole('button', { name: '移出并保留完整现场', exact: true }),
     ).toBeDisabled();
     expect(f.api.store.db.prepare('SELECT COUNT(*) n FROM branch_preservations').get()!.n).toBe(0);
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     release();
-    await close(page, f);
+    await Promise.allSettled(pendingReads);
+    await close(page, f, failed);
   }
 });

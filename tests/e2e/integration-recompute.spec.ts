@@ -77,11 +77,25 @@ async function choose(page: Page, f: Fixture) {
   await consent(page).check();
   await expect(submit(page)).toBeEnabled();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '重新预检浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 test('新目标重新预检固定旧v1，显式两项选择与确认；新记录可返回原记录，暗色/手机清楚', async ({
   page,
@@ -245,29 +259,42 @@ test('临时读取故障与任务新修订保留选择，重核明确清除确�
 });
 test('已取消旧读取的403不清除新编辑器，当前撤权则清除并不自动恢复输入', async ({ page }) => {
   const f = await fixture();
+  let failed = false;
+  let holdReads = true;
   let release = () => {};
+  const pendingReads: Promise<void>[] = [];
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   try {
     const url = `${f.url}/recompute-options`;
-    let seen = 0;
     await page.route(url, async (route) => {
-      if (++seen === 1) {
-        await gate;
-        await route
-          .fulfill({ status: 403, json: { error: { message: '旧读取撤权' } } })
-          .catch(() => {});
-      } else await route.continue();
+      if (!holdReads || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      // SSE 刷新可取消并重发读取；关闭旧编辑器前，所有旧读取都必须保持挂起。
+      const pending = gate.then(() =>
+        route.fulfill({ status: 403, json: { error: { message: '旧读取撤权' } } }),
+      );
+      pendingReads.push(pending);
+      await pending;
     });
     await open(page, f);
-    await expect.poll(() => seen).toBe(1);
+    await expect.poll(() => pendingReads.length).toBeGreaterThan(0);
+    await expect(submit(page)).toBeDisabled();
     await page.keyboard.press('Escape');
+    await expect(editor(page)).toHaveCount(0);
+    holdReads = false;
     await records(page).getByRole('button', { name: '使用新目标重新预检', exact: true }).click();
     await choose(page, f);
     release();
+    await Promise.all(pendingReads);
     await expect(submit(page)).toBeEnabled();
     await expect(target(page)).toHaveValue(f.retention.request.id);
+    await expect(material(page)).toHaveValue(`retention:${f.sr.request.id}`);
+    await expect(consent(page)).toBeChecked();
+    await expect(editor(page)).not.toContainText('旧读取撤权');
     await page.unroute(url);
     await page.route(url, (route) =>
       route.fulfill({ status: 403, json: { error: { message: '当前重新预检权限撤销' } } }),
@@ -279,8 +306,13 @@ test('已取消旧读取的403不清除新编辑器，当前撤权则清除并�
     await page.unroute(url);
     await page.getByRole('button', { name: '整合预检', exact: true }).click();
     await expect(records(page)).toContainText('整合内容已清除');
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     release();
-    await close(page, f);
+    await Promise.allSettled(pendingReads);
+    await close(page, f, failed);
   }
 });

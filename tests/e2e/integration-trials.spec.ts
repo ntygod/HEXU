@@ -105,11 +105,25 @@ async function choose(page: Page) {
   await consent(page).check();
   await expect(generate(page)).toBeEnabled();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '试应用浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 function candidate(
   v: IntegrationView,
@@ -299,33 +313,49 @@ test('暂时读取失败保留选择与命令，变化基线需明确重核并�
 
 test('已取消读取的迟到撤权结果不能卸载重新打开的选择器', async ({ page }) => {
   const f = await integrationFixture(origin);
+  let failed = false;
+  let holdReads = true;
   let release = () => {};
+  const pendingReads: Promise<void>[] = [];
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   try {
     const v = await ready(f);
-    let seen = 0;
     await page.route(viewUrl(f, v), async (route) => {
-      if (++seen === 1) {
-        await gate;
-        await error(route, 403, '旧读取已撤销').catch(() => {});
-      } else await route.continue();
+      if (!holdReads || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      // SSE 刷新可取消并重发读取；关闭旧编辑器前，所有旧读取都必须保持挂起。
+      const pending = gate.then(() => error(route, 403, '旧读取已撤销'));
+      pendingReads.push(pending);
+      await pending;
     });
     await open(page, f);
     await records(page).getByRole('button', { name: '选择文件试应用', exact: true }).click();
-    await expect.poll(() => seen).toBe(1);
+    await expect.poll(() => pendingReads.length).toBeGreaterThan(0);
+    await expect(generate(page)).toBeDisabled();
     await page.keyboard.press('Escape');
+    await expect(editor(page)).toHaveCount(0);
+    holdReads = false;
     await choose(page);
     release();
+    await Promise.all(pendingReads);
     await expect(
       editor(page).getByRole('checkbox', { name: '试应用 new.txt', exact: true }),
     ).toBeChecked();
+    await expect(consent(page)).toBeChecked();
     await expect(generate(page)).toBeEnabled();
     await expect(editor(page)).not.toContainText('旧读取已撤销');
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     release();
-    await close(page, f);
+    await Promise.allSettled(pendingReads);
+    await close(page, f, failed);
   }
 });
 

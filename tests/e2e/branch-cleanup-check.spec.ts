@@ -33,11 +33,25 @@ async function open(page: Page, f: Fixture) {
   await page.getByRole('button', { name: '方案分支', exact: true }).click();
   await card(page).getByRole('button', { name: '清理前核对', exact: true }).click();
 }
-async function close(page: Page, f: Fixture) {
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.goto('about:blank');
-  await page.context().close();
-  await f.close();
+async function close(page: Page, f: Fixture, preserveFailure = false) {
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    async () => {
+      if (!page.isClosed()) await page.unrouteAll({ behavior: 'ignoreErrors' });
+    },
+    () => page.context().close(),
+    () => f.close(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) {
+    if (!preserveFailure) throw new AggregateError(errors, '现场核对浏览器夹具清理失败');
+    test.info().annotations.push({ type: 'cleanup', description: errors.map(String).join('\n') });
+  }
 }
 
 test('已放弃方案明确选保护副本才生成固定本机命令，取消不写入，暗色与窄屏不暗示可删除', async ({
@@ -177,29 +191,42 @@ test('已删除的副本不能维持旧核对命令，空态引导明确保留�
 });
 test('旧已取消403不擦除新保护选择；当前撤权清空且重开不能恢复旧命令', async ({ page }) => {
   const f = await branchCleanupFixture(origin);
+  let failed = false;
+  let holdReads = true;
   let release = () => {};
+  const pendingReads: Promise<void>[] = [];
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   try {
     await f.discard();
     const url = `${origin}/api/v1/${f.path()}/cleanup-options`;
-    let seen = 0;
     await page.route(url, async (route) => {
-      if (++seen === 1) {
-        await gate;
-        await route
-          .fulfill({ status: 403, json: { error: { message: '旧拒绝' } } })
-          .catch(() => {});
-      } else await route.continue();
+      if (!holdReads || route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      // SSE 刷新可取消并重发读取；关闭旧编辑器前，所有旧读取都必须保持挂起。
+      const pending = gate.then(() =>
+        route.fulfill({ status: 403, json: { error: { message: '旧拒绝' } } }),
+      );
+      pendingReads.push(pending);
+      await pending;
     });
     await open(page, f);
-    await expect.poll(() => seen).toBe(1);
+    await expect.poll(() => pendingReads.length).toBeGreaterThan(0);
+    await expect(select(page)).toBeDisabled();
+    await expect(generate(page)).toBeDisabled();
     await panel(page).getByRole('button', { name: '返回保留的方案' }).click();
+    await expect(panel(page)).toHaveCount(0);
+    holdReads = false;
     await card(page).getByRole('button', { name: '清理前核对', exact: true }).click();
     await select(page).selectOption(f.material.request.id);
     release();
+    await Promise.all(pendingReads);
+    await expect(select(page)).toHaveValue(f.material.request.id);
     await expect(generate(page)).toBeEnabled();
+    await expect(panel(page)).not.toContainText('旧拒绝');
     await page.unroute(url);
     await page.route(url, (route) =>
       route.fulfill({ status: 403, json: { error: { message: '当前撤权' } } }),
@@ -211,8 +238,13 @@ test('旧已取消403不擦除新保护选择；当前撤权清空且重开不�
       card(page).getByRole('button', { name: '清理前核对', exact: true }),
     ).toBeDisabled();
     expect(f.read().branches[0]!.state).toBe('discarded');
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
+    holdReads = false;
     release();
-    await close(page, f);
+    await Promise.allSettled(pendingReads);
+    await close(page, f, failed);
   }
 });
