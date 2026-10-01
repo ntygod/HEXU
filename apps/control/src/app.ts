@@ -531,7 +531,7 @@ export async function createApp(
       parseAssignmentHistoryQuery(request.query),
     ),
   );
-  app.patch('/api/v1/tasks/:taskId', async (request) => {
+  app.patch('/api/v1/tasks/:taskId', { bodyLimit: 96 * 1024 }, async (request) => {
     const body = record(request.body);
     const data: {
       expectedRevision: number;

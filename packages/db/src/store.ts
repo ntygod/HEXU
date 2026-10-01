@@ -397,12 +397,25 @@ export class Store {
     key: string,
   ) {
     this.getTask(id, true);
-    return this.mutate(`task.patch:${id}`, key, data, () => {
-      const task = this.getTask(id, true);
-      assertRevision(task.revision, data.expectedRevision);
-      const { expectedRevision: _, ...changes } = data;
-      return this.saveTask({ ...task, ...changes, revision: task.revision + 1, updatedAt: now() });
-    });
+    return this.mutate(
+      `task.patch:${id}`,
+      key,
+      data,
+      () => {
+        const task = this.getTask(id, true);
+        assertRevision(task.revision, data.expectedRevision);
+        const { expectedRevision: _, ...changes } = data;
+        return this.saveTask({
+          ...task,
+          ...changes,
+          revision: task.revision + 1,
+          updatedAt: now(),
+        });
+      },
+      () => {
+        this.getTask(id, true);
+      },
+    );
   }
   private recordCompletion(task: Task, action: string) {
     this.db

@@ -165,6 +165,21 @@ jobs:
           name: hexu-result-activity-failures
           path: test-results/result-task-activity-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-edit-previews
+          path: |
+            artifacts/171-task-edit-baseline-dark.png
+            artifacts/172-task-edit-baseline-mobile-light.png
+            artifacts/173-task-edit-baseline-conflict-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-edit-failures
+          path: test-results/task-edit-baseline-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
