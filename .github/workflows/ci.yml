@@ -47,6 +47,20 @@ jobs:
           retention-days: 7
       # Keep the full report/trace artifact above. These focused previews remain
       # small enough to inspect even when the complete ZIP exceeds reader limits.
+      # The two cross-service regressions also need individually retrievable
+      # traces/screenshots if their original test still fails in a future run.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-node-summary-failure
+          path: test-results/nodes-*-CLI*/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-participant-permission-failure
+          path: test-results/team-只读成员自行参与*/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:

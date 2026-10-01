@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { RunnerNode } from '../../packages/contracts/src/nodes.js';
 const origin = 'http://127.0.0.1:4312';
 const password = 'Fictional Node Browser Password 2026!';
 const headers = (spaceId?: string) => ({
@@ -110,6 +111,7 @@ test('网页配对与真实独立 CLI：在线、Git 摘要、刷新重启及撤
   const f = await prepare(page);
   await page.getByRole('button', { name: '切换浅色模式', exact: true }).click();
   let agent: ReturnType<typeof cli> | null = null;
+  const observations: unknown[] = [];
   try {
     const code = await pairingUI(page, f.project.id);
     const pair = cli(['connect', '--config', f.config, '--state', f.home], code + '\nCONNECT\n');
@@ -122,8 +124,65 @@ test('网页配对与真实独立 CLI：在线、Git 摘要、刷新重启及撤
     const card = page.locator('.node-card').filter({ hasText: '我的开发节点' });
     await expect(card.locator('.badge')).toHaveText('在线');
     await expect(card.locator('.node-counts dd')).toHaveText(['0', '1', '1', '0']);
+    const nodeId = await card.getAttribute('data-node-id');
+    const readNode = async () => {
+      const response = await page.request.get(`${origin}/api/v1/nodes`, {
+        headers: headers(f.space.id),
+      });
+      expect(response.ok(), await response.text()).toBe(true);
+      const { items } = (await response.json()) as { items: RunnerNode[] };
+      const node = items.find((item) => item.id === nodeId);
+      expect(node, 'The paired node remains visible to its owner').toBeDefined();
+      return node!;
+    };
+    const before = await readNode();
+    const summary = (node: RunnerNode) => ({
+      sequence: node.acknowledgedSequence,
+      capturedAt: node.snapshot?.capturedAt,
+      counts: node.snapshot?.workspaces.map(({ staged, modified, untracked, conflicts }) => ({
+        staged,
+        modified,
+        untracked,
+        conflicts,
+      })),
+    });
+    observations.push({ phase: 'before local change', at: Date.now(), ...summary(before) });
     await writeFile(join(f.root, 'second-file.txt'), 'Another local change');
+    observations.push({ phase: 'local change written', at: Date.now() });
+    let lastSequence = before.acknowledgedSequence;
+    // The independent CLI and the page each poll every five seconds. First prove
+    // that the real CLI committed a newer snapshot, then test the page's own
+    // unmodified polling window. No forced sync, reload or fabricated response.
+    await expect
+      .poll(
+        async () => {
+          const node = await readNode();
+          if (node.acknowledgedSequence !== lastSequence) {
+            lastSequence = node.acknowledgedSequence;
+            observations.push({
+              phase: 'server snapshot advanced',
+              at: Date.now(),
+              ...summary(node),
+            });
+          }
+          return {
+            advanced: node.acknowledgedSequence > before.acknowledgedSequence,
+            counts: node.snapshot?.workspaces.map((workspace) => [
+              workspace.staged,
+              workspace.modified,
+              workspace.untracked,
+              workspace.conflicts,
+            ]),
+          };
+        },
+        {
+          message: 'The live CLI commits the second local change within its next sync window',
+          timeout: 10000,
+        },
+      )
+      .toEqual({ advanced: true, counts: [[0, 1, 2, 0]] });
     await expect(card.locator('.node-counts dd')).toHaveText(['0', '1', '2', '0']);
+    observations.push({ phase: 'page observed second local change', at: Date.now() });
     await mkdir('artifacts', { recursive: true });
     await page.locator('.node-resources').screenshot({ path: 'artifacts/20-runner-online.png' });
     await page.reload();
@@ -154,6 +213,7 @@ test('网页配对与真实独立 CLI：在线、Git 摘要、刷新重启及撤
     await expect(card).toContainText('历史摘要');
     await page.locator('.node-resources').screenshot({ path: 'artifacts/22-runner-revoked.png' });
   } finally {
+    console.info('Node synchronization stages:', JSON.stringify(observations));
     if (agent) await agent.stop();
     await rm(f.dir, { recursive: true, force: true });
   }
