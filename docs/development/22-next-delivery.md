@@ -2,11 +2,11 @@
 
 更新：2026-10-01。本页维护唯一下一项与后续队列；当前能力/验证见[21](21-implementation-status.md)，原ID与剩余范围见[19](19-work-items.md)。
 
-## 下一项：HX-DEV-04-01 普通任务创建请求预算
+## 下一项：HX-DEV-04-03/06 项目状态与关注内容筛选
 
-独立实测确认原普通新建接口虽然允许标题160、说明12000个UTF-16单位，最大合法中文正文36526字节和转义73006字节仍被默认32KiB传输预算拒绝。当前仅给普通Task创建POST配置96KiB，不扩大全局限制；全Unicode转义键/字段及100单位项目ID的理论最坏正文73729字节仍有界。原字符/字段验证、真人身份和项目编辑权限、原回执、原子计数/Task/outbox/回执保持，不新增attention或执行字段。
+沿用现有项目API/列表/看板共享谓词和URL选择，补原四种Task状态及关注文本present/absent交集。默认项目页面仍不含已取消，API默认仍含全部当前可见状态；明确cancelled才展示只读取消列，不用现有三选项状态编辑器隐式重开。attention只读真实去空白文本，不推断等待/阻塞/暂停或Run状态；项目总览和全局工作台不随局部条件改写。
 
-7项新回归与Task编辑/反馈后续任务相关31项通过，完整本地1097/1097及类型/UI token/构建通过；真实HTTP98304可用、98305拒绝，无关评论和项目创建继续32KiB。父工作说明编辑PR40已冻结83c513a2，CI158完成1090/1090工程、245/245 Chromium及汇总，171–173原图与制品摘要已核验。共同迟到读取夹具按会话持有并先排空后unroute，八处相关流程全部通过；本创建修正以该稳定父head独立发布，仍需自身精确CI，不借父级通过提前验收。说明历史、独立Requirement和正式存储不包含在这次预算修正中。
+明确处理未知/重复/非法条件：不能静默变成全部。刷新、Back/Forward、列表/看板切换、Task返回和清除保持一致；API继续先权限/项目/当前参与，再过滤和游标。12项新增和完整本地1109/1109、类型/UI token/构建通过；7条新页面完成严格类型与252条/40文件发现，有限独审修正两处测试预期后无阻断，174–176仍需自身精确CI。父Task编辑PR40已冻结83c513a2并在CI158完成1090/245及171–173实际验收；普通创建预算PR41冻结77e510e4，CI159完成1097/1097工程、245/245页面与汇总通过，两分页隔离再次通过。按顺序冻结/验收后再发布本切片，04-03/06仍部分实现，04-04不变。
 
 ## 前置有限核心检查点
 
@@ -22,11 +22,12 @@
 - PR38冻结30b9fd55：项目SQL有界摘要、取消Task历史、固定所见版本与URL分页；CI152工程1071/1071、Chromium232/232与汇总通过，165–167实际核验。首次两处夹具竞态修正未改生产，原Workbench全量传输不改变。
 - PR39冻结179f159f：当前Task状态与全部活动/unknown执行采用同一Workbench快照，CI154工程1082/1082、Chromium238/238及汇总通过；168–170实际查看，169固定导航在滚动后长截图位于中段的限制已披露，真实分页点击/键盘通过。
 - PR40冻结83c513a2：Task工作说明固定基线/原回执和晚响应归属、撤权旧详情清理及PATCH预算，CI158工程1090/1090、Chromium245/245及汇总通过，171–173已实际查看；8处迟到GET隔离与先drain后unroute在该head通过，前期测试问题按trace修正，不改生产或弱化断言。
+- PR41冻结77e510e4：普通Task创建路由独立96KiB容纳既有合法中文/全JSON转义，字符/权限/原回执/原子事务与无关32KiB预算保持；CI159工程1097/1097、Chromium245/245及汇总通过，无UI改动或新增截图宣称。
 - 上述PR仍为独立相依草稿，未合并或部署，main仍a3ae2e8；后续base调整必须重新验证。逐段失败修正与证据在21和对应历史，不重做已完成恢复/清理切片。
 
 ## 开始时读取
 
-[项目任务](../harness/projects-tasks.md)、[身份](../harness/identity.md)与[开发流程](../harness/development.md)；目标见[04工作包](04-tasks-requirements.md)。实际入口为[创建路由](../../apps/control/src/app.ts)、[原契约](../../packages/contracts/src/index.ts)、[预算回归](../../tests/task-create-budget.test.ts)与[验证记录](history/2026-10-01-task-create-budget.md)。路由预算不能变成字段或身份权限扩张。
+[UI](../harness/ui.md)、[项目任务](../harness/projects-tasks.md)、[身份](../harness/identity.md)与[开发流程](../harness/development.md)；原目标见[04工作包](04-tasks-requirements.md)。实际入口为[操作边界](../engineering/task-state-filters.md)、[查询契约](../../packages/contracts/src/task-participants.ts)、[共享谓词](../../packages/domain/src/index.ts)与[项目UI](../../apps/web/src/project-task-filters.tsx)。不做标签、排序/拖拽、说明历史或独立Requirement。
 
 ## 剩余交付队列
 

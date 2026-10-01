@@ -45,6 +45,10 @@ Use the independent participation revision, immutable events, scoped outbox and 
 
 Participation is excluded from model materials: do not update Task revision/timestamps, owner, Run, dispatch, frozen Operation or workspace locks. Actual access revocation still uses existing execution/continuation checks. participantUserIds is only a read projection, never persisted Task JSON or model input. Keep one pure people/search predicate for API and board/list, filter after current access checks, and preserve URL selection across reload/back. Uncertain UI changes confirm the same payload/key; authority changes discard the drawer. Follow 22 for the next slice; complete sorting, status/label/attention filters and private sharing remain pending.
 
+## 项目状态与关注筛选
+
+状态过滤使用原Task四状态；关注过滤只看attention去空白后的实际内容，不推断等待/阻塞/暂停或Run生命周期。API未指定status保持全部当前可见状态，项目页面未指定保持排除cancelled；只有明确cancelled才显示只读取消列，不复用三状态下拉隐式重开。所有条件与当前参与关系、负责人和原搜索交集，先权限/项目/当前参与，再过滤和游标。URL不可信输入需校验未知、重复、非法条件，错误不可静默扩大结果；清除保留合法视图及其他项目定位。局部筛选不改全局Workbench、总览计数、状态或执行。见[当前用法](../engineering/task-state-filters.md)。
+
 ## 如何验证与回写
 
 对应复用 [项目设置](../../tests/project-settings.test.ts)、[归档](../../tests/project-archive.test.ts)、[改派](../../tests/task-assignment.test.ts)、[参与](../../tests/task-participants.test.ts) 及 [团队 UI](../../tests/e2e/team.spec.ts)。涉及事务时核对旧回执、修订冲突和回滚；改展示不必重新验证全部执行协议。

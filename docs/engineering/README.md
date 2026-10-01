@@ -64,6 +64,8 @@
 | 保持原成果与同一目录，选择新检查点创建另一条只读预检 | [新目标重新预检](integration-target-recompute.md) |
 | 本机核对候选差异，另行共享并在Task查看不可变历史 | [候选差异](integration-trial-differences.md) |
 
+[任务状态与关注筛选](task-state-filters.md)：项目/API交集筛选、明确取消只读与URL有效性。
+
 ## 架构决策
 
 ADR 保存作出决定时的背景与约束；其中的阶段进度不覆盖 21。现行客户端形态由 ADR-0008 规定，桌面框架与安装分发仍未决定/交付。

@@ -180,6 +180,21 @@ jobs:
           name: hexu-task-edit-failures
           path: test-results/task-edit-baseline-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-filter-previews
+          path: |
+            artifacts/174-task-state-filters-dark.png
+            artifacts/175-task-state-filters-mobile-light.png
+            artifacts/176-task-state-filters-cancelled-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-filter-failures
+          path: test-results/task-state-filters-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

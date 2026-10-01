@@ -1,4 +1,12 @@
-import { DomainError, enumValue, record, revision, text } from './index.js';
+import {
+  DomainError,
+  enumValue,
+  record,
+  revision,
+  taskStatuses,
+  text,
+  type TaskStatus,
+} from './index.js';
 import type { ProjectRole } from './identity.js';
 
 export type ParticipationState = 'active' | 'left' | 'removed' | 'access_revoked';
@@ -50,6 +58,9 @@ export interface TaskPeopleFilters {
   q?: string;
   ownerUserId?: string;
   participantUserId?: string;
+  status?: TaskStatus;
+  /** Whether Task.attention contains non-whitespace text; not a Run or waiting state. */
+  attention?: 'present' | 'absent';
 }
 export interface ProjectTaskPeople {
   owners: { id: string; name: string; availability: 'available' | 'read_only' | 'removed' }[];
@@ -78,16 +89,34 @@ export function parseParticipantHistoryQuery(value: unknown) {
   if (limit > 50) throw new DomainError('INVALID_INPUT', '每次最多读取 50 条参与记录');
   return { limit, before: query.before === undefined ? null : number(query.before) };
 }
-/** Parse these filters without changing existing project/cursor/limit query semantics. */
+/** Parse filters while allowing the task-list route's project/cursor/limit parameters. */
 export function parseTaskPeopleFilters(value: unknown): TaskPeopleFilters {
   const query = record(value);
+  const allowed = [
+    'q',
+    'ownerUserId',
+    'participantUserId',
+    'status',
+    'attention',
+    'projectId',
+    'cursor',
+    'limit',
+  ];
+  if (Object.keys(query).some((key) => !allowed.includes(key)))
+    throw new DomainError('INVALID_INPUT', '不支持的任务筛选查询参数');
+  if (Object.values(query).some((value) => value !== undefined && typeof value !== 'string'))
+    throw new DomainError('INVALID_INPUT', '任务筛选查询参数必须是单个文本值');
   const optional = (value: unknown, label: string, max: number) =>
-    value === undefined || (typeof value === 'string' && value.trim() === '')
-      ? undefined
-      : text(value, label, max);
+    value === undefined ? undefined : text(value, label, max, true) || undefined;
   return {
     q: optional(query.q, '搜索', 160),
     ownerUserId: optional(query.ownerUserId, '负责人', 100),
     participantUserId: optional(query.participantUserId, '参与者', 100),
+    ...(query.status === undefined
+      ? {}
+      : { status: enumValue(query.status, taskStatuses, '任务状态') }),
+    ...(query.attention === undefined
+      ? {}
+      : { attention: enumValue(query.attention, ['present', 'absent'] as const, '关注内容筛选') }),
   };
 }

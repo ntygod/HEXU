@@ -4,6 +4,7 @@
   gap: var(--hx-space-3);
 }
 .project-people-filters label {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--hx-space-2);
@@ -17,6 +18,8 @@
 }
 .project-filter-error {
   flex-basis: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--hx-text-secondary);
   font-size: var(--hx-font-secondary);
 }
@@ -31,4 +34,8 @@
     flex: 1;
     width: 100px;
   }
+}
+
+.project-board.project-cancelled-board {
+  grid-template-columns: minmax(0, 1fr);
 }

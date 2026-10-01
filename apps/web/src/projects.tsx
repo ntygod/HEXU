@@ -129,7 +129,16 @@ export function ProjectPage({ id }: { id: string }) {
     history.pushState({}, '', url);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
-  const { view, setView, filters, setFilter, clear } = useProjectTaskFilters();
+  const {
+    view,
+    setView,
+    filters,
+    values,
+    error: filterError,
+    hasFilters,
+    setFilter,
+    clear,
+  } = useProjectTaskFilters();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
@@ -157,7 +166,16 @@ export function ProjectPage({ id }: { id: string }) {
   const allTasks = data.tasks.filter(
     (task) => task.projectId === id && task.status !== 'cancelled',
   );
-  const tasks = allTasks.filter((task) => matchesTaskPeopleFilters(task, filters));
+  const tasks = filters
+    ? data.tasks.filter(
+        (task) =>
+          task.projectId === id &&
+          (filters.status === 'cancelled' || task.status !== 'cancelled') &&
+          matchesTaskPeopleFilters(task, filters),
+      )
+    : [];
+  const boardStatuses: TaskStatus[] =
+    filters?.status === 'cancelled' ? ['cancelled'] : ['todo', 'in_progress', 'done'];
   const editable = project.access !== 'view';
   return (
     <div className="work-page">
@@ -262,19 +280,24 @@ export function ProjectPage({ id }: { id: string }) {
             </div>
             <ProjectTaskFilters
               projectId={id}
-              filters={filters}
+              values={values}
+              validationError={filterError}
+              hasFilters={hasFilters}
               setFilter={setFilter}
               clear={clear}
             />
-            <span className="muted">{tasks.length} 项任务</span>
+            {!filterError && <span className="muted">{tasks.length} 项任务</span>}
           </div>
-          {view === 'board' ? (
-            <div className="project-board stagger">
-              {(['todo', 'in_progress', 'done'] as const).map((status) => (
+          {filterError ? null : view === 'board' ? (
+            <div
+              className={`project-board stagger${filters?.status === 'cancelled' ? ' project-cancelled-board' : ''}`}
+            >
+              {boardStatuses.map((status) => (
                 <section className="project-column" key={status}>
                   <header>
                     <StatusBadge status={status} />
                     <span>{tasks.filter((task) => task.status === status).length}</span>
+                    {status === 'cancelled' && <span className="muted">只读</span>}
                   </header>
                   {tasks
                     .filter((task) => task.status === status)
@@ -284,25 +307,31 @@ export function ProjectPage({ id }: { id: string }) {
                           <span className="work-task-id">{task.shortId}</span>
                           <h3>{task.title}</h3>
                           <p>{task.description || '打开任务查看讨论与成果。'}</p>
-                          {task.attention && <span className="badge amber">{task.attention}</span>}
+                          {task.attention?.trim() && (
+                            <span className="badge amber">{task.attention}</span>
+                          )}
                         </Link>
                         <footer>
                           <Avatar
                             user={data.members.find((member) => member.id === task.ownerUserId)}
                             size="small"
                           />
-                          <select
-                            aria-label={`${task.shortId} 状态`}
-                            value={task.status}
-                            disabled={!canEditTask(data, task)}
-                            onChange={(event) =>
-                              void changeStatus(task, event.target.value as TaskStatus)
-                            }
-                          >
-                            <option value="todo">待处理</option>
-                            <option value="in_progress">进行中</option>
-                            <option value="done">已完成</option>
-                          </select>
+                          {task.status === 'cancelled' ? (
+                            <span className="muted">已取消 · 只读</span>
+                          ) : (
+                            <select
+                              aria-label={`${task.shortId} 状态`}
+                              value={task.status}
+                              disabled={!canEditTask(data, task)}
+                              onChange={(event) =>
+                                void changeStatus(task, event.target.value as TaskStatus)
+                              }
+                            >
+                              <option value="todo">待处理</option>
+                              <option value="in_progress">进行中</option>
+                              <option value="done">已完成</option>
+                            </select>
+                          )}
                         </footer>
                       </article>
                     ))}
