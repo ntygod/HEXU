@@ -21,6 +21,12 @@ Keep the edit baseline fixed while the drawer is open. SSE updates show a compar
 
 标题/说明/关注内容仍走原Task PATCH，不混入完成、归属或执行命令。编辑基线固定Task ID、修订和原内容；SSE冲突只提示，由用户明确丢弃或保留草稿后采用当前基线。未知保存只确认原正文和幂等键，原回执不可换成最新Task投影；已关闭编辑器的晚响应不能影响新会话。当前Workbench移除Task或详情明确拒绝时清除旧详情/编辑包，不能因临时读取保留而延长撤权内容可见性。事务内当前编辑权限先于回执回放，业务/outbox/回执原子提交。见[操作边界](../engineering/task-edit-baseline.md)与[回归](../../tests/task-edit-baseline.test.ts)。
 
+## Task 工作说明历史
+
+标题/说明/关注内容的历史属于原Task，按当前父Task阅读权限读取，不按历史作者、负责人、协助快照或游标授权。内容快照与创建/PATCH/原采用/清除attention的状态事务、outbox和原回执一起提交；仅实际内容变化留记录，Task修订仍可能因其他操作有间隔。迁移只留已知当前快照且作者/时间未知。不可变表不接受更新或删除，历史读取不能产生执行或修改源材料。
+
+历史抽屉只读：有新内容时提示并保留已读页/展开状态，明确刷新才替换；当前拒绝或工作台移除Task时清空，关闭与身份/空间/Task切换取消旧请求，迟到成功或拒绝均不能影响新会话。分页绑定同一Task已有修订且SQL有界，不把旧权限延长为读取权。见[操作方法](../engineering/task-content-history.md)、[事务/API回归](../../tests/task-content-history.test.ts)与[浏览器流程](../../tests/e2e/task-content-history.spec.ts)。
+
 ## 项目归档与恢复
 
 Archive is a barrier for new model work, not deletion or a blanket read-only state for human collaboration. Require current project manage permission before replay and inside the revision-checked transaction. Commit project state/history/outbox, cancellation of never-permitted node dispatches and suspension of every pending preview/node Operation together. Preserve fixed Operation material; immediate restore never revives old plans. Only unpermitted cancellation returns selected notes to queued.

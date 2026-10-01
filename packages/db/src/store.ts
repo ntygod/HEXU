@@ -13,6 +13,7 @@ import { ResultRevisions } from './result-revisions.js';
 import { AssistanceStore } from './assistance.js';
 import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
+import { TaskContentHistoryStore } from './task-content-history.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { ProjectSourcesStore } from './project-sources.js';
@@ -78,6 +79,7 @@ export class Store {
   readonly projectLifecycle: ProjectLifecycleStore;
   readonly taskAssignment: TaskAssignmentStore;
   readonly taskParticipants: TaskParticipantsStore;
+  readonly taskContentHistory: TaskContentHistoryStore;
   readonly projectSources: ProjectSourcesStore;
   readonly projectAgreements: ProjectAgreementsStore;
   readonly projectMaterials: ProjectMaterialsStore;
@@ -120,6 +122,7 @@ export class Store {
     this.projectLifecycle = new ProjectLifecycleStore(this);
     this.taskAssignment = new TaskAssignmentStore(this);
     this.taskParticipants = new TaskParticipantsStore(this);
+    this.taskContentHistory = new TaskContentHistoryStore(this);
     this.projectSources = new ProjectSourcesStore(this);
     this.projectAgreements = new ProjectAgreementsStore(this);
     this.projectMaterials = new ProjectMaterialsStore(this);
@@ -383,6 +386,7 @@ export class Store {
     this.db
       .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
       .run(task.id, this.spaceId, task.projectId, JSON.stringify(task));
+    this.taskContentHistory.record(task, 'created');
     this.event(task.id, 'task.created');
     return task;
   }
@@ -405,12 +409,14 @@ export class Store {
         const task = this.getTask(id, true);
         assertRevision(task.revision, data.expectedRevision);
         const { expectedRevision: _, ...changes } = data;
-        return this.saveTask({
+        const next = this.saveTask({
           ...task,
           ...changes,
           revision: task.revision + 1,
           updatedAt: now(),
         });
+        this.taskContentHistory.changed(task, next, 'edited');
+        return next;
       },
       () => {
         this.getTask(id, true);
@@ -445,6 +451,7 @@ export class Store {
           revision: task.revision + 1,
           updatedAt: now(),
         });
+        this.taskContentHistory.changed(task, next, 'status');
         if (
           status === 'done' ||
           status === 'cancelled' ||
@@ -1072,10 +1079,12 @@ export class Store {
           .run(project.id, SPACE_ID, JSON.stringify(project));
         this.projectSettings.record(project, null, null, null);
       }
-      for (const task of demoTasks)
+      for (const task of demoTasks) {
         this.db
           .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
           .run(task.id, SPACE_ID, task.projectId, JSON.stringify(task));
+        this.taskContentHistory.record(task, 'legacy');
+      }
       this.insertMessage(
         'task-24',
         '按月份导出订单，沿用当前筛选条件。先完成页面，保持现有权限不变。',

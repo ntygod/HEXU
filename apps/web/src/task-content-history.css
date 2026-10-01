@@ -1,0 +1,45 @@
+.task-content-history {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  font-size: var(--hx-font-body);
+  gap: var(--hx-space-4);
+  overflow-wrap: anywhere;
+}
+.task-content-history > p,
+.task-content-snapshot > p {
+  color: var(--hx-text-secondary);
+  margin: 0;
+}
+.task-content-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.task-content-snapshot {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding: var(--hx-space-4) 0;
+  display: grid;
+  gap: var(--hx-space-2);
+}
+.task-content-snapshot h3 {
+  margin: 0;
+  font-size: inherit;
+}
+.task-content-snapshot summary {
+  cursor: pointer;
+  padding: var(--hx-space-2) 0;
+  color: var(--hx-brand-text);
+}
+.task-content-snapshot dl {
+  margin: 0;
+}
+.task-content-snapshot dt {
+  margin-top: var(--hx-space-3);
+  color: var(--hx-text-secondary);
+}
+.task-content-snapshot dd {
+  margin: var(--hx-space-1) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

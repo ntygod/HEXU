@@ -12,6 +12,7 @@ import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-i
 import { ResultFeedbackFollowUps } from '../../../packages/db/src/result-feedback-followups.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
+import { parseTaskContentHistoryQuery } from '../../../packages/contracts/src/task-content-history.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
 import {
   parseDraftPageQuery,
@@ -499,6 +500,12 @@ export async function createApp(
   );
   app.get('/api/v1/tasks/:taskId/assignment', async (request) =>
     store.taskAssignment.options(param(request.params, 'taskId')),
+  );
+  app.get('/api/v1/tasks/:taskId/content-history', async (request) =>
+    store.taskContentHistory.history(
+      param(request.params, 'taskId'),
+      parseTaskContentHistoryQuery(request.query),
+    ),
   );
   app.get('/api/v1/tasks/:taskId/participants', async (request) =>
     store.taskParticipants.view(param(request.params, 'taskId')),

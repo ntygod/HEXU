@@ -782,4 +782,24 @@ CREATE TRIGGER result_reference_event_immutable_delete BEFORE DELETE ON result_r
  BEGIN SELECT RAISE(ABORT,'result reference events are immutable'); END;
 `,
   },
+  {
+    version: 38,
+    sql: `
+CREATE TABLE task_content_revisions (
+ task_id TEXT NOT NULL REFERENCES tasks(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ body TEXT NOT NULL, PRIMARY KEY(task_id,revision)
+);
+-- Only the currently stored snapshot is known; do not infer past authors or save times.
+INSERT INTO task_content_revisions(task_id,revision,body)
+ SELECT id,json_extract(body,'$.revision'),json_object(
+ 'taskId',id,'revision',json_extract(body,'$.revision'),
+ 'title',json_extract(body,'$.title'),'description',json_extract(body,'$.description'),
+ 'attention',json_extract(body,'$.attention'),'actorId',NULL,'actorName',NULL,'savedAt',NULL,
+ 'source','legacy','changedFields',json('[]')) FROM tasks;
+CREATE TRIGGER task_content_revision_immutable_update BEFORE UPDATE ON task_content_revisions
+ BEGIN SELECT RAISE(ABORT,'task content revisions are immutable'); END;
+CREATE TRIGGER task_content_revision_immutable_delete BEFORE DELETE ON task_content_revisions
+ BEGIN SELECT RAISE(ABORT,'task content revisions are immutable'); END;
+`,
+  },
 ];

@@ -17,7 +17,13 @@ const path = (resultId: string, revisionId: string, messageId: string) =>
   `results/${resultId}/versions/${revisionId}/feedback/${messageId}`;
 const snapshots = (store: Store, tables: string[]) =>
   tables.map((table) => JSON.stringify(store.db.prepare(`SELECT * FROM ${table}`).all()));
-const writeTables = ['tasks', 'metadata', 'outbox', 'idempotency_records'];
+const writeTables = [
+  'tasks',
+  'task_content_revisions',
+  'metadata',
+  'outbox',
+  'idempotency_records',
+];
 const input = { title: '处理这条反馈', description: '由人编辑的独立要求' };
 async function fixture(privateTask = false, body = '固定版本的原始反馈', legacy = false) {
   const api = await teamFixture();
@@ -739,7 +745,14 @@ test('旧回执在事务内检查目标Task当前可见性，失去目标访问�
       truncated: false,
     });
     assert.equal((await f.api.call(f.path + '/follow-ups', f.alice, input, key)).statusCode, 404);
-    f.api.store.db.prepare('DELETE FROM tasks WHERE id=?').run(task.id);
+    // Deliberately corrupt only this disposable fixture. Production foreign keys
+    // now prevent deleting a Task with its immutable initial content snapshot.
+    f.api.store.db.exec('PRAGMA foreign_keys=OFF');
+    try {
+      f.api.store.db.prepare('DELETE FROM tasks WHERE id=?').run(task.id);
+    } finally {
+      f.api.store.db.exec('PRAGMA foreign_keys=ON');
+    }
     const missing = snapshots(f.api.store, writeTables);
     assert.equal((await f.api.call(f.path + '/follow-ups', f.alice, input, key)).statusCode, 404);
     assert.deepEqual(snapshots(f.api.store, writeTables), missing);
@@ -752,7 +765,13 @@ test('旧回执在事务内检查目标Task当前可见性，失去目标访问�
 test('计数器、Task及来源、outbox和回执任一步失败均完整回滚，原键可安全重试', async () => {
   const f = await fixture();
   try {
-    for (const point of ['metadata', 'tasks', 'outbox', 'idempotency_records']) {
+    for (const point of [
+      'metadata',
+      'tasks',
+      'task_content_revisions',
+      'outbox',
+      'idempotency_records',
+    ]) {
       const before = snapshots(f.api.store, writeTables);
       const key = randomUUID();
       f.api.store.db.exec(
