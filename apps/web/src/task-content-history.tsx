@@ -8,6 +8,7 @@ import { ApiError } from '../../../packages/client/src/index.js';
 import { taskContentHistory } from '../../../packages/client/src/task-content-history.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { time, useApp } from './state.js';
+import { TaskContentComparison } from './task-content-comparison.js';
 import './task-content-history.css';
 
 const fields = { title: '标题', description: '说明', attention: '关注内容' };
@@ -143,6 +144,9 @@ function History({ taskId, onClose }: { taskId: string; onClose: () => void }) {
                 </Button>
               )}
             </div>
+          )}
+          {!denied && page && page.items.length > 1 && (
+            <TaskContentComparison key={taskId} taskId={taskId} items={page.items} />
           )}
           <div key={generation}>
             {page?.items.map((item, index) => (

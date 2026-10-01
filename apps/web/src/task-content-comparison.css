@@ -1,0 +1,116 @@
+.task-comparison-picker,
+.task-content-comparison {
+  display: grid;
+  align-content: start;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.task-comparison-picker > button {
+  justify-self: start;
+}
+.task-comparison-picker form,
+.task-comparison-picker label {
+  display: grid;
+  gap: var(--hx-space-2);
+  min-width: 0;
+}
+.task-comparison-picker select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.task-comparison-picker p,
+.task-comparison-picker h3,
+.task-comparison-picker h4,
+.task-comparison-picker h5,
+.task-comparison-picker dl {
+  margin: 0;
+}
+.task-content-comparison {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+}
+.task-content-comparison h3,
+.task-content-comparison h4,
+.task-content-comparison h5 {
+  font-size: inherit;
+}
+.task-content-comparison h4 {
+  margin-bottom: var(--hx-space-2);
+}
+.task-compared-version p,
+.task-content-comparison dt {
+  color: var(--hx-text-secondary);
+}
+.task-content-comparison dd {
+  margin: var(--hx-space-1) 0 var(--hx-space-2);
+}
+.task-content-comparison dd,
+.task-comparison-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-comparison-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+  margin-bottom: var(--hx-space-2);
+}
+.task-comparison-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hx-space-3);
+}
+.task-comparison-pair pre {
+  margin: var(--hx-space-2) 0 0;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+.task-comparison-pair pre:focus-visible {
+  outline: 2px solid var(--hx-brand);
+  outline-offset: 2px;
+}
+.task-comparison-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  font-size: var(--hx-font-body);
+}
+.task-comparison-gutter {
+  width: 40px;
+}
+.task-comparison-marker {
+  width: 24px;
+}
+.task-comparison-table td,
+.task-comparison-table th {
+  border-bottom: 1px solid var(--hx-border-muted);
+  vertical-align: top;
+  text-align: left;
+  padding: var(--hx-space-1);
+  overflow-wrap: anywhere;
+}
+.task-comparison-table td:last-child span {
+  white-space: pre-wrap;
+}
+.task-comparison-table small {
+  display: block;
+  color: var(--hx-text-secondary);
+}
+.task-comparison-addition {
+  background: var(--hx-running-soft);
+}
+.task-comparison-deletion {
+  background: var(--hx-danger-soft);
+}
+@media (max-width: 650px) {
+  .task-comparison-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

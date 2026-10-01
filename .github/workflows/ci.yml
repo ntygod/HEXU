@@ -224,6 +224,21 @@ jobs:
           name: hexu-task-content-history-failures
           path: test-results/task-content-history-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-content-comparison-previews
+          path: |
+            artifacts/180-task-content-comparison-dark.png
+            artifacts/181-task-content-comparison-mobile-light.png
+            artifacts/182-task-content-comparison-legacy-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-content-comparison-failures
+          path: test-results/task-content-comparison-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
