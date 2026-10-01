@@ -166,7 +166,9 @@ int main(int argc, char **argv) {
    * and preserve both locations rather than undoing or deleting either. */
   int r = deletion ? renameat2(3, argv[1], 4, argv[2], RENAME_NOREPLACE)
                    : renameat2(4, argv[2], 3, argv[1], RENAME_EXCHANGE);
-  if (r) return deletion ? refused() : unknown();
+  /* EIO is not evidence that rename left both names untouched. Keep the
+   * durable file intent even when the kernel reports an I/O failure. */
+  if (r) return deletion && errno != EIO ? refused() : unknown();
   if (fsync(3) || fsync(4) || !directories(&parent, &backup) ||
       !exact_file(source, input, before_len, &saved) ||
       !same_material(&saved, &original) || !regular(&saved, before_len, argv[3]) ||
