@@ -1,0 +1,75 @@
+.result-main-surface.reference-bearing-surface {
+  /* History and paging controls must remain reachable below long result text. */
+  max-height: none;
+}
+.result-references {
+  margin-top: var(--hx-space-4);
+  padding: var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+  min-width: 0;
+  flex-shrink: 0;
+}
+.reference-section-heading,
+.reference-row-heading,
+.reference-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.reference-section-heading {
+  justify-content: space-between;
+}
+.reference-section-heading h3 {
+  margin: 0;
+}
+.reference-register-action {
+  min-width: 0;
+}
+.result-reference-form {
+  display: grid;
+  gap: var(--hx-space-3);
+  padding: var(--hx-panel-padding);
+  min-width: 0;
+}
+.result-reference-form .field {
+  margin: 0;
+}
+.result-reference-form .dialog-actions {
+  flex-wrap: wrap;
+}
+.reference-fixed-source {
+  padding: var(--hx-space-3);
+  background: var(--hx-surface-raised);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  overflow-wrap: anywhere;
+}
+.result-reference-row {
+  margin-top: var(--hx-space-3);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.result-reference-row.withdrawn {
+  background: var(--hx-surface-raised);
+}
+.reference-external {
+  display: inline-block;
+  max-width: 100%;
+  margin-block: var(--hx-space-2);
+  overflow-wrap: anywhere;
+}
+.reference-external svg {
+  margin-left: var(--hx-space-1);
+}
+.reference-original-url {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.reference-pagination {
+  justify-content: space-between;
+  margin-top: var(--hx-space-3);
+}

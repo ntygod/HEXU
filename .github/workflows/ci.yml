@@ -119,6 +119,22 @@ jobs:
           name: hexu-member-version-failures
           path: test-results/member-result-versions-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-result-reference-previews
+          path: |
+            artifacts/162-result-reference-editor-dark.png
+            artifacts/163-result-reference-editor-mobile-light.png
+            artifacts/163b-result-reference-editor-mobile-actions.png
+            artifacts/164-result-reference-history-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-result-reference-failures
+          path: test-results/result-references-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

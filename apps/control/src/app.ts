@@ -4,6 +4,8 @@ import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
 import { MemberResultVersions } from '../../../packages/db/src/member-result-versions.js';
+import { ResultReferences } from '../../../packages/db/src/result-references.js';
+import { parseResultReferenceListQuery } from '../../../packages/contracts/src/result-references.js';
 import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-inputs.js';
 import { ResultFeedbackFollowUps } from '../../../packages/db/src/result-feedback-followups.js';
 import { attachAssistance } from './assistance.js';
@@ -761,6 +763,49 @@ export async function createApp(
       param(request.params, 'resultId'),
       param(request.params, 'revisionId'),
     ),
+  );
+  app.get('/api/v1/results/:resultId/versions/:revisionId/references', async (request) =>
+    new ResultReferences(store).list(
+      param(request.params, 'resultId'),
+      param(request.params, 'revisionId'),
+      parseResultReferenceListQuery(request.query),
+    ),
+  );
+  app.get(
+    '/api/v1/results/:resultId/versions/:revisionId/references/:referenceId',
+    async (request) =>
+      new ResultReferences(store).get(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'referenceId'),
+      ),
+  );
+  app.post(
+    '/api/v1/results/:resultId/versions/:revisionId/references',
+    { bodyLimit: 24 * 1024 },
+    async (request, reply) =>
+      reply
+        .code(201)
+        .send(
+          new ResultReferences(store).create(
+            param(request.params, 'resultId'),
+            param(request.params, 'revisionId'),
+            request.body,
+            key(request.headers),
+          ),
+        ),
+  );
+  app.post(
+    '/api/v1/results/:resultId/versions/:revisionId/references/:referenceId/lifecycle',
+    { bodyLimit: 4096 },
+    async (request) =>
+      new ResultReferences(store).lifecycle(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'referenceId'),
+        request.body,
+        key(request.headers),
+      ),
   );
   app.post('/api/v1/results/:resultId/versions/:revisionId/code-feedback', async (request, reply) =>
     reply
