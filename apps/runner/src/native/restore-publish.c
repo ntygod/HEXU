@@ -46,7 +46,12 @@ int main(int argc, char **argv) {
       fstatat(3, argv[1], &named, AT_SYMLINK_NOFOLLOW) ||
       !S_ISDIR(named.st_mode) || named.st_dev != staged.st_dev ||
       named.st_ino != staged.st_ino) return refused();
-  if (renameat2(3, argv[1], 3, argv[2], RENAME_NOREPLACE)) return refused();
+  if (renameat2(3, argv[1], 3, argv[2], RENAME_NOREPLACE)) {
+    /* POSIX rename excludes EIO from its unaffected-destination guarantee.
+     * Preserve publishing intent rather than mislabel an uncertain result. */
+    if (errno == EIO) { puts("publication_io_unknown"); return 21; }
+    return refused();
+  }
   /* The rename has happened. Do not label a subsequent sync failure as absent. */
   if (fsync(3)) {
     puts("published_sync_unknown");
