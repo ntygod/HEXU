@@ -306,7 +306,7 @@ test('HTTP严格限制编辑字段、类型、修订和字符长度，拒绝时�
   }
 });
 
-test('真实HTTP接受最大原文及JSON转义中文，只有任务PATCH使用96KiB预算并拒绝超限字节', async () => {
+test('真实HTTP接受最大原文及JSON转义中文，任务PATCH使用96KiB预算且不扩大其他路由', async () => {
   const store = new Store();
   const app = await createApp({ store, native: { enabled: false, roots: [] } });
   try {
@@ -353,10 +353,11 @@ test('真实HTTP接受最大原文及JSON转义中文，只有任务PATCH使用9
     });
     assert.equal(rejected.status, 413, await rejected.text());
     assert.deepEqual(snapshot(store), before);
-    const otherRoute = await fetch(`${origin}/api/v1/spaces/${store.spaceId}/tasks`, {
+    const otherBody = JSON.stringify({ name: '正常项目' });
+    const otherRoute = await fetch(`${origin}/api/v1/spaces/${store.spaceId}/projects`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ title: '正常标题', description: '文'.repeat(12000) }),
+      body: otherBody + ' '.repeat(32769 - Buffer.byteLength(otherBody)),
     });
     assert.equal(otherRoute.status, 413, await otherRoute.text());
     assert.deepEqual(snapshot(store), before);
