@@ -209,7 +209,42 @@ test('成员明确登记与撤下固定v1的发布链接，新v2不抢来源；�
     expect(
       (await editor(page).getByLabel('稳定链接', { exact: true }).boundingBox())!.width,
     ).toBeGreaterThan(240);
-    await editor(page).getByLabel('环境说明（可选）').press('Control+Enter');
+    const confirm = editor(page).getByRole('button', { name: '确认登记到v1', exact: true });
+    const reachable = async () => {
+      await confirm.scrollIntoViewIfNeeded();
+      const box = (await confirm.boundingBox())!,
+        modal = (await editor(page).boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(modal.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(modal.x + modal.width);
+      expect(box.y).toBeGreaterThanOrEqual(modal.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(modal.y + modal.height);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(844);
+      expect(
+        await confirm.evaluate((button) => {
+          const box = button.getBoundingClientRect();
+          return button.contains(
+            document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+          );
+        }),
+      ).toBe(true);
+    };
+    // The first mobile capture retains the validation message and top fields.
+    // Inspect the real scrollable footer too, then exercise interruption and pointer use.
+    await reachable();
+    await editor(page).screenshot({
+      path: 'artifacts/163b-result-reference-editor-mobile-actions.png',
+    });
+    await page.keyboard.press('Escape');
+    await edit(page);
+    await expect(editor(page).getByLabel('链接标题', { exact: true })).toHaveValue(
+      '取消行为发布说明',
+    );
+    await expect(editor(page).getByLabel('稳定链接', { exact: true })).toHaveValue(
+      'https://releases.example.invalid/release-1#changes',
+    );
+    await reachable();
+    await confirm.click();
     await expect(editor(page)).toHaveCount(0);
     await expect(page).toHaveURL(url(f));
     const references = await f.list();
