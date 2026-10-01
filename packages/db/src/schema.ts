@@ -749,4 +749,37 @@ CREATE TRIGGER branch_preservation_report_immutable_delete BEFORE DELETE ON bran
  BEGIN SELECT RAISE(ABORT,'branch preservation reports are immutable'); END;
 `,
   },
+  {
+    version: 37,
+    sql: `
+-- Manual links retain their original contents after registration is withdrawn.
+CREATE TABLE result_references (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id),
+ result_id TEXT NOT NULL REFERENCES results(id),
+ result_revision_id TEXT NOT NULL REFERENCES result_revisions(id), body TEXT NOT NULL,
+ revision INTEGER NOT NULL CHECK(revision IN (1,2)),
+ status TEXT NOT NULL CHECK(status IN ('active','withdrawn')),
+ withdrawn_at TEXT, withdrawn_by TEXT,
+ CHECK((status='active' AND revision=1 AND withdrawn_at IS NULL AND withdrawn_by IS NULL)
+ OR (status='withdrawn' AND revision=2 AND withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL))
+);
+CREATE INDEX result_references_version ON result_references(result_revision_id);
+CREATE TRIGGER result_reference_original_immutable BEFORE UPDATE ON result_references
+ WHEN OLD.id IS NOT NEW.id OR OLD.task_id IS NOT NEW.task_id
+ OR OLD.result_id IS NOT NEW.result_id OR OLD.result_revision_id IS NOT NEW.result_revision_id
+ OR OLD.body IS NOT NEW.body OR OLD.status='withdrawn'
+ BEGIN SELECT RAISE(ABORT,'result reference originals are immutable'); END;
+CREATE TRIGGER result_reference_immutable_delete BEFORE DELETE ON result_references
+ BEGIN SELECT RAISE(ABORT,'result reference originals are immutable'); END;
+CREATE TABLE result_reference_events (
+ reference_id TEXT NOT NULL REFERENCES result_references(id), revision INTEGER NOT NULL,
+ action TEXT NOT NULL CHECK(action IN ('registered','withdrawn')), body TEXT NOT NULL,
+ PRIMARY KEY(reference_id,revision)
+);
+CREATE TRIGGER result_reference_event_immutable_update BEFORE UPDATE ON result_reference_events
+ BEGIN SELECT RAISE(ABORT,'result reference events are immutable'); END;
+CREATE TRIGGER result_reference_event_immutable_delete BEFORE DELETE ON result_reference_events
+ BEGIN SELECT RAISE(ABORT,'result reference events are immutable'); END;
+`,
+  },
 ];

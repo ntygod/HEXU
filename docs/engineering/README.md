@@ -41,6 +41,7 @@
 | 已结算方案Run的只读来源、共享输出与事件边界 | [成果来源预览](branch-result-sources.md) |
 | 固定成果版本、来源/反馈、方案比较与选择 | [方案成果](branch-results.md) |
 | 普通文字成果同一容器内明确追加不可变版本 | [文字版本修订](member-result-versions.md) |
+| 固定成果版本手动登记/撤下可选报告与发布稳定链接 | [链接登记](result-references.md) |
 | 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |
 | 固定成果文件/行位置的反馈与旧版跳转 | [代码反馈](result-code-feedback.md) |
 | 回复具体成果反馈、保留直接来源与原版本 | [反馈回复](result-feedback-replies.md) |

@@ -1,4 +1,5 @@
 import type { BranchResultSource } from '../../../packages/contracts/src/results.js';
+import { ResultReferences } from './result-references.js';
 import { MemberResultVersions } from './member-result-versions.js';
 import { CodeFeedbackEntry } from './result-code-feedback.js';
 import { useEffect, useState } from 'react';
@@ -160,7 +161,7 @@ export function ResultPage({
       )}
       <div className="result-workspace-grid">
         <section
-          className={`result-main-surface${version.source.kind === 'work_branch' ? ' fixed-version-surface' : ''}`}
+          className={`result-main-surface reference-bearing-surface${version.source.kind === 'work_branch' ? ' fixed-version-surface' : ''}`}
         >
           <div className="result-section-title">
             <Icon name={version.kind === 'demo-preview' ? 'monitor' : 'file'} />
@@ -194,6 +195,7 @@ export function ResultPage({
             </CodeFeedbackEntry>
           )}
           <PrepareIntegration version={version} />
+          <ResultReferences key={version.id} task={task} version={version} />
           <div className="result-source">
             {version.kind === 'demo-preview'
               ? '演示数据 · CSV 可按当前筛选导出'
