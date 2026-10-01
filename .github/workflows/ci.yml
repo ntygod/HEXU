@@ -150,6 +150,21 @@ jobs:
           name: hexu-project-result-failures
           path: test-results/project-results-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-result-activity-previews
+          path: |
+            artifacts/168-result-task-activity-dark.png
+            artifacts/169-result-task-activity-mobile-light.png
+            artifacts/170-result-task-activity-history-mobile.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-result-activity-failures
+          path: test-results/result-task-activity-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
