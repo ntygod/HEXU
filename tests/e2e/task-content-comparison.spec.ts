@@ -107,12 +107,32 @@ test('固定两版的标题关注和行级说明对照，未变行可展开，�
     .scrollIntoViewIfNeeded();
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/180-task-content-comparison-dark.png', fullPage: true });
+  await table.scrollIntoViewIfNeeded();
+  await expect(table).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: 'artifacts/180b-task-content-line-diff-dark.png', fullPage: true });
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '切换浅色模式', exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: '工作说明历史', exact: true }).click();
   await history(page).getByRole('button', { name: '对照两个版本', exact: true }).click();
   await show(page).click();
+  const mobileTable = comparison(page).getByRole('table', { name: '说明行级变化', exact: true });
+  // A long table may scroll vertically; both actual changed rows must be readable.
+  const added = mobileTable.locator('.task-comparison-addition');
+  const removed = mobileTable.locator('.task-comparison-deletion');
+  await added.scrollIntoViewIfNeeded();
+  await expect(added).toBeInViewport({ ratio: 1 });
+  await expect(removed).toBeInViewport({ ratio: 1 });
+  expect(
+    await mobileTable.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+  ).toBe(true);
+  const textCell = await added.locator('td:last-child').boundingBox();
+  expect(textCell).not.toBeNull();
+  expect(textCell!.width).toBeGreaterThanOrEqual(180);
+  await page.screenshot({
+    path: 'artifacts/181b-task-content-line-diff-mobile-light.png',
+    fullPage: true,
+  });
   await comparison(page).getByRole('button', { name: '两版全文', exact: true }).click();
   await expect(
     comparison(page).getByRole('region', { name: '较早说明全文', exact: true }).locator('pre'),

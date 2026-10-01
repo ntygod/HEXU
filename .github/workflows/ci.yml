@@ -230,7 +230,9 @@ jobs:
           name: hexu-task-content-comparison-previews
           path: |
             artifacts/180-task-content-comparison-dark.png
+            artifacts/180b-task-content-line-diff-dark.png
             artifacts/181-task-content-comparison-mobile-light.png
+            artifacts/181b-task-content-line-diff-mobile-light.png
             artifacts/182-task-content-comparison-legacy-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
