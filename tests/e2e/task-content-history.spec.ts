@@ -82,12 +82,25 @@ test('真实编辑保存与历史持久化，旧版本全文及来源可读，�
   expect(
     await history(page).evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
   ).toBe(true);
+  const reading = history(page).locator('.task-content-history');
+  const readingBox = await reading.boundingBox();
+  const paragraphBox = await reading.locator(':scope > p').first().boundingBox();
+  expect(readingBox).not.toBeNull();
+  expect(paragraphBox).not.toBeNull();
+  expect(paragraphBox!.x - readingBox!.x).toBeGreaterThanOrEqual(12);
+  expect(paragraphBox!.width).toBeGreaterThanOrEqual(320);
+  await expect(
+    history(page).locator('.dialog-footer').getByRole('button', { name: '关闭', exact: true }),
+  ).toBeInViewport();
   const refresh = history(page).getByRole('button', { name: '重新读取历史', exact: true });
   await refresh.focus();
   await page.keyboard.press('Enter');
   await expect(refresh).toBeEnabled();
   await expect(rows(page)).toHaveCount(2);
-  await history(page).getByRole('button', { name: '关闭', exact: true }).click();
+  await history(page)
+    .locator('.dialog-footer')
+    .getByRole('button', { name: '关闭', exact: true })
+    .click();
   await page.reload();
   await open(page);
   await expect(row(page, 2)).toContainText(body);
@@ -241,7 +254,10 @@ test('已知旧快照不补造操作者或保存时间，手机可展开全文�
   expect(
     await history(page).evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
   ).toBe(true);
-  await history(page).getByRole('button', { name: '关闭', exact: true }).click();
+  await history(page)
+    .locator('.dialog-footer')
+    .getByRole('button', { name: '关闭', exact: true })
+    .click();
   await expect(history(page)).toHaveCount(0);
 });
 

@@ -120,41 +120,43 @@ function History({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   }, [taskId, version]);
   return (
     <Dialog title="工作说明历史" drawer onClose={onClose}>
-      <div className="task-content-history">
-        <p>
-          保存标题、说明或关注内容的变化。任务修订还包含状态等操作，因此编号可能不连续。查看历史不会改变当前任务或执行。
-        </p>
-        {newer && <p role="status">有新的工作说明记录，可重新读取；当前展开内容保留。</p>}
-        {denied && <p role="alert">工作说明历史已不可访问，先前内容已清除。</p>}
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
+      <div className="drawer-form">
+        <div className="dialog-body task-content-history">
+          <p>
+            保存标题、说明或关注内容的变化。任务修订还包含状态等操作，因此编号可能不连续。查看历史不会改变当前任务或执行。
           </p>
-        )}
-        {!denied && (
-          <div className="task-content-history-actions">
-            <Button disabled={busy} onClick={() => void load()}>
-              重新读取历史
-            </Button>
-            {error && (
-              <Button disabled={busy} onClick={() => void load(attempted.current)}>
-                重试历史读取
+          {newer && <p role="status">有新的工作说明记录，可重新读取；当前展开内容保留。</p>}
+          {denied && <p role="alert">工作说明历史已不可访问，先前内容已清除。</p>}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          {!denied && (
+            <div className="task-content-history-actions">
+              <Button disabled={busy} onClick={() => void load()}>
+                重新读取历史
               </Button>
-            )}
+              {error && (
+                <Button disabled={busy} onClick={() => void load(attempted.current)}>
+                  重试历史读取
+                </Button>
+              )}
+            </div>
+          )}
+          <div key={generation}>
+            {page?.items.map((item, index) => (
+              <Snapshot key={item.revision} item={item} first={index === 0} />
+            ))}
           </div>
-        )}
-        <div key={generation}>
-          {page?.items.map((item, index) => (
-            <Snapshot key={item.revision} item={item} first={index === 0} />
-          ))}
+          {page && !page.items.length && <p>暂无已记录的工作说明历史。</p>}
+          {busy && <p role="status">正在读取工作说明历史…</p>}
+          {!denied && page?.nextCursor !== null && page?.nextCursor !== undefined && (
+            <Button disabled={busy} onClick={() => void load(page.nextCursor!)}>
+              更早的工作说明
+            </Button>
+          )}
         </div>
-        {page && !page.items.length && <p>暂无已记录的工作说明历史。</p>}
-        {busy && <p role="status">正在读取工作说明历史…</p>}
-        {!denied && page?.nextCursor !== null && page?.nextCursor !== undefined && (
-          <Button disabled={busy} onClick={() => void load(page.nextCursor!)}>
-            更早的工作说明
-          </Button>
-        )}
         <div className="dialog-footer">
           <Button onClick={onClose}>关闭</Button>
         </div>

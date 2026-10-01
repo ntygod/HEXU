@@ -1,6 +1,8 @@
 .task-content-history {
   min-width: 0;
   display: grid;
+  align-content: start;
+  font-size: var(--hx-font-body);
   gap: var(--hx-space-4);
   overflow-wrap: anywhere;
 }
