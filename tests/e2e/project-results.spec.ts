@@ -471,12 +471,14 @@ test('切换分页后晚到的旧页成功或拒绝均不覆盖当前页，读�
       await page.goBack();
       await expect(page).toHaveURL(url(f));
       await expect(rows(page)).toHaveCount(20);
-      // Later Forward must perform a real read, not encounter this old session's
-      // 403 fixture. Drain every captured response before checking current state.
+      // Stop capturing new reads, but retain the interceptor until its pending
+      // Routes settle. Unrouting first handles those Routes in Playwright and a
+      // later fulfill would fail before the old-response assertions can run.
       session.holding = false;
-      await page.unroute(pattern, delayOldPage);
       held.resolve();
       await Promise.all(pending);
+      // Forward now performs a real read, never this old session's 403 fixture.
+      await page.unroute(pattern, delayOldPage);
       await expect(section(page).getByRole('alert')).toHaveCount(0);
       expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
       await expect(rows(page)).toHaveCount(20);

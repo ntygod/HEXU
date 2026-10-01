@@ -653,11 +653,13 @@ test('链接分页真实读取前后页，撤下记录保留；旧页晚到拒�
     await expect(section(page).locator('[data-reference-id]')).toHaveCount(0);
     await switchVersion(page, f, v2);
     holdReads = false;
-    await page.unroute(pattern, delayOldPage);
     await edit(page);
     await fill(page, 'NEW_VERSION_DRAFT_SURVIVES_OLD_READ');
+    // Keep the interceptor installed until its old Routes have been fulfilled.
+    // New reads already pass through because this session no longer captures.
     held.resolve();
     await Promise.all(pendingReads);
+    await page.unroute(pattern, delayOldPage);
     await expect(editor(page).getByLabel('链接标题', { exact: true })).toHaveValue(
       'NEW_VERSION_DRAFT_SURVIVES_OLD_READ',
     );
