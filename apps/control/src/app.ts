@@ -486,7 +486,7 @@ export async function createApp(
       nextCursor: items.length > limit ? items[limit - 1]!.id : null,
     };
   });
-  app.post('/api/v1/spaces/:spaceId/tasks', async (request, reply) => {
+  app.post('/api/v1/spaces/:spaceId/tasks', { bodyLimit: 96 * 1024 }, async (request, reply) => {
     if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     return reply

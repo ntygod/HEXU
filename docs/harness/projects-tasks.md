@@ -13,6 +13,10 @@ Project metadata edits require current project manage permission before replay a
 
 Keep the edit baseline fixed while the drawer is open. SSE updates show a comparison without replacing the draft or silently rebasing. Uncertain replies reuse the exact original payload/key when the user confirms; never infer that closing a drawer cancels a sent request. Drafts are drawer-local memory, cleared on close/refresh/identity or space changes and revoked manage access. Project edits do not update tasks, nodes, frozen material or running models. Archive/restore uses the separate lifecycle endpoint and the same project revision, never metadata PATCH.
 
+## Task 创建输入
+
+普通Task创建只接受标题、说明和可选项目ID；attention、状态、负责人和执行字段不借大请求体进入创建。标题/说明/项目ID仍按原UTF-16字符上限校验，路由字节预算只为合法Unicode/JSON转义提供有界空间，不提高全局Fastify预算。当前身份/项目权限和原Task插入事务不变。验证[原始与全转义正文、权限及字节边界](../../tests/task-create-budget.test.ts)，并保留无关路由较小限制的回归。
+
 ## Task 工作说明编辑
 
 标题/说明/关注内容仍走原Task PATCH，不混入完成、归属或执行命令。编辑基线固定Task ID、修订和原内容；SSE冲突只提示，由用户明确丢弃或保留草稿后采用当前基线。未知保存只确认原正文和幂等键，原回执不可换成最新Task投影；已关闭编辑器的晚响应不能影响新会话。当前Workbench移除Task或详情明确拒绝时清除旧详情/编辑包，不能因临时读取保留而延长撤权内容可见性。事务内当前编辑权限先于回执回放，业务/outbox/回执原子提交。见[操作边界](../engineering/task-edit-baseline.md)与[回归](../../tests/task-edit-baseline.test.ts)。
