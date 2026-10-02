@@ -25,6 +25,11 @@ const pageIds = (page: Page) =>
   rows(page).evaluateAll((elements) =>
     elements.map((item) => item.getAttribute('data-handoff-id')),
   );
+// Normal navigation/read completion may cross a legitimate visibility reload.
+// Check size, order and identity in one collection read under the normal expect
+// budget, rather than splitting a count assertion from an instantaneous snapshot.
+const expectPageIds = (page: Page, expected: string[]) =>
+  expect.poll(() => pageIds(page)).toEqual(expected);
 
 interface SyntheticInvitation {
   id: string;
@@ -418,8 +423,10 @@ test('当前空间只展示本人仍可访问的有效邀请，有限分页和�
     const before = f.snapshot(),
       calls = audit(page);
     await open(page, f);
-    await expect(rows(page)).toHaveCount(20);
-    expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
+    await expectPageIds(
+      page,
+      first.items.map((item) => item.id),
+    );
     await expect(list(page)).not.toContainText(
       /OTHER_RECIPIENT_ONLY|WITHDRAWN_ONLY|EXPIRED_ONLY|PRIVATE_INVITATION_ONLY/,
     );
@@ -428,8 +435,10 @@ test('当前空间只展示本人仍可访问的有效邀请，有限分页和�
     await page.getByRole('button', { name: '我的工作', exact: true }).click();
     await list(page).getByRole('link', { name: '较早邀请', exact: true }).press('Enter');
     await expect(page).toHaveURL(home(first.nextCursor!));
-    await expect(rows(page)).toHaveCount(3);
-    expect(await pageIds(page)).toEqual(second.items.map((item) => item.id));
+    await expectPageIds(
+      page,
+      second.items.map((item) => item.id),
+    );
     await expect(list(page).getByRole('link', { name: '较早邀请', exact: true })).toHaveCount(0);
     await page.reload();
     await expect(rows(page)).toHaveCount(3);
@@ -608,12 +617,20 @@ test('明确处理才读取精确旧邀请卡，重复处理入口和刷新都�
     await open(page, f, path);
     await expect(summary(page)).toContainText(target.summary);
     calls.readOnly();
-    await drawer(page)
-      .getByRole('button', { name: '查看并处理邀请', exact: true })
-      .evaluate((button: HTMLButtonElement) => {
-        button.click();
-        button.click();
-      });
+    // Keep both reentrant clicks in one turn, but do not silently lose them
+    // while a legitimate summary reload has temporarily disabled the control.
+    await expect
+      .poll(() =>
+        drawer(page)
+          .getByRole('button', { name: '查看并处理邀请', exact: true })
+          .evaluate((button: HTMLButtonElement) => {
+            if (button.disabled) return false;
+            button.click();
+            button.click();
+            return true;
+          }),
+      )
+      .toBe(true);
     const handlingDrawer = page.getByRole('dialog', { name: '任务接手邀请', exact: true });
     await expect(handlingDrawer.getByRole('article', { name: '接手邀请记录' })).toHaveCount(1);
     await expect(handlingDrawer.getByRole('article', { name: '接手邀请记录' })).toContainText(
@@ -706,11 +723,15 @@ for (const status of [200, 403]) {
       await expect(list(page).getByRole('alert')).toHaveCount(0);
       await expect(list(page).getByRole('status')).toContainText('正在读取待接手邀请');
       await current.drain();
-      await expect(rows(page)).toHaveCount(20);
-      expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
+      await expectPageIds(
+        page,
+        first.items.map((item) => item.id),
+      );
       await page.goForward();
-      await expect(rows(page)).toHaveCount(1);
-      expect(await pageIds(page)).toEqual(second.items.map((item) => item.id));
+      await expectPageIds(
+        page,
+        second.items.map((item) => item.id),
+      );
       calls.readOnly();
     });
   });
@@ -864,8 +885,10 @@ test('切换空间清除分页和旧摘要，旧空间所有晚到读取不能�
     await expect(page.locator('body')).not.toContainText(second.items[0]!.summary);
     await expect(drawer(page)).toHaveCount(0);
     await page.getByLabel('当前工作空间', { exact: true }).selectOption(f.bob.spaceId);
-    await expect(rows(page)).toHaveCount(20);
-    expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
+    await expectPageIds(
+      page,
+      first.items.map((item) => item.id),
+    );
     await expect(page).toHaveURL(home());
     calls.readOnly();
   });
