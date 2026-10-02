@@ -1,4 +1,5 @@
 import { AssistanceWorkbench } from './assistance.js';
+import { IncomingHandoffsWorkbench } from './incoming-handoffs.js';
 import { useState } from 'react';
 import {
   Button,
@@ -69,6 +70,7 @@ export function Workbench() {
           {attention.length} 项需关注
         </span>
       </div>
+      <IncomingHandoffsWorkbench />
       <div className="home-columns">
         <div className="home-main">
           <section className="resume-work">

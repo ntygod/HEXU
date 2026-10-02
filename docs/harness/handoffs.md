@@ -10,6 +10,12 @@
 - 发布、拒绝、撤回、到期只改邀请的独立修订及其待接受操作，不改 Task、负责人、操作者、Run、输入材料、工作区锁或本机文件。状态、不可变事件、outbox 与原请求回执一并提交；旧回执返回最新状态，不能再次产生副作用。到期单独持久化系统事件，重启不复活。
 - 摘要、剩余工作、环境说明与发布时任务标题/版本固定；后续变化只作比较提示。期限是邀请可处理期限，不是对象删除或进程终止证明。
 
+## 待接手邀请只读发现
+
+新增发现与精确目标只读当前空间、本人受邀、父项目Task可访问、offered且未到期的摘要；不依赖Task负责人。当前权限与期限先于投影/分页，游标绑定当前身份/空间。查询独立于旧邀请list/get/history/expire/view和材料/接受对象，不以读取顺便推进生命周期；过期等不可用目标清除摘要，不扩展终态历史。
+
+摘要定位只打开纯摘要。只有明确“查看并处理邀请”才进入原完整Card，其后既有接受/准备/执行行为保持。新列表/定位需验证所有持久表不变及旧方法零调用；处理入口只验证精确导航，不借切片重新审查或验证旧材料/文件路径。UI临时失败可重试，权限/期限和关闭/切换使旧响应失效。见[用法](../engineering/incoming-handoffs.md)。
+
 ## 接受接手与本机新核验
 
 `received` 仅说明对象接收最后回执，`restored` 是一次历史发布结果。[接受契约](../../packages/contracts/src/handoff-acceptance.ts)、[接受事务](../../packages/db/src/handoff-acceptance.ts)、[本机核验](../../apps/runner/src/agent/handoff-acceptance.ts) 和 [接受面板](../../apps/web/src/handoff-acceptance.tsx) 要求新的现场核验再提交 accepted / 操作者变化；使用见 [接受指南](../engineering/handoff-acceptance.md)。

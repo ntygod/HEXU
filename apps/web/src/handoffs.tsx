@@ -9,10 +9,11 @@ import type {
   HandoffEvent,
 } from '../../../packages/contracts/src/handoffs.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
-import { canEditTask, time, useApp } from './state.js';
+import { canEditTask, go, time, useApp } from './state.js';
 import { useAssistanceCommand, useAssistanceRead } from './assistance-common.js';
 import './handoffs.css';
 import { HandoffAcceptancePanel } from './handoff-acceptance.js';
+import { IncomingHandoffSummaryPanel } from './incoming-handoffs.js';
 
 const base = (id: string) => `/tasks/${encodeURIComponent(id)}/handoffs`;
 const labels: Record<HandoffState, string> = {
@@ -470,4 +471,79 @@ export function TaskHandoffs({ task }: { task: Task }) {
   const { data } = useApp();
   if (data.mode !== 'team-local' || task.visibility !== 'project') return null;
   return <Entry key={`${data.user.id}:${data.space?.id}:${task.id}`} task={task} />;
+}
+
+// This adapter is mounted only after the explicit summary action. It reaches the
+// selected invitation directly without opening or scanning the old list panel.
+function ExactHandoffCard({ task, handoffId }: { task: Task; handoffId: string }) {
+  const { data } = useApp();
+  const path = `${base(task.id)}/${encodeURIComponent(handoffId)}`;
+  const read = useAssistanceRead<HandoffView>(path, 3000);
+  if (read.denied) return <p role="alert">此邀请当前无法处理，内容已清除。</p>;
+  return (
+    <div className="incoming-handoff-handling">
+      {read.error && (
+        <p role="alert">
+          {read.error}
+          <Button onClick={read.retry}>重读接手邀请</Button>
+        </p>
+      )}
+      {read.value ? (
+        <Card
+          task={task}
+          view={read.value}
+          path={path}
+          editable={canEditTask(data, task)}
+          reload={read.retry}
+        />
+      ) : (
+        !read.error && <p role="status">正在读取接手邀请…</p>
+      )}
+    </div>
+  );
+}
+
+function TargetDrawer({ taskId, handoffId }: { taskId: string; handoffId: string }) {
+  const { data } = useApp();
+  const [handling, setHandling] = useState(false);
+  const task = data.tasks.find((item) => item.id === taskId);
+  useEffect(() => {
+    if (!task || data.mode !== 'team-local') setHandling(false);
+  }, [task, data.mode]);
+  return (
+    <Dialog
+      title={handling ? '任务接手邀请' : '待接手邀请摘要'}
+      drawer
+      onClose={() => go(`/tasks/${encodeURIComponent(taskId)}`)}
+    >
+      <div className="incoming-handoff-target">
+        {handling && task && data.mode === 'team-local' ? (
+          <ExactHandoffCard task={task} handoffId={handoffId} />
+        ) : (
+          <IncomingHandoffSummaryPanel
+            taskId={taskId}
+            handoffId={handoffId}
+            onHandle={() => setHandling(true)}
+          />
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+export function IncomingHandoffTarget({
+  taskId,
+  handoffId,
+}: {
+  taskId: string;
+  handoffId: string;
+}) {
+  const { data } = useApp();
+  return (
+    <TargetDrawer
+      key={`${data.user.id}:${data.space?.id}:${taskId}:${handoffId}`}
+      taskId={taskId}
+      handoffId={handoffId}
+    />
+  );
 }

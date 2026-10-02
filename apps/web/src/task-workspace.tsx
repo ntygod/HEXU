@@ -1,5 +1,5 @@
 import { TaskCheckpoints } from './checkpoints.js';
-import { TaskHandoffs } from './handoffs.js';
+import { IncomingHandoffTarget, TaskHandoffs } from './handoffs.js';
 import { TaskWorkBranches } from './work-branches.js';
 import { TaskIntegrations } from './integrations.js';
 import { TaskAssistances } from './assistance.js';
@@ -50,7 +50,28 @@ function readLayout(key: string): { width: number; hidden: boolean } {
   }
 }
 
-export function TaskPage({ id }: { id: string }) {
+export function TaskPage({ id, handoffId }: { id: string; handoffId?: string }) {
+  const { data } = useApp();
+  const task = data.tasks.find((item) => item.id === id);
+  // A discovery deep link opens only its summary drawer. Mount the ordinary
+  // workspace on the Task route, after an explicit navigation to that route.
+  if (handoffId)
+    return (
+      <>
+        <div className="page">
+          <span className="eyebrow">{task?.shortId ?? '接手邀请'}</span>
+          <h1>{task?.title ?? '接手邀请'}</h1>
+          <Link className="button secondary" to={`/tasks/${encodeURIComponent(id)}`}>
+            打开任务
+          </Link>
+        </div>
+        <IncomingHandoffTarget taskId={id} handoffId={handoffId} />
+      </>
+    );
+  return <TaskWorkspace id={id} />;
+}
+
+function TaskWorkspace({ id }: { id: string }) {
   const { value, error, denied, retry } = useAssistanceRead<TaskDetail>(`/tasks/${id}`, 0);
   const { data, refresh, notice, changeStatus, saveDraft } = useApp();
   // Workbench is the current full visibility snapshot. A failed detail refresh must
