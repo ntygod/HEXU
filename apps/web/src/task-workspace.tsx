@@ -229,7 +229,7 @@ export function TaskPage({ id }: { id: string }) {
             <Icon name="upload" />
             分享成果
           </Button>
-          {task.status === 'done' ? (
+          {task.status === 'done' || task.status === 'cancelled' ? (
             <Button disabled={!editable} onClick={() => void changeStatus(task, 'todo')}>
               <Icon name="back" size={16} />
               重新打开

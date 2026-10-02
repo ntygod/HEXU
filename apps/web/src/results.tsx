@@ -86,6 +86,7 @@ export function ResultPage({
   const { result, task, version, messages, revisions, unversionedMessages } = value;
   const currentTask = data.tasks.find((item) => item.id === task.id);
   const editable = !!currentTask && canEditTask(data, currentTask);
+  const reopenable = currentTask?.status === 'done' || currentTask?.status === 'cancelled';
   return (
     <div className="work-page result-workspace">
       {messageId && !messages.some((message) => message.id === messageId) && (
@@ -141,11 +142,10 @@ export function ResultPage({
             variant="primary"
             disabled={!editable}
             onClick={() => {
-              if (currentTask)
-                void changeStatus(currentTask, currentTask.status === 'done' ? 'todo' : 'done');
+              if (currentTask) void changeStatus(currentTask, reopenable ? 'todo' : 'done');
             }}
           >
-            {currentTask?.status === 'done' ? '重新打开' : '标记完成'}
+            {reopenable ? '重新打开' : '标记完成'}
           </Button>
         </div>
       </header>

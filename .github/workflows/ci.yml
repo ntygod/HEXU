@@ -271,6 +271,20 @@ jobs:
           name: hexu-task-completion-history-failures
           path: test-results/task-completion-history-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-cancelled-task-reopen-previews
+          path: |
+            artifacts/189-cancelled-task-reopen-dark.png
+            artifacts/190-cancelled-result-reopen-mobile-light.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-cancelled-task-reopen-failures
+          path: test-results/cancelled-task-reopen-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
