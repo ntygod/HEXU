@@ -23,9 +23,10 @@ jobs:
       - run: npm run check
   browser:
     runs-on: ubuntu-latest
-    # 143 real browser flows exceed the former 124-flow job's ~15 minute budget.
+    # CI175: 314 flows took 22.4 minutes; CI176 reached only 329/334 before
+    # the 25 minute job cancellation. Allow full execution and failure artifacts.
     # Individual test/assertion timeouts and retry policy remain unchanged.
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +36,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      # Print each failure immediately, even if the job cannot reach onEnd.
+      - run: npm run test:e2e -- --reporter=line,html
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -49,14 +53,15 @@ jobs:
       # small enough to inspect even when the complete ZIP exceeds reader limits.
       # The two cross-service regressions also need individually retrievable
       # traces/screenshots if their original test still fails in a future run.
+      # Upload focused failures after cancellation as well as ordinary failure.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-node-summary-failure
           path: test-results/nodes-*-CLI*/
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-participant-permission-failure
           path: test-results/team-只读成员自行参与*/
@@ -98,7 +103,7 @@ jobs:
             artifacts/155-feedback-branch-input-selection-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-feedback-input-failures
           path: test-results/feedback-next-input-*/
@@ -113,7 +118,7 @@ jobs:
             artifacts/158-feedback-followup-origin-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-feedback-followup-failures
           path: test-results/feedback-followups-*/
@@ -128,7 +133,7 @@ jobs:
             artifacts/161-member-version-history-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-member-version-failures
           path: test-results/member-result-versions-*/
@@ -144,7 +149,7 @@ jobs:
             artifacts/164-result-reference-history-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-result-reference-failures
           path: test-results/result-references-*/
@@ -159,7 +164,7 @@ jobs:
             artifacts/167-project-results-fixed-version-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-project-result-failures
           path: test-results/project-results-*/
@@ -174,7 +179,7 @@ jobs:
             artifacts/170-result-task-activity-history-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-result-activity-failures
           path: test-results/result-task-activity-*/
@@ -189,7 +194,7 @@ jobs:
             artifacts/173-task-edit-baseline-conflict-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-edit-failures
           path: test-results/task-edit-baseline-*/
@@ -204,7 +209,7 @@ jobs:
             artifacts/176-task-state-filters-cancelled-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-filter-failures
           path: test-results/task-state-filters-*/
@@ -219,7 +224,7 @@ jobs:
             artifacts/179-task-content-history-legacy-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-content-history-failures
           path: test-results/task-content-history-*/
@@ -236,7 +241,7 @@ jobs:
             artifacts/182-task-content-comparison-legacy-mobile.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-content-comparison-failures
           path: test-results/task-content-comparison-*/
@@ -251,7 +256,7 @@ jobs:
             artifacts/185-task-labels-project-filter-dark.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-labels-failures
           path: test-results/task-labels-*/
@@ -266,7 +271,7 @@ jobs:
             artifacts/188-task-completion-history-pagination.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-completion-history-failures
           path: test-results/task-completion-history-*/
@@ -280,7 +285,7 @@ jobs:
             artifacts/190-cancelled-result-reopen-mobile-light.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-cancelled-task-reopen-failures
           path: test-results/cancelled-task-reopen-*/
@@ -294,7 +299,7 @@ jobs:
             artifacts/192-task-completion-dialog-mobile-light.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-completion-dialog-failures
           path: test-results/task-completion-dialog-*/
@@ -308,7 +313,7 @@ jobs:
             artifacts/194-task-cancellation-mobile-light.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-cancellation-failures
           path: test-results/task-cancellation-*/
@@ -322,7 +327,7 @@ jobs:
             artifacts/196-task-search-older-mobile-light.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-task-search-pagination-failures
           path: test-results/task-search-pagination-*/
@@ -336,7 +341,7 @@ jobs:
             artifacts/198-incoming-handoff-summary-mobile-light.png
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: ${{ always() && (failure() || cancelled()) }}
         with:
           name: hexu-incoming-handoffs-failures
           path: test-results/incoming-handoffs-*/
