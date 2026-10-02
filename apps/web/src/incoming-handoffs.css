@@ -1,0 +1,116 @@
+.incoming-handoffs {
+  min-width: 0;
+}
+.incoming-handoffs-heading,
+.incoming-handoff-row,
+.incoming-handoffs-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+}
+.incoming-handoffs-heading {
+  margin-bottom: var(--hx-space-3);
+}
+.incoming-handoffs-heading h2,
+.incoming-handoff-row h3 {
+  margin: 0 0 var(--hx-space-2);
+}
+.incoming-handoffs-heading p,
+.incoming-handoff-meta,
+.incoming-handoff-summary-actions p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.incoming-handoffs-heading p {
+  margin: 0;
+}
+.incoming-handoff-list {
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-panel);
+  background: var(--hx-surface-panel);
+  overflow: hidden;
+}
+.incoming-handoff-row {
+  padding: var(--hx-space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.incoming-handoff-row + .incoming-handoff-row {
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.incoming-handoff-row > div {
+  min-width: 0;
+}
+.incoming-handoff-row > a {
+  flex-shrink: 0;
+}
+.incoming-handoff-excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: var(--hx-space-2) 0;
+}
+.incoming-handoffs-pagination,
+.incoming-handoffs-message {
+  margin-top: var(--hx-space-3);
+}
+.dialog.drawer:has(> .incoming-handoff-target) {
+  overflow: hidden;
+  background: var(--hx-surface-panel);
+}
+.dialog.drawer:has(> .incoming-handoff-target) > .dialog-heading {
+  flex-shrink: 0;
+}
+.incoming-handoff-target,
+.incoming-handoff-summary {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.incoming-handoff-summary-content,
+.incoming-handoff-handling {
+  padding: var(--hx-space-4);
+  overflow: auto;
+  min-height: 0;
+  overflow-wrap: anywhere;
+}
+.incoming-handoff-summary-content {
+  flex: 1;
+}
+.incoming-handoff-summary-content h3,
+.incoming-handoff-summary-content h4 {
+  margin: var(--hx-space-3) 0 var(--hx-space-2);
+}
+.incoming-handoff-text {
+  white-space: pre-wrap;
+}
+.incoming-handoff-summary-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-4);
+  border-top: 1px solid var(--hx-border-subtle);
+}
+.incoming-handoff-summary-actions p {
+  flex-basis: 100%;
+  margin: 0 0 var(--hx-space-2);
+}
+@media (max-width: 640px) {
+  .incoming-handoffs-heading,
+  .incoming-handoff-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--hx-space-3);
+  }
+  .incoming-handoff-row > a {
+    align-self: flex-start;
+  }
+  .incoming-handoff-summary-actions > button {
+    min-height: 44px;
+  }
+}

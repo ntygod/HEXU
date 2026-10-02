@@ -43,7 +43,11 @@ export function App() {
           segment[2] === 'compare' && segment[3] ? (
             <BranchComparisonPage taskId={segment[1]} groupId={segment[3]} key={path} />
           ) : (
-            <TaskPage id={segment[1]} key={segment[1]} />
+            <TaskPage
+              id={segment[1]}
+              handoffId={segment[2] === 'handoffs' ? segment[3] : undefined}
+              key={segment[1]}
+            />
           )
         ) : active === 'results' ? (
           segment[1] ? (

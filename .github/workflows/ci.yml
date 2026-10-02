@@ -327,6 +327,20 @@ jobs:
           name: hexu-task-search-pagination-failures
           path: test-results/task-search-pagination-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-incoming-handoffs-previews
+          path: |
+            artifacts/197-incoming-handoffs-dark.png
+            artifacts/198-incoming-handoff-summary-mobile-light.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-incoming-handoffs-failures
+          path: test-results/incoming-handoffs-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

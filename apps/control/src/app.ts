@@ -1,5 +1,6 @@
 import { attachCheckpoints } from './checkpoints.js';
 import { attachHandoffs } from './handoffs.js';
+import { attachIncomingHandoffs } from './incoming-handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
@@ -188,6 +189,7 @@ export async function createApp(
   const nodeExecution = attachNodes(app, store);
   attachCheckpoints(app, store);
   attachHandoffs(app, store);
+  attachIncomingHandoffs(app, store);
   attachWorkBranches(app, store);
   attachIntegrations(app, store);
   const operationRecords = (id: string) =>
