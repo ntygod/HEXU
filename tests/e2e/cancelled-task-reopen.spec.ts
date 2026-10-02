@@ -231,7 +231,7 @@ async function repeatReopen(page: Page, f: Fixture, surface: Surface) {
 }
 
 for (const surface of ['task', 'result'] as const) {
-  const name = surface === 'task' ? '任务详情' : '手机历史成果页';
+  const name = surface === 'task' ? '任务详情' : '固定历史成果页';
   test(`${name}明确重开已取消任务，重复点击只生效一次且保留运行和固定成果`, async ({ page }) => {
     const f = await fixture();
     let failed = false;
@@ -255,12 +255,27 @@ for (const surface of ['task', 'result'] as const) {
           'NEWER_VERSION_MUST_NOT_REPLACE_PINNED_BODY',
         );
       }
+      if (surface === 'result') {
+        // This is a long document: its normal-flow footer need not share the
+        // viewport with the header action. Check each at its actual scroll position.
+        const footer = page.locator('.workbench-footer');
+        await footer.scrollIntoViewIfNeeded();
+        await expect(footer).toBeInViewport({ ratio: 1 });
+        await status(page, surface).scrollIntoViewIfNeeded();
+      }
       await reopen(page).scrollIntoViewIfNeeded();
       await expect(reopen(page)).toBeInViewport({ ratio: 1 });
       await expect(status(page, surface)).toBeInViewport({ ratio: 1 });
       await expect(status(page, surface)).toHaveText('已取消');
       if (surface === 'result') {
-        await expect(page.locator('.workbench-footer')).toBeInViewport({ ratio: 1 });
+        expect(
+          await reopen(page).evaluate((button) => {
+            const rect = button.getBoundingClientRect();
+            return button.contains(
+              document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+            );
+          }),
+        ).toBe(true);
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
         ).toBe(true);
