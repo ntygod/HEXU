@@ -313,6 +313,20 @@ jobs:
           name: hexu-task-cancellation-failures
           path: test-results/task-cancellation-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-search-pagination-previews
+          path: |
+            artifacts/195-task-search-loaded-pages-dark.png
+            artifacts/196-task-search-older-mobile-light.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-search-pagination-failures
+          path: test-results/task-search-pagination-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

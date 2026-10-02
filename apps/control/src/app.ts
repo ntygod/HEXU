@@ -6,6 +6,8 @@ import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
 import { MemberResultVersions } from '../../../packages/db/src/member-result-versions.js';
 import { ResultReferences } from '../../../packages/db/src/result-references.js';
 import { ProjectResults } from '../../../packages/db/src/project-results.js';
+import { TaskSearch } from '../../../packages/db/src/task-search.js';
+import { parseTaskSearchQuery } from '../../../packages/contracts/src/task-search.js';
 import { parseProjectResultListQuery } from '../../../packages/contracts/src/project-results.js';
 import { parseResultReferenceListQuery } from '../../../packages/contracts/src/result-references.js';
 import { ResultFeedbackInputs } from '../../../packages/db/src/result-feedback-inputs.js';
@@ -931,19 +933,9 @@ export async function createApp(
         ),
       );
   });
-  app.get('/api/v1/search', async (request) => {
-    const q = text(record(request.query).q, '搜索', 160).toLocaleLowerCase();
-    return {
-      items: store
-        .tasks()
-        .filter((task) =>
-          (task.title + ' ' + task.description + ' ' + task.shortId)
-            .toLocaleLowerCase()
-            .includes(q),
-        )
-        .slice(0, 30),
-    };
-  });
+  app.get('/api/v1/search', async (request) =>
+    new TaskSearch(store).list(parseTaskSearchQuery(request.query)),
+  );
   for (const url of ['/api/v1/events', '/api/v1/tasks/:taskId/events'])
     app.get(url, async (request, reply) => {
       if (streams.size >= 32)

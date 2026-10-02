@@ -2,6 +2,7 @@ import type { ResultCodeFeedbackAnchor } from './result-code-feedback.js';
 import type { ResultFeedbackReplyTarget } from './result-feedback-replies.js';
 import type { ResultFeedbackFollowUpOrigin } from './result-feedback-followups.js';
 import type { NativeRunConfig } from './native.js';
+export * from './task-search.js';
 export const taskStatuses = ['todo', 'in_progress', 'done', 'cancelled'] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
 export const runStates = [
