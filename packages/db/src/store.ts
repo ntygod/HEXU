@@ -15,6 +15,7 @@ import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
 import { TaskLabelsStore } from './task-labels.js';
 import { TaskContentHistoryStore } from './task-content-history.js';
+import { TaskCompletionHistoryStore } from './task-completion-history.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { ProjectSourcesStore } from './project-sources.js';
@@ -82,6 +83,7 @@ export class Store {
   readonly taskParticipants: TaskParticipantsStore;
   readonly taskLabels: TaskLabelsStore;
   readonly taskContentHistory: TaskContentHistoryStore;
+  readonly taskCompletionHistory: TaskCompletionHistoryStore;
   readonly projectSources: ProjectSourcesStore;
   readonly projectAgreements: ProjectAgreementsStore;
   readonly projectMaterials: ProjectMaterialsStore;
@@ -126,6 +128,7 @@ export class Store {
     this.taskParticipants = new TaskParticipantsStore(this);
     this.taskLabels = new TaskLabelsStore(this);
     this.taskContentHistory = new TaskContentHistoryStore(this);
+    this.taskCompletionHistory = new TaskCompletionHistoryStore(this);
     this.projectSources = new ProjectSourcesStore(this);
     this.projectAgreements = new ProjectAgreementsStore(this);
     this.projectMaterials = new ProjectMaterialsStore(this);

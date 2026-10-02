@@ -26,6 +26,7 @@ import { Link, time, useApp, canEditTask } from './state.js';
 import { ContinuePanel, EditTask, ShareResult } from './forms.js';
 import { TASK_EDIT_DRAFT } from './task-edit.js';
 import { TaskContentHistoryButton } from './task-content-history.js';
+import { TaskCompletionHistoryButton } from './task-completion-history.js';
 import { useAssistanceRead } from './assistance-common.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { ContinuationStatus } from './continuations.js';
@@ -257,6 +258,7 @@ export function TaskPage({ id }: { id: string }) {
             <span aria-label="当前操作者">当前操作者：{task.operatorName ?? '记录中的成员'}</span>
           )}
           <span className="spacer" />
+          <TaskCompletionHistoryButton key={`completion:${task.id}`} task={task} />
           <TaskContentHistoryButton key={task.id} task={task} />
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明

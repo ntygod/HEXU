@@ -24,6 +24,7 @@
 | 同Task固定两版的标题/关注/说明只读变化 | [工作说明对照](task-content-comparison.md) |
 | 归档/恢复及运行影响 | [项目归档](project-archive.md) |
 | Task标签维护与项目精确标签筛选 | [任务标签](task-labels.md) |
+| Task完成/取消/重新打开记录只读入口 | [完成记录](task-completion-history.md) |
 | 改派与参与者/筛选 | [负责人](task-assignment.md)、[参与](task-participants.md) |
 | 文本/链接资料、版本与删除恢复 | [项目资料](project-sources.md) |
 | 从讨论明确发布/替代约定 | [项目约定](project-agreements.md) |

@@ -1,0 +1,31 @@
+.task-completion-history {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  font-size: var(--hx-font-body);
+  gap: var(--hx-space-4);
+  overflow-wrap: anywhere;
+}
+.task-completion-history > p,
+.task-completion-event > p {
+  margin: 0;
+  color: var(--hx-text-secondary);
+}
+.task-completion-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.task-completion-event {
+  border-top: 1px solid var(--hx-border-subtle);
+  padding: var(--hx-space-4) 0;
+  display: grid;
+  gap: var(--hx-space-2);
+}
+.task-completion-event h3 {
+  margin: 0;
+  font-size: inherit;
+}
+.task-completion-event time {
+  color: var(--hx-text-secondary);
+}

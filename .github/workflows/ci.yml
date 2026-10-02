@@ -256,6 +256,21 @@ jobs:
           name: hexu-task-labels-failures
           path: test-results/task-labels-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-completion-history-previews
+          path: |
+            artifacts/186-task-completion-history-dark.png
+            artifacts/187-task-completion-history-mobile-light.png
+            artifacts/188-task-completion-history-pagination.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-completion-history-failures
+          path: test-results/task-completion-history-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

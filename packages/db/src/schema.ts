@@ -823,4 +823,11 @@ CREATE TRIGGER task_label_event_immutable_delete BEFORE DELETE ON task_label_eve
  BEGIN SELECT RAISE(ABORT,'task label events are immutable'); END;
 `,
   },
+  {
+    version: 40,
+    sql: `
+-- Query acceleration only: existing events stay unchanged and missing history stays empty.
+CREATE INDEX IF NOT EXISTS completion_events_task_history ON completion_events(task_id,task_revision DESC,id DESC);
+`,
+  },
 ];

@@ -63,6 +63,12 @@ Participation is excluded from model materials: do not update Task revision/time
 
 编辑器固定基线，冲突后明确选择载入或整体替换；未知只确认原包键。暂时故障保留草稿，当前拒绝/关闭/身份空间Task改变清理，所有旧读取与晚写回不得影响新会话。筛选按精确规范名称与原条件交集，先当前权限后过滤再分页；URL非法条件不能静默扩大结果。取消看板只读，Task详情仍沿用原人工元数据编辑权。见[用法](../engineering/task-labels.md)与[事务回归](../../tests/task-labels.test.ts)。
 
+## Task 完成记录
+
+完成记录只读原completion_events，当前父Task权限先于参数/同Task游标查询，SQL有界且按任务修订/事件ID稳定排列。读取时当前可见成员名不当历史名字；未知成员/动作和没有旧记录需诚实显示，不根据Task状态补造历史。查询索引迁移不改变事件模型、Task或Run。查看完成记录不表示执行已停止或代码已发布。
+
+新事件提示保留已读内容，明确刷新才替换；当前拒绝清除，旧分页/权限探测不能覆盖较新的显式读取，关闭与身份/空间/Task变化隔离迟到回应。见[当前用法](../engineering/task-completion-history.md)与[只读回归](../../tests/task-completion-history.test.ts)。
+
 ## 如何验证与回写
 
 对应复用 [项目设置](../../tests/project-settings.test.ts)、[归档](../../tests/project-archive.test.ts)、[改派](../../tests/task-assignment.test.ts)、[参与](../../tests/task-participants.test.ts) 及 [团队 UI](../../tests/e2e/team.spec.ts)。涉及事务时核对旧回执、修订冲突和回滚；改展示不必重新验证全部执行协议。

@@ -507,6 +507,9 @@ export async function createApp(
       parseTaskContentHistoryQuery(request.query),
     ),
   );
+  app.get('/api/v1/tasks/:taskId/completion-history', async (request) =>
+    store.taskCompletionHistory.history(param(request.params, 'taskId'), request.query),
+  );
   app.get('/api/v1/tasks/:taskId/labels', async (request) =>
     store.taskLabels.view(param(request.params, 'taskId')),
   );
