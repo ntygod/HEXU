@@ -260,6 +260,15 @@ export function TaskPage({ id }: { id: string }) {
           <span className="spacer" />
           <TaskCompletionHistoryButton key={`completion:${task.id}`} task={task} />
           <TaskContentHistoryButton key={task.id} task={task} />
+          {data.tasks.find((current) => current.id === task.id)?.status !== 'cancelled' && (
+            <Button
+              variant="ghost"
+              disabled={!editable}
+              onClick={() => void changeStatus(task, 'cancelled')}
+            >
+              取消任务…
+            </Button>
+          )}
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明
           </button>

@@ -117,12 +117,27 @@ interface AppState {
   saveDraft(taskId: string, purpose: string, text: string): void;
 }
 const Context = createContext<AppState | null>(null);
-interface CompletionSession {
+interface TaskConfirmationSession {
   id: number;
   task: Task;
+  action: 'complete' | 'cancel';
+  hadActiveRuns: boolean;
+  executionChanged: boolean;
   stopAlso: boolean;
   busy: boolean;
   revisionChanged: boolean;
+}
+function unavailableConfirmation(action: TaskConfirmationSession['action']) {
+  return action === 'cancel'
+    ? '任务当前不可编辑，已关闭本次取消确认'
+    : '任务当前不可编辑，已取消本次完成确认';
+}
+function newlyActiveCancellation(session: TaskConfirmationSession, data: Workbench) {
+  return (
+    session.action === 'cancel' &&
+    !session.hadActiveRuns &&
+    data.runs.some((run) => run.taskId === session.task.id && isActiveRun(run.state))
+  );
 }
 export const useApp = () => {
   const context = useContext(Context);
@@ -149,20 +164,20 @@ export function Provider({ children }: { children: ReactNode }) {
     [fatal, setFatal] = useState(''),
     [toast, setToast] = useState<{ text: string; error: boolean } | null>(null),
     [connected, setConnected] = useState(false),
-    [finishing, setFinishing] = useState<CompletionSession | null>(null);
+    [confirming, setConfirming] = useState<TaskConfirmationSession | null>(null);
   const currentData = useRef<Workbench | null>(null);
-  const completion = useRef<CompletionSession | null>(null);
-  const completionId = useRef(0);
-  const setCompletion = useCallback((session: CompletionSession | null) => {
+  const confirmation = useRef<TaskConfirmationSession | null>(null);
+  const confirmationId = useRef(0);
+  const setConfirmation = useCallback((session: TaskConfirmationSession | null) => {
     // Invalidate callbacks immediately, including before React renders refreshed access.
-    completion.current = session;
-    setFinishing(session);
+    confirmation.current = session;
+    setConfirming(session);
   }, []);
   const notice = useCallback((text: string, error = false) => setToast({ text, error }), []);
   const readWorkbench = useCallback(
     async (isCurrent?: () => boolean) => {
       const next = await request<Workbench>('/workbench');
-      // A completion-owned read may outlive its confirmation just like its POST.
+      // A confirmation-owned read may outlive its session just like its POST.
       // Ordinary refreshes still apply the current visibility snapshot as before.
       if (isCurrent && !isCurrent()) return;
       if (
@@ -172,14 +187,18 @@ export function Provider({ children }: { children: ReactNode }) {
       )
         throw new Error('服务返回的工作台数据格式不正确');
       currentData.current = next;
-      const session = completion.current;
+      const session = confirmation.current;
       if (session) {
         const task = next.tasks.find((item) => item.id === session.task.id);
         if (!task || !canEditTask(next, task)) {
-          setCompletion(null);
-          notice('任务当前不可编辑，已取消本次完成确认', true);
-        } else if (!session.busy && task.revision !== session.task.revision) {
-          setCompletion({ ...session, revisionChanged: true });
+          setConfirmation(null);
+          notice(unavailableConfirmation(session.action), true);
+        } else if (!session.busy) {
+          setConfirmation({
+            ...session,
+            revisionChanged: session.revisionChanged || task.revision !== session.task.revision,
+            executionChanged: session.executionChanged || newlyActiveCancellation(session, next),
+          });
         }
       }
       setData(next);
@@ -190,12 +209,12 @@ export function Provider({ children }: { children: ReactNode }) {
       setVersion((value) => value + 1);
       setFatal('');
     },
-    [drafts, notice, setCompletion],
+    [drafts, notice, setConfirmation],
   );
   const refresh = useCallback(() => readWorkbench(), [readWorkbench]);
   useEffect(
     () => () => {
-      completion.current = null;
+      confirmation.current = null;
     },
     [],
   );
@@ -255,8 +274,9 @@ export function Provider({ children }: { children: ReactNode }) {
       return;
     }
     if (
-      status === 'done' &&
-      data?.runs.some((run) => run.taskId === task.id && isActiveRun(run.state))
+      status === 'cancelled' ||
+      (status === 'done' &&
+        data?.runs.some((run) => run.taskId === task.id && isActiveRun(run.state)))
     ) {
       const current = currentData.current;
       const selected = current?.tasks.find((item) => item.id === task.id);
@@ -264,10 +284,18 @@ export function Provider({ children }: { children: ReactNode }) {
         notice('任务当前不可编辑，请重新查看任务', true);
         return;
       }
-      setCompletion({
-        id: ++completionId.current,
+      if (status === 'cancelled' && selected.status === 'cancelled') return;
+      const hadActiveRuns = current.runs.some(
+        (run) => run.taskId === task.id && isActiveRun(run.state),
+      );
+      setConfirmation({
+        id: ++confirmationId.current,
         task: structuredClone(task),
-        stopAlso: true,
+        action: status === 'cancelled' ? 'cancel' : 'complete',
+        hadActiveRuns,
+        executionChanged: false,
+        // No-active cancellation consent never silently turns into a stop request.
+        stopAlso: status === 'done' || hadActiveRuns,
         busy: false,
         revisionChanged: selected.revision !== task.revision,
       });
@@ -280,26 +308,31 @@ export function Provider({ children }: { children: ReactNode }) {
       await refresh().catch(() => {});
     }
   };
-  const confirmCompletion = async (id: number) => {
-    const session = completion.current;
+  const confirmTaskAction = async (id: number) => {
+    const session = confirmation.current;
     if (!session || session.id !== id || session.busy) return;
     const current = currentData.current;
     const task = current?.tasks.find((item) => item.id === session.task.id);
     if (!current || !task || !canEditTask(current, task)) {
-      setCompletion(null);
-      notice('任务当前不可编辑，已取消本次完成确认', true);
+      setConfirmation(null);
+      notice(unavailableConfirmation(session.action), true);
       return;
     }
-    if (session.revisionChanged || task.revision !== session.task.revision) {
-      setCompletion({ ...session, revisionChanged: true });
+    const executionChanged = session.executionChanged || newlyActiveCancellation(session, current);
+    if (session.revisionChanged || task.revision !== session.task.revision || executionChanged) {
+      setConfirmation({
+        ...session,
+        revisionChanged: session.revisionChanged || task.revision !== session.task.revision,
+        executionChanged,
+      });
       return;
     }
-    const isCurrent = () => completion.current?.id === id;
-    setCompletion({ ...session, busy: true });
+    const isCurrent = () => confirmation.current?.id === id;
+    setConfirmation({ ...session, busy: true });
     try {
       // Keep the selected revision/choice. A sent command's own SSE update does
       // not invalidate it; only its response establishes whether it was accepted.
-      await request(`/tasks/${session.task.id}/complete`, {
+      await request(`/tasks/${session.task.id}/${session.action}`, {
         method: 'POST',
         body: {
           expectedRevision: session.task.revision,
@@ -309,33 +342,40 @@ export function Provider({ children }: { children: ReactNode }) {
       if (!isCurrent()) return;
       await readWorkbench(isCurrent);
       if (!isCurrent()) return;
-      setCompletion(null);
-      notice('已标记完成，随时可以重新打开');
+      setConfirmation(null);
+      notice(
+        session.action === 'cancel'
+          ? '已取消任务，讨论和成果已保留，随时可以重新打开'
+          : '已标记完成，随时可以重新打开',
+      );
     } catch (error) {
       if (!isCurrent()) return;
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
-        setCompletion(null);
-        notice('任务当前不可编辑，已取消本次完成确认', true);
+        setConfirmation(null);
+        notice(unavailableConfirmation(session.action), true);
         return;
       }
       if (error instanceof ApiError && error.status === 409)
-        setCompletion({ ...completion.current!, revisionChanged: true });
+        setConfirmation({ ...confirmation.current!, revisionChanged: true });
       await readWorkbench(isCurrent).catch(() => {});
       if (isCurrent()) notice((error as Error).message, true);
     } finally {
       if (isCurrent()) {
-        const session = completion.current!;
+        const session = confirmation.current!;
         const task = currentData.current?.tasks.find((item) => item.id === session.task.id);
-        setCompletion({
+        setConfirmation({
           ...session,
           busy: false,
           revisionChanged: session.revisionChanged || task?.revision !== session.task.revision,
+          executionChanged:
+            session.executionChanged ||
+            (!!currentData.current && newlyActiveCancellation(session, currentData.current)),
         });
       }
     }
   };
-  const closeCompletion = (id: number) => {
-    if (completion.current?.id === id && !completion.current.busy) setCompletion(null);
+  const closeConfirmation = (id: number) => {
+    if (confirmation.current?.id === id && !confirmation.current.busy) setConfirmation(null);
   };
   if (!data)
     return (
@@ -360,11 +400,20 @@ export function Provider({ children }: { children: ReactNode }) {
         )}
       </div>
     );
-  const completionTask = finishing && data.tasks.find((task) => task.id === finishing.task.id);
+  const confirmationTask = confirming && data.tasks.find((task) => task.id === confirming.task.id);
   const revisionChanged =
-    finishing &&
-    (finishing.revisionChanged ||
-      (!finishing.busy && completionTask?.revision !== finishing.task.revision));
+    confirming &&
+    (confirming.revisionChanged ||
+      (!confirming.busy && confirmationTask?.revision !== confirming.task.revision));
+  const activeRuns = confirming
+    ? data.runs.filter((run) => run.taskId === confirming.task.id && isActiveRun(run.state))
+    : [];
+  const executionChanged =
+    confirming &&
+    (confirming.executionChanged ||
+      (!confirming.busy && newlyActiveCancellation(confirming, data)));
+  const cancellation = confirming?.action === 'cancel';
+  const confirmationInvalid = !!revisionChanged || !!executionChanged;
   return (
     <Context.Provider
       value={{ data, version, refresh, notice, changeStatus, connected, readDraft, saveDraft }}
@@ -382,41 +431,78 @@ export function Provider({ children }: { children: ReactNode }) {
           </button>
         </div>
       )}
-      {finishing && completionTask && canEditTask(data, completionTask) && (
-        <Dialog title="标记任务完成" onClose={() => closeCompletion(finishing.id)}>
+      {confirming && confirmationTask && canEditTask(data, confirmationTask) && (
+        <Dialog
+          title={cancellation ? '取消任务' : '标记任务完成'}
+          onClose={() => closeConfirmation(confirming.id)}
+        >
           <div className="dialog-body">
-            <p>「{finishing.task.title}」仍有活动执行。任务完成与执行停止是两件事。</p>
+            {cancellation ? (
+              <>
+                <p>
+                  确认不再继续「{confirming.task.title}」？讨论和成果会保留，之后仍可重新打开任务。
+                </p>
+                {confirming.hadActiveRuns || activeRuns.length > 0 || executionChanged ? (
+                  <p>
+                    当前有 {activeRuns.length} 项活动执行。停止中或连接未知的执行也计入其中。
+                    取消任务不代表执行已经停止。
+                  </p>
+                ) : (
+                  <p>当前没有活动执行，本次只取消任务，不请求停止执行。</p>
+                )}
+              </>
+            ) : (
+              <p>「{confirming.task.title}」仍有活动执行。任务完成与执行停止是两件事。</p>
+            )}
             {revisionChanged && (
               <p role="alert">
-                任务已更新，本次完成确认已失效。请关闭后查看当前任务，再重新选择标记完成。
+                {cancellation
+                  ? '任务已更新，本次取消确认已失效。请返回后查看当前任务，再重新选择取消任务。'
+                  : '任务已更新，本次完成确认已失效。请关闭后查看当前任务，再重新选择标记完成。'}
               </p>
             )}
-            <label className="check-line">
-              <input
-                type="checkbox"
-                checked={finishing.stopAlso}
-                disabled={finishing.busy || !!revisionChanged}
-                onChange={(event) => {
-                  const session = completion.current;
-                  if (session?.id === finishing.id && !session.busy && !session.revisionChanged)
-                    setCompletion({ ...session, stopAlso: event.target.checked });
-                }}
-              />
-              同时请求停止当前执行
-            </label>
-            <p className="muted">取消勾选后，任务会标记完成，执行仍保持可见。</p>
+            {executionChanged && (
+              <p role="alert">活动执行已变化，本次取消确认已失效。请返回后重新确认。</p>
+            )}
+            {(!cancellation || confirming.hadActiveRuns) && (
+              <>
+                <label className="check-line">
+                  <input
+                    type="checkbox"
+                    checked={confirming.stopAlso}
+                    disabled={confirming.busy || confirmationInvalid}
+                    onChange={(event) => {
+                      const session = confirmation.current;
+                      if (
+                        session?.id === confirming.id &&
+                        !session.busy &&
+                        !session.revisionChanged &&
+                        !session.executionChanged
+                      )
+                        setConfirmation({ ...session, stopAlso: event.target.checked });
+                    }}
+                  />
+                  同时请求停止当前执行
+                </label>
+                <p className="muted">
+                  {cancellation
+                    ? '取消勾选后，仅取消任务，不请求停止执行；实际执行状态仍单独显示。请求停止也不等于已终止。'
+                    : '取消勾选后，任务会标记完成，执行仍保持可见。'}
+                </p>
+              </>
+            )}
           </div>
           <div className="dialog-footer">
-            <Button onClick={() => closeCompletion(finishing.id)} disabled={finishing.busy}>
-              取消
+            <Button onClick={() => closeConfirmation(confirming.id)} disabled={confirming.busy}>
+              {cancellation ? '返回' : '取消'}
             </Button>
             <Button
               variant="primary"
-              busy={finishing.busy}
-              disabled={!!revisionChanged}
-              onClick={() => confirmCompletion(finishing.id)}
+              busy={confirming.busy}
+              disabled={confirmationInvalid}
+              onClick={() => confirmTaskAction(confirming.id)}
             >
-              标记完成
+              {cancellation ? '确认取消任务' : '标记完成'}
             </Button>
           </div>
         </Dialog>
