@@ -285,6 +285,20 @@ jobs:
           name: hexu-cancelled-task-reopen-failures
           path: test-results/cancelled-task-reopen-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-completion-dialog-previews
+          path: |
+            artifacts/191-task-completion-dialog-dark.png
+            artifacts/192-task-completion-dialog-mobile-light.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-completion-dialog-failures
+          path: test-results/task-completion-dialog-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
