@@ -260,7 +260,23 @@ for (const surface of ['task', 'result'] as const) {
         // viewport with the header action. Check each at its actual scroll position.
         const footer = page.locator('.workbench-footer');
         await footer.scrollIntoViewIfNeeded();
-        await expect(footer).toBeInViewport({ ratio: 1 });
+        // At the document end Chromium can round scrollY while the footer has
+        // fractional line height. Require all footer text and its full box,
+        // allowing only the same one-pixel rounding used for page width below.
+        const footerText = footer.locator('span');
+        await expect(footerText).toHaveCount(2);
+        for (const text of await footerText.all()) await expect(text).toBeInViewport({ ratio: 1 });
+        expect(
+          await footer.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            return (
+              rect.top >= 0 &&
+              rect.left >= 0 &&
+              rect.bottom <= innerHeight + 1 &&
+              rect.right <= innerWidth + 1
+            );
+          }),
+        ).toBe(true);
         await status(page, surface).scrollIntoViewIfNeeded();
       }
       await reopen(page).scrollIntoViewIfNeeded();
