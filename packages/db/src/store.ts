@@ -172,13 +172,20 @@ export class Store {
       throw error;
     }
   }
-  mutate<T>(scope: string, key: string, payload: unknown, action: () => T): T {
+  mutate<T>(
+    scope: string,
+    key: string,
+    payload: unknown,
+    action: () => T,
+    beforeReplay?: () => void,
+  ): T {
     if (!key || key.length > 128 || !/^[\w.:-]+$/.test(key))
       throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', '操作需要有效的 Idempotency-Key');
     if (this.teamMode) this.permissions.space();
     const fullScope = `${this.actorId}:${this.teamMode ? this.spaceId + ':' : ''}${scope}`;
     const fingerprint = createHash('sha256').update(canonicalJson(payload)).digest('hex');
     return this.transaction(() => {
+      beforeReplay?.();
       const previous = this.db
         .prepare('SELECT fingerprint,result FROM idempotency_records WHERE scope=? AND key=?')
         .get(fullScope, key) as { fingerprint: string; result: string } | undefined;
@@ -331,35 +338,46 @@ export class Store {
   }
   createTask(data: { title: string; description: string; projectId: string | null }, key: string) {
     if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
-    return this.mutate('task.create', key, data, () => {
-      if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
-      if (data.projectId) this.project(data.projectId);
-      const counter = this.db
-        .prepare("SELECT value FROM metadata WHERE key='task_counter'")
-        .get() as { value: string };
-      const next = Number(counter.value) + 1;
-      this.db.prepare("UPDATE metadata SET value=? WHERE key='task_counter'").run(String(next));
-      const at = now();
-      const task: Task = {
-        id: randomUUID(),
-        shortId: `HX-${String(next).padStart(3, '0')}`,
-        spaceId: this.spaceId,
-        ...data,
-        visibility: data.projectId ? 'project' : 'private',
-        ownerUserId: this.actorId,
-        createdByUserId: this.actorId,
-        status: 'todo',
-        attention: null,
-        revision: 1,
-        createdAt: at,
-        updatedAt: at,
-      };
-      this.db
-        .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
-        .run(task.id, this.spaceId, task.projectId, JSON.stringify(task));
-      this.event(task.id, 'task.created');
-      return task;
-    });
+    return this.mutate(
+      'task.create',
+      key,
+      data,
+      () => {
+        if (this.teamMode && data.projectId) this.permissions.project(data.projectId, 'edit');
+        if (data.projectId) this.project(data.projectId);
+        const counter = this.db
+          .prepare("SELECT value FROM metadata WHERE key='task_counter'")
+          .get() as { value: string };
+        const next = Number(counter.value) + 1;
+        this.db.prepare("UPDATE metadata SET value=? WHERE key='task_counter'").run(String(next));
+        const at = now();
+        const task: Task = {
+          id: randomUUID(),
+          shortId: `HX-${String(next).padStart(3, '0')}`,
+          spaceId: this.spaceId,
+          ...data,
+          visibility: data.projectId ? 'project' : 'private',
+          ownerUserId: this.actorId,
+          createdByUserId: this.actorId,
+          status: 'todo',
+          attention: null,
+          revision: 1,
+          createdAt: at,
+          updatedAt: at,
+        };
+        this.db
+          .prepare('INSERT INTO tasks VALUES(?,?,?,?)')
+          .run(task.id, this.spaceId, task.projectId, JSON.stringify(task));
+        this.event(task.id, 'task.created');
+        return task;
+      },
+      () => {
+        if (this.teamMode) {
+          this.permissions.space();
+          if (data.projectId) this.permissions.project(data.projectId, 'edit');
+        }
+      },
+    );
   }
   patchTask(
     id: string,
@@ -372,12 +390,25 @@ export class Store {
     key: string,
   ) {
     this.getTask(id, true);
-    return this.mutate(`task.patch:${id}`, key, data, () => {
-      const task = this.getTask(id, true);
-      assertRevision(task.revision, data.expectedRevision);
-      const { expectedRevision: _, ...changes } = data;
-      return this.saveTask({ ...task, ...changes, revision: task.revision + 1, updatedAt: now() });
-    });
+    return this.mutate(
+      `task.patch:${id}`,
+      key,
+      data,
+      () => {
+        const task = this.getTask(id, true);
+        assertRevision(task.revision, data.expectedRevision);
+        const { expectedRevision: _, ...changes } = data;
+        return this.saveTask({
+          ...task,
+          ...changes,
+          revision: task.revision + 1,
+          updatedAt: now(),
+        });
+      },
+      () => {
+        this.getTask(id, true);
+      },
+    );
   }
   private recordCompletion(task: Task, action: string) {
     this.db
@@ -427,6 +458,9 @@ export class Store {
             });
         }
         return next;
+      },
+      () => {
+        this.getTask(id, true);
       },
     );
   }

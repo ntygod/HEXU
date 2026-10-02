@@ -107,9 +107,14 @@ export function ResultPage({ id, revisionId }: { id: string; revisionId?: string
           <Button
             variant="primary"
             disabled={!editable}
-            onClick={() => void changeStatus(task, task.status === 'done' ? 'todo' : 'done')}
+            onClick={() =>
+              void changeStatus(
+                task,
+                task.status === 'done' || task.status === 'cancelled' ? 'todo' : 'done',
+              )
+            }
           >
-            {task.status === 'done' ? '重新打开' : '标记完成'}
+            {task.status === 'done' || task.status === 'cancelled' ? '重新打开' : '标记完成'}
           </Button>
         </div>
       </header>
