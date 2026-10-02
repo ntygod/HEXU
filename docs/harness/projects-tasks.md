@@ -57,6 +57,12 @@ Participation is excluded from model materials: do not update Task revision/time
 
 状态过滤使用原Task四状态；关注过滤只看attention去空白后的实际内容，不推断等待/阻塞/暂停或Run生命周期。API未指定status保持全部当前可见状态，项目页面未指定保持排除cancelled；只有明确cancelled才显示只读取消列，不复用三状态下拉隐式重开。所有条件与当前参与关系、负责人和原搜索交集，先权限/项目/当前参与，再过滤和游标。URL不可信输入需校验未知、重复、非法条件，错误不可静默扩大结果；清除保留合法视图及其他项目定位。局部筛选不改全局Workbench、总览计数、状态或执行。见[当前用法](../engineering/task-state-filters.md)。
 
+## Task 标签
+
+标签是项目可见Task自有的有界文字集合，不是项目目录或访问授权。独立标签修订/不可变事件/Task范围outbox/回执同事务；当前父Task权限在旧回执前和事务内复核。无变化不增加修订，旧Task不补造标签历史。只投影人工Workbench/detail/list；不把标签写入原Task JSON、内容修订、运行材料或model输入。
+
+编辑器固定基线，冲突后明确选择载入或整体替换；未知只确认原包键。暂时故障保留草稿，当前拒绝/关闭/身份空间Task改变清理，所有旧读取与晚写回不得影响新会话。筛选按精确规范名称与原条件交集，先当前权限后过滤再分页；URL非法条件不能静默扩大结果。取消看板只读，Task详情仍沿用原人工元数据编辑权。见[用法](../engineering/task-labels.md)与[事务回归](../../tests/task-labels.test.ts)。
+
 ## 如何验证与回写
 
 对应复用 [项目设置](../../tests/project-settings.test.ts)、[归档](../../tests/project-archive.test.ts)、[改派](../../tests/task-assignment.test.ts)、[参与](../../tests/task-participants.test.ts) 及 [团队 UI](../../tests/e2e/team.spec.ts)。涉及事务时核对旧回执、修订冲突和回滚；改展示不必重新验证全部执行协议。

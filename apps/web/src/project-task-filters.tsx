@@ -50,7 +50,14 @@ export function ProjectTaskFilters({
   setFilter(key: ProjectTaskFilterKey, value: string): void;
   clear(): void;
 }) {
-  const { refresh } = useApp();
+  const { data, refresh } = useApp();
+  const labelOptions = [
+    ...new Set(
+      data.tasks
+        .filter((task) => task.projectId === projectId && task.visibility === 'project')
+        .flatMap((task) => task.labelNames ?? []),
+    ),
+  ].sort();
   const { value, error } = useLoad<ProjectTaskPeople>(`/projects/${projectId}/task-people`);
   const invalidStatus =
     values.status !== undefined &&
@@ -100,6 +107,24 @@ export function ProjectTaskFilters({
             <option value="">全部关注情况</option>
             <option value="present">有关注内容</option>
             <option value="absent">无关注内容</option>
+          </select>
+        </label>
+        <label>
+          标签
+          <select
+            aria-label="标签筛选"
+            value={values.label ?? ''}
+            onChange={(event) => setFilter('label', event.target.value)}
+          >
+            <option value="">全部标签</option>
+            {values.label !== undefined && !labelOptions.includes(values.label) && (
+              <option value={values.label}>链接中的标签：{values.label || '（空值，无效）'}</option>
+            )}
+            {labelOptions.map((label) => (
+              <option key={label} value={label}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <label>

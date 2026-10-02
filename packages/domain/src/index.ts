@@ -6,6 +6,7 @@ import {
 } from '../../contracts/src/index.js';
 import type { TaskPeopleFilters } from '../../contracts/src/task-participants.js';
 export function matchesTaskPeopleFilters(task: Task, filters: TaskPeopleFilters): boolean {
+  if (filters.label && !task.labelNames?.includes(filters.label)) return false;
   if (filters.status && task.status !== filters.status) return false;
   const hasAttention = !!task.attention?.trim();
   if (filters.attention === 'present' && !hasAttention) return false;

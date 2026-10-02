@@ -802,4 +802,25 @@ CREATE TRIGGER task_content_revision_immutable_delete BEFORE DELETE ON task_cont
  BEGIN SELECT RAISE(ABORT,'task content revisions are immutable'); END;
 `,
   },
+  {
+    version: 39,
+    sql: `
+-- Empty labels for old tasks: no invented events, authors or timestamps.
+CREATE TABLE task_label_sets (
+ task_id TEXT PRIMARY KEY REFERENCES tasks(id), revision INTEGER NOT NULL CHECK(revision>=1)
+);
+CREATE TABLE task_labels (
+ task_id TEXT NOT NULL REFERENCES task_label_sets(task_id), name TEXT NOT NULL,
+ PRIMARY KEY(task_id,name)
+);
+CREATE TABLE task_label_events (
+ task_id TEXT NOT NULL REFERENCES tasks(id), revision INTEGER NOT NULL CHECK(revision>=2),
+ body TEXT NOT NULL, PRIMARY KEY(task_id,revision)
+);
+CREATE TRIGGER task_label_event_immutable_update BEFORE UPDATE ON task_label_events
+ BEGIN SELECT RAISE(ABORT,'task label events are immutable'); END;
+CREATE TRIGGER task_label_event_immutable_delete BEFORE DELETE ON task_label_events
+ BEGIN SELECT RAISE(ABORT,'task label events are immutable'); END;
+`,
+  },
 ];
