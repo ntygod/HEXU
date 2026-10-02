@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Frame, type Page, type Route } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { teamFixture, PASSWORD, type Account } from '../helpers/team.js';
@@ -624,11 +624,27 @@ test('明确处理才读取精确旧邀请卡，重复处理入口和刷新都�
     expect(calls.legacy.every((item) => origin + item === legacyEndpoint)).toBe(true);
     expect(calls.writes).toEqual([]);
     await expect(page).toHaveURL(origin + path);
-    calls.legacy.length = 0;
-    await page.reload();
+    // The explicitly opened old Card may finish a read while reload is still
+    // navigating. Audit the new summary from the main document commit, before
+    // its application requests; retain the original full-flow audit as well.
+    let reloadedCalls: ReturnType<typeof audit> | undefined;
+    const committed = (frame: Frame) => {
+      if (frame !== page.mainFrame()) return;
+      reloadedCalls = audit(page);
+      page.off('framenavigated', committed);
+    };
+    page.on('framenavigated', committed);
+    try {
+      await page.reload();
+    } finally {
+      page.off('framenavigated', committed);
+    }
+    expect(reloadedCalls).toBeDefined();
     await expect(summary(page)).toContainText(target.summary);
     await expect(drawer(page).getByRole('article', { name: '接手邀请记录' })).toHaveCount(0);
-    calls.readOnly();
+    reloadedCalls!.readOnly();
+    expect(calls.legacy.every((item) => origin + item === legacyEndpoint)).toBe(true);
+    expect(calls.writes).toEqual([]);
     expect(f.snapshot()).toEqual(before);
     await drawer(page).getByRole('button', { name: '查看并处理邀请', exact: true }).click();
     await expect(handlingDrawer.getByRole('article', { name: '接手邀请记录' })).toHaveCount(1);
