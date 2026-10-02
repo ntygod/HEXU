@@ -924,6 +924,7 @@ test('列表初次故障不冒充空列表，当前页短暂故障保留摘要�
           })
         : route.continue(),
     );
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f);
     await expect(list(page).getByRole('alert')).toContainText('邀请列表暂时读取失败');
     await expect(rows(page)).toHaveCount(0);
@@ -1073,14 +1074,24 @@ test('已加载第二页的游标锚点失效后清除旧摘要，返回第一�
       second = await f.incoming(first.nextCursor!);
     const anchor = f.invitations.find((item) => item.id === first.items.at(-1)!.id)!;
     const calls = audit(page);
+    let workbenchReads = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'GET' && request.url() === `${origin}/api/v1/workbench`)
+        workbenchReads++;
+    });
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f, `/?keep=1&incomingCursor=${encodeURIComponent(first.nextCursor!)}`);
     await expect(rows(page)).toHaveCount(1);
     await expect(row(page, second.items[0]!.id)).toContainText(second.items[0]!.summary);
+    // The loaded second page follows the one initial successful Workbench read.
+    // Another Workbench request would invalidate this same-version precondition.
+    expect(workbenchReads).toBe(1);
     // No event/new visibility key: the next poll of this loaded page itself
     // returns INVALID_CURSOR and must not retain the previous page as current.
     f.change(anchor, { state: 'withdrawn', revision: 2 });
     await expect(list(page).getByRole('alert')).toContainText('邀请列表位置已无效');
     await expect(rows(page)).toHaveCount(0);
+    expect(workbenchReads).toBe(1);
     await list(page).getByRole('link', { name: '返回第一页', exact: true }).click();
     await expect(page).toHaveURL(`${origin}/?keep=1`);
     await expect(rows(page)).toHaveCount(20);
