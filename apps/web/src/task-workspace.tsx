@@ -21,8 +21,10 @@ import {
   StatusBadge,
   ToolMark,
 } from '../../../packages/ui/src/index.js';
-import { Link, time, useApp, useLoad, canEditTask } from './state.js';
-import { ContinuePanel, EditTask, ShareResult } from './forms.js';
+import { Link, time, useApp, canEditTask } from './state.js';
+import { ContinuePanel, ShareResult } from './forms.js';
+import { EditTask, TASK_EDIT_DRAFT } from './task-content-editor.js';
+import { useAssistanceRead } from './assistance-common.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { ContinuationStatus } from './continuations.js';
 import { NodeContinuationStatus } from './node-continuations.js';
@@ -45,8 +47,11 @@ function readLayout(key: string): { width: number; hidden: boolean } {
 }
 
 export function TaskPage({ id }: { id: string }) {
-  const { value, error } = useLoad<TaskDetail>(`/tasks/${id}`);
-  const { data, refresh, notice, changeStatus } = useApp();
+  const { value, error, denied, retry } = useAssistanceRead<TaskDetail>(`/tasks/${id}`, 0);
+  const { data, refresh, notice, changeStatus, saveDraft } = useApp();
+  // Workbench is the current full visibility snapshot. A failed detail refresh must
+  // never keep an earlier task readable after it disappears from that snapshot.
+  const visible = data.tasks.some((task) => task.id === id);
   const [modal, setModal] = useState<'continue' | 'node-continue' | 'share' | 'edit' | null>(null),
     [drawer, setDrawer] = useState<'context' | 'runs' | null>(null),
     [rightTab, setRightTab] = useState('results'),
@@ -90,14 +95,37 @@ export function TaskPage({ id }: { id: string }) {
         current === 'continue' || current === 'node-continue' ? null : current,
       );
   }, [archived]);
-  if (error)
+  useEffect(() => {
+    if (denied || !visible) {
+      saveDraft(id, TASK_EDIT_DRAFT, '');
+      setModal((current) => (current === 'edit' ? null : current));
+      setDrawer(null);
+    }
+  }, [denied, visible, id, saveDraft]);
+  if (!visible)
+    return (
+      <Empty
+        icon="warning"
+        title="当前无法访问此任务"
+        description="当前工作空间已不再显示此任务。不再展示先前内容，工作说明草稿已清除。"
+        action={
+          <Button
+            variant="primary"
+            onClick={() => void refresh().catch((cause) => notice(cause.message, true))}
+          >
+            重新加载
+          </Button>
+        }
+      />
+    );
+  if (error && !value)
     return (
       <Empty
         icon="warning"
         title="暂时无法打开任务"
         description={error}
         action={
-          <Button variant="primary" onClick={() => void refresh()}>
+          <Button variant="primary" onClick={retry}>
             重新加载
           </Button>
         }
@@ -129,6 +157,12 @@ export function TaskPage({ id }: { id: string }) {
   }
   return (
     <div className="task-page w1-task">
+      {error && (
+        <div className="notice-box" role="alert">
+          暂时无法刷新任务：{error}。仍显示上次读取的内容，你的编辑草稿已保留。
+          <Button onClick={retry}>重读当前任务</Button>
+        </div>
+      )}
       <div className="task-header">
         <div className="task-title">
           <h1>{task.title}</h1>
@@ -191,7 +225,7 @@ export function TaskPage({ id }: { id: string }) {
             <Icon name="upload" />
             分享成果
           </Button>
-          {task.status === 'done' ? (
+          {task.status === 'done' || task.status === 'cancelled' ? (
             <Button disabled={!editable} onClick={() => void changeStatus(task, 'todo')}>
               <Icon name="back" size={16} />
               重新打开
@@ -219,6 +253,15 @@ export function TaskPage({ id }: { id: string }) {
             <span aria-label="当前操作者">当前操作者：{task.operatorName ?? '记录中的成员'}</span>
           )}
           <span className="spacer" />
+          {data.tasks.find((current) => current.id === task.id)?.status !== 'cancelled' && (
+            <Button
+              variant="ghost"
+              disabled={!editable}
+              onClick={() => void changeStatus(task, 'cancelled')}
+            >
+              取消任务…
+            </Button>
+          )}
           <button className="text-button w1-context-shortcut" onClick={() => setDrawer('context')}>
             工作说明
           </button>

@@ -230,7 +230,7 @@ test('被新快照取消的旧响应不卸载任务编辑器或丢失未保存�
   await page.goto(`/tasks/${task.id}`);
   await page.getByRole('button', { name: '编辑工作说明', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '编辑工作说明', exact: true });
-  await editor.getByRole('textbox').last().fill('不能被已取消的读取清掉的草稿');
+  await editor.getByLabel('说明', { exact: true }).fill('不能被已取消的读取清掉的草稿');
   await page.evaluate((path) => {
     const state = { armed: true, pending: false, cancelled: false };
     Object.assign(window, { __hexuCancelledRead: state });
@@ -279,5 +279,7 @@ test('被新快照取消的旧响应不卸载任务编辑器或丢失未保存�
     page.locator('.message-content').getByText('第二次快照更新', { exact: true }),
   ).toBeAttached();
   await expect(editor).toBeVisible();
-  await expect(editor.getByRole('textbox').last()).toHaveValue('不能被已取消的读取清掉的草稿');
+  await expect(editor.getByLabel('说明', { exact: true })).toHaveValue(
+    '不能被已取消的读取清掉的草稿',
+  );
 });

@@ -23,7 +23,7 @@ jobs:
       - run: npm run check
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,7 +33,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --reporter=line,html
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -42,6 +44,86 @@ jobs:
             playwright-report/
             test-results/
             artifacts/
+          retention-days: 7
+      - name: Upload Task reliability previews
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-reliability-previews
+          path: |
+            artifacts/201-*.png
+            artifacts/202-*.png
+            artifacts/203-*.png
+            artifacts/204-*.png
+            artifacts/205-*.png
+            artifacts/206-*.png
+            artifacts/207-*.png
+            artifacts/208-*.png
+            artifacts/209-*.png
+            artifacts/210-*.png
+            artifacts/211-*.png
+            artifacts/107-branch-result-dark.png
+            artifacts/108-branch-result-mobile.png
+          retention-days: 7
+      - name: Upload task-edit-baseline failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-edit-baseline-failures
+          path: |
+            test-results/task-edit-baseline-*/trace.zip
+            test-results/task-edit-baseline-*/test-failed-*.png
+            test-results/task-edit-baseline-*/error-context.md
+          retention-days: 7
+      - name: Upload cancelled-task-reopen failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-cancelled-task-reopen-failures
+          path: |
+            test-results/cancelled-task-reopen-*/trace.zip
+            test-results/cancelled-task-reopen-*/test-failed-*.png
+            test-results/cancelled-task-reopen-*/error-context.md
+          retention-days: 7
+      - name: Upload task-completion-dialog failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-completion-dialog-failures
+          path: |
+            test-results/task-completion-dialog-*/trace.zip
+            test-results/task-completion-dialog-*/test-failed-*.png
+            test-results/task-completion-dialog-*/error-context.md
+          retention-days: 7
+      - name: Upload task-cancellation failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-cancellation-failures
+          path: |
+            test-results/task-cancellation-*/trace.zip
+            test-results/task-cancellation-*/test-failed-*.png
+            test-results/task-cancellation-*/error-context.md
+          retention-days: 7
+      - name: Upload task-status-request-recovery failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-status-request-recovery-failures
+          path: |
+            test-results/task-status-request-recovery-*/trace.zip
+            test-results/task-status-request-recovery-*/test-failed-*.png
+            test-results/task-status-request-recovery-*/error-context.md
+          retention-days: 7
+      - name: Upload branch-results failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-branch-results-failures
+          path: |
+            test-results/branch-results-*/trace.zip
+            test-results/branch-results-*/test-failed-*.png
+            test-results/branch-results-*/error-context.md
           retention-days: 7
   check:
     needs: [engineering, browser]
