@@ -7,6 +7,7 @@ import {
   text,
   type TaskStatus,
 } from './index.js';
+import { parseTaskLabel } from './task-labels.js';
 import type { ProjectRole } from './identity.js';
 
 export type ParticipationState = 'active' | 'left' | 'removed' | 'access_revoked';
@@ -61,6 +62,7 @@ export interface TaskPeopleFilters {
   status?: TaskStatus;
   /** Whether Task.attention contains non-whitespace text; not a Run or waiting state. */
   attention?: 'present' | 'absent';
+  label?: string;
 }
 export interface ProjectTaskPeople {
   owners: { id: string; name: string; availability: 'available' | 'read_only' | 'removed' }[];
@@ -98,6 +100,7 @@ export function parseTaskPeopleFilters(value: unknown): TaskPeopleFilters {
     'participantUserId',
     'status',
     'attention',
+    'label',
     'projectId',
     'cursor',
     'limit',
@@ -109,6 +112,7 @@ export function parseTaskPeopleFilters(value: unknown): TaskPeopleFilters {
   const optional = (value: unknown, label: string, max: number) =>
     value === undefined ? undefined : text(value, label, max, true) || undefined;
   return {
+    ...(query.label === undefined ? {} : { label: parseTaskLabel(query.label) }),
     q: optional(query.q, '搜索', 160),
     ownerUserId: optional(query.ownerUserId, '负责人', 100),
     participantUserId: optional(query.participantUserId, '参与者', 100),

@@ -241,6 +241,21 @@ jobs:
           name: hexu-task-content-comparison-failures
           path: test-results/task-content-comparison-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-labels-previews
+          path: |
+            artifacts/183-task-labels-editor-dark.png
+            artifacts/184-task-labels-editor-mobile-light.png
+            artifacts/185-task-labels-project-filter-dark.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hexu-task-labels-failures
+          path: test-results/task-labels-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()

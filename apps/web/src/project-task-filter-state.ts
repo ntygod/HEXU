@@ -9,6 +9,7 @@ export const projectTaskFilterKeys = [
   'participantUserId',
   'status',
   'attention',
+  'label',
 ] as const;
 export type ProjectTaskFilterKey = (typeof projectTaskFilterKeys)[number];
 export type ProjectTaskFilterValues = Partial<Record<ProjectTaskFilterKey, string>>;
@@ -19,6 +20,7 @@ const labels: Record<string, string> = {
   participantUserId: '参与者',
   status: '状态',
   attention: '关注内容',
+  label: '标签',
   view: '视图',
   tab: '项目页面',
   source: '项目资料',

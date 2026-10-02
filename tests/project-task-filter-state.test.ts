@@ -119,3 +119,23 @@ test('clear repairs invalid filters and unknown keys without losing valid view o
     'view=list&tab=tasks&source=one',
   );
 });
+
+test('labels preserve raw URL text and exact normalized identity, invalid values do not broaden results', () => {
+  const selected = readProjectTaskFilterState(
+    'view=list&status=todo&label=' + encodeURIComponent(' Cafe\u0301 '),
+  );
+  assert.equal(selected.values.label, ' Cafe\u0301 ');
+  assert.equal(selected.filters?.label, 'Café');
+  assert.equal(selected.filters?.status, 'todo');
+  assert.equal(selected.error, null);
+  assert.equal(readProjectTaskFilterState('label=unknown').filters?.label, 'unknown');
+  for (const label of ['', ' ', '\n', 'x'.repeat(33)]) {
+    const state = readProjectTaskFilterState(new URLSearchParams({ label }).toString());
+    assert.equal(state.filters, null);
+    assert.ok(state.error);
+    assert.equal(state.values.label, label);
+  }
+  const changed = updateProjectTaskFilterSearch('view=list&label=old&status=todo', 'label', 'API');
+  assert.equal(readProjectTaskFilterState(changed).filters?.label, 'API');
+  assert.equal(clearProjectTaskFilterSearch(changed), 'view=list');
+});

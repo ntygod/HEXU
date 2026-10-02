@@ -1,3 +1,4 @@
+import { TaskLabelChips } from './task-labels.js';
 import { useEffect, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
@@ -307,6 +308,7 @@ export function ProjectPage({ id }: { id: string }) {
                           <span className="work-task-id">{task.shortId}</span>
                           <h3>{task.title}</h3>
                           <p>{task.description || '打开任务查看讨论与成果。'}</p>
+                          <TaskLabelChips labels={task.labelNames} />
                           {task.attention?.trim() && (
                             <span className="badge amber">{task.attention}</span>
                           )}

@@ -44,6 +44,9 @@ export interface Task {
   operatorName?: string | null;
   /** Current participants projected for reads; never persisted in Task JSON or sent as model input. */
   participantUserIds?: string[];
+  /** Current human-facing label projection; absent from stored Task/model material. */
+  labelNames?: string[];
+  labelsRevision?: number;
   /** Unknown for legacy records; never inferred from the current owner. */
   createdByUserId?: string | null;
   id: string;

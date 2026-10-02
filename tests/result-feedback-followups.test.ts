@@ -215,6 +215,9 @@ test('预览/关闭不写入；提交在原项目创建现有Task，负责人和
       'continuation_operations',
       'node_continuation_operations',
       'collab_project_members',
+      'task_label_sets',
+      'task_labels',
+      'task_label_events',
     ];
     const original = snapshots(f.api.store, unchanged);
     const r = await f.api.call(f.path + '/follow-ups', f.bob, input);
@@ -238,9 +241,15 @@ test('预览/关闭不写入；提交在原项目创建现有Task，负责人和
       f.task,
     );
     assert.deepEqual(snapshots(f.api.store, unchanged), original);
+    const stored = f.as(() => f.api.store.getTask(task.id));
+    assert.deepEqual(stored, task);
+    assert.equal(Object.hasOwn(stored, 'labelNames'), false);
+    assert.equal(Object.hasOwn(stored, 'labelsRevision'), false);
     assert.deepEqual((await f.api.call(`tasks/${task.id}`, f.alice)).json().task, {
       ...task,
       participantUserIds: [],
+      labelNames: [],
+      labelsRevision: 1,
     });
     const events = f.api.store.db
       .prepare('SELECT task_id,kind FROM outbox WHERE task_id=?')

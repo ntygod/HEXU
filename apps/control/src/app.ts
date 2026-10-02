@@ -475,7 +475,7 @@ export async function createApp(
       items = items.filter((task) => task.projectId === id);
     }
     items = items
-      .map((task) => store.taskParticipants.decorate(task))
+      .map((task) => store.taskLabels.decorate(store.taskParticipants.decorate(task)))
       .filter((task) => matchesTaskPeopleFilters(task, peopleFilters));
     if (query.cursor !== undefined) {
       const cursor = text(query.cursor, '任务游标', 100);
@@ -506,6 +506,12 @@ export async function createApp(
       param(request.params, 'taskId'),
       parseTaskContentHistoryQuery(request.query),
     ),
+  );
+  app.get('/api/v1/tasks/:taskId/labels', async (request) =>
+    store.taskLabels.view(param(request.params, 'taskId')),
+  );
+  app.post('/api/v1/tasks/:taskId/labels', async (request) =>
+    store.taskLabels.change(param(request.params, 'taskId'), request.body, key(request.headers)),
   );
   app.get('/api/v1/tasks/:taskId/participants', async (request) =>
     store.taskParticipants.view(param(request.params, 'taskId')),

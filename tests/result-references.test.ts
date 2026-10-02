@@ -1050,7 +1050,7 @@ test('迁移37保留既有成果/版本/反馈和任务状态，不推断报告�
       // Remove this and later additive migrations from the disposable copy to
       // recreate schema 36, while retaining all preexisting result/Task data.
       db.exec(
-        'DROP TABLE task_content_revisions; DROP TABLE result_reference_events; DROP TABLE result_references; DELETE FROM schema_migrations WHERE version>=37;',
+        'DROP TABLE task_labels; DROP TABLE task_label_sets; DROP TABLE task_label_events; DROP TABLE task_content_revisions; DROP TABLE result_reference_events; DROP TABLE result_references; DELETE FROM schema_migrations WHERE version>=37;',
       );
       assert.equal(
         db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()!.version,
