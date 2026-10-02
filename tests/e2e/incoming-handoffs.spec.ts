@@ -351,6 +351,24 @@ async function navigate(page: Page, path: string) {
   }, path);
   await expect(page).toHaveURL(origin + path);
 }
+async function subscribeAfterSetupEvents(page: Page, f: Fixture) {
+  // These cases need an already-loaded visibility session. Start the real SSE
+  // subscription after fixture setup, whose historical events would otherwise
+  // schedule a Workbench replacement during the polling/deadline assertion.
+  // Later events and the server's live session/permission checks remain real.
+  const { sequence } = f.api.store.db
+    .prepare('SELECT COALESCE(MAX(sequence), 0) AS sequence FROM outbox')
+    .get() as { sequence: number };
+  expect(Number.isSafeInteger(sequence)).toBe(true);
+  await page.route(
+    (url) => url.origin === origin && url.pathname === '/api/v1/events',
+    (route) => {
+      const url = new URL(route.request().url());
+      url.searchParams.set('after', String(sequence));
+      return route.continue({ url: url.href });
+    },
+  );
+}
 async function refreshWorkbench(f: Fixture, marker: string) {
   const response = await f.api.call(`tasks/${f.task.id}/messages`, f.alice, { body: marker });
   expect(response.statusCode, response.body).toBe(201);
@@ -842,6 +860,7 @@ test('真实会话失效清除打开和在途摘要，换账号登录不恢复�
     const target = f.invitations[0]!,
       targetSummary = await f.detail(target),
       calls = audit(page);
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f, targetPath(target.taskId, target.id));
     await expect(summary(page)).toContainText(target.summary);
     const held = await holdReads(
@@ -851,8 +870,10 @@ test('真实会话失效清除打开和在途摘要，换账号登录不恢复�
       200,
       targetSummary,
     );
-    await drawer(page).getByRole('button', { name: '刷新邀请摘要', exact: true }).click();
+    await refreshWorkbench(f, '会话撤销前的真实可见性事件');
     await held.reached;
+    expect(held.count()).toBeGreaterThan(0);
+    await expect(drawer(page).getByRole('status')).toContainText('正在读取邀请摘要');
     const revoked = await f.api.call('identity/revoke-sessions', f.bob, {});
     expect(revoked.statusCode, revoked.body).toBe(200);
     await expect(page.getByRole('heading', { name: '欢迎回到合序', exact: true })).toBeVisible();
@@ -928,6 +949,7 @@ test('当前精确摘要短暂故障保留可读内容但禁用处理，拒绝�
     const target = f.invitations[0]!,
       value = await f.detail(target),
       calls = audit(page);
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f, targetPath(target.taskId, target.id));
     await expect(summary(page)).toContainText(target.summary);
     let status = 503;
@@ -995,6 +1017,7 @@ test('本地期限经过时清除已加载摘要，晚到成功读取不能使�
       before = f.snapshot();
     await completeIncomingAfterAbort(page, targetEndpoint(target.taskId, target.id));
     await page.clock.install({ time: new Date(start) });
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f, targetPath(target.taskId, target.id));
     await expect(summary(page)).toContainText(target.summary);
     const held = await holdReads(
@@ -1007,6 +1030,8 @@ test('本地期限经过时清除已加载摘要，晚到成功读取不能使�
     await page.clock.fastForward(3001);
     await held.reached;
     expect(held.count()).toBeGreaterThan(0);
+    // This is a same-session background poll, not a visibility replacement.
+    await expect(summary(page)).toContainText(target.summary);
     await page.clock.fastForward(57_000);
     await expect(drawer(page).getByRole('alert')).toContainText('先前摘要已清除');
     await expect(summary(page)).not.toContainText(target.summary);
