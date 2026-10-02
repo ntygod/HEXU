@@ -1,6 +1,6 @@
 # 21｜当前实现进度
 
-更新：2026-10-02。当前候选从 main `a3ae2e8` 独立提取 Task 可靠性修正：PR40/41/48/49/50/55，仅附带 PR33 的普通事务 `beforeReplay` 回调，另修补创建/状态旧回执在事务开始后的当前权限检查缺口。候选尚未完成自身验证，未合并或部署；旧堆叠分支的通过记录不等于本候选已通过。原工作项见 [19](19-work-items.md)，唯一下一项见 [22](22-next-delivery.md)，范围与取证见[整合记录](history/2026-10-02-task-reliability-integration.md)。
+更新：2026-10-02。main 保持 `a3ae2e8`。[PR56](https://github.com/ntygod/HEXU/pull/56) 的独立 Task 可靠性提取已完成自身 CI 和原图验收，保持草稿、未合并。当前后续基于其冻结代码树，只补直接 start/reopen/无活动 complete 的原请求恢复；新范围自身验证待完成，不能沿用父 PR 的通过结论。原工作项见 [19](19-work-items.md)，唯一下一项见 [22](22-next-delivery.md)，父范围见[整合记录](history/2026-10-02-task-reliability-integration.md)，本次见[直接状态恢复记录](history/2026-10-02-direct-task-status-recovery.md)。
 
 ## main 基线能力
 
@@ -19,16 +19,17 @@
 | 成果与选择 | 不可变文字版本、来源/共享输出、版本反馈与旧数据兼容；可选固定提交/副本状态，节点明确共享有界代码对比；固定版本比较/选择/取消，后续成果记录接续来源 | 引用不是备份，显示包不是完整补丁；未提交捕获、完整文件/diff/真实预览、AI差异建议、非方案后续版本编辑与实际整合写入仍缺 |
 | 整合预检 | 固定一个源ResultRevision、本人目标提交/恢复副本，读取完整保留或接收对象与原共同起点；只读三方文件/冲突检查、目标现场核验、明确共享和取消/回执/历史 | 同机Linux普通Git目录，需干净目标；报告最多80文件/48 KiB，省略明确阻止完整应用。没有实际写入、文本自动合并、多来源或冲突解决；旧报告不是当前现场证明 |
 
-## 本次 Task 可靠性候选
+## PR56 已验收范围与当前后续
 
-| 范围 | 本候选纳入的代码行为 | 验证与剩余边界 |
+| 范围 | 候选代码行为 | 验证与剩余边界 |
 | --- | --- | --- |
 | 工作说明编辑 | 固定 Task/修订/原文，外部变化只做冲突对照；明确载入新基线，同包同键确认未知 PATCH；事务内旧回执前复核当前编辑权 | 来源 [PR40](https://github.com/ntygod/HEXU/pull/40)；不含内容历史、独立 Requirement 或执行输入，见[用法](../engineering/task-edit-baseline.md) |
 | 普通 Task 创建 | 本路由独立 96 KiB JSON 字节预算，容纳既有合法中文与全转义输入；标题/说明字符上限、原回执与原子事务保持，另补旧回执事务内当前空间/项目编辑权复核 | 来源 [PR41](https://github.com/ntygod/HEXU/pull/41)；全局及无关路由仍为原预算，无新 schema/迁移 |
 | 重开与确认 | 已取消 Task 可从详情和固定成果重开；完成/取消确认跟随当前访问/编辑权和固定修订；详情取消读取同 Task 全部活动 Run 并明确 stop/keep | 来源 [PR48](https://github.com/ntygod/HEXU/pull/48)、[PR49](https://github.com/ntygod/HEXU/pull/49)、[PR50](https://github.com/ntygod/HEXU/pull/50)；Task 状态和真实执行终止分别判断 |
-| 未知结果恢复 | 首次发送固定动作/正文/幂等键，关闭后同 Task 状态入口先恢复原包；有效成功 ACK 后读取失败只 GET 刷新 | 来源 [PR55](https://github.com/ntygod/HEXU/pull/55)；另补 complete/cancel/reopen 旧回执事务内当前编辑权复核；Provider 内存按身份/空间隔离，当前撤权清除，不跨硬刷新，见[用法](../engineering/task-completion-confirmation.md) |
+| 确认弹窗的未知结果恢复 | 完成/取消确认首次发送固定动作/正文/幂等键，关闭后同 Task 状态入口先恢复原包；有效成功 ACK 后读取失败只 GET 刷新 | PR56 已验收，来源 [PR55](https://github.com/ntygod/HEXU/pull/55)；另补 complete/cancel/reopen 旧回执事务内当前编辑权复核；Provider 内存按身份/空间隔离，当前撤权清除，不跨硬刷新，见[用法](../engineering/task-completion-confirmation.md) |
+| 直接状态的原请求恢复 | start/reopen/无活动 complete 首次点击仍立即 POST；发送前固定原 Task/动作/正文/修订/键，只有未知结果或有效 ACK 后 GET 失败才显示恢复；所有同 Task 状态入口先恢复原包 | 当前独立后续，自身检查待完成；start 只把 Task 标记为 in_progress，不启动 Run。复用上述 Provider/outcome/当前权限与 GET-only 路径，无新后端/API/schema，见[记录](history/2026-10-02-direct-task-status-recovery.md) |
 
-上表描述候选代码范围，不声明已完成候选验收。除上述 Task 修正和 [PR33](https://github.com/ntygod/HEXU/pull/33) 普通事务回调这个最小依赖外，不导入其他旧堆叠功能；没有新增数据库 schema/迁移。本轮不检查或修改暂停的原生、文件、私有材料和 registry 范围，[问题52](https://github.com/ntygod/HEXU/issues/52) 保持暂停，也不作整包安全结论。
+上表前四项属于已验收、未合并的 PR56；最后一项是待独立验证的后续。父 PR 仅从 main 提取 PR40/41/48/49/50/55 及 [PR33](https://github.com/ntygod/HEXU/pull/33) 普通事务回调这个最小依赖；当前后续不修改冻结 PR56 或其他旧堆叠功能，没有新增数据库 schema/迁移。本轮不检查或修改暂停的原生、文件、私有材料和 registry 范围，[问题52](https://github.com/ntygod/HEXU/issues/52) 保持暂停，也不作整包安全结论。
 
 ## 模式与验证边界
 
@@ -42,11 +43,12 @@
 
 | 对象 | 实际证据与适用范围 |
 | --- | --- |
-| main `a3ae2e8` 基线 | [CI121 / 36658556183](https://github.com/ntygod/HEXU/actions/runs/36658556183)：596/596 工程通过、Chromium 123/124；固定成果版本 URL 用例 1 项失败。实际 trace 显示测试在 v2 加载时读到空选项，之后以未定义目标选择 v2；本候选只修该用例的加载/固定 ID 前置条件，尚待重验，不更改该基线问题的成果生产逻辑 |
+| main `a3ae2e8` 基线 | [CI121 / 36658556183](https://github.com/ntygod/HEXU/actions/runs/36658556183)：596/596 工程通过、Chromium 123/124；固定成果版本 URL 用例 1 项失败。实际 trace 显示测试在 v2 加载时读到空选项，之后以未定义目标选择 v2；PR56 只修该用例的加载/固定 ID 前置条件，已由其 172/172 Chromium 验证，不更改该基线问题的成果生产逻辑 |
 | 旧堆叠最终 [PR55](https://github.com/ntygod/HEXU/pull/55) `e977fb24` | [CI182 / 37042961842](https://github.com/ntygod/HEXU/actions/runs/37042961842)：1169/1169 工程、349/349 Chromium 与汇总通过；199/200 原图实际查看。只证明该完整堆叠 head，不覆盖本 main 候选 |
-| 本 main Task 候选 | 新鲜构建后相关工程 **38/38** 通过（含 22 项新增），类型/UI token/格式/构建及严格 E2E 类型通过；事务回调禁用反证 0/2、恢复后 2/2。首次本地全量检查通过类型/UI token/服务端构建后，在原 AI 进程夹具的 workspace-leases 目录创建处遇到 ENOENT 并在清理等待后中断，不能记为工程全通过；浏览器/视觉验收尚未完成。已发现 172 条浏览器用例（124 条基线 + 48 条适配新增），发现数不等于执行通过；无可据以宣称通过的候选 CI。最终结果按实际运行写回本页及[历史](history/2026-10-02-task-reliability-integration.md) |
+| 父 [PR56](https://github.com/ntygod/HEXU/pull/56) 冻结树 `96b7cb89` | 远端 head `a06998ab9035bb3164a271d77ec884204febfaad` 与本地 `cb650c5` 同树。[CI183 / 37051207701](https://github.com/ntygod/HEXU/actions/runs/37051207701)：工程 **618/618**、Chromium **172/172** 与汇总全部 success；107/108、201—211 共 13 张原图于 19:19 UTC 实际查看，PR 正文于 19:21 UTC 回读。草稿未合并，详细耗时、artifact 与早期本地失败见[父记录](history/2026-10-02-task-reliability-integration.md) |
+| 当前直接状态恢复后续 | 已有父代码的源 AST 与真实可丢弃 HTTP 诊断，确认原直接分支未保存原包并会换键；该诊断不是 React/浏览器验收。本轮完整类型、UI token、格式与前后端构建通过，最终独立源码/测试审阅无阻断；修正后的临时定向源函数/HTTP 诊断 12/12 通过，非工程套件新增测试或浏览器覆盖。新增 27 条与受影响旧重开 4 条通过独立严格 E2E 类型；最终全量发现 **199 条 / 26 文件**（172 + 27），不是执行通过。工程全套/实际浏览器/视觉与 CI 待完成；212—214 仅为计划截图，不能用父 PR 的通过或图片替代，见[本次记录](history/2026-10-02-direct-task-status-recovery.md) |
 
-旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；本次提取不是批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
+旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
 
 ### 已入 main 的历史证据
 

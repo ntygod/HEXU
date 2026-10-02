@@ -175,8 +175,7 @@ async function repeatReopen(page: Page, f: Fixture, surface: Surface) {
     if (!holding) return route.continue();
     captured.push({ method: route.request().method(), body: route.request().postDataJSON() });
     const work = (async () => {
-      // Both clicks reach the original command before either receives a response.
-      // The real service, not a fabricated response, decides the revision conflict.
+      // Hold the real command so repeated clicks exercise the in-flight guard.
       await gate;
       const response = await route.fetch();
       responses.push(response.status());
@@ -194,20 +193,22 @@ async function repeatReopen(page: Page, f: Fixture, surface: Surface) {
   let failed = false;
   try {
     const before = taskState(f);
-    await reopen(page).click();
+    await reopen(page).evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
     await expect.poll(() => captured.length).toBe(1);
     await expect(status(page, surface)).toHaveText('已取消');
     await reopen(page).click();
-    await expect.poll(() => captured.length).toBe(2);
+    expect(captured).toHaveLength(1);
     expect(responses).toEqual([]);
     expect(taskState(f)).toEqual(before);
     expect(captured).toEqual([
       { method: 'POST', body: { expectedRevision: before.revision, activeRunAction: 'stop' } },
-      { method: 'POST', body: { expectedRevision: before.revision, activeRunAction: 'stop' } },
     ]);
     holding = false;
     release();
-    await expect.poll(() => responses.slice().sort()).toEqual([200, 409]);
+    await expect.poll(() => responses).toEqual([200]);
     await expect(status(page, surface)).toHaveText('待处理');
     await expect(page.getByRole('button', { name: '标记完成', exact: true })).toBeEnabled();
     await expect(page.getByRole('dialog', { name: '标记任务完成', exact: true })).toHaveCount(0);
@@ -308,10 +309,7 @@ for (const surface of ['task', 'result'] as const) {
         if (request.method() === 'POST') writes.push(new URL(request.url()).pathname);
       });
       await repeatReopen(page, f, surface);
-      expect(writes).toEqual([
-        `/api/v1/tasks/${f.task.id}/reopen`,
-        `/api/v1/tasks/${f.task.id}/reopen`,
-      ]);
+      expect(writes).toEqual([`/api/v1/tasks/${f.task.id}/reopen`]);
       expect(taskState(f)).toMatchObject({
         id: before.id,
         status: 'todo',

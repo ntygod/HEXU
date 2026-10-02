@@ -4,7 +4,7 @@
 
 ## 1. 状态口径
 
-2026-10-02：按本候选的 102 行实际状态核对，仍为 **2 项已完成、78 项部分实现、22 项未实现**。基线为 main `a3ae2e8`；本轮仅整合 Task 编辑、创建预算与状态确认的可靠性修正，候选尚未完成自身验证，未合并或部署。旧堆叠分支的 2/80/20 不适用于本候选，交付位置与验证分别见 [21](21-implementation-status.md)。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
+2026-10-02：按当前候选的 102 行实际状态核对，仍为 **2 项已完成、78 项部分实现、22 项未实现**。main 保持 `a3ae2e8`；Task 可靠性 [PR56](https://github.com/ntygod/HEXU/pull/56) 已完成自身 CI 与原图验收，保持草稿、未合并。当前独立后续只补直接 start/reopen/无活动 complete 的原请求恢复，新改动验证待完成；未合并或部署。旧堆叠分支的 2/80/20 不适用于当前候选，交付位置与验证分别见 [21](21-implementation-status.md)。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
 
 当前能力与最近验证看 [21](21-implementation-status.md)，下一项只看 [22](22-next-delivery.md)，详细批次证据与旧状态叙述看 [实现历史](history/2026-09-28-implementation.md)。本页不重复 CI 日志。M0—M4 是产品目标阶段，E0—E2c2 是历史代码批次，不能互相替代。
 
@@ -34,8 +34,8 @@
 | HX-DEV-03-04 | 项目、仓库引用与成员配置 | BE/FE | 部分实现 | 真实项目创建/读取、成员和角色配置已有；新增管理者名称/说明编辑、修订冲突、历史分页与 W1 设置抽屉，保存/通知/幂等原子提交；归档/恢复与运行选择已接入；仓库引用与完整目标配置尚缺。 | [设置事务](../../packages/db/src/project-settings.ts) / [界面](../../apps/web/src/project-settings.tsx) / [回归](../../tests/project-settings.test.ts) |
 | HX-DEV-03-05 | 个人/团队渐进入门 | FE | 部分实现 | 账号建立、团队创建/加入、节点配对与本人单独执行授权已有；完整渐进入门偏好和安装分发仍缺。 | [身份](../../apps/web/src/identity.tsx) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-06 | 成员撤销、归档与权限事件 | BE | 部分实现 | 成员、项目和会话撤销已有；节点及待配对码随所有者项目撤权永久失效，重新加回成员不复活旧凭证。新增管理者修订式归档/恢复、未许可取消、双类等待安排原子暂停、活动运行 keep/stop 和恢复不重放；同机权限/事件已覆盖，正式跨电脑生命周期联动未实现。 | [归档事务](../../packages/db/src/project-lifecycle.ts) / [回归](../../tests/project-archive.test.ts) / [节点](../../packages/db/src/node-execution.ts) |
-| HX-DEV-04-01 | Task 基础、归属和修订 | BE | 部分实现 | 主线已有 Task 修订、真实权限、真人改派/历史和独立参与关系；本人加入退出、编辑者管理、撤权结束和历史回执不复活已接入。参与不授予权限或改动运行材料。本候选纳入 PR40 的工作说明固定基线、冲突对照/明确载入、当前编辑权与同包同键回执确认，以及 PR41 普通创建独立 96 KiB JSON 预算，另补创建旧回执事务内当前空间/项目编辑权复核，既有字符上限不变；候选自身验证尚未完成。未纳入 Task 内容历史/版本对照，私有转共享及正式存储完整模型仍缺。 | [任务](../../packages/db/src/store.ts) / [编辑说明](../engineering/task-edit-baseline.md) / [整合记录](history/2026-10-02-task-reliability-integration.md) |
-| HX-DEV-04-02 | 完成、重开、取消与活动执行联动 | BE/FE | 部分实现 | 主线已有完成/重开/取消及活动执行后端联动。本候选纳入 PR48 已取消 Task 的详情/成果重开入口、PR49 当前权限与固定修订确认、PR50 详情取消及全部活动执行 stop/keep、PR55 未知结果原包原键确认及成功 ACK 后仅 GET 刷新，另补状态旧回执在事务开始后的当前编辑权复核；候选自身验证尚未完成。停止请求不是终止事实；未纳入完成记录列表等其他堆叠功能，完整动作 UI 与远程执行联动仍待收口。 | [任务](../../packages/db/src/store.ts) / [确认说明](../engineering/task-completion-confirmation.md) / [整合记录](history/2026-10-02-task-reliability-integration.md) |
+| HX-DEV-04-01 | Task 基础、归属和修订 | BE | 部分实现 | 主线已有 Task 修订、真实权限、真人改派/历史和独立参与关系；本人加入退出、编辑者管理、撤权结束和历史回执不复活已接入。参与不授予权限或改动运行材料。本候选纳入 PR40 的工作说明固定基线、冲突对照/明确载入、当前编辑权与同包同键回执确认，以及 PR41 普通创建独立 96 KiB JSON 预算，另补创建旧回执事务内当前空间/项目编辑权复核，既有字符上限不变；这些 PR56 范围已完成自身验收，仍未合并。未纳入 Task 内容历史/版本对照，私有转共享及正式存储完整模型仍缺。 | [任务](../../packages/db/src/store.ts) / [编辑说明](../engineering/task-edit-baseline.md) / [整合记录](history/2026-10-02-task-reliability-integration.md) |
+| HX-DEV-04-02 | 完成、重开、取消与活动执行联动 | BE/FE | 部分实现 | 主线已有完成/重开/取消及活动执行后端联动。本候选纳入 PR48 已取消 Task 的详情/成果重开入口、PR49 当前权限与固定修订确认、PR50 详情取消及全部活动执行 stop/keep、PR55 完成/取消确认的未知结果原包原键恢复及成功 ACK 后仅 GET 刷新，另补状态旧回执在事务开始后的当前编辑权复核；这些 PR56 范围已验收、未合并。当前后续将直接 start/reopen/无活动 complete 接入同一恢复路径，首次点击仍立即 POST；start 只标记 Task 进行中，不启动 Run，新范围验证待完成。停止请求不是终止事实；未纳入完成记录列表等其他堆叠功能，完整动作 UI 与远程执行联动仍待收口。 | [任务](../../packages/db/src/store.ts) / [确认说明](../engineering/task-completion-confirmation.md) / [直接状态恢复](history/2026-10-02-direct-task-status-recovery.md) |
 | HX-DEV-04-03 | 列表、看板、排序、筛选与等待原因 | FE/BE | 部分实现 | W1 项目看板/列表/API 共用负责人、参与者、标题/编号/说明交集；URL 保存条件/视图并支持刷新返回。真实 Task 状态和轻量新建保留；持久排序、完整状态/标签/attention 筛选仍未交付。 | [项目](../../apps/web/src/projects.tsx) / [人员筛选](../../apps/web/src/project-task-filters.tsx) |
 | HX-DEV-04-04 | 可选需求说明、修订与局部采用 | FE/BE | 未实现 | 可编辑 Task 说明不等于独立需求模型；Requirement 修订和局部采用未实现。 | —（尚无可用实现） |
 | HX-DEV-04-05 | 子任务、依赖、标签与里程碑 | BE/FE | 未实现 | 子任务、依赖、可维护标签和里程碑未实现。 | —（尚无可用实现） |
