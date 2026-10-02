@@ -346,6 +346,20 @@ jobs:
           name: hexu-incoming-handoffs-failures
           path: test-results/incoming-handoffs-*/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-status-request-previews
+          path: |
+            artifacts/199-task-status-unknown-dark.png
+            artifacts/200-task-status-refresh-mobile-light.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && (failure() || cancelled()) }}
+        with:
+          name: hexu-task-status-request-failures
+          path: test-results/task-status-request-recovery-*/
+          retention-days: 7
   check:
     needs: [engineering, browser]
     if: always()
