@@ -73,6 +73,8 @@ Participation is excluded from model materials: do not update Task revision/time
 
 现有完成确认必须跟随当前Workbench的父Task可见性与编辑权，失效时清除旧标题/确认，重新授权不自动恢复。原Task修订固定，发送前发现变化需明确重新确认；已发送操作的自身SSE与最终回执分开，旧success/catch/finally不得影响新UI会话。关闭不等于撤回服务器操作，Run停止请求不当作终止事实。见[当前确认边界](../engineering/task-completion-confirmation.md)。
 
+共享完成/取消确认首次发送固定Task、动作、正文与幂等键；未知回应只显式确认原包，当前修订变化不把原回执重设为新请求。待确认包属于当前Provider内存，关闭后同Task其他状态入口先恢复它；包括已关闭包也须随当前访问/编辑权丢失或身份空间改变清除。已验证成功ACK后的Workbench失败只重读，不能重发业务写入。未发送确认保留原修订/新活动检查，不扩大到新的后端回执模型或跨硬刷新队列。见[原协议回归](../../tests/task-status-replay.test.ts)与[未知结果流程](../../tests/e2e/task-status-request-recovery.spec.ts)。
+
 Task详情取消入口只调用原cancel，保留内容/成果及明确重开，不把取消列变为可写。取消总有一次确认；有活动执行时明确stop/keep，读取当前Workbench同Task全部isActiveRun记录而非主编程子集。无活动时固定keep，观察到新活动要重新确认，不能暗改成stop。共用确认会话在完成/取消之间也隔离晚回应及其Workbench读取，不新建API、原因字段或回执模型。见[取消流程](../../tests/e2e/task-cancellation.spec.ts)。
 
 完成记录只读原completion_events，当前父Task权限先于参数/同Task游标查询，SQL有界且按任务修订/事件ID稳定排列。读取时当前可见成员名不当历史名字；未知成员/动作和没有旧记录需诚实显示，不根据Task状态补造历史。查询索引迁移不改变事件模型、Task或Run。查看完成记录不表示执行已停止或代码已发布。

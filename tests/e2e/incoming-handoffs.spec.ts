@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Frame, type Page, type Route } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { teamFixture, PASSWORD, type Account } from '../helpers/team.js';
@@ -25,6 +25,11 @@ const pageIds = (page: Page) =>
   rows(page).evaluateAll((elements) =>
     elements.map((item) => item.getAttribute('data-handoff-id')),
   );
+// Normal navigation/read completion may cross a legitimate visibility reload.
+// Check size, order and identity in one collection read under the normal expect
+// budget, rather than splitting a count assertion from an instantaneous snapshot.
+const expectPageIds = (page: Page, expected: string[]) =>
+  expect.poll(() => pageIds(page)).toEqual(expected);
 
 interface SyntheticInvitation {
   id: string;
@@ -418,8 +423,10 @@ test('当前空间只展示本人仍可访问的有效邀请，有限分页和�
     const before = f.snapshot(),
       calls = audit(page);
     await open(page, f);
-    await expect(rows(page)).toHaveCount(20);
-    expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
+    await expectPageIds(
+      page,
+      first.items.map((item) => item.id),
+    );
     await expect(list(page)).not.toContainText(
       /OTHER_RECIPIENT_ONLY|WITHDRAWN_ONLY|EXPIRED_ONLY|PRIVATE_INVITATION_ONLY/,
     );
@@ -428,8 +435,10 @@ test('当前空间只展示本人仍可访问的有效邀请，有限分页和�
     await page.getByRole('button', { name: '我的工作', exact: true }).click();
     await list(page).getByRole('link', { name: '较早邀请', exact: true }).press('Enter');
     await expect(page).toHaveURL(home(first.nextCursor!));
-    await expect(rows(page)).toHaveCount(3);
-    expect(await pageIds(page)).toEqual(second.items.map((item) => item.id));
+    await expectPageIds(
+      page,
+      second.items.map((item) => item.id),
+    );
     await expect(list(page).getByRole('link', { name: '较早邀请', exact: true })).toHaveCount(0);
     await page.reload();
     await expect(rows(page)).toHaveCount(3);
@@ -608,12 +617,20 @@ test('明确处理才读取精确旧邀请卡，重复处理入口和刷新都�
     await open(page, f, path);
     await expect(summary(page)).toContainText(target.summary);
     calls.readOnly();
-    await drawer(page)
-      .getByRole('button', { name: '查看并处理邀请', exact: true })
-      .evaluate((button: HTMLButtonElement) => {
-        button.click();
-        button.click();
-      });
+    // Keep both reentrant clicks in one turn, but do not silently lose them
+    // while a legitimate summary reload has temporarily disabled the control.
+    await expect
+      .poll(() =>
+        drawer(page)
+          .getByRole('button', { name: '查看并处理邀请', exact: true })
+          .evaluate((button: HTMLButtonElement) => {
+            if (button.disabled) return false;
+            button.click();
+            button.click();
+            return true;
+          }),
+      )
+      .toBe(true);
     const handlingDrawer = page.getByRole('dialog', { name: '任务接手邀请', exact: true });
     await expect(handlingDrawer.getByRole('article', { name: '接手邀请记录' })).toHaveCount(1);
     await expect(handlingDrawer.getByRole('article', { name: '接手邀请记录' })).toContainText(
@@ -624,11 +641,27 @@ test('明确处理才读取精确旧邀请卡，重复处理入口和刷新都�
     expect(calls.legacy.every((item) => origin + item === legacyEndpoint)).toBe(true);
     expect(calls.writes).toEqual([]);
     await expect(page).toHaveURL(origin + path);
-    calls.legacy.length = 0;
-    await page.reload();
+    // The explicitly opened old Card may finish a read while reload is still
+    // navigating. Audit the new summary from the main document commit, before
+    // its application requests; retain the original full-flow audit as well.
+    let reloadedCalls: ReturnType<typeof audit> | undefined;
+    const committed = (frame: Frame) => {
+      if (frame !== page.mainFrame()) return;
+      reloadedCalls = audit(page);
+      page.off('framenavigated', committed);
+    };
+    page.on('framenavigated', committed);
+    try {
+      await page.reload();
+    } finally {
+      page.off('framenavigated', committed);
+    }
+    expect(reloadedCalls).toBeDefined();
     await expect(summary(page)).toContainText(target.summary);
     await expect(drawer(page).getByRole('article', { name: '接手邀请记录' })).toHaveCount(0);
-    calls.readOnly();
+    reloadedCalls!.readOnly();
+    expect(calls.legacy.every((item) => origin + item === legacyEndpoint)).toBe(true);
+    expect(calls.writes).toEqual([]);
     expect(f.snapshot()).toEqual(before);
     await drawer(page).getByRole('button', { name: '查看并处理邀请', exact: true }).click();
     await expect(handlingDrawer.getByRole('article', { name: '接手邀请记录' })).toHaveCount(1);
@@ -690,11 +723,15 @@ for (const status of [200, 403]) {
       await expect(list(page).getByRole('alert')).toHaveCount(0);
       await expect(list(page).getByRole('status')).toContainText('正在读取待接手邀请');
       await current.drain();
-      await expect(rows(page)).toHaveCount(20);
-      expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
+      await expectPageIds(
+        page,
+        first.items.map((item) => item.id),
+      );
       await page.goForward();
-      await expect(rows(page)).toHaveCount(1);
-      expect(await pageIds(page)).toEqual(second.items.map((item) => item.id));
+      await expectPageIds(
+        page,
+        second.items.map((item) => item.id),
+      );
       calls.readOnly();
     });
   });
@@ -848,8 +885,10 @@ test('切换空间清除分页和旧摘要，旧空间所有晚到读取不能�
     await expect(page.locator('body')).not.toContainText(second.items[0]!.summary);
     await expect(drawer(page)).toHaveCount(0);
     await page.getByLabel('当前工作空间', { exact: true }).selectOption(f.bob.spaceId);
-    await expect(rows(page)).toHaveCount(20);
-    expect(await pageIds(page)).toEqual(first.items.map((item) => item.id));
+    await expectPageIds(
+      page,
+      first.items.map((item) => item.id),
+    );
     await expect(page).toHaveURL(home());
     calls.readOnly();
   });
@@ -908,6 +947,7 @@ test('列表初次故障不冒充空列表，当前页短暂故障保留摘要�
           })
         : route.continue(),
     );
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f);
     await expect(list(page).getByRole('alert')).toContainText('邀请列表暂时读取失败');
     await expect(rows(page)).toHaveCount(0);
@@ -1057,14 +1097,24 @@ test('已加载第二页的游标锚点失效后清除旧摘要，返回第一�
       second = await f.incoming(first.nextCursor!);
     const anchor = f.invitations.find((item) => item.id === first.items.at(-1)!.id)!;
     const calls = audit(page);
+    let workbenchReads = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'GET' && request.url() === `${origin}/api/v1/workbench`)
+        workbenchReads++;
+    });
+    await subscribeAfterSetupEvents(page, f);
     await open(page, f, `/?keep=1&incomingCursor=${encodeURIComponent(first.nextCursor!)}`);
     await expect(rows(page)).toHaveCount(1);
     await expect(row(page, second.items[0]!.id)).toContainText(second.items[0]!.summary);
+    // The loaded second page follows the one initial successful Workbench read.
+    // Another Workbench request would invalidate this same-version precondition.
+    expect(workbenchReads).toBe(1);
     // No event/new visibility key: the next poll of this loaded page itself
     // returns INVALID_CURSOR and must not retain the previous page as current.
     f.change(anchor, { state: 'withdrawn', revision: 2 });
     await expect(list(page).getByRole('alert')).toContainText('邀请列表位置已无效');
     await expect(rows(page)).toHaveCount(0);
+    expect(workbenchReads).toBe(1);
     await list(page).getByRole('link', { name: '返回第一页', exact: true }).click();
     await expect(page).toHaveURL(`${origin}/?keep=1`);
     await expect(rows(page)).toHaveCount(20);
