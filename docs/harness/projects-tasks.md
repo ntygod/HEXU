@@ -43,6 +43,16 @@ Participation is excluded from model materials: do not update Task revision/time
 
 Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeReplay` 回调只提供该最小依赖，不因此导入其他成果功能或迁移。普通创建 POST 与 PATCH 独立使用 96 KiB JSON 预算，以容纳原字符上限和 JSON 转义；不得提升全局/无关路由预算或扩充可写字段。创建事务开始后、返回旧回执前也须先核对 team 当前空间权限，再检查非空项目的编辑权；私有创建/回放也须受空间撤权约束。以独立 SQLite 连接的项目/空间权限变化分别覆盖这项时序。当前用法见[工作说明编辑](../engineering/task-edit-baseline.md)。
 
+## 普通 Task 创建的原请求恢复
+
+普通创建首次 POST 前固定标题、说明、项目、空间、路径和幂等键；重试不是新建另一项 Task。当前身份/空间的未结创建包由既有 Provider 内存拥有，所有 NewTask 入口先恢复它；关闭或导航不撤回可能已提交的操作，不能以改表单/项目、重开入口或重复点击换键绕过。未发送草稿在新建表单本地、关闭即丢弃；已提交原包留在 Provider 中，二者均不跨硬刷新。
+
+未知结果只显式确认完全相同的原正文/键，不能把当前 Workbench/SSE 投影当作该请求成功回执。核对有效创建 ACK 的身份/空间/项目、内容和初始 Task 状态后先记住已接受结果；核对内容使用现有契约规范化，重试正文保持原样。后续 GET 失败只能刷新读取，不重发 POST。旧 POST、拒绝、finally 与所属刷新按 UI 会话隔离，不清空后来草稿、不关闭新界面、不抢回导航。
+
+当前项目创建权限失效、身份或空间变更清除原包与不再可见的内容，重新授权不复活；短暂读取故障不等于撤权。自己的明确访问拒绝清除仍属原请求的包；其他明确 4xx 恢复可编辑原输入，网络/5xx/无效 ACK 保留未知原包。普通创建后端的现有当前空间/项目权限与幂等事务保持，不新增可写字段、schema、协议或 Run。当前切片与验收状态见[创建恢复](../engineering/task-creation-request-recovery.md)及[21](../development/21-implementation-status.md)。
+
+创建请求可通过 client 的 `shouldNotifyAccessLoss` 守卫全局身份/空间撤权事件，默认其他请求及 ApiError 不变。不能仅靠弹窗或原包仍存在判断当前身份拒绝：同 Provider 的真实拒绝在关闭/清包后仍须正常广播；旧 Provider、身份、空间或请求空间失配的迟到拒绝不能清空新身份。创建所属 GET 还须服从后来的成功读取快照，拒绝通知与 UI 会话/原包归属分别检查。
+
 ## Task 完成、取消、重开与未知结果
 
 状态命令在事务开始后、读取 complete/cancel/reopen 旧回执前重新核对当前 Task 编辑权；使用真实第二 SQLite 连接覆盖事务开始前权限变化，不把 UI 权限检查代替该回归。本轮只明确普通创建、PATCH 与状态命令的授权时序，不据此声称全系统回执均已覆盖。
@@ -55,7 +65,7 @@ Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeR
 
 ## 如何验证与回写
 
-普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程，直接路径见[直接状态恢复](../../tests/e2e/direct-task-status-recovery.spec.ts)；直接 start/reopen/无活动 complete 的请求未到服务、提交后回包丢失与已接受后 GET 故障分别验证；关闭/导航/重复点击、后来标题/修订、当前撤权和迟到回应用真实请求边界区分。源函数/HTTP 诊断只证明该诊断的请求与事务行为，不能替代 React/浏览器流程。
+普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程，直接路径见[直接状态恢复](../../tests/e2e/direct-task-status-recovery.spec.ts)；直接 start/reopen/无活动 complete 的请求未到服务、提交后回包丢失与已接受后 GET 故障分别验证；关闭/导航/重复点击、后来标题/修订、当前撤权和迟到回应用真实请求边界区分。普通创建浏览器入口见[创建恢复](../../tests/e2e/task-creation-request-recovery.spec.ts)，另区分未达服务、已提交回包丢失和有效 ACK 后 GET 故障；核对原键/原正文、唯一 Task/回执/编号/outbox 效果、所有新建入口恢复、权限清理及迟到回应。源函数/HTTP 诊断只证明该诊断的请求与事务行为，不能替代 React/浏览器流程。
 
 对应复用 [项目设置](../../tests/project-settings.test.ts)、[归档](../../tests/project-archive.test.ts)、[改派](../../tests/task-assignment.test.ts)、[参与](../../tests/task-participants.test.ts) 及 [团队 UI](../../tests/e2e/team.spec.ts)。涉及事务时核对旧回执、修订冲突和回滚；改展示不必重新验证全部执行协议。
 

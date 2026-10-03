@@ -65,6 +65,8 @@ jobs:
             artifacts/212-*.png
             artifacts/213-*.png
             artifacts/214-*.png
+            artifacts/215-*.png
+            artifacts/216-*.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -137,6 +139,16 @@ jobs:
             test-results/direct-task-status-recovery-*/trace.zip
             test-results/direct-task-status-recovery-*/test-failed-*.png
             test-results/direct-task-status-recovery-*/error-context.md
+          retention-days: 7
+      - name: Upload task-creation-request-recovery failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-creation-request-recovery-failures
+          path: |
+            test-results/task-creation-request-recovery-*/trace.zip
+            test-results/task-creation-request-recovery-*/test-failed-*.png
+            test-results/task-creation-request-recovery-*/error-context.md
           retention-days: 7
   check:
     needs: [engineering, browser]

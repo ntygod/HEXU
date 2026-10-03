@@ -1,27 +1,26 @@
 # 22｜下一步交付
 
-更新：2026-10-02。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
+更新：2026-10-03。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-2026-10-03接手补记：用户已明确授权排除PR57的`database is locked`阻碍。本轮仅修复`assertCodeQuiescent`两条只读连接的短事务竞争，新增4项并发回归；原失败用例及相关Linux12/12已通过，完整验收查看[PR57精确HEAD检查](https://github.com/ntygod/HEXU/pull/57/checks)。不扩展其他文件操作独审、#52或产品功能，不改冻结PR56。诊断与证据见[锁竞争记录](history/2026-10-03-pr57-quiescence-lock.md)；下文较早的整体暂停约束在此限定故障内由本次用户授权覆盖。
+## 下一项：完成普通 Task 创建恢复的真实浏览器、CI 与原图验收
 
-## 下一项：补齐直接 Task 状态的原请求恢复并完成独立验收
+从冻结 [PR57](https://github.com/ntygod/HEXU/pull/57) 的 head `0947dd5b238aab88947caebfe9d979005040c0e3`、tree `49c2d825b78b208c0c794c132e21c3302707bf04` 开始独立小切片，仅覆盖 HX-DEV-04-01/03 的普通创建恢复。父 PR 已完成 CI185 工程/浏览器/汇总终态 success 与精确 head 8 张原图验收，详细证据见 [21](21-implementation-status.md) 与[直接状态记录](history/2026-10-02-direct-task-status-recovery.md)。先前工程锁竞争失败和用户授权修复保留在[原修复记录](history/2026-10-03-pr57-quiescence-lock.md)，不重做、不扩大该审阅。
 
-从冻结 [PR56](https://github.com/ntygod/HEXU/pull/56) 的树 `96b7cb8936149edc3acb84cfd55a5a47598e463d` 开始一个独立后续，仅覆盖 HX-DEV-04-02 的直接 start/reopen/无活动 complete。父 PR 的远端 head 为 `a06998ab9035bb3164a271d77ec884204febfaad`，本地 `cb650c5` 与其同树；父 PR 已完成 CI183 工程 618/618、Chromium 172/172、汇总及 13 张原图验收，保持草稿未合并。证据归属见 [21](21-implementation-status.md) 与[父记录](history/2026-10-02-task-reliability-integration.md)，不表示本次新改动已经通过。
-
-main 保持 `a3ae2e8`；父 PR56 与旧 25 个草稿 PR（#29—#51、#54、#55）继续冻结、未合并。[问题52](https://github.com/ntygod/HEXU/issues/52) 及原生/文件/私有材料/registry 审阅保持暂停。本轮不扩为包级安全审计，不修改冻结 PR 或重做旧分支。
+main 保持 `a3ae2e8`；PR56 `a06998ab9035bb3164a271d77ec884204febfaad`、PR57 与旧 25 个草稿 PR（#29—#51、#54、#55）继续冻结、未合并。[问题52](https://github.com/ntygod/HEXU/issues/52) 及原生/文件/私有材料/registry 审阅保持暂停。本轮不修改这些冻结分支，也不合并或部署。
 
 ## 本轮范围与收口
 
-1. 直接 start/reopen/无活动 complete 首次点击仍立即发送现有 POST，不增加发送前确认。start 只把 Task 标记为 in_progress，不启动 Run；原请求正文和停止处理语义保持。
-2. 复用已有 Provider 的原包、outcome、当前权限和 ACK 后 GET-only 路径。首次发送前保存固定 Task、动作、正文、修订和幂等键；未知结果只明确确认同包同键，不因后来修订或无关标题更新而替换请求。
-3. 有效 ACK 必须匹配原 Task/目标状态/原修订加一；之后 Workbench 失败只能 GET 刷新。关闭/导航或同 Task 其他状态入口先恢复原包；当前撤权、身份/空间变化清除包，硬刷新不持久化。迟到回应与所属 UI/读取隔离。
-4. 区分原问题与证据：真实可丢弃 HTTP 诊断已确认旧直接路径没有 pending packet、下一次点击换键；提交后丢失回包或 ACK 后 GET 失败并未证明重复业务写入，原键可回放相同回执且不追加效果。这是原路径缺口，不是 PR56 移植回归，也不是浏览器验收。
-5. 按最终代码运行适用工程与真实浏览器检查，覆盖三直接动作的请求未达服务、提交后回包丢失、ACK 后 GET 失败，以及关闭/导航、权限/身份和迟到回应；实际查看 212—214 原图。本轮类型/UI token/格式/构建、12/12 临时源函数/HTTP 诊断、受影响 E2E 严格类型和 199 条全量发现已通过，独立审阅无阻断；工程全套/实际浏览器/CI 与像素验收待完成；诊断不计作新增工程测试。按实际结果更新 19/21/本页及[本轮历史](history/2026-10-02-direct-task-status-recovery.md)，再发布可评审的独立草稿。无新后端、schema、回执 API、其他堆叠功能；不合并或部署。
+1. 普通创建首次提交仍调用现有 POST，在发送前固定原标题、说明、项目、空间与幂等键；创建只新增 Task，不启动 Run。没有后端、schema、字段、回执协议或独立需求模型扩展。
+2. 在现有 Provider 内保留原创建包与结果状态。未知结果只明确确认同键同正文；关闭、导航及任何 NewTask 入口先恢复未结请求，不能靠换项目或重开新建表单生成另一把键。当前项目权限、身份或空间变化清除旧包；草稿与待确认请求不跨硬刷新。
+3. 有效成功 ACK 后 Workbench 失败，只能 GET 刷新；当前投影或 SSE 不能替代原创建 ACK。重复点击、旧请求和迟到读取不得关闭/清空后来界面、抢回导航或干扰新身份/空间的状态。已增加创建请求专用的可选拒绝通知守卫，隔离旧 Provider 的全局身份事件；同 Provider 的真实身份/空间拒绝在关闭或清包后仍正常广播。其他请求的默认行为和 ApiError 保持。
+4. 真实 HTTP 基线已完成 4 场景：原 NewTask 提交函数经 TypeScript AST 提取，使用实际 client、回环 HTTP 与磁盘 Store。提交后回包丢失和 ACK 后 GET 故障的后续重提均换键并实际创建第二个 Task；原键/正文回放只返首个 Task 且所有持久表快照不变。请求未达服务没有首笔效果；改动标题/说明/项目后重提是另建，原键改正文返回 409。该诊断不包括 React/浏览器事件，不能替代本轮验收。
+5. 新实现、完整格式/类型/UI token/前后端构建、既有创建预算 8/8、独立静态复核与最终源码定向诊断已经完成。新增 28 条 E2E 的严格类型/格式和全量 227 条/27 文件发现通过，但没有执行浏览器；定向诊断的 5 个恢复、18 个拒绝事件控制和 3 个读取排序不计为新增工程测试，也不是 React/真实撤权验收。当前收口是远端完整工程/Chromium CI 与精确 head 原图，保留任何实际失败并按结果回填。
+6. 计划原图为 `215-task-creation-unknown-dark.png`（未知结果、桌面深色）与 `216-task-creation-refresh-mobile-light.png`（有效 ACK 后读取失败、390px 浅色）；生成与实际查看仍待完成。本地没有运行 Chromium，也不复跑受限测试。验收结果归属 [21](21-implementation-status.md) 和[本轮历史](history/2026-10-03-task-creation-request-recovery.md)，原工作项状态保持，不把父 CI、发现测试或静态复核当作本轮实际浏览器通过。
 
 ## 开始时读取
 
 - [04 任务工作包](04-tasks-requirements.md)、[产品 UI/UX](../product/04-ux-and-design.md)、[项目任务](../harness/projects-tasks.md)、[UI](../harness/ui.md)、[身份](../harness/identity.md)与[开发流程](../harness/development.md)。
-- [编辑说明](../engineering/task-edit-baseline.md)、[状态确认](../engineering/task-completion-confirmation.md)、[普通 Task 事务](../../packages/db/src/store.ts)、[控制路由](../../apps/control/src/app.ts)、[共享状态](../../apps/web/src/state.tsx)和本轮普通 HTTP/UI 流程。
+- [普通创建恢复](../engineering/task-creation-request-recovery.md)、[编辑说明](../engineering/task-edit-baseline.md)、[普通新建表单](../../apps/web/src/forms.tsx)、[共享状态](../../apps/web/src/state.tsx)、[创建恢复 hook](../../apps/web/src/task-creation.ts)、[client 拒绝通知](../../packages/client/src/index.ts)和本轮普通 HTTP/UI 流程；后端只核对普通创建契约与现有权限，不扩展字段或协议。
 - 不从先前默认的选择性整合计划恢复原生/文件/私有材料工作；不把已冻结 stack 的本地文件路径写成本候选已有能力。
 
 ## 剩余交付队列

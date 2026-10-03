@@ -49,7 +49,14 @@ export class ApiError extends Error {
 }
 export async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; key?: string; signal?: AbortSignal } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    key?: string;
+    signal?: AbortSignal;
+    /** Guard only global identity events for an owned request; failures still throw. */
+    shouldNotifyAccessLoss?: () => boolean;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { 'X-Hexu-Client': 'web' };
   if (activeSpace) headers['X-Hexu-Space'] = activeSpace;
@@ -65,7 +72,10 @@ export async function request<T>(
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    if (!path.startsWith('/identity')) {
+    // Ordinary requests keep their existing global invalidation behavior. An
+    // obsolete creation request must not tear down a replacement identity/space
+    // before its caller can apply the request's own ownership checks.
+    if (!path.startsWith('/identity') && options.shouldNotifyAccessLoss?.() !== false) {
       if (response.status === 401) window.dispatchEvent(new Event('hexu-auth-required'));
       if (data?.error?.code === 'SPACE_ACCESS_REVOKED')
         window.dispatchEvent(new Event('hexu-space-revoked'));
