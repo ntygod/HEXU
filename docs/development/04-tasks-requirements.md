@@ -66,8 +66,14 @@
 
 04-03/06 的项目列表/看板/API 共用负责人、当前参与者、标题/编号/说明交集筛选，项目 URL 保存条件与视图；同一 Task 读取 DTO 提供参与者投影，旧数据不补造参与历史。完整状态/标签/attention 筛选、持久排序和完整规划模型仍待实现，不将工作项提前标为完成。见 [参与者与筛选](../engineering/task-participants.md)。
 
-## 9. 04-02 状态恢复候选
+## 9. 已验收、未合并的 04-02 状态恢复候选
 
-已验收、未合并的 PR56 为完成/取消确认保留原 Task、动作、正文、修订与幂等键；未知结果只明确确认原包，有效 ACK 后读取失败只 GET。当前独立后续补齐直接 start/reopen/无活动 complete：首次点击仍立即 POST，仅在未知结果或已接受后读取失败时显示恢复；同 Task 状态入口不能绕过待确认原包。start 只把 Task 标记为进行中，不启动 Run；直接请求仍沿用原停止处理正文。
+已验收、未合并的 PR56 为完成/取消确认保留原 Task、动作、正文、修订与幂等键；未知结果只明确确认原包，有效 ACK 后读取失败只 GET。已验收、冻结未合并的 PR57 补齐直接 start/reopen/无活动 complete：首次点击仍立即 POST，仅在未知结果或已接受后读取失败时显示恢复；同 Task 状态入口不能绕过待确认原包。start 只把 Task 标记为进行中，不启动 Run；直接请求仍沿用原停止处理正文。
 
-后续复用 Provider 内存、当前权限清理、ACK 核对与迟到回应隔离，不增加 schema、回执 API、CompletionEvent 列表或新同意步骤。原包不因后来标题/修订变化换键，也不跨硬刷新；撤权与身份/空间切换清除。原 04-02 仍为部分实现，本次验证与限制见 [21](21-implementation-status.md)、[状态恢复用法](../engineering/task-completion-confirmation.md)和[独立记录](history/2026-10-02-direct-task-status-recovery.md)。
+这两轮复用 Provider 内存、当前权限清理、ACK 核对与迟到回应隔离，不增加 schema、回执 API、CompletionEvent 列表或新同意步骤。原包不因后来标题/修订变化换键，也不跨硬刷新；撤权与身份/空间切换清除。原 04-02 仍为部分实现，本次验证与限制见 [21](21-implementation-status.md)、[状态恢复用法](../engineering/task-completion-confirmation.md)和[独立记录](history/2026-10-02-direct-task-status-recovery.md)。
+
+## 10. 当前 04-01/03 普通创建恢复切片
+
+本轮从冻结 PR57 独立补普通 Task 创建的原请求恢复。原新建表单在每次重提时生成新幂等键；真实 HTTP 基线已经确认，提交后回包丢失和有效 ACK 后 Workbench 读取失败都可在下一次提交创建第二个 Task。原键/原正文的回放只返回首次 Task，不增加持久效果，因此修正重点是 UI 保留原请求与已接受状态。
+
+首次发送固定标题、说明、项目、空间和幂等键；未知结果只明确确认原包，不能改表单或从别的新建入口绕过待确认请求。关闭/导航保留同身份与空间内的未结包，当前权限变化清除；有效 ACK 后读取失败只 GET。临时草稿与原包不跨硬刷新，不新增后端、字段、schema 或回执协议，创建仍不启动 Run。创建原包与迟到回应隔离已实现，静态复核无剩余阻断；真实浏览器、完整 CI 与原图验收待完成，原 04-01/03 保持部分实现；当前证据见 [21](21-implementation-status.md) 与[创建恢复记录](history/2026-10-03-task-creation-request-recovery.md)。

@@ -20,6 +20,7 @@
 | --- | --- |
 | 项目名称/说明与角色 | [项目设置入口](team-local.md#项目基本设置与修订) |
 | 归档/恢复及运行影响 | [项目归档](project-archive.md) |
+| 普通 Task 创建的未知结果确认与已接受后刷新 | [创建恢复](task-creation-request-recovery.md) |
 | Task 工作说明固定基线、冲突与原请求确认 | [工作说明编辑](task-edit-baseline.md) |
 | Task 完成/取消、已取消重开与未知结果确认 | [状态确认](task-completion-confirmation.md) |
 | 改派与参与者/筛选 | [负责人](task-assignment.md)、[参与](task-participants.md) |

@@ -12,6 +12,7 @@ import type { Task, TaskStatus, Workbench } from '../../../packages/contracts/sr
 import { ApiError, request, getActiveSpace } from '../../../packages/client/src/index.js';
 import { isActiveRun } from '../../../packages/domain/src/index.js';
 import { Button, Dialog, Icon } from '../../../packages/ui/src/index.js';
+import { useTaskCreation, type TaskCreation } from './task-creation.js';
 export function canEditTask(data: Workbench, task: Task) {
   return (
     data.mode === 'local-preview' ||
@@ -115,6 +116,7 @@ interface AppState {
   connected: boolean;
   readDraft(taskId: string, purpose: string): string | undefined;
   saveDraft(taskId: string, purpose: string, text: string): void;
+  taskCreation: TaskCreation;
 }
 const Context = createContext<AppState | null>(null);
 type TaskAction = 'complete' | 'cancel' | 'start' | 'reopen';
@@ -215,13 +217,42 @@ export function Provider({ children }: { children: ReactNode }) {
     setConfirming(session);
   }, []);
   const notice = useCallback((text: string, error = false) => setToast({ text, error }), []);
-  const readWorkbench = useCallback(
-    async (isCurrent?: () => boolean) => {
+  const taskCreation = useTaskCreation({
+    currentData: () => currentData.current,
+    readWorkbench: (isCurrent, ownsIdentity) => readWorkbench(isCurrent, true, ownsIdentity),
+    notice,
+    onCreated: (taskId) => {
+      go(`/tasks/${encodeURIComponent(taskId)}`);
+      notice('任务已创建并保存；尚未启动执行');
+    },
+  });
+  const { clear: clearTaskCreation, reconcile: reconcileTaskCreation } = taskCreation;
+  const readWorkbench: (
+    isCurrent?: () => boolean,
+    preferNewerSnapshot?: boolean,
+    ownsIdentity?: () => boolean,
+  ) => Promise<void> = useCallback(
+    async (
+      isCurrent?: () => boolean,
+      preferNewerSnapshot = false,
+      ownsIdentity?: () => boolean,
+    ) => {
       const generation = providerGeneration.current;
       const readId = ++workbenchReadId.current;
       let next: Workbench;
       try {
-        next = await request<Workbench>('/workbench');
+        next = await request<Workbench>('/workbench', {
+          // Only creation-owned reads opt in. Identity loss is still global
+          // after dialog dismissal, unless the Provider or a newer successful
+          // visibility read has superseded this request. UI cleanup below also
+          // requires the original presentation to remain current.
+          shouldNotifyAccessLoss: preferNewerSnapshot
+            ? () =>
+                generation === providerGeneration.current &&
+                !!ownsIdentity?.() &&
+                readId > successfulWorkbenchReadId.current
+            : undefined,
+        });
       } catch (error) {
         if (
           generation === providerGeneration.current &&
@@ -230,6 +261,7 @@ export function Provider({ children }: { children: ReactNode }) {
           isAccessDenial(error)
         ) {
           pendingActions.clear();
+          clearTaskCreation();
           const session = confirmation.current;
           if (session) {
             setConfirmation(null);
@@ -241,6 +273,9 @@ export function Provider({ children }: { children: ReactNode }) {
       // A confirmation-owned read may outlive its session just like its POST.
       // Ordinary refreshes still apply the current visibility snapshot as before.
       if (generation !== providerGeneration.current || (isCurrent && !isCurrent())) return;
+      // Creation-owned reads can finish against a newer successful snapshot,
+      // but cannot replace it with an older permission snapshot.
+      if (preferNewerSnapshot && readId < successfulWorkbenchReadId.current) return;
       if (
         !['local-preview', 'team-local'].includes(next.mode) ||
         !Array.isArray(next.tasks) ||
@@ -251,6 +286,7 @@ export function Provider({ children }: { children: ReactNode }) {
       // This guards denial cleanup without changing ordinary successful refreshes.
       successfulWorkbenchReadId.current = Math.max(successfulWorkbenchReadId.current, readId);
       currentData.current = next;
+      reconcileTaskCreation(next);
       // Dismissed requests belong to this Provider too. Revocation must discard
       // them even when there is no dialog to close; a later grant cannot revive them.
       for (const taskId of pendingActions.keys()) {
@@ -279,7 +315,7 @@ export function Provider({ children }: { children: ReactNode }) {
       setVersion((value) => value + 1);
       setFatal('');
     },
-    [drafts, notice, pendingActions, setConfirmation],
+    [drafts, notice, pendingActions, setConfirmation, clearTaskCreation, reconcileTaskCreation],
   );
   const refresh = useCallback(() => readWorkbench(), [readWorkbench]);
   useEffect(
@@ -618,7 +654,17 @@ export function Provider({ children }: { children: ReactNode }) {
   const confirmationInvalid = !!revisionChanged || !!executionChanged;
   return (
     <Context.Provider
-      value={{ data, version, refresh, notice, changeStatus, connected, readDraft, saveDraft }}
+      value={{
+        data,
+        version,
+        refresh,
+        notice,
+        changeStatus,
+        connected,
+        readDraft,
+        saveDraft,
+        taskCreation,
+      }}
     >
       {children}
       {toast && (
