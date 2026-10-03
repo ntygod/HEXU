@@ -447,12 +447,50 @@ async function noStoredPacket(page: Page, original: Packet) {
   expect(stored).not.toContain(original.key);
   expect(stored).not.toContain(JSON.parse(original.body!).title);
 }
+async function readableFrozenFields(page: Page) {
+  const luminance = (color: string) => {
+    const match = color.match(/^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)$/);
+    expect(match, `Expected an opaque computed sRGB color: ${color}`).not.toBeNull();
+    expect(Number(match![4] ?? 1), `Color must be opaque: ${color}`).toBe(1);
+    const [r, g, b] = match!.slice(1, 4).map((channel) => {
+      const value = Number(channel) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  for (const field of [
+    recovery(page).getByLabel('要做什么', { exact: true }),
+    recovery(page).getByRole('combobox', { name: '放在哪里', exact: true }),
+    recovery(page).getByLabel('补充说明'),
+  ]) {
+    await expect(field).toBeDisabled();
+    const paint = await field.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const fill = style.getPropertyValue('-webkit-text-fill-color');
+      return {
+        foreground: fill && fill !== 'currentcolor' ? fill : style.color,
+        background: style.backgroundColor,
+        opacity: Number(style.opacity),
+      };
+    });
+    expect(paint.opacity).toBe(1);
+    const foreground = luminance(paint.foreground),
+      background = luminance(paint.background);
+    const ratio =
+      (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    expect(
+      ratio,
+      `Frozen text contrast: ${paint.foreground} on ${paint.background}`,
+    ).toBeGreaterThanOrEqual(4.5);
+  }
+}
 async function screenshot(page: Page, name: string, known = false) {
   await prepareScreenshot(page, known ? refresh(page) : recover(page), recovery(page));
   await expect(recovery(page).getByRole('heading')).toBeVisible();
   await expect(known ? accepted(page) : pending(page)).toBeVisible();
   await expect(known ? accepted(page) : pending(page)).toBeInViewport({ ratio: 1 });
   await expect(dismiss(page)).toBeInViewport({ ratio: 1 });
+  await readableFrozenFields(page);
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: `artifacts/${name}` });
 }

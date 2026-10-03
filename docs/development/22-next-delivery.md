@@ -2,11 +2,13 @@
 
 更新：2026-10-03。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：完成普通 Task 创建恢复的真实浏览器、CI 与原图验收
+## 下一项：完成普通 Task 创建恢复冻结值可读性的最终验收
 
 从冻结 [PR57](https://github.com/ntygod/HEXU/pull/57) 的 head `0947dd5b238aab88947caebfe9d979005040c0e3`、tree `49c2d825b78b208c0c794c132e21c3302707bf04` 开始独立小切片，仅覆盖 HX-DEV-04-01/03 的普通创建恢复。父 PR 已完成 CI185 工程/浏览器/汇总终态 success 与精确 head 8 张原图验收，详细证据见 [21](21-implementation-status.md) 与[直接状态记录](history/2026-10-02-direct-task-status-recovery.md)。先前工程锁竞争失败和用户授权修复保留在[原修复记录](history/2026-10-03-pr57-quiescence-lock.md)，不重做、不扩大该审阅。
 
 main 保持 `a3ae2e8`；PR56 `a06998ab9035bb3164a271d77ec884204febfaad`、PR57 与旧 25 个草稿 PR（#29—#51、#54、#55）继续冻结、未合并。[问题52](https://github.com/ntygod/HEXU/issues/52) 及原生/文件/私有材料/registry 审阅保持暂停。本轮不修改这些冻结分支，也不合并或部署。
+
+CI187 `11eaddbd` 已通过 622/622 工程、227/227 Chromium 和汇总，并实际查看 215/216 及 212/213。原功能与测试定位已得到远端验证；当前只补实际图中偏淡的冻结原文，用创建表单自己的作用域样式提高可读性，保持 disabled。新样式的精确 head 仍须完整 CI 与 215/216 重新看图，不以旧绿灯替代。
 
 ## 本轮范围与收口
 

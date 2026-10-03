@@ -5,6 +5,7 @@ import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon, ToolMark } from '../../../packages/ui/src/index.js';
 import { useApp, go, useTaskDraft } from './state.js';
 import { canCreateTask } from './task-creation.js';
+import './task-creation.css';
 export function NewTask({ onClose, projectId }: { onClose: () => void; projectId?: string }) {
   const { data, taskCreation, notice } = useApp();
   const { view, open, close, detach, submit } = taskCreation;
@@ -55,6 +56,7 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
   return (
     <Dialog title={pending ? '确认任务创建' : '开始一项工作'} onClose={() => close(id)}>
       <form
+        className="task-creation-form"
         onSubmit={(event) => {
           event.preventDefault();
           void submit(id, { title, description, projectId: project || null }, !!pending);
