@@ -25,11 +25,14 @@ const inside = (a: string, b: string) => {
   return !r || (!isAbsolute(r) && r !== '..' && !r.startsWith('..' + sep));
 };
 export function assertCodeQuiescent(home: string, root: string, rootIdentity: string) {
+  // These read-only connections can meet another process's short write transaction.
+  // Match WorkspaceLease's bounded wait; an unreadable database must still throw.
   const journal = join(home, 'journal.sqlite');
   if (existsSync(journal)) {
     restorePrivatePath(journal, false);
     const db = new DatabaseSync(journal, { readOnly: true });
     try {
+      db.exec('PRAGMA busy_timeout=5000');
       if (
         db.prepare("SELECT 1 FROM sqlite_master WHERE name='execution_commands'").get() &&
         db.prepare("SELECT 1 FROM execution_commands WHERE phase!='terminal'").get()
@@ -48,6 +51,7 @@ export function assertCodeQuiescent(home: string, root: string, rootIdentity: st
     restorePrivatePath(registry, false);
     const db = new DatabaseSync(registry, { readOnly: true });
     try {
+      db.exec('PRAGMA busy_timeout=5000');
       const claims = db.prepare('SELECT root,identity FROM claims').all() as {
         root: string;
         identity: string;

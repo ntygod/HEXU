@@ -49,13 +49,13 @@ Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeR
 
 完成/取消确认跟随当前父 Task 可见性与编辑权，失效时清除旧标题/选择/原包。尚未发送时固定修订，变化须重新确认；已发送包不因自身 SSE 或后来修订而重设。取消从同 Task 全部 `isActiveRun` 判断 stop/keep，不能只看主编程执行；无活动时固定 keep，发送前新活动需重新确认。停止请求不是终止证据，不清未知锁。
 
-首次发送固定 Task、动作、正文和幂等键。未知结果只显式确认原包，关闭后同 Task 的其他状态入口先恢复它；当前撤权、身份/空间变更清除已关闭的包，不跨硬刷新。有效成功 ACK 后 Workbench 失败只能 GET 刷新，不重发业务写入。旧 POST、拒绝、finally 及所属刷新均按确认会话隔离；不更改原全局身份失效语义，也不声称读取回执会跳过整个控制路由。
+直接 start/reopen/无活动 complete 首次点击仍立即 POST，不增加新的事前同意步骤；start 只改变 Task 为 in_progress，不能启动 Run。它们与已有完成/取消确认复用 Provider 原包和 outcome。首次发送前固定 Task、动作、正文、修订和幂等键，保持直接路径原 activeRunAction: stop 正文；只有未知结果或有效 ACK 后 GET 失败才显示直接恢复界面。未知结果只显式确认原包，关闭后同 Task 的其他状态入口先恢复它；当前撤权、身份/空间变更清除已关闭的包，不跨硬刷新。有效成功 ACK 后 Workbench 失败只能 GET 刷新，不重发业务写入。直接发送期间 pathname/search 路由变化分离旧 UI/所属读取，保留原包；仅 hash 锚点不当作离开页面。原包的进行中标记阻止同 Task 重复请求；另一 Task 会话打开后，旧有效 ACK 只可更新仍属自己的原包，不能触发新会话的刷新/UI。旧 POST、拒绝、finally 及所属刷新均按确认会话隔离；不更改原全局身份失效语义，也不声称读取回执会跳过整个控制路由。
 
 详情取消保留讨论/成果，已取消 Task 的详情/固定成果使用原重开动作，不能把成果版本、Task 状态和 Run 终止混成一项事实。完成无需报告；不新增完成历史 API、取消原因、数据库模型或后端回执协议。用法见[状态确认](../engineering/task-completion-confirmation.md)。
 
 ## 如何验证与回写
 
-普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程；未知 POST、已接受后 GET 故障、关闭/导航/重复点击、当前撤权和迟到回应用真实请求边界区分。
+普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程，直接路径见[直接状态恢复](../../tests/e2e/direct-task-status-recovery.spec.ts)；直接 start/reopen/无活动 complete 的请求未到服务、提交后回包丢失与已接受后 GET 故障分别验证；关闭/导航/重复点击、后来标题/修订、当前撤权和迟到回应用真实请求边界区分。源函数/HTTP 诊断只证明该诊断的请求与事务行为，不能替代 React/浏览器流程。
 
 对应复用 [项目设置](../../tests/project-settings.test.ts)、[归档](../../tests/project-archive.test.ts)、[改派](../../tests/task-assignment.test.ts)、[参与](../../tests/task-participants.test.ts) 及 [团队 UI](../../tests/e2e/team.spec.ts)。涉及事务时核对旧回执、修订冲突和回滚；改展示不必重新验证全部执行协议。
 

@@ -117,23 +117,39 @@ interface AppState {
   saveDraft(taskId: string, purpose: string, text: string): void;
 }
 const Context = createContext<AppState | null>(null);
+type TaskAction = 'complete' | 'cancel' | 'start' | 'reopen';
+const taskActionLabels: Record<TaskAction, string> = {
+  complete: '完成',
+  cancel: '取消',
+  start: '标记进行中',
+  reopen: '重新打开',
+};
+const taskActionStatuses: Record<TaskAction, TaskStatus> = {
+  complete: 'done',
+  cancel: 'cancelled',
+  start: 'in_progress',
+  reopen: 'todo',
+};
 interface TaskConfirmationPacket {
   readonly task: Readonly<Task>;
-  readonly action: 'complete' | 'cancel';
+  readonly action: TaskAction;
   readonly path: string;
   readonly body: Readonly<{ expectedRevision: number; activeRunAction: 'stop' | 'keep' }>;
   readonly key: string;
   readonly hadActiveRuns: boolean;
+  readonly direct: boolean;
 }
 interface PendingTaskAction {
   readonly packet: TaskConfirmationPacket;
   outcome: 'unknown' | 'accepted';
   error: string;
+  operationId?: string;
 }
 interface TaskConfirmationSession {
   id: number;
   task: Task;
-  action: 'complete' | 'cancel';
+  action: TaskAction;
+  direct?: boolean;
   hadActiveRuns: boolean;
   executionChanged: boolean;
   stopAlso: boolean;
@@ -146,7 +162,9 @@ interface TaskConfirmationSession {
 function unavailableConfirmation(action: TaskConfirmationSession['action']) {
   return action === 'cancel'
     ? '任务当前不可编辑，已关闭本次取消确认'
-    : '任务当前不可编辑，已取消本次完成确认';
+    : action === 'complete'
+      ? '任务当前不可编辑，已取消本次完成确认'
+      : '任务当前不可编辑，已关闭本次状态请求';
 }
 function isAccessDenial(error: unknown) {
   return error instanceof ApiError && [401, 403, 404].includes(error.status);
@@ -275,6 +293,19 @@ export function Provider({ children }: { children: ReactNode }) {
     [drafts, pendingActions],
   );
   useEffect(() => {
+    let route = location.pathname + location.search;
+    const detachDirectAction = () => {
+      const next = location.pathname + location.search;
+      if (next === route) return;
+      route = next;
+      // A direct first send has no dialog to dismiss before navigating. Retain
+      // its packet, but detach the old page's presentation and owned reads.
+      if (confirmation.current?.direct) setConfirmation(null);
+    };
+    window.addEventListener('popstate', detachDirectAction);
+    return () => window.removeEventListener('popstate', detachDirectAction);
+  }, [setConfirmation]);
+  useEffect(() => {
     refresh().catch((error) => setFatal(error.message));
     let timer: ReturnType<typeof setTimeout> | undefined;
     const events = new EventSource(
@@ -304,26 +335,6 @@ export function Provider({ children }: { children: ReactNode }) {
     const timer = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(timer);
   }, [toast]);
-  const perform = async (
-    task: Task,
-    status: TaskStatus,
-    activeRunAction: 'stop' | 'keep' = 'stop',
-  ) => {
-    const action =
-      status === 'done'
-        ? 'complete'
-        : status === 'cancelled'
-          ? 'cancel'
-          : status === 'in_progress'
-            ? 'start'
-            : 'reopen';
-    await request(`/tasks/${task.id}/${action}`, {
-      method: 'POST',
-      body: { expectedRevision: task.revision, activeRunAction },
-    });
-    await refresh();
-    notice(status === 'done' ? '已标记完成，随时可以重新打开' : '任务状态已更新');
-  };
   const changeStatus = async (task: Task, status: TaskStatus) => {
     const current = currentData.current;
     const selected = current?.tasks.find((item) => item.id === task.id);
@@ -337,12 +348,13 @@ export function Provider({ children }: { children: ReactNode }) {
     // the original command before it can start another command for this Task.
     const pending = pendingActions.get(task.id);
     if (pending) {
-      if (confirmation.current?.pending === pending) return;
+      if (pending.operationId || confirmation.current?.pending === pending) return;
       const packet = pending.packet;
       setConfirmation({
         id: ++confirmationId.current,
         task: packet.task,
         action: packet.action,
+        direct: packet.direct,
         hadActiveRuns: packet.hadActiveRuns,
         executionChanged: false,
         stopAlso: packet.body.activeRunAction === 'stop',
@@ -375,12 +387,21 @@ export function Provider({ children }: { children: ReactNode }) {
       });
       return;
     }
-    try {
-      await perform(task, status);
-    } catch (error) {
-      notice((error as Error).message, true);
-      await refresh().catch(() => {});
-    }
+    // Direct actions still send on the first click. Their session is hidden until
+    // recovery is needed, but owns the same immutable packet as confirmed actions.
+    const session: TaskConfirmationSession = {
+      id: ++confirmationId.current,
+      task: structuredClone(task),
+      action: status === 'done' ? 'complete' : status === 'in_progress' ? 'start' : 'reopen',
+      direct: true,
+      hadActiveRuns: current.runs.some((run) => run.taskId === task.id && isActiveRun(run.state)),
+      executionChanged: false,
+      stopAlso: true,
+      busy: false,
+      revisionChanged: selected.revision !== task.revision,
+    };
+    setConfirmation(session);
+    await confirmTaskAction(session.id);
   };
   const confirmTaskAction = async (id: number) => {
     const session = confirmation.current;
@@ -398,6 +419,11 @@ export function Provider({ children }: { children: ReactNode }) {
       !session.pending &&
       (session.revisionChanged || task.revision !== session.task.revision || executionChanged)
     ) {
+      if (session.direct) {
+        setConfirmation(null);
+        notice('任务已更新，请重新查看任务后再更改状态', true);
+        return;
+      }
       setConfirmation({
         ...session,
         revisionChanged: session.revisionChanged || task.revision !== session.task.revision,
@@ -417,13 +443,22 @@ export function Provider({ children }: { children: ReactNode }) {
         }),
         key: crypto.randomUUID(),
         hadActiveRuns: session.hadActiveRuns,
+        direct: !!session.direct,
       });
     const operationId = crypto.randomUUID();
+    const generation = providerGeneration.current;
     const isCurrent = () =>
-      confirmation.current?.id === id && confirmation.current.operationId === operationId;
+      generation === providerGeneration.current &&
+      confirmation.current?.id === id &&
+      confirmation.current.operationId === operationId;
+    const ownsPacket = () =>
+      generation === providerGeneration.current &&
+      pendingActions.get(packet.task.id)?.packet === packet &&
+      pendingActions.get(packet.task.id)?.operationId === operationId;
     const putPending = (pending: PendingTaskAction) => {
-      pendingActions.set(packet.task.id, pending);
-      setConfirmation({ ...confirmation.current!, pending });
+      const next = { ...pending, operationId };
+      pendingActions.set(packet.task.id, next);
+      if (isCurrent()) setConfirmation({ ...confirmation.current!, pending: next });
     };
     setConfirmation({ ...session, operationId, busy: true, recovering: !!session.pending });
     // Store the immutable packet before the very first POST. Dialog ownership is
@@ -437,10 +472,10 @@ export function Provider({ children }: { children: ReactNode }) {
             body: packet.body,
             key: packet.key,
           });
-          if (!isCurrent()) return;
+          if (!ownsPacket()) return;
           if (
             receipt?.id !== packet.task.id ||
-            receipt.status !== (packet.action === 'cancel' ? 'cancelled' : 'done') ||
+            receipt.status !== taskActionStatuses[packet.action] ||
             receipt.revision !== packet.body.expectedRevision + 1
           )
             throw new ApiError(
@@ -452,29 +487,40 @@ export function Provider({ children }: { children: ReactNode }) {
           // SSE projection or the success/failure of the subsequent Workbench GET.
           putPending({ packet, outcome: 'accepted', error: '' });
         } catch (error) {
-          if (!isCurrent()) return;
+          if (!ownsPacket()) return;
           if (isAccessDenial(error)) {
             pendingActions.delete(packet.task.id);
-            setConfirmation(null);
-            notice(unavailableConfirmation(session.action), true);
+            if (isCurrent()) {
+              setConfirmation(null);
+              notice(unavailableConfirmation(session.action), true);
+            }
             return;
           }
           const message = error instanceof Error ? error.message : '暂时无法确认原请求结果';
           if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
             pendingActions.delete(packet.task.id);
-            setConfirmation({
-              ...confirmation.current!,
-              pending: undefined,
-              revisionChanged: session.revisionChanged || error.status === 409,
-            });
+            if (isCurrent())
+              setConfirmation({
+                ...confirmation.current!,
+                pending: undefined,
+                revisionChanged: session.revisionChanged || error.status === 409,
+              });
           } else {
             putPending({ packet, outcome: 'unknown', error: message });
           }
-          await readWorkbench(isCurrent).catch(() => {});
-          if (isCurrent()) notice(message, true);
+          if (isCurrent()) {
+            await readWorkbench(isCurrent).catch(() => {});
+            if (isCurrent()) {
+              notice(message, true);
+              if (session.direct && !pendingActions.has(packet.task.id)) setConfirmation(null);
+            }
+          }
           return;
         }
       }
+      // A different Task's session may be open now. Keep the known ACK in its
+      // provider-owned packet, without applying an old session's refresh or UI.
+      if (!isCurrent()) return;
       try {
         await readWorkbench(isCurrent);
         if (!isCurrent()) return;
@@ -482,10 +528,12 @@ export function Provider({ children }: { children: ReactNode }) {
         setConfirmation(null);
         notice(
           session.pending
-            ? `原${packet.action === 'cancel' ? '取消' : '完成'}请求已确认于任务修订 ${packet.body.expectedRevision + 1}；当前任务可能已有后续变化`
+            ? `原${taskActionLabels[packet.action]}请求已确认于任务修订 ${packet.body.expectedRevision + 1}；当前任务可能已有后续变化`
             : packet.action === 'cancel'
               ? '已取消任务，讨论和成果已保留，随时可以重新打开'
-              : '已标记完成，随时可以重新打开',
+              : packet.action === 'complete'
+                ? '已标记完成，随时可以重新打开'
+                : '任务状态已更新',
         );
       } catch (error) {
         if (!isCurrent()) return;
@@ -497,6 +545,11 @@ export function Provider({ children }: { children: ReactNode }) {
         notice('原请求已确认成功，暂时无法刷新任务状态。请重试刷新。', true);
       }
     } finally {
+      if (ownsPacket()) {
+        const pending = { ...pendingActions.get(packet.task.id)!, operationId: undefined };
+        pendingActions.set(packet.task.id, pending);
+        if (isCurrent()) setConfirmation({ ...confirmation.current!, pending });
+      }
       if (isCurrent()) {
         const session = confirmation.current!;
         const task = currentData.current?.tasks.find((item) => item.id === session.task.id);
@@ -557,6 +610,11 @@ export function Provider({ children }: { children: ReactNode }) {
   const cancellation = confirming?.action === 'cancel';
   const pending = confirming?.pending;
   const showRecovery = !!pending && (!confirming.busy || confirming.recovering);
+  const showConfirmation =
+    confirming &&
+    (!confirming.direct || showRecovery) &&
+    confirmationTask &&
+    canEditTask(data, confirmationTask);
   const confirmationInvalid = !!revisionChanged || !!executionChanged;
   return (
     <Context.Provider
@@ -575,13 +633,28 @@ export function Provider({ children }: { children: ReactNode }) {
           </button>
         </div>
       )}
-      {confirming && confirmationTask && canEditTask(data, confirmationTask) && (
+      {confirming && showConfirmation && (
         <Dialog
-          title={cancellation ? '取消任务' : '标记任务完成'}
+          title={
+            cancellation
+              ? '取消任务'
+              : confirming.action === 'start'
+                ? '标记任务进行中'
+                : confirming.action === 'reopen'
+                  ? '重新打开任务'
+                  : '标记任务完成'
+          }
           onClose={() => closeConfirmation(confirming.id)}
         >
           <div className="dialog-body">
-            {cancellation ? (
+            {confirming.direct ? (
+              <p>
+                「{confirming.task.title}」的原{taskActionLabels[confirming.action]}请求已提交。
+                {confirming.action === 'complete'
+                  ? '任务完成与执行停止是两件事。'
+                  : '本次只更改任务状态，不会启动或停止执行。'}
+              </p>
+            ) : cancellation ? (
               <>
                 <p>
                   {pending
@@ -619,17 +692,23 @@ export function Provider({ children }: { children: ReactNode }) {
                     ? `原请求已确认成功，回执为任务修订 ${pending.packet.body.expectedRevision + 1}；当前任务可能已有后续变化。`
                     : confirming.busy
                       ? '原请求已提交，正在等待可核对的回执。'
-                      : '尚未确认原请求是否成功，停止选择已锁定。'}
+                      : confirming.direct
+                        ? '尚未确认原请求是否成功，原请求内容已锁定。'
+                        : '尚未确认原请求是否成功，停止选择已锁定。'}
                 </p>
                 <p>
-                  {pending.packet.body.activeRunAction === 'stop'
-                    ? '原选择：同时请求停止执行；请求停止不等于已终止。'
-                    : '原选择：只更改任务状态，不请求停止执行。'}
+                  {confirming.direct
+                    ? confirming.action === 'complete'
+                      ? '原处理方式：标记任务完成，并请求停止处理时的活动执行；请求停止不等于已终止。'
+                      : `原操作：${confirming.action === 'start' ? '将任务标记为进行中' : '将任务重新打开为待处理'}。`
+                    : pending.packet.body.activeRunAction === 'stop'
+                      ? '原选择：同时请求停止执行；请求停止不等于已终止。'
+                      : '原选择：只更改任务状态，不请求停止执行。'}
                 </p>
                 <p>
                   {pending.outcome === 'accepted'
                     ? '刷新只读取当前任务状态，不会再次提交状态请求。'
-                    : `本次保留原任务、原修订 ${pending.packet.body.expectedRevision} 和停止选择；确认结果会重试同一请求。`}
+                    : `本次保留原任务、原修订 ${pending.packet.body.expectedRevision} 和${confirming.direct ? '原处理方式' : '停止选择'}；确认结果会重试同一请求。`}
                   关闭不会撤回已提交的操作。
                 </p>
                 {pending.error && <p role="alert">{pending.error}</p>}
@@ -645,7 +724,7 @@ export function Provider({ children }: { children: ReactNode }) {
             {executionChanged && (
               <p role="alert">活动执行已变化，本次取消确认已失效。请返回后重新确认。</p>
             )}
-            {(!cancellation || confirming.hadActiveRuns) && (
+            {!confirming.direct && (!cancellation || confirming.hadActiveRuns) && (
               <>
                 <label className="check-line">
                   <input
