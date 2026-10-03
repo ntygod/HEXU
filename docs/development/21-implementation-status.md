@@ -1,6 +1,6 @@
 # 21｜当前实现进度
 
-更新：2026-10-02。main 保持 `a3ae2e8`。[PR56](https://github.com/ntygod/HEXU/pull/56) 的独立 Task 可靠性提取已完成自身 CI 和原图验收，保持草稿、未合并。当前后续基于其冻结代码树，只补直接 start/reopen/无活动 complete 的原请求恢复；新范围自身验证待完成，不能沿用父 PR 的通过结论。原工作项见 [19](19-work-items.md)，唯一下一项见 [22](22-next-delivery.md)，父范围见[整合记录](history/2026-10-02-task-reliability-integration.md)，本次见[直接状态恢复记录](history/2026-10-02-direct-task-status-recovery.md)。
+更新：2026-10-03。main保持`a3ae2e8`，[PR56](https://github.com/ntygod/HEXU/pull/56)的已验收基线`a06998ab`保持冻结。[PR57](https://github.com/ntygod/HEXU/pull/57)补直接start/reopen/无活动complete的原请求恢复；原head`ce4a202`已通过199/199浏览器，工程617/618在只读占用检查遇到SQLite锁竞争。本轮按用户明确要求补上该读取的有界忙等待，原失败用例及相关Linux12/12定向验证通过，最终完整CI以PR57精确HEAD检查为准。原失败、定位与修复见[锁竞争记录](history/2026-10-03-pr57-quiescence-lock.md)。原工作项见[19](19-work-items.md)，唯一下一项见[22](22-next-delivery.md)，父范围见[整合记录](history/2026-10-02-task-reliability-integration.md)，直接状态行为见[本次记录](history/2026-10-02-direct-task-status-recovery.md)。
 
 ## main 基线能力
 

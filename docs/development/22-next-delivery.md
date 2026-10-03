@@ -2,6 +2,8 @@
 
 更新：2026-10-02。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
+2026-10-03接手补记：用户已明确授权排除PR57的`database is locked`阻碍。本轮仅修复`assertCodeQuiescent`两条只读连接的短事务竞争，新增4项并发回归；原失败用例及相关Linux12/12已通过，完整验收查看[PR57精确HEAD检查](https://github.com/ntygod/HEXU/pull/57/checks)。不扩展其他文件操作独审、#52或产品功能，不改冻结PR56。诊断与证据见[锁竞争记录](history/2026-10-03-pr57-quiescence-lock.md)；下文较早的整体暂停约束在此限定故障内由本次用户授权覆盖。
+
 ## 下一项：补齐直接 Task 状态的原请求恢复并完成独立验收
 
 从冻结 [PR56](https://github.com/ntygod/HEXU/pull/56) 的树 `96b7cb8936149edc3acb84cfd55a5a47598e463d` 开始一个独立后续，仅覆盖 HX-DEV-04-02 的直接 start/reopen/无活动 complete。父 PR 的远端 head 为 `a06998ab9035bb3164a271d77ec884204febfaad`，本地 `cb650c5` 与其同树；父 PR 已完成 CI183 工程 618/618、Chromium 172/172、汇总及 13 张原图验收，保持草稿未合并。证据归属见 [21](21-implementation-status.md) 与[父记录](history/2026-10-02-task-reliability-integration.md)，不表示本次新改动已经通过。
