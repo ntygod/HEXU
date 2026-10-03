@@ -146,9 +146,9 @@ jobs:
         with:
           name: hexu-task-creation-request-recovery-failures
           path: |
-            test-results/task-creation-request-recovery-*/trace.zip
-            test-results/task-creation-request-recovery-*/test-failed-*.png
-            test-results/task-creation-request-recovery-*/error-context.md
+            test-results/task-creation-request-reco*/trace.zip
+            test-results/task-creation-request-reco*/test-failed-*.png
+            test-results/task-creation-request-reco*/error-context.md
           retention-days: 7
   check:
     needs: [engineering, browser]

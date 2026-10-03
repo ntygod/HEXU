@@ -230,20 +230,22 @@ async function fill(page: Page, body: Payload) {
   await expect(fresh(page)).toBeVisible();
   await fresh(page).getByLabel('要做什么', { exact: true }).fill(body.title);
   await fresh(page)
-    .getByLabel('放在哪里', { exact: true })
+    .getByRole('combobox', { name: '放在哪里', exact: true })
     .selectOption(body.projectId ?? '');
   await fresh(page).getByLabel('补充说明').fill(body.description);
 }
 async function locked(page: Page, body: Payload) {
   for (const [name, value] of [
     ['要做什么', body.title],
-    ['放在哪里', body.projectId ?? ''],
     ['补充说明', body.description],
   ]) {
     const field = recovery(page).getByLabel(name!);
     await expect(field).toBeDisabled();
     await expect(field).toHaveValue(value!);
   }
+  const project = recovery(page).getByRole('combobox', { name: '放在哪里', exact: true });
+  await expect(project).toBeDisabled();
+  await expect(project).toHaveValue(body.projectId ?? '');
   await expect(fresh(page)).toHaveCount(0);
   await expect(recovery(page).getByRole('button', { name: '创建任务', exact: true })).toHaveCount(
     0,
@@ -258,16 +260,14 @@ async function twice(button: ReturnType<Page['getByRole']>) {
 async function makeUnknown(page: Page, f: Fixture, body: Payload, from: Entry = 'workbench') {
   const abort = (route: Route) => route.abort('failed');
   await page.route(endpoint(f), abort);
-  try {
-    await entry(page, f, from);
-    await fill(page, body);
-    await twice(submit(page));
-    await expect(pending(page)).toBeVisible();
-    await expect(recover(page)).toBeEnabled();
-    await locked(page, body);
-  } finally {
-    await page.unroute(endpoint(f), abort);
-  }
+  await entry(page, f, from);
+  await fill(page, body);
+  await twice(submit(page));
+  await expect(pending(page)).toBeVisible();
+  await expect(recover(page)).toBeEnabled();
+  await locked(page, body);
+  // On failure, run() owns route cleanup and preserves the primary test error.
+  await page.unroute(endpoint(f), abort);
 }
 async function role(f: Fixture, value: 'edit' | 'view' | null) {
   const response = await f.api.call(`projects/${f.project.id}/members/${f.bob.user.id}`, f.alice, {
@@ -979,10 +979,12 @@ for (const loss of ['view', null] as const) {
       await expect(fresh(page).getByLabel('要做什么', { exact: true })).toHaveValue('');
       await expect(fresh(page).getByLabel('补充说明')).toHaveValue('');
       await expect(submit(page)).toBeDisabled();
-      await expect(fresh(page).getByLabel('放在哪里', { exact: true })).toHaveValue('');
+      await expect(
+        fresh(page).getByRole('combobox', { name: '放在哪里', exact: true }),
+      ).toHaveValue('');
       await expect(
         fresh(page)
-          .getByLabel('放在哪里', { exact: true })
+          .getByRole('combobox', { name: '放在哪里', exact: true })
           .locator(`option[value="${f.project.id}"]`),
       ).toHaveCount(0);
       expect(outgoing).toHaveLength(0);
@@ -1118,7 +1120,9 @@ test('同一在途创建经其他入口重开后收到当前403只留通用拒�
       '任务创建权限已失效，请重新查看后再创建',
     );
     await expect(recovery(page).getByLabel('要做什么', { exact: true })).toHaveCount(0);
-    await expect(recovery(page).getByLabel('放在哪里', { exact: true })).toHaveCount(0);
+    await expect(
+      recovery(page).getByRole('combobox', { name: '放在哪里', exact: true }),
+    ).toHaveCount(0);
     await expect(recovery(page).getByLabel('补充说明')).toHaveCount(0);
     await expect(recovery(page)).not.toContainText(body.title.trim());
     await expect(recovery(page)).not.toContainText(body.description.trim());

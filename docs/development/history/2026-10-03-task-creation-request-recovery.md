@@ -64,10 +64,20 @@ main `a3ae2e8`、PR56 `a06998ab9035bb3164a271d77ec884204febfaad`、PR57 与旧�
 
 ### 浏览器与远端验收待完成
 
-新增 [task-creation-request-recovery.spec.ts](../../../tests/e2e/task-creation-request-recovery.spec.ts) **28 条**用例，独立严格 TypeScript、Prettier、Playwright 发现与 diff 检查通过；最终全量发现 **227 条 / 27 文件**（父 199 + 新增 28）。覆盖私有/项目创建、规范化与单次效果、未知结果/有效 ACK 后只读刷新、跨入口/迟到回应/新编辑器、项目降权撤权与未发送草稿清理、身份/空间/硬刷新、400 与 5xx/无效 ACK，以及真实延迟/当前会话 401、空间 403 的身份失效。这里描述的是测试源码覆盖，尚未实际执行。
+新增 [task-creation-request-recovery.spec.ts](../../../tests/e2e/task-creation-request-recovery.spec.ts) **28 条**用例，独立严格 TypeScript、Prettier、Playwright 发现与 diff 检查通过；最终全量发现 **227 条 / 27 文件**（父 199 + 新增 28）。覆盖私有/项目创建、规范化与单次效果、未知结果/有效 ACK 后只读刷新、跨入口/迟到回应/新编辑器、项目降权撤权与未发送草稿清理、身份/空间/硬刷新、400 与 5xx/无效 ACK，以及真实延迟/当前会话 401、空间 403 的身份失效。这里描述的是首次提交时的测试源码覆盖；首次远端执行及修正见下文。
 
 本地未运行 Chromium，也未复跑受限测试。远端完整工程与真实浏览器 CI 仍待完成；本轮未增加 Node 工程用例，工程数量预期仍为父树的 622 项，实际数量与结果须以本轮 CI 为准。不能把父 CI 或上述 5+18+3 诊断替代这些待验收项。
 
 计划截图为 **`215-task-creation-unknown-dark.png`**（未知结果、桌面深色）与 **`216-task-creation-refresh-mobile-light.png`**（有效 ACK 后刷新失败、390px 浅色）；尚未生成或实际查看。收到本轮精确 head 的 artifact 后须实际查看原图，不用文件存在或父图代替像素验收。
 
 原 102 行仍为 **2 完成 / 78 部分实现 / 22 未实现**。本轮只是原 04-01/03 的可靠性切片，不新增完成项；状态事实与下一项分别由 [21](../21-implementation-status.md) 和 [22](../22-next-delivery.md) 维护。
+
+## CI186：修正新测试的项目选择器
+
+首个远端 head `d202f72a07b9f31589b8ff550df61d3827270af7` 的 [CI186 / 37105111461](https://github.com/ntygod/HEXU/actions/runs/37105111461) 工程 **622/622** 通过（0 失败/取消/跳过，127.9 秒）。浏览器日志记录新创建用例连续 **18 项超时**，开始第 173/227 条后整作业被取消；没有得到全套终态通过，不能作为本轮验收。
+
+已读取专用失败包中的实际 trace、错误快照和 390px 原始失败图。页面的新建弹窗及启用的项目下拉框均存在，测试停在 `getByLabel('放在哪里', { exact: true }).selectOption(...)`，尚未发送创建 POST。该包裹 label 内含 select 的 option 文本，安装版本的 Playwright 标签定位会递归取这些文本，无法与短标签精确匹配；无障碍树的 combobox 名称则为“放在哪里”。统一改为精确 combobox 角色与名称，所有原值、禁用、权限、原包和单次业务效果断言保留。失败时原 helper 的 finally/unroute 还会用页面关闭错误覆盖主因，改由原外层清理统一处理失败，成功路径继续正常解除路由。
+
+专用包 artifact `11268245502` 为 13,637,351 字节，SHA256 `758cad5a47fe69f2d89e436544b65e7910778a1efcf4e5ab4e21697389ec7d14`，已验证摘要后读取。总包超过本环境 32 MiB 限制，未下载或绕过。Playwright 对长输出目录名缩短了 spec 前缀；旧 glob 仅匹配日志中 18 个失败目录的 9 个，改为本 spec 独有的 `task-creation-request-reco*` 前缀后匹配全部 18 个。
+
+这次仅修测试定位/失败清理及失败制品匹配，生产四文件 SHA256 与上述最终诊断完全一致。227 条测试、30 秒单例、10 秒断言、零重试与 25 分钟 job 预算不变。修正后严格 TypeScript、格式、全量发现和独立静态复核通过；新的精确 head 仍需完整 CI 与 215/216 实图验收，不纯重跑原失败树。
