@@ -2,25 +2,25 @@
 
 更新：2026-10-04。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：成果详情的当前版本固定链接
+## 下一项：项目任务说明关键词命中的片段展示
 
-基于已验收、冻结 [PR61](https://github.com/ntygod/HEXU/pull/61) head `017df91c6a497b8b9d75bd6b3243dd8d1e2516c8`、tree `6bdd38ffcf278932acac44fc79adc6d1d4d1a320` 开独立分支。父 CI193 已通过 637 工程 / 233 Chromium，219/220 原图实际查看并写回 PR 描述。当前只补 14-02 现有成果版本导航的可发现性，不从旧堆叠搬后台或文件能力。
+基于冻结 [PR62](https://github.com/ntygod/HEXU/pull/62) head `928c2719c714e951833ec0989182fe6b400d43e6`、tree `ac4d149308edf89e3dbc51b5318390e74ed2952b` 开独立分支。父 CI194 已通过 637 工程 / 234 Chromium 及 221/222、107/108 原图验收；最终 PR 正文已回读。
 
-普通 `/results/:id` 加载后只在 React 内存固定所看版本，单版本选择器无法通过重新选择当前值生成固定地址。详情增加已加载版本的普通链接，用户可打开或使用浏览器复制链接；无需新 API、自动重定向或剪贴板访问。
+原关键词会匹配说明，但列表不显示说明、看板只显示开头。当前补首个说明命中附近的有界纯文本片段，解释原有搜索结果。只读时间排序没有被既定计划单列，不能冒充需要 rank/revision/冲突处理的持久手动排序。
 
 ## 本轮范围与验收
 
-1. 链接目标只取详情实际 result.id/version.id，加载期没有未定义 ID 链接；单版本、所看历史版和切换后的新版各指向自己的固定路由。
-2. 普通 v1 HTTP 夹具验证键盘打开、刷新、前进/返回及手机点击；链接/筛选导航不写 Task/Result/反馈，完整详情前后相同。
-3. 历史版只在既有成果 UI 用例补 href 和加载期断言，不修改其版本创建、协议夹具或文件准备路径。
-4. 首轮截图 **221-result-version-link-dark.png** 与 **222-result-version-link-mobile-light.png** 先滚动并验证新入口/说明实际可见，检查 390px 可用宽度、命中与无溢出；不要求远处页脚同时在屏幕内。
-5. 完成本地类型/格式/UI token/构建与独立复核，随后独立草稿、精确 head 完整 CI 和实际图验收。未运行的阶段据实保留，证据归[本轮记录](history/2026-10-04-result-version-link.md)。
+1. 只从当前可见 Task 投影生成片段；原人员/关键词、状态/attention 谓词、集合和顺序保持，不增加 API/字段/URL 参数。
+2. 空/空白查询、无说明命中或标题/编号已经命中保持原显示；重复匹配只展示首处。长查询只高亮片段内的实际原文，省略标记不进入高亮。
+3. 纯文本 React 渲染，HTML 字符不执行；中文、Unicode 大小写扩展、代理对、组合字符和 emoji 截取不产生错误原文/高亮，极端输入也有明确长度边界。
+4. 普通 HTTP/浏览器验证列表/看板精确集合与交集、URL 刷新/历史/清除、取消只读导航，完整 TaskDetail 前后相同且无页面业务写请求。
+5. 首轮 **223-project-task-match-dark.png** 和 **224-project-task-match-mobile-light.png** 展示长说明末尾命中及高亮；截图前确保实际片段/任务链接可见、390px 宽度/命中/无溢出。最终通过独立草稿、精确 head 完整 CI 与实际原图验收，见[记录](history/2026-10-04-project-task-match-snippets.md)。
 
 ## 开始时读取
 
-- [14 成果工作包](14-results-feedback.md)、[成果](../harness/results.md)、[UI](../harness/ui.md)和[开发流程](../harness/development.md)。
-- [成果页](../../apps/web/src/results.tsx)、[版本样式](../../apps/web/src/result-versions.css)和普通固定链接用例。
-- 用户 PR59、原平台受限身份诊断以及问题52/文件/原生/私有材料/registry 审阅保持暂停；不修改 state/client/后台模型或把导航链接当公开分享。main 和既有草稿不合并、不部署。
+- [04 工作包](04-tasks-requirements.md)、[项目任务](../harness/projects-tasks.md)、[UI](../harness/ui.md)、[开发流程](../harness/development.md)。
+- [项目视图](../../apps/web/src/projects.tsx)、[TaskRow](../../apps/web/src/work-cards.tsx)与现有[关键词谓词](../../packages/domain/src/index.ts)。
+- 不改 state/client/身份/后台或持久排序，不恢复原受限诊断和问题52/文件/原生/私有材料/registry 审阅；用户 PR59 与父草稿保持冻结，无合并部署。
 
 ## 剩余交付队列
 

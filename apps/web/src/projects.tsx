@@ -12,6 +12,8 @@ import { Link, useApp, canEditTask } from './state.js';
 import { NewProject, NewTask } from './forms.js';
 import { ProjectAccess } from './team.js';
 import { ResultCard, TaskRow } from './work-cards.js';
+import { taskDescriptionMatchSnippet } from './task-match-snippet.js';
+import { TaskDescriptionMatch } from './task-match-snippet-view.js';
 import './work-pages.css';
 
 export function Projects() {
@@ -326,38 +328,47 @@ export function ProjectPage({ id }: { id: string }) {
                   </header>
                   {tasks
                     .filter((task) => task.status === status)
-                    .map((task) => (
-                      <article className="project-task-card spotlight" key={task.id}>
-                        <Link to={`/tasks/${task.id}`}>
-                          <span className="work-task-id">{task.shortId}</span>
-                          <h3>{task.title}</h3>
-                          <p>{task.description || '打开任务查看讨论与成果。'}</p>
-                          {task.attention && <span className="badge amber">{task.attention}</span>}
-                        </Link>
-                        <footer>
-                          <Avatar
-                            user={data.members.find((member) => member.id === task.ownerUserId)}
-                            size="small"
-                          />
-                          {task.status === 'cancelled' ? (
-                            <span className="muted">打开任务详情查看讨论与成果</span>
-                          ) : (
-                            <select
-                              aria-label={`${task.shortId} 状态`}
-                              value={task.status}
-                              disabled={!canEditTask(data, task)}
-                              onChange={(event) =>
-                                void changeStatus(task, event.target.value as TaskStatus)
-                              }
-                            >
-                              <option value="todo">待处理</option>
-                              <option value="in_progress">进行中</option>
-                              <option value="done">已完成</option>
-                            </select>
-                          )}
-                        </footer>
-                      </article>
-                    ))}
+                    .map((task) => {
+                      const descriptionMatch = taskDescriptionMatchSnippet(task, filters.q);
+                      return (
+                        <article className="project-task-card spotlight" key={task.id}>
+                          <Link to={`/tasks/${task.id}`}>
+                            <span className="work-task-id">{task.shortId}</span>
+                            <h3>{task.title}</h3>
+                            {descriptionMatch ? (
+                              <TaskDescriptionMatch snippet={descriptionMatch} />
+                            ) : (
+                              <p>{task.description || '打开任务查看讨论与成果。'}</p>
+                            )}
+                            {task.attention && (
+                              <span className="badge amber">{task.attention}</span>
+                            )}
+                          </Link>
+                          <footer>
+                            <Avatar
+                              user={data.members.find((member) => member.id === task.ownerUserId)}
+                              size="small"
+                            />
+                            {task.status === 'cancelled' ? (
+                              <span className="muted">打开任务详情查看讨论与成果</span>
+                            ) : (
+                              <select
+                                aria-label={`${task.shortId} 状态`}
+                                value={task.status}
+                                disabled={!canEditTask(data, task)}
+                                onChange={(event) =>
+                                  void changeStatus(task, event.target.value as TaskStatus)
+                                }
+                              >
+                                <option value="todo">待处理</option>
+                                <option value="in_progress">进行中</option>
+                                <option value="done">已完成</option>
+                              </select>
+                            )}
+                          </footer>
+                        </article>
+                      );
+                    })}
                   {!tasks.some((task) => task.status === status) && (
                     <p className="work-empty-text">暂无任务</p>
                   )}
@@ -367,7 +378,11 @@ export function ProjectPage({ id }: { id: string }) {
           ) : (
             <div className="work-task-list task-list">
               {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
+                />
               ))}
               {!tasks.length && (
                 <Empty

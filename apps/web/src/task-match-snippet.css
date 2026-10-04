@@ -1,0 +1,21 @@
+.task-match-snippet {
+  margin: var(--hx-space-2) 0 0;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.task-match-snippet mark {
+  color: var(--hx-brand-text);
+  background: var(--hx-brand-soft);
+}
+/* The helper already bounds text; another line clamp could hide the actual hit. */
+.project-task-card p.task-match-snippet {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+@media (max-width: 650px) {
+  .work-task-row.work-task-row-match .grow {
+    flex-basis: 100%;
+  }
+}

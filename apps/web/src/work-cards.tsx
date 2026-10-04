@@ -1,14 +1,25 @@
 import type { Result, Task } from '../../../packages/contracts/src/index.js';
 import { Avatar, Icon, RunBadge, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp } from './state.js';
+import type { TaskMatchSnippet } from './task-match-snippet.js';
+import { TaskDescriptionMatch } from './task-match-snippet-view.js';
 
-export function TaskRow({ task }: { task: Task }) {
+export function TaskRow({
+  task,
+  descriptionMatch,
+}: {
+  task: Task;
+  descriptionMatch?: TaskMatchSnippet | null;
+}) {
   const { data } = useApp();
   const run = data.runs
     .filter((item) => item.taskId === task.id && item.purpose !== 'assist')
     .at(-1);
   return (
-    <Link to={`/tasks/${task.id}`} className="work-task-row">
+    <Link
+      to={`/tasks/${task.id}`}
+      className={`work-task-row${descriptionMatch ? ' work-task-row-match' : ''}`}
+    >
       <span className="work-task-id">{task.shortId}</span>
       <div className="grow">
         <strong>{task.title}</strong>
@@ -17,6 +28,7 @@ export function TaskRow({ task }: { task: Task }) {
             data.projects.find((project) => project.id === task.projectId)?.name ||
             '个人工作'}
         </small>
+        {descriptionMatch && <TaskDescriptionMatch snippet={descriptionMatch} />}
       </div>
       {run && (
         <span className="work-task-run">
