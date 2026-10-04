@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Route } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
 test('工作台真实打开，并保留桌面截图', async ({ page }) => {
@@ -26,31 +26,135 @@ test('项目看板和列表使用同一份持久化状态', async ({ page }) => 
   await expect(page.locator('.task-list').getByText('增加导出文件命名规则')).toBeVisible();
 });
 test('轻量新建、评论与刷新后恢复', async ({ page }) => {
-  await page.route('**/api/v1/workbench', async (route) => {
-    const response = await route.fetch();
-    const data = await response.json();
-    await route.fulfill({
-      response,
-      json: { ...data, projects: [], tasks: [], runs: [], results: [] },
-    });
+  const workbenchUrl = /\/api\/v1\/workbench(?:\?.*)?$/;
+  const pendingReads = new Set<Promise<void>>();
+  const readErrors: unknown[] = [];
+  let captureReads = true;
+  let routeInstalled = false;
+  let heldReadCompleted = false;
+  let heldReadDrainedBeforeUnroute = false;
+  let releaseHeldRead!: () => void;
+  const heldReadGate = new Promise<void>((resolve) => {
+    releaseHeldRead = resolve;
   });
-  await page.goto('/');
-  await page.locator('.resume-work').getByRole('button', { name: '新建任务', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '开始一项工作', exact: true })).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe('/');
-  await page.unroute('**/api/v1/workbench');
-  await page.getByLabel('要做什么').fill('浏览器中创建的真实任务');
-  await page.getByRole('button', { name: '创建任务', exact: true }).click();
-  await expect(
-    page.getByRole('heading', { name: '浏览器中创建的真实任务', exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole('textbox', { name: '任务评论', exact: true })
-    .fill('这条评论应当在刷新后仍然存在。');
-  await page.getByRole('button', { name: '发送评论', exact: true }).click();
-  await expect(page.getByText('这条评论应当在刷新后仍然存在。', { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(page.getByText('这条评论应当在刷新后仍然存在。', { exact: true })).toBeVisible();
+  let markHeldReadReached!: () => void;
+  let rejectHeldReadReached!: (error: unknown) => void;
+  const heldReadReached = new Promise<void>((resolve, reject) => {
+    markHeldReadReached = resolve;
+    rejectHeldReadReached = reject;
+  });
+  void heldReadReached.catch(() => {});
+  const observeRead = (operation: Promise<void>) => {
+    const observed = operation.catch((error: unknown) => {
+      readErrors.push(error);
+      rejectHeldReadReached(error);
+    });
+    pendingReads.add(observed);
+    void observed.then(() => pendingReads.delete(observed));
+    return observed;
+  };
+  const emptyWorkbenchHandler = (route: Route) =>
+    observeRead(
+      (async () => {
+        try {
+          if (!captureReads || route.request().method() !== 'GET') {
+            await route.fallback();
+            return;
+          }
+          const response = await route.fetch();
+          const data = await response.json();
+          if (
+            new URL(route.request().url()).searchParams.get('fixture') === 'empty-workbench-drain'
+          ) {
+            markHeldReadReached();
+            await heldReadGate;
+          }
+          await route.fulfill({
+            response,
+            json: { ...data, projects: [], tasks: [], runs: [], results: [] },
+          });
+        } catch (error) {
+          // Settle the browser read too; an already handled route keeps its original error.
+          await route.abort().catch((abortError: unknown) => {
+            readErrors.push(abortError);
+          });
+          throw error;
+        }
+      })(),
+    );
+  const removeEmptyWorkbenchFixture = async () => {
+    captureReads = false;
+    releaseHeldRead();
+    while (pendingReads.size > 0) await Promise.all([...pendingReads]);
+    if (routeInstalled) {
+      heldReadDrainedBeforeUnroute = heldReadCompleted;
+      try {
+        await page.unroute(workbenchUrl, emptyWorkbenchHandler);
+        routeInstalled = false;
+      } catch (error) {
+        readErrors.push(error);
+      }
+    }
+    if (readErrors.length > 0)
+      throw new AggregateError(readErrors, 'Empty workbench fixture failed');
+  };
+  let testFailed = false;
+  try {
+    await page.route(workbenchUrl, emptyWorkbenchHandler);
+    routeInstalled = true;
+    await page.goto('/');
+    await page
+      .locator('.resume-work')
+      .getByRole('button', { name: '新建任务', exact: true })
+      .click();
+    await expect(page.getByRole('dialog', { name: '开始一项工作', exact: true })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/');
+    // Keep an ordinary server read in flight while the creation form is open.
+    observeRead(
+      page
+        .evaluate(async () => {
+          const response = await fetch('/api/v1/workbench?fixture=empty-workbench-drain');
+          return { status: response.status, data: await response.json() };
+        })
+        .then(({ status, data }) => {
+          expect(status).toBe(200);
+          expect(data).toMatchObject({ projects: [], tasks: [], runs: [], results: [] });
+          heldReadCompleted = true;
+        }),
+    );
+    await heldReadReached;
+    expect(heldReadCompleted).toBe(false);
+    await removeEmptyWorkbenchFixture();
+    expect(heldReadDrainedBeforeUnroute).toBe(true);
+    await page.getByLabel('要做什么').fill('浏览器中创建的真实任务');
+    await page.getByRole('button', { name: '创建任务', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: '浏览器中创建的真实任务', exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('textbox', { name: '任务评论', exact: true })
+      .fill('这条评论应当在刷新后仍然存在。');
+    await page.getByRole('button', { name: '发送评论', exact: true }).click();
+    await expect(page.getByText('这条评论应当在刷新后仍然存在。', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByText('这条评论应当在刷新后仍然存在。', { exact: true })).toBeVisible();
+  } catch (error) {
+    testFailed = true;
+    throw error;
+  } finally {
+    try {
+      await removeEmptyWorkbenchFixture();
+    } catch (error) {
+      if (!testFailed) throw error;
+      test.info().annotations.push({
+        type: 'fixture-cleanup-error',
+        description:
+          error instanceof AggregateError
+            ? error.errors.map((readError: unknown) => String(readError)).join('\n')
+            : String(error),
+      });
+    }
+  }
 });
 test('模拟等待回复，响应后结束但不完成任务', async ({ page }) => {
   await page.goto('/tasks/task-24');

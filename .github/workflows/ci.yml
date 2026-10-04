@@ -238,6 +238,17 @@ jobs:
             test-results/workbench-cancelled-tasks-*/error-context.md
           retention-days: 7
 
+      - name: Upload empty-workbench creation failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-empty-workbench-creation-failures
+          path: |
+            test-results/workbench-轻量新建*/trace.zip
+            test-results/workbench-轻量新建*/test-failed-*.png
+            test-results/workbench-轻量新建*/error-context.md
+          retention-days: 7
+
   check:
     needs: [engineering, browser]
     if: always()

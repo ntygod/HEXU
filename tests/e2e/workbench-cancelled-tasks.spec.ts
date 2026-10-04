@@ -219,7 +219,11 @@ async function expectUnchanged(page: Page, f: Fixture, baseline = f.before) {
 }
 
 async function expectHitTarget(target: Locator, width: number, height: number) {
-  await target.scrollIntoViewIfNeeded();
+  // CI200 left the mobile Task row fractionally clipped at the lower edge.
+  // Place the actual target inside the viewport before retaining ratio=1.
+  await target.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
   await expect(target).toBeInViewport({ ratio: 1 });
   expect(
     await target.evaluate(
@@ -475,7 +479,8 @@ test('普通取消与重开立即采用当前投影，勾选状态保留且浏�
     await expectUnchanged(page, f);
 
     // Explicit ordinary fixture commands are the only mutations. Exact detail
-    // comparisons allow only their status/revision/time fields to change.
+    // comparisons allow only their status/revision/time and the existing
+    // cancellation rule that clears attention to change.
     for (const action of ['cancel', 'reopen', 'cancel'] as const) {
       const prior = baseline.find((entry) => entry.task.id === changing.id)!.task;
       const receipt = await post<Task>(page, `tasks/${changing.id}/${action}`, {
@@ -491,6 +496,7 @@ test('普通取消与重开立即采用当前投影，勾选状态保留且浏�
       expect(updated).toEqual({
         ...prior,
         status: action === 'cancel' ? 'cancelled' : 'todo',
+        attention: action === 'cancel' ? null : prior.attention,
         revision: prior.revision + 1,
         updatedAt: updated.updatedAt,
       });
