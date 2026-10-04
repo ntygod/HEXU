@@ -37,6 +37,10 @@ Use the independent participation revision, immutable events, scoped outbox and 
 
 Participation is excluded from model materials: do not update Task revision/timestamps, owner, Run, dispatch, frozen Operation or workspace locks. Actual access revocation still uses existing execution/continuation checks. participantUserIds is only a read projection, never persisted Task JSON or model input. Keep one pure people/search predicate for API and board/list, filter after current access checks, and preserve URL selection across reload/back. Uncertain UI changes confirm the same payload/key; authority changes discard the drawer. Follow 22 for the next slice; complete sorting, status/label/attention filters and private sharing remain pending.
 
+## 项目任务状态导航
+
+状态是当前可见项目投影上的 UI 选择，保留既有人员/关键词 API 与纯谓词。默认排除 cancelled；合法状态选择保存于 URL，列表/看板取相同交集。无效、空白或重复状态不得静默扩大结果，须显示错误并允许清除。取消列只读，导航到现有 Task 详情，不通过筛选触发状态命令或执行。项目总览/成果的原数据范围不随本次选择改变。当前边界与用法见[参与者说明](../engineering/task-participants.md#项目任务状态选择)。
+
 ## Task 工作说明与创建预算
 
 工作说明只改标题、说明和关注事项，不建立内容历史、独立需求或执行输入。编辑固定 Task、原修订和原文；SSE 只展示冲突，载入新基线须明确选择。未知 PATCH 只确认原正文/键，关闭后的迟到结果不能清除后来编辑器或草稿。当前访问/编辑权丢失清除详情与原包，重授不复活；暂时读取故障与明确拒绝分开。

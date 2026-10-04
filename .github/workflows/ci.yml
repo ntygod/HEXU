@@ -67,6 +67,8 @@ jobs:
             artifacts/214-*.png
             artifacts/215-*.png
             artifacts/216-*.png
+            artifacts/217-project-task-status-dark.png
+            artifacts/218-project-task-status-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -149,6 +151,16 @@ jobs:
             test-results/task-creation-request-reco*/trace.zip
             test-results/task-creation-request-reco*/test-failed-*.png
             test-results/task-creation-request-reco*/error-context.md
+          retention-days: 7
+      - name: Upload project-task-status failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-project-task-status-failures
+          path: |
+            test-results/project-task-status-*/trace.zip
+            test-results/project-task-status-*/test-failed-*.png
+            test-results/project-task-status-*/error-context.md
           retention-days: 7
   check:
     needs: [engineering, browser]

@@ -8,7 +8,7 @@
 
 抽屉提供当前成员、此前参与状态和分页变更记录。参与操作逐次提交；并发修订不匹配返回 409，重新读取后由用户再次选择。回执不确定时只通过“确认上次参与操作”重放原 payload/key。关闭不撤销已发送的请求；身份/空间变化、任务撤权和编辑权变化会清除当前抽屉状态。历史阅读不被 SSE 自动重置。
 
-项目看板和列表共用负责人、参与者和关键词交集。关键词匹配标题、编号和说明。`ownerUserId`、`participantUserId`、`q`、`view=list` 保存在项目 URL，支持刷新、返回和深链接；参与者只匹配当前仍有项目访问权的有效关系。已退出或只读的负责人有明确标记，失效链接保留筛选值而不偷偷回到全部任务。项目页仍显示原有非 cancelled 任务范围，完整状态/标签/attention 筛选与持久排序待后续交付。
+项目看板和列表共用负责人、参与者和关键词交集。关键词匹配标题、编号和说明。`ownerUserId`、`participantUserId`、`q`、`view=list` 保存在项目 URL，支持刷新、返回和深链接；参与者只匹配当前仍有项目访问权的有效关系。已退出或只读的负责人有明确标记，失效链接保留筛选值而不偷偷回到全部任务。项目页默认仍显示原有非 cancelled 任务范围；下述状态选择只作用于已经可见的项目数据，标签/attention 筛选与持久排序仍待交付。
 
 ## 权限和持久化
 
@@ -26,3 +26,11 @@
 `Task.participantUserIds` 仅是详情/工作台/列表读取投影，不持久化到 Task JSON，也不发送为模型输入。历史姓名限于任务范围已记录的数据。没有私有任务邀请、跨空间分享、提及通知、委派运行或真人账户模型验证。
 
 实现入口：`packages/contracts/src/task-participants.ts`、`packages/db/src/task-participants.ts`、`apps/web/src/task-participants.tsx`、`apps/web/src/project-task-filters.tsx`。实际检查见 [21](../development/21-implementation-status.md)。
+
+## 项目任务状态选择
+
+“任务状态筛选”默认“不含已取消”，也可明确选择待处理、进行中、已完成、已取消。状态和负责人、参与者、关键词取交集，列表与看板保持同一结果。选定单一状态时看板只显示对应列；已取消列没有改状态控件，点击任务进入原详情，按现有流程处理。
+
+URL 使用 `status=todo|in_progress|done|cancelled`；无参数即默认。空值、重复、未知或带多余空白的状态显示“状态筛选无效”，不静默退回全部任务。重新选择合法状态或“清除筛选”可恢复；清除保留当前视图、其他导航参数和锚点。刷新、返回/前进及视图切换保留合法选择。
+
+这里不增加 Task-list API 状态参数，不改变原 API 无状态筛选的语义或任何可见权限；只对现有 Workbench 可见数据做 UI 选择。项目成果/总览仍使用原非取消范围。筛选不修改 Task、修订、Run 或持久表，实际检查见[本轮记录](../development/history/2026-10-04-project-task-status-navigation.md)。

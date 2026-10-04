@@ -1,29 +1,26 @@
 # 22｜下一步交付
 
-更新：2026-10-03。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
+更新：2026-10-04。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：完成普通 Task 创建恢复冻结值可读性的最终验收
+## 下一项：验收项目任务状态筛选与已取消任务导航
 
-从冻结 [PR57](https://github.com/ntygod/HEXU/pull/57) 的 head `0947dd5b238aab88947caebfe9d979005040c0e3`、tree `49c2d825b78b208c0c794c132e21c3302707bf04` 开始独立小切片，仅覆盖 HX-DEV-04-01/03 的普通创建恢复。父 PR 已完成 CI185 工程/浏览器/汇总终态 success 与精确 head 8 张原图验收，详细证据见 [21](21-implementation-status.md) 与[直接状态记录](history/2026-10-02-direct-task-status-recovery.md)。先前工程锁竞争失败和用户授权修复保留在[原修复记录](history/2026-10-03-pr57-quiescence-lock.md)，不重做、不扩大该审阅。
+从已验收、冻结 [PR58](https://github.com/ntygod/HEXU/pull/58) 的 `7f7b9328033e48fbcde26be021e30d0ade9c51d8` 开独立兄弟分支。该能力来源于既有 04-03/06 规划与旧 [PR42](https://github.com/ntygod/HEXU/pull/42) 普通产品行为，本轮只选择性恢复状态展示，不搬整提交或其他依赖。用户 [PR59](https://github.com/ntygod/HEXU/pull/59) 保留原 head；本分支没有纳入或重新验证其身份修正。
 
-main 保持 `a3ae2e8`；PR56 `a06998ab9035bb3164a271d77ec884204febfaad`、PR57 与旧 25 个草稿 PR（#29—#51、#54、#55）继续冻结、未合并。[问题52](https://github.com/ntygod/HEXU/issues/52) 及原生/文件/私有材料/registry 审阅保持暂停。本轮不修改这些冻结分支，也不合并或部署。
+父 PR58 精确 CI188 已完成 622/622 工程、227/227 Chromium、汇总与最终 215/216 原图验收，详见[记录](history/2026-10-03-task-creation-request-recovery.md#ci188最终验收与冻结)。main、既有草稿保持原提交，不合并或部署。受限身份诊断与问题52、原生/文件/私有材料/registry 审阅继续暂停。
 
-CI187 `11eaddbd` 已通过 622/622 工程、227/227 Chromium 和汇总，并实际查看 215/216 及 212/213。原功能与测试定位已得到远端验证；当前只补实际图中偏淡的冻结原文，用创建表单自己的作用域样式提高可读性，保持 disabled。新样式的精确 head 仍须完整 CI 与 215/216 重新看图，不以旧绿灯替代。
+## 本轮范围与验收
 
-## 本轮范围与收口
-
-1. 普通创建首次提交仍调用现有 POST，在发送前固定原标题、说明、项目、空间与幂等键；创建只新增 Task，不启动 Run。没有后端、schema、字段、回执协议或独立需求模型扩展。
-2. 在现有 Provider 内保留原创建包与结果状态。未知结果只明确确认同键同正文；关闭、导航及任何 NewTask 入口先恢复未结请求，不能靠换项目或重开新建表单生成另一把键。当前项目权限、身份或空间变化清除旧包；草稿与待确认请求不跨硬刷新。
-3. 有效成功 ACK 后 Workbench 失败，只能 GET 刷新；当前投影或 SSE 不能替代原创建 ACK。重复点击、旧请求和迟到读取不得关闭/清空后来界面、抢回导航或干扰新身份/空间的状态。已增加创建请求专用的可选拒绝通知守卫，隔离旧 Provider 的全局身份事件；同 Provider 的真实身份/空间拒绝在关闭或清包后仍正常广播。其他请求的默认行为和 ApiError 保持。
-4. 真实 HTTP 基线已完成 4 场景：原 NewTask 提交函数经 TypeScript AST 提取，使用实际 client、回环 HTTP 与磁盘 Store。提交后回包丢失和 ACK 后 GET 故障的后续重提均换键并实际创建第二个 Task；原键/正文回放只返首个 Task 且所有持久表快照不变。请求未达服务没有首笔效果；改动标题/说明/项目后重提是另建，原键改正文返回 409。该诊断不包括 React/浏览器事件，不能替代本轮验收。
-5. 新实现、完整格式/类型/UI token/前后端构建、既有创建预算 8/8、独立静态复核与最终源码定向诊断已经完成。新增 28 条 E2E 的严格类型/格式和全量 227 条/27 文件发现通过，；首轮 CI186 工程 622/622 通过，浏览器因新测试共用项目选择器连续超时后被取消，已依据实际 trace/像素窄修定位和失败制品，仍待新 head 全套验收。定向诊断的 5 个恢复、18 个拒绝事件控制和 3 个读取排序不计为新增工程测试，也不是 React/真实撤权验收。当前收口是远端完整工程/Chromium CI 与精确 head 原图，保留任何实际失败并按结果回填。
-6. 计划原图为 `215-task-creation-unknown-dark.png`（未知结果、桌面深色）与 `216-task-creation-refresh-mobile-light.png`（有效 ACK 后读取失败、390px 浅色）；生成与实际查看仍待完成。本地没有运行 Chromium，也不复跑受限测试。验收结果归属 [21](21-implementation-status.md) 和[本轮历史](history/2026-10-03-task-creation-request-recovery.md)，原工作项状态保持，不把父 CI、发现测试或静态复核当作本轮实际浏览器通过。
+1. 项目当前可见 Task 的列表/看板共享状态选择，并与原人员/关键词取交集；默认不含已取消，明确选择 todo/in_progress/done/cancelled。没有 API、数据库、身份或状态命令改动。
+2. URL 保存状态和视图，切视图、刷新及返回/前进一致；空、重复、未知或多余空白的状态明确报错并显示零匹配。清除保留其他导航参数与锚点。
+3. 已取消看板列只读，原任务链接可达；筛选不改 Task 内容、修订、状态或 Run，项目总览/成果保持原范围。
+4. 定向纯逻辑、类型/格式/UI token/构建和独立复核后，在独立 draft 验证本分支的精确 head CI。现有工作流不引用被拦诊断，且本分支不包含 PR59 新身份用例；不能据此替代 PR59 或受限范围的验收。
+5. 原图 **217-project-task-status-dark.png** 与 **218-project-task-status-mobile-light.png** 分别展示实际取消卡片/筛选和 390px 浅色可达导航，截图前检查目标可见、命中和内容宽度。实际检查与任何失败只记录在[本轮历史](history/2026-10-04-project-task-status-navigation.md)，不把编译/发现或父 CI 当本轮通过。
 
 ## 开始时读取
 
-- [04 任务工作包](04-tasks-requirements.md)、[产品 UI/UX](../product/04-ux-and-design.md)、[项目任务](../harness/projects-tasks.md)、[UI](../harness/ui.md)、[身份](../harness/identity.md)与[开发流程](../harness/development.md)。
-- [普通创建恢复](../engineering/task-creation-request-recovery.md)、[编辑说明](../engineering/task-edit-baseline.md)、[普通新建表单](../../apps/web/src/forms.tsx)、[共享状态](../../apps/web/src/state.tsx)、[创建恢复 hook](../../apps/web/src/task-creation.ts)、[client 拒绝通知](../../packages/client/src/index.ts)和本轮普通 HTTP/UI 流程；后端只核对普通创建契约与现有权限，不扩展字段或协议。
-- 不从先前默认的选择性整合计划恢复原生/文件/私有材料工作；不把已冻结 stack 的本地文件路径写成本候选已有能力。
+- [04 任务工作包](04-tasks-requirements.md)、[UI](../harness/ui.md)、[项目任务](../harness/projects-tasks.md)和[开发流程](../harness/development.md)。
+- [筛选用法](../engineering/task-participants.md#项目任务状态选择)、[项目视图](../../apps/web/src/projects.tsx)、[筛选组件](../../apps/web/src/project-task-filters.tsx)与本轮纯状态 helper 和浏览器测试。
+- 不修改 `state.tsx`、身份/client 请求归属、后台权限、模型调度或文件原语；不从已冻结旧堆叠恢复暂停审阅。
 
 ## 剩余交付队列
 
