@@ -125,9 +125,10 @@ export function TeamSettings() {
                   method: 'POST',
                   body: { name },
                 });
-                await identity.refresh(space.id);
-                history.replaceState({}, '', '/');
-                window.dispatchEvent(new PopStateEvent('popstate'));
+                if (await identity.refresh(space.id)) {
+                  history.replaceState({}, '', '/');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
               } catch (e) {
                 notice((e as Error).message, true);
               } finally {

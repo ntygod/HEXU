@@ -4,7 +4,7 @@
 
 ## 1. 状态口径
 
-2026-10-03：按当前候选的 102 行实际状态核对，仍为 **2 项已完成、78 项部分实现、22 项未实现**。main 保持 `a3ae2e8`；Task 可靠性 [PR56](https://github.com/ntygod/HEXU/pull/56) 与直接状态恢复 [PR57](https://github.com/ntygod/HEXU/pull/57) 均已完成自身 CI 与原图验收，保持冻结草稿、未合并。当前独立后续仅补普通 Task 创建的原请求恢复，属于 04-01/03；真实 HTTP 基线已复现换键重提造成重复创建，新实现与本地静态/定向检查已完成，真实浏览器、完整 CI 与原图验收待完成，未合并或部署。旧堆叠分支的 2/80/20 不适用于当前候选，交付位置与验证分别见 [21](21-implementation-status.md)。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
+2026-10-04：按当前候选的 102 行实际状态核对，仍为 **2 项已完成、78 项部分实现、22 项未实现**。main 保持 `a3ae2e8`；Task 可靠性 [PR56](https://github.com/ntygod/HEXU/pull/56)、直接状态恢复 [PR57](https://github.com/ntygod/HEXU/pull/57) 与普通创建恢复 [PR58](https://github.com/ntygod/HEXU/pull/58) 已验收，均保持冻结草稿、未合并。当前用户指定后续是账号/空间切换后的迟到响应修正，属于 03-01；独立本机修复与实际账号浏览器验证已完成，提交后完整 CI 待补齐，未合并或部署。旧堆叠分支的 2/80/20 不适用于当前候选，交付位置与验证分别见 [21](21-implementation-status.md)。工作项大小不同，不能折算为产品完成百分比；“部分实现”同时看已交付范围与剩余内容。
 
 当前能力与最近验证看 [21](21-implementation-status.md)，下一项只看 [22](22-next-delivery.md)，详细批次证据与旧状态叙述看 [实现历史](history/2026-09-28-implementation.md)。本页不重复 CI 日志。M0—M4 是产品目标阶段，E0—E2c2 是历史代码批次，不能互相替代。
 
@@ -28,7 +28,7 @@
 | HX-DEV-02-04 | 四类核心页面的模拟交互 | UX/FE | 已完成 | 工作台、项目、任务和成果四类页面骨架已接统一示例数据并可交互；此完成状态仅指页面骨架。 | [界面](../../apps/web/src/App.tsx) / [变量](../../packages/ui/src/tokens.css) |
 | HX-DEV-02-05 | 继续、协助、并行与反馈面板 | UX/FE | 部分实现 | 继续、反馈、接续状态界面已有；W1 归档交互参考并选用 Figma 求助材料／交接信息结构。真人有限材料与 Claude 纯文本 AI 协助已接入；完整代码协助、并行与接手仍未实现，参考按钮不计作功能交付。 | [设计参考](../design/workbench-reference.html) / [界面](../../apps/web/src/App.tsx) |
 | HX-DEV-02-06 | 响应式、键盘、文案与异常状态 | FE | 部分实现 | W1 已接浅深色／密度、按身份空间保存的布局偏好、键盘焦点、窄屏面板切换、草稿与历史阅读保护；完整业务文案字典及后续功能状态仍未收口。 | [工作区](../../apps/web/src/task-workspace.tsx) / [浏览器检查](../../tests/e2e/workbench.spec.ts) |
-| HX-DEV-03-01 | 认证组件、登录与会话恢复 | BE/FE | 部分实现 | Better Auth 真实密码账号、初始化代码、登录/退出、改密、会话恢复及撤销已实现；邮件验证、忘记密码恢复、SSO 和正式部署未接入。 | [认证](../../packages/identity/src/index.ts) / [界面](../../apps/web/src/identity.tsx) |
+| HX-DEV-03-01 | 认证组件、登录与会话恢复 | BE/FE | 部分实现 | Better Auth 真实密码账号、初始化代码、登录/退出、改密、会话恢复及撤销已实现；另补账号/空间变化后的旧拒绝通知隔离与身份查询排序，见[本轮记录](history/2026-10-04-identity-late-response.md)。邮件验证、忘记密码恢复、SSO 和正式部署未接入。 | [认证](../../packages/identity/src/index.ts) / [界面](../../apps/web/src/identity.tsx) |
 | HX-DEV-03-02 | 空间、成员与邀请 | BE/FE | 部分实现 | 真实个人/团队空间、绑定邮箱的邀请、接受/撤销/过期与成员退出/移除已有；无邮件发送、完整空间角色管理与所有者转移。 | [协作数据](../../packages/db/src/collaboration.ts) / [空间](../../apps/web/src/team.tsx) |
 | HX-DEV-03-03 | 统一访问策略与资源授权 | BE | 部分实现 | 统一真实项目/私有数据权限已有，节点本人执行权限与目录摘要可见性分离；指定他人执行、通用 AccessGrant、附件和远程授权仍未实现。 | [权限](../../packages/db/src/permissions.ts) / [派发](../../packages/db/src/node-execution.ts) |
 | HX-DEV-03-04 | 项目、仓库引用与成员配置 | BE/FE | 部分实现 | 真实项目创建/读取、成员和角色配置已有；新增管理者名称/说明编辑、修订冲突、历史分页与 W1 设置抽屉，保存/通知/幂等原子提交；归档/恢复与运行选择已接入；仓库引用与完整目标配置尚缺。 | [设置事务](../../packages/db/src/project-settings.ts) / [界面](../../apps/web/src/project-settings.tsx) / [回归](../../tests/project-settings.test.ts) |
