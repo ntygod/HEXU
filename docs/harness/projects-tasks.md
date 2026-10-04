@@ -75,6 +75,10 @@ Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeR
 
 详情取消保留讨论/成果，已取消 Task 的详情/固定成果使用原重开动作，不能把成果版本、Task 状态和 Run 终止混成一项事实。完成无需报告；不新增完成历史 API、取消原因、数据库模型或后端回执协议。用法见[状态确认](../engineering/task-completion-confirmation.md)。
 
+## 工作台当前任务展开
+
+工作台任务列表只对当前可见投影逐批呈现，默认8项、每次追加8项；不保存Task副本，不另建查询或权限规则。保留原mine/team、cancelled与活动/未知Run过滤及顺序，继续卡、关注和成果不受展开影响。列表计数来自当前props，页签切换重置展开数；展开焦点进入第一条新任务，收起焦点回到保留的标题。用法见[工作台任务列表](../engineering/workbench-task-list.md)。
+
 ## 如何验证与回写
 
 普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程，直接路径见[直接状态恢复](../../tests/e2e/direct-task-status-recovery.spec.ts)；直接 start/reopen/无活动 complete 的请求未到服务、提交后回包丢失与已接受后 GET 故障分别验证；关闭/导航/重复点击、后来标题/修订、当前撤权和迟到回应用真实请求边界区分。普通创建浏览器入口见[创建恢复](../../tests/e2e/task-creation-request-recovery.spec.ts)，另区分未达服务、已提交回包丢失和有效 ACK 后 GET 故障；核对原键/原正文、唯一 Task/回执/编号/outbox 效果、所有新建入口恢复、权限清理及迟到回应。源函数/HTTP 诊断只证明该诊断的请求与事务行为，不能替代 React/浏览器流程。

@@ -1,0 +1,26 @@
+.workbench-task-section > .work-section-heading {
+  flex-wrap: wrap;
+}
+.workbench-task-list-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  margin-top: var(--hx-space-3);
+}
+.workbench-task-list-footer > p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.workbench-task-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+@media (max-width: 650px) {
+  .workbench-task-list-actions > .button {
+    min-height: 44px;
+  }
+}

@@ -2,27 +2,25 @@
 
 更新：2026-10-04。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：项目任务说明关键词命中的片段展示
+## 下一项：工作台当前任务逐批展开
 
-基于冻结 [PR62](https://github.com/ntygod/HEXU/pull/62) head `928c2719c714e951833ec0989182fe6b400d43e6`、tree `ac4d149308edf89e3dbc51b5318390e74ed2952b` 开独立分支。父 CI194 已通过 637 工程 / 234 Chromium 及 221/222、107/108 原图验收；最终 PR 正文已回读。
+基于冻结 [PR63](https://github.com/ntygod/HEXU/pull/63) head `e3afb212312ed7cf3278947e67a5b7c1f624133b`、tree `d77f80e6086695b8d2cb2ab980c5c8de0d465127` 开独立分支。父 CI196 的647工程/237Chromium及223/224、211实图已验收，正文已回读。
 
-原关键词会匹配说明，但列表不显示说明、看板只显示开头。当前补首个说明命中附近的有界纯文本片段，解释原有搜索结果。只读时间排序没有被既定计划单列，不能冒充需要 rank/revision/冲突处理的持久手动排序。
-
-首轮 CI195 的647工程通过、236浏览器通过，唯一旧ACK后读取夹具出现 route.fulfill 重复处理。先修该普通读取的排空/清理与截短失败制品glob，保留全部原业务断言；不改片段生产代码，最终新head完整验收后再下一项，详见本轮记录。
+原工作台和导引栏各只显示前8项，项目列表无法补足无项目个人任务的浏览入口。按04-06/15-02补「最近任务」逐批显示更多、收起、当前显示数，让用户不必记住关键词也能找到更早任务。已核普通Workbench投影没有服务器LIMIT；本片仍仅展开当前已加载列表，不新增服务端分页或查询。
 
 ## 本轮范围与验收
 
-1. 只从当前可见 Task 投影生成片段；原人员/关键词、状态/attention 谓词、集合和顺序保持，不增加 API/字段/URL 参数。
-2. 空/空白查询、无说明命中或标题/编号已经命中保持原显示；重复匹配只展示首处。长查询只高亮片段内的实际原文，省略标记不进入高亮。
-3. 纯文本 React 渲染，HTML 字符不执行；中文、Unicode 大小写扩展、代理对、组合字符和 emoji 截取不产生错误原文/高亮，极端输入也有明确长度边界。
-4. 普通 HTTP/浏览器验证列表/看板精确集合与交集、URL 刷新/历史/清除、取消只读导航，完整 TaskDetail 前后相同且无页面业务写请求。
-5. 首轮 **223-project-task-match-dark.png** 和 **224-project-task-match-mobile-light.png** 展示长说明末尾命中及高亮；截图前确保实际片段/任务链接可见、390px 宽度/命中/无溢出。最终通过独立草稿、精确 head 完整 CI 与实际原图验收，见[记录](history/2026-10-04-project-task-match-snippets.md)。
+1. 默认8项、每次加8项、最后一批准确结束；0/8/9/多批边界、原顺序和当前显示数正确。
+2. 保留原mine/team、cancelled与活动/未知Run谓词，继续卡、关注和成果范围不变；当前投影变化即时更新，不缓存旧Task副本。
+3. 页签切换恢复首批；展开焦点到第一条新任务，收起回到列表标题。更多/收起不写入业务数据或偏好。
+4. 普通已有HTTP夹具核当前实际Task链接、状态后计数和完整TaskDetail不变；不新增API、身份切换或认证诊断。
+5. 首轮 **228-workbench-task-list-dark.png** 与 **229-workbench-task-list-mobile-light.png** 验证展开的实际行、数量、390px宽度与命中/键盘导航；精确head全量CI与实图验收后再选下一片。
 
 ## 开始时读取
 
-- [04 工作包](04-tasks-requirements.md)、[项目任务](../harness/projects-tasks.md)、[UI](../harness/ui.md)、[开发流程](../harness/development.md)。
-- [项目视图](../../apps/web/src/projects.tsx)、[TaskRow](../../apps/web/src/work-cards.tsx)与现有[关键词谓词](../../packages/domain/src/index.ts)。
-- 不改 state/client/身份/后台或持久排序，不恢复原受限诊断和问题52/文件/原生/私有材料/registry 审阅；用户 PR59 与父草稿保持冻结，无合并部署。
+- [04工作包](04-tasks-requirements.md)、[15工作包](15-overview-search-cost.md)、[UI](../harness/ui.md)、[项目任务](../harness/projects-tasks.md)。
+- [当前用法](../engineering/workbench-task-list.md)和[本轮记录](history/2026-10-04-workbench-task-list.md)。
+- 完成记录局部工作保持冻结且不纳入本片；用户PR59和父草稿不动，不恢复受限身份诊断与问题52/文件/原生/私有材料/registry审阅，无合并部署。
 
 ## 剩余交付队列
 

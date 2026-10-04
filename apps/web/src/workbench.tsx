@@ -11,7 +11,8 @@ import {
 import { isActiveRun } from '../../../packages/domain/src/index.js';
 import { Link, useApp } from './state.js';
 import { NewTask } from './forms.js';
-import { ResultCard, TaskRow } from './work-cards.js';
+import { ResultCard } from './work-cards.js';
+import { WorkbenchTaskList } from './workbench-task-list.js';
 import './work-pages.css';
 
 export function Workbench() {
@@ -107,22 +108,7 @@ export function Workbench() {
               />
             )}
           </section>
-          <section className="work-section">
-            <div className="work-section-heading">
-              <h2>最近任务</h2>
-              <Link to="/projects">
-                查看项目 <Icon name="chevron" size={14} />
-              </Link>
-            </div>
-            <div className="work-task-list">
-              {tasks.slice(0, 8).map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-              {!tasks.length && (
-                <p className="work-empty-text">还没有任务。创建后，工作记录会留在这里。</p>
-              )}
-            </div>
-          </section>
+          <WorkbenchTaskList key={tab} tasks={tasks} />
         </div>
         <aside className="home-attention">
           <div className="work-section-heading">

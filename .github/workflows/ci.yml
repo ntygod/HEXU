@@ -75,6 +75,8 @@ jobs:
             artifacts/222-result-version-link-mobile-light.png
             artifacts/223-project-task-match-dark.png
             artifacts/224-project-task-match-mobile-light.png
+            artifacts/228-workbench-task-list-dark.png
+            artifacts/229-workbench-task-list-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -197,6 +199,17 @@ jobs:
             test-results/project-task-match-snippet*/trace.zip
             test-results/project-task-match-snippet*/test-failed-*.png
             test-results/project-task-match-snippet*/error-context.md
+          retention-days: 7
+
+      - name: Upload workbench-task-list failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-workbench-task-list-failures
+          path: |
+            test-results/workbench-task-list-*/trace.zip
+            test-results/workbench-task-list-*/test-failed-*.png
+            test-results/workbench-task-list-*/error-context.md
           retention-days: 7
 
   check:
