@@ -313,3 +313,6 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 ## 普通Task搜索分页
 
 `GET /api/v1/search?q=...&cursor=...` 继续使用现有当前可见Task集合；q按原规则去首尾空白、最多160字符并转小写，匹配标题、说明和编号拼接文本。首批不带cursor，响应为 `{ items: Task[], nextCursor: string | null }`，每批最多30项。cursor最多1024字符，绑定规范化查询和当前有序匹配DTO序列，不是访问凭据或历史快照。非法/不匹配查询返回INVALID_CURSOR/400，当前序列变化返回SEARCH_RESULTS_CHANGED/409；客户端清除旧批次并明确重新搜索。读取不更新业务表，无新增迁移/写操作。
+
+
+Task搜索的范围扩展：可选`scope=all|personal|project`，缺省all；personal只取当前集合中projectId为null的Task，project必须带非空、无首尾空白、最多150字符的projectId；all/personal不接受projectId。重复/非法/不完整范围返回INVALID_INPUT/400，合法但无匹配ID返回空页，不放大为全局。游标摘要同时绑定规范化q、scope与projectId，范围先于匹配序列摘要和分页；此前只绑定q的旧书签明确INVALID_CURSOR后重搜。未新增权限来源、资源端点或数据库模型。

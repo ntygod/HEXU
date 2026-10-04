@@ -3,9 +3,13 @@ import type { Task } from '../../../packages/contracts/src/index.js';
 import {
   normalizeTaskSearchQuery,
   type TaskSearchPage,
+  type TaskSearchScope,
 } from '../../../packages/contracts/src/task-search.js';
 import { ApiError, request } from '../../../packages/client/src/index.js';
-import { matchesTaskSearchQuery } from '../../../packages/domain/src/task-search.js';
+import {
+  matchesTaskSearchQuery,
+  matchesTaskSearchScope,
+} from '../../../packages/domain/src/task-search.js';
 
 interface TaskSearchView {
   scope: string;
@@ -19,6 +23,7 @@ interface TaskSearchView {
 }
 interface SearchRead {
   query: string;
+  selection: TaskSearchScope;
   view: TaskSearchView;
   inFlight: boolean;
   controller: AbortController | null;
@@ -36,15 +41,28 @@ const emptyView = (scope: string, searching: boolean): TaskSearchView => ({
 });
 
 /** Only the current matching Task projection can own ordinary search pages. */
-export function useTaskSearchPages(query: string, tasks: readonly Task[]) {
+export function useTaskSearchPages(
+  query: string,
+  tasks: readonly Task[],
+  selection: TaskSearchScope,
+  available: boolean,
+) {
   const trimmedQuery = query.trim();
   const normalizedQuery = trimmedQuery ? normalizeTaskSearchQuery(trimmedQuery) : '';
   const scope = JSON.stringify([
     query,
-    normalizedQuery ? tasks.filter((task) => matchesTaskSearchQuery(task, normalizedQuery)) : [],
+    selection,
+    available,
+    available && normalizedQuery
+      ? tasks.filter(
+          (task) =>
+            matchesTaskSearchScope(task, selection) &&
+            matchesTaskSearchQuery(task, normalizedQuery),
+        )
+      : [],
   ]);
   const current = useRef<SearchRead | null>(null);
-  const [view, setView] = useState(() => emptyView(scope, !!trimmedQuery));
+  const [view, setView] = useState(() => emptyView(scope, available && !!trimmedQuery));
 
   const release = useCallback((read: SearchRead) => {
     if (read.timer !== null) clearTimeout(read.timer);
@@ -71,7 +89,13 @@ export function useTaskSearchPages(query: string, tasks: readonly Task[]) {
       setView(next);
     };
     publish({ ...read.view, busy: cursor ? 'more' : 'initial', error: '', focusTaskId: null });
-    const path = `/search?q=${encodeURIComponent(read.query)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+    const scopeParams =
+      read.selection.scope === 'project'
+        ? `&scope=project&projectId=${encodeURIComponent(read.selection.projectId)}`
+        : read.selection.scope === 'personal'
+          ? '&scope=personal'
+          : '';
+    const path = `/search?q=${encodeURIComponent(read.query)}${scopeParams}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
     void request<TaskSearchPage>(path, { signal: controller.signal })
       .then((page) => {
         if (!isCurrent()) return;
@@ -107,10 +131,11 @@ export function useTaskSearchPages(query: string, tasks: readonly Task[]) {
   }, []);
 
   const start = useCallback(
-    (scope: string, query: string, delay: number) => {
+    (scope: string, query: string, selection: TaskSearchScope, delay: number) => {
       if (current.current) release(current.current);
       const read: SearchRead = {
         query,
+        selection,
         view: emptyView(scope, !!query),
         inFlight: false,
         controller: null,
@@ -128,12 +153,12 @@ export function useTaskSearchPages(query: string, tasks: readonly Task[]) {
   );
 
   useLayoutEffect(() => {
-    start(scope, trimmedQuery, 150);
+    start(scope, available ? trimmedQuery : '', selection, 150);
     return () => {
       // An explicit retry may have replaced the first read in this scope.
       if (current.current) release(current.current);
     };
-  }, [scope, trimmedQuery, start, release]);
+  }, [scope, trimmedQuery, selection, available, start, release]);
 
   const loadMore = useCallback(() => {
     const read = current.current;
@@ -142,8 +167,8 @@ export function useTaskSearchPages(query: string, tasks: readonly Task[]) {
     readPage(read, read.view.nextCursor);
   }, [scope, readPage]);
   const restart = useCallback(() => {
-    start(scope, trimmedQuery, 0);
-  }, [scope, trimmedQuery, start]);
+    start(scope, available ? trimmedQuery : '', selection, 0);
+  }, [scope, trimmedQuery, selection, available, start]);
   const cancel = useCallback(() => {
     const read = current.current;
     if (!read) return;
@@ -154,7 +179,7 @@ export function useTaskSearchPages(query: string, tasks: readonly Task[]) {
   // Hide stale rows in the same render as a query/projection change, before the
   // layout cleanup aborts old work and starts the new debounced generation.
   return {
-    ...(view.scope === scope ? view : emptyView(scope, !!trimmedQuery)),
+    ...(view.scope === scope ? view : emptyView(scope, available && !!trimmedQuery)),
     loadMore,
     restart,
     cancel,

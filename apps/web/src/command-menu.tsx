@@ -1,12 +1,21 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
+import type { TaskSearchScope } from '../../../packages/contracts/src/task-search.js';
 import { Dialog, Icon, StatusBadge, type IconName } from '../../../packages/ui/src/index.js';
 import { go, useApp } from './state.js';
 import { useTaskSearchPages } from './task-search-pages.js';
+import {
+  taskSearchProjectLabel,
+  taskSearchResultContext,
+  taskSearchScopeContext,
+} from './task-search-context.js';
+import { TaskDescriptionMatch } from './task-match-snippet-view.js';
 import './command-menu.css';
 export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
   const { data } = useApp();
   const [q, setQ] = useState('');
-  const search = useTaskSearchPages(q, data.tasks);
+  const [selection, setSelection] = useState<TaskSearchScope>({ scope: 'all', projectId: null });
+  const context = taskSearchScopeContext(selection, data.projects);
+  const search = useTaskSearchPages(q, data.tasks, selection, context.available);
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -83,25 +92,27 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       row?.focus();
     }
   }, [search.needsRestart, search.focusTaskId]);
-  const status = !q.trim()
-    ? '输入关键词，搜索当前可见的任务。'
-    : search.needsRestart
-      ? '搜索结果已失效，请重新搜索。'
-      : search.busy === 'initial'
-        ? '正在搜索…'
-        : !search.items.length
-          ? search.error
-            ? '搜索失败，请重试。'
-            : '没有找到匹配的任务。'
-          : `已显示 ${search.items.length} 项任务，${
-              search.busy === 'more'
-                ? '正在加载更多…'
-                : search.error
-                  ? '可重试加载更多'
-                  : search.nextCursor
-                    ? '可继续加载'
-                    : '已加载全部结果'
-            }`;
+  const status = !context.available
+    ? '所选项目当前不可用，请选择其他搜索范围。'
+    : !q.trim()
+      ? '输入关键词，搜索当前范围内可见的任务。'
+      : search.needsRestart
+        ? '搜索结果已失效，请重新搜索。'
+        : search.busy === 'initial'
+          ? '正在搜索…'
+          : !search.items.length
+            ? search.error
+              ? '搜索失败，请重试。'
+              : '没有找到匹配的任务。'
+            : `已显示 ${search.items.length} 项任务，${
+                search.busy === 'more'
+                  ? '正在加载更多…'
+                  : search.error
+                    ? '可重试加载更多'
+                    : search.nextCursor
+                      ? '可继续加载'
+                      : '已加载全部结果'
+              }`;
   return (
     <Dialog title="搜索与快捷操作" onClose={close} wide>
       <div className="dialog-body command-search-body">
@@ -112,11 +123,42 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
             autoFocus
             aria-label="全局搜索"
             maxLength={160}
-            placeholder="任务标题、编号，或新建、项目、设置…"
+            placeholder="任务标题、说明、编号，或新建、项目、设置…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <kbd>ESC</kbd>
+        </label>
+        <label className="command-search-scope">
+          <span>任务搜索范围</span>
+          <select
+            aria-label="任务搜索范围"
+            title={context.label}
+            value={
+              selection.scope === 'project' ? `project:${selection.projectId}` : selection.scope
+            }
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelection(
+                value === 'all' || value === 'personal'
+                  ? { scope: value, projectId: null }
+                  : { scope: 'project', projectId: value.slice('project:'.length) },
+              );
+            }}
+          >
+            <option value="all">全部当前可见任务</option>
+            <option value="personal">无项目个人任务</option>
+            {selection.scope === 'project' && !context.available && (
+              <option value={`project:${selection.projectId}`} disabled>
+                项目不可用
+              </option>
+            )}
+            {data.projects.map((project) => (
+              <option key={project.id} value={`project:${project.id}`}>
+                {taskSearchProjectLabel(project)}
+              </option>
+            ))}
+          </select>
         </label>
         {commands.some((command) => command.name.includes(q.trim())) && (
           <div className="command-actions" aria-label="快捷操作">
@@ -157,25 +199,39 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
               focusedResult.current = null;
           }}
         >
-          {search.items.length > 0 && <span className="command-section-label">当前可见任务</span>}
-          {search.items.map((task) => (
-            <button
-              key={task.id}
-              data-task-id={task.id}
-              onClick={() => {
-                go(`/tasks/${task.id}`);
-                close();
-              }}
-            >
-              <Icon name="file" />
-              <div>
-                <strong>{task.title}</strong>
-                <small>{task.shortId}</small>
-              </div>
-              <StatusBadge status={task.status} />
-              <Icon name="arrow" size={15} />
-            </button>
-          ))}
+          {search.items.length > 0 && (
+            <span className="command-section-label">{context.label}</span>
+          )}
+          {search.items.map((task) => {
+            const resultContext = taskSearchResultContext(task, data.projects, q);
+            return (
+              <button
+                key={task.id}
+                data-task-id={task.id}
+                onClick={() => {
+                  go(`/tasks/${task.id}`);
+                  close();
+                }}
+              >
+                <Icon name="file" />
+                <div className="command-task-heading">
+                  <strong>{task.title}</strong>
+                  <div className="command-task-meta">
+                    <small>{task.shortId}</small>
+                    <span className="command-task-revision">修订 {task.revision}</span>
+                  </div>
+                </div>
+                <StatusBadge status={task.status} />
+                <Icon name="arrow" size={15} />
+                <div className="command-task-context">
+                  <span className="command-task-source">{resultContext.sourceLabel}</span>
+                  {resultContext.descriptionMatch && (
+                    <TaskDescriptionMatch snippet={resultContext.descriptionMatch} />
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
         {search.error && (
           <p className="command-search-error" role="alert">

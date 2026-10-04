@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { DomainError, type Task } from '../../contracts/src/index.js';
 import type { TaskSearchPage, TaskSearchQuery } from '../../contracts/src/task-search.js';
 import { canonicalJson } from '../../domain/src/index.js';
-import { matchesTaskSearchQuery } from '../../domain/src/task-search.js';
+import { matchesTaskSearchQuery, matchesTaskSearchScope } from '../../domain/src/task-search.js';
 
 const pageSize = 30;
 interface Cursor {
@@ -46,8 +46,12 @@ function decodeCursor(cursor: string): Cursor {
  * the ordered matching DTOs expires it; a new search starts from current data.
  */
 export function pageTaskSearch(tasks: readonly Task[], query: TaskSearchQuery): TaskSearchPage {
-  const matches = tasks.filter((task) => matchesTaskSearchQuery(task, query.q));
-  const queryHash = hash(query.q);
+  const matches = tasks.filter(
+    (task) => matchesTaskSearchScope(task, query) && matchesTaskSearchQuery(task, query.q),
+  );
+  const queryHash = hash(
+    canonicalJson({ q: query.q, scope: query.scope, projectId: query.projectId }),
+  );
   const sequenceHash = hash(canonicalJson(matches));
   let start = 0;
   if (query.cursor !== null) {

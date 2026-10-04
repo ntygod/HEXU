@@ -85,6 +85,8 @@ jobs:
             artifacts/235-result-library-search-mobile-light.png
             artifacts/236-task-search-pagination-dark.png
             artifacts/237-task-search-pagination-mobile-light.png
+            artifacts/238-task-search-scope-dark.png
+            artifacts/239-task-search-scope-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -273,6 +275,17 @@ jobs:
             test-results/task-search-pagination-*/trace.zip
             test-results/task-search-pagination-*/test-failed-*.png
             test-results/task-search-pagination-*/error-context.md
+          retention-days: 7
+
+      - name: Upload task-search-scope failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-search-scope-failures
+          path: |
+            test-results/task-search-scope-*/trace.zip
+            test-results/task-search-scope-*/test-failed-*.png
+            test-results/task-search-scope-*/error-context.md
           retention-days: 7
 
   check:

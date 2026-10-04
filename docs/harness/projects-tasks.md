@@ -89,7 +89,7 @@ Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeR
 
 ## 普通Task搜索分页
 
-搜索先取得原Store.tasks当前可见集合，再使用共享原字段matcher；不改rowid顺序或借DTO时间字段重排。30项游标绑定规范化查询与完整当前匹配DTO序列；序列变化使游标失效，不拼接不同版本页。前端只用当前data.tasks的同matcher投影失效旧查询会话，不新增身份源或修改共享client。普通查询/关闭/追加响应按会话取消，追加5xx可原cursor重试，400/409清除旧批次并明确重搜。真实HTTP多页和只读检查见[分页用法](../engineering/task-search-pagination.md)。
+搜索先取得原Store.tasks当前可见集合，再使用共享原字段matcher；不改rowid顺序或借DTO时间字段重排。30项游标绑定规范化查询与完整当前匹配DTO序列；序列变化使游标失效，不拼接不同版本页。前端只用当前data.tasks的同matcher投影失效旧查询会话，不新增身份源或修改共享client。普通查询/关闭/追加响应按会话取消，追加5xx可原cursor重试，400/409清除旧批次并明确重搜。范围只在原当前集合内按projectId或null交集，先于摘要和分页，游标也绑定scope/projectId；当前项目选项失效不静默变为全局。来源/Task修订用现有当前DTO，说明片段只解释独立命中，不改变原全局跨字段谓词。真实HTTP多页和只读检查见[分页用法](../engineering/task-search-pagination.md)。
 
 ## 如何验证与回写
 
