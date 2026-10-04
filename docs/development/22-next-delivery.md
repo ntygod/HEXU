@@ -1,28 +1,24 @@
 # 22｜下一步交付
 
-更新：2026-10-03。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
+更新：2026-10-04。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：完成普通 Task 创建恢复冻结值可读性的最终验收
+## 当前收口：交接账号/空间切换后的迟到响应修正
 
-从冻结 [PR57](https://github.com/ntygod/HEXU/pull/57) 的 head `0947dd5b238aab88947caebfe9d979005040c0e3`、tree `49c2d825b78b208c0c794c132e21c3302707bf04` 开始独立小切片，仅覆盖 HX-DEV-04-01/03 的普通创建恢复。父 PR 已完成 CI185 工程/浏览器/汇总终态 success 与精确 head 8 张原图验收，详细证据见 [21](21-implementation-status.md) 与[直接状态记录](history/2026-10-02-direct-task-status-recovery.md)。先前工程锁竞争失败和用户授权修复保留在[原修复记录](history/2026-10-03-pr57-quiescence-lock.md)，不重做、不扩大该审阅。
+用户指定在独立环境完成远端 AI 暂停的迟到响应修正与验证。起点为冻结 [PR58](https://github.com/ntygod/HEXU/pull/58) `7f7b9328033e48fbcde26be021e30d0ade9c51d8`；父 PR 的 CI188 工程、Chromium、汇总与冻结值原图均已验收，证据见 [21](21-implementation-status.md) 和其 PR 正文。本轮没有在远端重试平台被拒绝的命令，也没有开通或改变 Daybreak 资格。
 
-main 保持 `a3ae2e8`；PR56 `a06998ab9035bb3164a271d77ec884204febfaad`、PR57 与旧 25 个草稿 PR（#29—#51、#54、#55）继续冻结、未合并。[问题52](https://github.com/ntygod/HEXU/issues/52) 及原生/文件/私有材料/registry 审阅保持暂停。本轮不修改这些冻结分支，也不合并或部署。
+main、PR56/57/58 与旧草稿分支保持原提交、未合并。[问题52](https://github.com/ntygod/HEXU/issues/52) 及原生/文件/私有材料/registry 审阅保持暂停。当前只改浏览器 client 的请求归属与 IdentityGate 查询顺序，不扩大后台功能或模型权限。
 
-CI187 `11eaddbd` 已通过 622/622 工程、227/227 Chromium 和汇总，并实际查看 215/216 及 212/213。原功能与测试定位已得到远端验证；当前只补实际图中偏淡的冻结原文，用创建表单自己的作用域样式提高可读性，保持 disabled。新样式的精确 head 仍须完整 CI 与 215/216 重新看图，不以旧绿灯替代。
+## 本轮范围与交接
 
-## 本轮范围与收口
-
-1. 普通创建首次提交仍调用现有 POST，在发送前固定原标题、说明、项目、空间与幂等键；创建只新增 Task，不启动 Run。没有后端、schema、字段、回执协议或独立需求模型扩展。
-2. 在现有 Provider 内保留原创建包与结果状态。未知结果只明确确认同键同正文；关闭、导航及任何 NewTask 入口先恢复未结请求，不能靠换项目或重开新建表单生成另一把键。当前项目权限、身份或空间变化清除旧包；草稿与待确认请求不跨硬刷新。
-3. 有效成功 ACK 后 Workbench 失败，只能 GET 刷新；当前投影或 SSE 不能替代原创建 ACK。重复点击、旧请求和迟到读取不得关闭/清空后来界面、抢回导航或干扰新身份/空间的状态。已增加创建请求专用的可选拒绝通知守卫，隔离旧 Provider 的全局身份事件；同 Provider 的真实身份/空间拒绝在关闭或清包后仍正常广播。其他请求的默认行为和 ApiError 保持。
-4. 真实 HTTP 基线已完成 4 场景：原 NewTask 提交函数经 TypeScript AST 提取，使用实际 client、回环 HTTP 与磁盘 Store。提交后回包丢失和 ACK 后 GET 故障的后续重提均换键并实际创建第二个 Task；原键/正文回放只返首个 Task 且所有持久表快照不变。请求未达服务没有首笔效果；改动标题/说明/项目后重提是另建，原键改正文返回 409。该诊断不包括 React/浏览器事件，不能替代本轮验收。
-5. 新实现、完整格式/类型/UI token/前后端构建、既有创建预算 8/8、独立静态复核与最终源码定向诊断已经完成。新增 28 条 E2E 的严格类型/格式和全量 227 条/27 文件发现通过，；首轮 CI186 工程 622/622 通过，浏览器因新测试共用项目选择器连续超时后被取消，已依据实际 trace/像素窄修定位和失败制品，仍待新 head 全套验收。定向诊断的 5 个恢复、18 个拒绝事件控制和 3 个读取排序不计为新增工程测试，也不是 React/真实撤权验收。当前收口是远端完整工程/Chromium CI 与精确 head 原图，保留任何实际失败并按结果回填。
-6. 计划原图为 `215-task-creation-unknown-dark.png`（未知结果、桌面深色）与 `216-task-creation-refresh-mobile-light.png`（有效 ACK 后读取失败、390px 浅色）；生成与实际查看仍待完成。本地没有运行 Chromium，也不复跑受限测试。验收结果归属 [21](21-implementation-status.md) 和[本轮历史](history/2026-10-03-task-creation-request-recovery.md)，原工作项状态保持，不把父 CI、发现测试或静态复核当作本轮实际浏览器通过。
+1. 普通请求的全局 401/空间撤权通知只作用于发送时的账号/空间代次；旧请求仍返回原 ApiError，同账号再次登录原空间也不复活旧代次。
+2. 旧身份查询的结果和错误不覆盖后来的身份恢复、显式空间选择、退出或卸载；真实当前拒绝继续恢复登录或清除旧空间。
+3. 保留 PR57/58 的原正文/幂等键、未知结果确认与有效 ACK 后只 GET，不修改其冻结分支或后台权限。
+4. 本机实际账号复现与修后浏览器验证已完成，提交后的精确 head 完整 CI 和最终交接由本轮 PR 正文补齐。检查与边界只在 [21](21-implementation-status.md) 及[本次记录](history/2026-10-04-identity-late-response.md)维护，不扩大成原生/整包审阅。完成交接后，再按用户要求选择后续产品工作。
 
 ## 开始时读取
 
-- [04 任务工作包](04-tasks-requirements.md)、[产品 UI/UX](../product/04-ux-and-design.md)、[项目任务](../harness/projects-tasks.md)、[UI](../harness/ui.md)、[身份](../harness/identity.md)与[开发流程](../harness/development.md)。
-- [普通创建恢复](../engineering/task-creation-request-recovery.md)、[编辑说明](../engineering/task-edit-baseline.md)、[普通新建表单](../../apps/web/src/forms.tsx)、[共享状态](../../apps/web/src/state.tsx)、[创建恢复 hook](../../apps/web/src/task-creation.ts)、[client 拒绝通知](../../packages/client/src/index.ts)和本轮普通 HTTP/UI 流程；后端只核对普通创建契约与现有权限，不扩展字段或协议。
+- [03 身份工作包](03-identity-projects.md)、[UI](../harness/ui.md)、[身份](../harness/identity.md)与[开发流程](../harness/development.md)。
+- [IdentityGate](../../apps/web/src/identity.tsx)、[client](../../packages/client/src/index.ts)、[新浏览器回归](../../tests/e2e/identity-late-response.spec.ts)与[本次记录](history/2026-10-04-identity-late-response.md)；跨入 Task 恢复时再读[项目任务](../harness/projects-tasks.md)与[普通创建恢复](../engineering/task-creation-request-recovery.md)。
 - 不从先前默认的选择性整合计划恢复原生/文件/私有材料工作；不把已冻结 stack 的本地文件路径写成本候选已有能力。
 
 ## 剩余交付队列

@@ -1,6 +1,14 @@
 import { useAppearance } from './appearance.js';
 import './identity.css';
-import { createContext, Fragment, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { IdentityState } from '../../../packages/contracts/src/identity.js';
 import { request, setActiveSpace } from '../../../packages/client/src/index.js';
 import { Brand, Button, Icon } from '../../../packages/ui/src/index.js';
@@ -40,20 +48,28 @@ export function IdentityGate({ children }: { children: ReactNode }) {
     [spaceId, setSpaceId] = useState(''),
     [error, setError] = useState('');
   const [path, setPath] = useState(location.pathname);
+  const refreshId = useRef(0);
   const select = (next: IdentityState, preferred?: string) => {
     const id = next.user
       ? (next.spaces.find((s) => s.id === (preferred ?? savedSpace(next.user!.id)))?.id ??
         `personal-${next.user.id}`)
       : '';
-    setActiveSpace(id);
+    setActiveSpace(id, next.user?.id ?? '');
     setSpaceId(id);
     if (next.user) saveSpace(next.user.id, id);
   };
   const refresh = async (preferred?: string) => {
-    const next = await request<IdentityState>('/identity');
-    select(next, preferred);
-    setState(next);
-    setError('');
+    const id = ++refreshId.current;
+    try {
+      const next = await request<IdentityState>('/identity');
+      // A newer identity read, explicit space choice or sign-out owns the UI.
+      if (id !== refreshId.current) return;
+      select(next, preferred);
+      setState(next);
+      setError('');
+    } catch (error) {
+      if (id === refreshId.current) throw error;
+    }
   };
   useEffect(() => {
     void refresh().catch((e) => setError(e.message));
@@ -73,6 +89,8 @@ export function IdentityGate({ children }: { children: ReactNode }) {
     window.addEventListener('hexu-space-revoked', revoked);
     window.addEventListener('popstate', route);
     return () => {
+      refreshId.current++;
+      setActiveSpace('');
       window.removeEventListener('hexu-auth-required', auth);
       window.removeEventListener('hexu-space-revoked', revoked);
       window.removeEventListener('popstate', route);
@@ -96,8 +114,11 @@ export function IdentityGate({ children }: { children: ReactNode }) {
       </div>
     );
   const signOut = async () => {
+    const id = ++refreshId.current;
     await request('/identity/sign-out', { method: 'POST', body: {} });
+    if (id !== refreshId.current) return;
     setActiveSpace('');
+    setState(null);
     await refresh();
   };
   const value: IdentityContextValue = {
@@ -107,7 +128,8 @@ export function IdentityGate({ children }: { children: ReactNode }) {
     signOut,
     switchSpace: (id) => {
       if (!state.spaces.some((s) => s.id === id)) return;
-      setActiveSpace(id);
+      refreshId.current++;
+      setActiveSpace(id, state.user?.id ?? '');
       setSpaceId(id);
       if (state.user) saveSpace(state.user.id, id);
       home();
