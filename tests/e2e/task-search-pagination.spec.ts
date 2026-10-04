@@ -263,27 +263,34 @@ async function capture(page: Page, task: Task, path: string, mobile: boolean, te
   );
   // The modal's own results area scrolls; inspect its measured bounds rather
   // than assuming a page footer or the underlying topbar shares this viewport.
-  expect(
-    await target.evaluate((element) => {
-      const scroller = element.closest('.command-results');
-      if (!scroller) throw new Error('缺少任务搜索滚动容器');
-      const content = scroller.getBoundingClientRect();
-      const row = element.getBoundingClientRect();
-      return (
-        scroller.scrollTop > 0 &&
-        scroller.scrollHeight > scroller.clientHeight &&
-        row.top >= content.top - 1 &&
-        row.bottom <= content.bottom + 1
-      );
-    }),
-  ).toBe(true);
+  const geometry = await target.evaluate((element) => {
+    const scroller = element.closest('.command-results');
+    if (!scroller) throw new Error('缺少任务搜索滚动容器');
+    const content = scroller.getBoundingClientRect();
+    const row = element.getBoundingClientRect();
+    return {
+      scrollTop: scroller.scrollTop,
+      scrollHeight: scroller.scrollHeight,
+      clientHeight: scroller.clientHeight,
+      content: { top: content.top, bottom: content.bottom },
+      row: { top: row.top, bottom: row.bottom },
+    };
+  });
+  expect(geometry.scrollTop, JSON.stringify(geometry)).toBeGreaterThan(0);
+  expect(geometry.scrollHeight, JSON.stringify(geometry)).toBeGreaterThan(geometry.clientHeight);
+  expect(geometry.row.top, JSON.stringify(geometry)).toBeGreaterThanOrEqual(
+    geometry.content.top - 1,
+  );
+  expect(geometry.row.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(
+    geometry.content.bottom + 1,
+  );
   for (const visible of [
     dialog(page).locator('.dialog-heading'),
     search(page),
     target,
     status(page),
   ])
-    await expect(visible).toBeInViewport({ ratio: 1 });
+    await expect(visible, JSON.stringify(geometry)).toBeInViewport({ ratio: 1 });
   for (const control of [
     search(page),
     target,

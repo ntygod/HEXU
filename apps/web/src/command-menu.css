@@ -28,11 +28,13 @@
 .command-results {
   margin-top: var(--hx-space-4);
   max-height: min(420px, 50dvh);
+  padding-block-end: var(--hx-space-1);
   overflow: auto;
   overscroll-behavior: contain;
 }
 .command-results:empty {
   margin-top: 0;
+  padding-block-end: 0;
 }
 .command-results > button {
   display: flex;

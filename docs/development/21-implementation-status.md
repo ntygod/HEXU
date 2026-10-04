@@ -59,7 +59,7 @@
 | 父[PR65](https://github.com/ntygod/HEXU/pull/65)我参与的工作台入口 | head `9d0a17e8142621dd4d495ea09ead64a2a1f2a436`、tree `fd3b59bcbec2eecd20baad2302d4550766a070c9`；[CI199 / 37227168143](https://github.com/ntygod/HEXU/actions/runs/37227168143)工程 **650/650**、Chromium **246/246、16.5m**和汇总成功。最终230/231原图19:28 UTC实际查看，最终正文19:29 UTC更新并回读，见[记录](history/2026-10-04-workbench-participating.md) |
 | 父[PR66](https://github.com/ntygod/HEXU/pull/66)取消个人任务找回 | head `e82b0a7185223a9c943b6ea1b67f93b12ea3ad61`、tree `f06e23837cd11887692e0018dc6af70866a5b0bc`；[CI201 / 37231321458](https://github.com/ntygod/HEXU/actions/runs/37231321458)工程 **650/650**、Chromium **249/249、19.5m**和汇总成功。最终232/233原图20:36 UTC实际查看，正文20:37 UTC更新并回读。首轮三夹具失败与修正见[记录](history/2026-10-04-workbench-cancelled-tasks.md) |
 | 父PR67成果库查找 | 项目/关键词交集、当前成果与Task字段、来源/有界片段、URL恢复及预选项目入口；原详情与固定版本链接复用。[CI202](https://github.com/ntygod/HEXU/actions/runs/37234521020)工程661/661、Chromium254/254及汇总成功；234/235原图已查看，最终正文已回读，见[记录](history/2026-10-04-result-library-search.md) |
-| 当前Task搜索分页 | 原当前可见Task集合和顺序，每页30项、查询/当前序列绑定；变化或无效游标清除旧批次并明确重搜，重复加载、切词/关闭/当前匹配投影变化隔离。11项临时SQLite/HTTP定向测试、完整类型/UI token/格式/构建、5E2E严格类型/发现及独立静态审阅通过；精确head全量CI和236/237实际原图待完成，见[记录](history/2026-10-04-task-search-pagination.md) |
+| 当前Task搜索分页 | 原当前可见Task集合和顺序，每页30项、查询/当前序列绑定；变化或无效游标清除旧批次并明确重搜，重复加载、切词/关闭/当前匹配投影变化隔离。11项临时SQLite/HTTP定向测试、完整类型/UI token/格式/构建、5E2E严格类型/发现及独立静态审阅通过；首轮CI203工程672/672、浏览器258通过/1失败，手机末行严格可见率未过；当前补滚动末端留白，精确新head全量CI和236/237实际原图待完成，见[记录](history/2026-10-04-task-search-pagination.md) |
 
 旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58/60/61/62/63/64/65/66/67 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
 
