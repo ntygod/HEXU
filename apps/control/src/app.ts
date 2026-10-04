@@ -53,6 +53,8 @@ import {
   text,
 } from '../../../packages/contracts/src/index.js';
 import { Store } from '../../../packages/db/src/store.js';
+import { parseTaskSearchQuery } from '../../../packages/contracts/src/task-search.js';
+import { pageTaskSearch } from '../../../packages/db/src/task-search.js';
 import { MockAdapter } from '../../../packages/adapters/mock/src/index.js';
 
 export async function createApp(
@@ -759,17 +761,7 @@ export async function createApp(
       );
   });
   app.get('/api/v1/search', async (request) => {
-    const q = text(record(request.query).q, '搜索', 160).toLocaleLowerCase();
-    return {
-      items: store
-        .tasks()
-        .filter((task) =>
-          (task.title + ' ' + task.description + ' ' + task.shortId)
-            .toLocaleLowerCase()
-            .includes(q),
-        )
-        .slice(0, 30),
-    };
+    return pageTaskSearch(store.tasks(), parseTaskSearchQuery(request.query));
   });
   for (const url of ['/api/v1/events', '/api/v1/tasks/:taskId/events'])
     app.get(url, async (request, reply) => {

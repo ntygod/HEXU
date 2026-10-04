@@ -1,3 +1,6 @@
+.command-search-body {
+  min-width: 0;
+}
 .command-search-field {
   display: flex;
   align-items: center;
@@ -26,6 +29,10 @@
   margin-top: var(--hx-space-4);
   max-height: min(420px, 50dvh);
   overflow: auto;
+  overscroll-behavior: contain;
+}
+.command-results:empty {
+  margin-top: 0;
 }
 .command-results > button {
   display: flex;
@@ -65,12 +72,44 @@
 }
 .command-results small {
   color: var(--hx-text-secondary);
+  overflow-wrap: anywhere;
 }
 .command-results > p {
   padding: var(--hx-space-3);
   color: var(--hx-text-secondary);
 }
+.command-search-body > .command-search-error {
+  color: var(--hx-danger-text);
+  margin-top: var(--hx-space-3);
+  overflow-wrap: anywhere;
+}
+.command-search-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  margin-top: var(--hx-space-3);
+}
+.command-search-footer > p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.command-search-footer > .button {
+  max-width: 100%;
+  white-space: normal;
+}
 @media (max-width: 500px) {
+  .command-search-field input,
+  .command-results > button,
+  .command-search-footer > .button {
+    min-height: var(--hx-touch-target);
+  }
+  .dialog:has(.command-search-body) > .dialog-heading > .icon-button {
+    min-width: var(--hx-touch-target);
+    min-height: var(--hx-touch-target);
+  }
   .command-results > button {
     flex-wrap: wrap;
   }

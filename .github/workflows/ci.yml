@@ -83,6 +83,8 @@ jobs:
             artifacts/233-workbench-cancelled-mobile-light.png
             artifacts/234-result-library-search-dark.png
             artifacts/235-result-library-search-mobile-light.png
+            artifacts/236-task-search-pagination-dark.png
+            artifacts/237-task-search-pagination-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -260,6 +262,17 @@ jobs:
             test-results/result-library-search-*/trace.zip
             test-results/result-library-search-*/test-failed-*.png
             test-results/result-library-search-*/error-context.md
+          retention-days: 7
+
+      - name: Upload task-search-pagination failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-search-pagination-failures
+          path: |
+            test-results/task-search-pagination-*/trace.zip
+            test-results/task-search-pagination-*/test-failed-*.png
+            test-results/task-search-pagination-*/error-context.md
           retention-days: 7
 
   check:

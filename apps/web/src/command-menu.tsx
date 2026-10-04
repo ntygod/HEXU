@@ -1,19 +1,39 @@
-import { useEffect, useState } from 'react';
-import type { Task } from '../../../packages/contracts/src/index.js';
-import { request } from '../../../packages/client/src/index.js';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog, Icon, StatusBadge, type IconName } from '../../../packages/ui/src/index.js';
 import { go, useApp } from './state.js';
+import { useTaskSearchPages } from './task-search-pages.js';
 import './command-menu.css';
 export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
   const { data } = useApp();
+  const [q, setQ] = useState('');
+  const search = useTaskSearchPages(q, data.tasks);
+  const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const restartRef = useRef<HTMLButtonElement>(null);
+  const focusedResult = useRef<HTMLElement | null>(null);
+  const committedScope = useRef(search.scope);
+  const renderedScope = useRef(search.scope);
+  renderedScope.current = search.scope;
+  const close = () => {
+    search.cancel();
+    onClose();
+  };
   const commands: { name: string; icon: IconName; action: () => void }[] = [
-    { name: '新建任务', icon: 'plus', action: onNewTask },
+    {
+      name: '新建任务',
+      icon: 'plus',
+      action: () => {
+        search.cancel();
+        onNewTask();
+      },
+    },
     {
       name: '打开工作台',
       icon: 'home',
       action: () => {
         go('/');
-        onClose();
+        close();
       },
     },
     {
@@ -21,7 +41,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       icon: 'folder',
       action: () => {
         go('/projects');
-        onClose();
+        close();
       },
     },
     {
@@ -29,7 +49,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       icon: 'box',
       action: () => {
         go('/results');
-        onClose();
+        close();
       },
     },
     {
@@ -37,58 +57,58 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       icon: 'settings',
       action: () => {
         go('/settings');
-        onClose();
+        close();
       },
     },
   ];
-  const [q, setQ] = useState(''),
-    [items, setItems] = useState<Task[]>([]),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  useEffect(() => {
-    const controller = new AbortController();
-    if (!q.trim()) {
-      setItems([]);
-      setBusy(false);
-      setError('');
-      return () => controller.abort();
+  useLayoutEffect(() => {
+    if (committedScope.current !== search.scope) {
+      const previousResult = focusedResult.current;
+      if (
+        previousResult &&
+        !previousResult.isConnected &&
+        (!document.activeElement || document.activeElement === document.body)
+      )
+        inputRef.current?.focus();
+      focusedResult.current = null;
+      committedScope.current = search.scope;
     }
-    setBusy(true);
-    setItems([]);
-    setError('');
-    const timer = setTimeout(
-      () =>
-        request<{ items: Task[] }>(`/search?q=${encodeURIComponent(q.trim())}`, {
-          signal: controller.signal,
-        })
-          .then((result) => {
-            if (!controller.signal.aborted) {
-              setItems(result.items);
-              setError('');
-            }
-          })
-          .catch((error) => {
-            if (error.name !== 'AbortError') {
-              setItems([]);
-              setError(error.message);
-            }
-          })
-          .finally(() => {
-            if (!controller.signal.aborted) setBusy(false);
-          }),
-      150,
-    );
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [q]);
+  }, [search.scope]);
+  useLayoutEffect(() => {
+    if (search.needsRestart) restartRef.current?.focus();
+    else if (search.focusTaskId) {
+      const row = Array.from(
+        listRef.current?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+      ).find((button) => button.dataset.taskId === search.focusTaskId);
+      row?.focus();
+    }
+  }, [search.needsRestart, search.focusTaskId]);
+  const status = !q.trim()
+    ? '输入关键词，搜索当前可见的任务。'
+    : search.needsRestart
+      ? '搜索结果已失效，请重新搜索。'
+      : search.busy === 'initial'
+        ? '正在搜索…'
+        : !search.items.length
+          ? search.error
+            ? '搜索失败，请重试。'
+            : '没有找到匹配的任务。'
+          : `已显示 ${search.items.length} 项任务，${
+              search.busy === 'more'
+                ? '正在加载更多…'
+                : search.error
+                  ? '可重试加载更多'
+                  : search.nextCursor
+                    ? '可继续加载'
+                    : '已加载全部结果'
+            }`;
   return (
-    <Dialog title="搜索与快捷操作" onClose={onClose} wide>
-      <div className="dialog-body">
+    <Dialog title="搜索与快捷操作" onClose={close} wide>
+      <div className="dialog-body command-search-body">
         <label className="command-search-field">
           <Icon name="search" />
           <input
+            ref={inputRef}
             autoFocus
             aria-label="全局搜索"
             maxLength={160}
@@ -98,7 +118,6 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           />
           <kbd>ESC</kbd>
         </label>
-        {error && <p role="alert">{error}</p>}
         {commands.some((command) => command.name.includes(q.trim())) && (
           <div className="command-actions" aria-label="快捷操作">
             <span className="command-section-label">快捷操作</span>
@@ -113,14 +132,39 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
               ))}
           </div>
         )}
-        <div className="command-results">
-          {items.length > 0 && <span className="command-section-label">当前可见任务</span>}
-          {items.map((task) => (
+        <div
+          className="command-results"
+          id={`${id}-results`}
+          ref={listRef}
+          role="region"
+          aria-label="任务搜索结果"
+          aria-busy={!!search.busy}
+          onFocusCapture={(event) => {
+            if (event.target instanceof HTMLElement) focusedResult.current = event.target;
+          }}
+          onBlurCapture={(event) => {
+            if (
+              event.relatedTarget instanceof Node &&
+              event.currentTarget.contains(event.relatedTarget)
+            )
+              return;
+            // Removing a focused row may omit blur or dispatch it during the
+            // reset commit. Keep that row until the layout check can recover it.
+            if (
+              renderedScope.current === committedScope.current ||
+              (event.relatedTarget && event.relatedTarget !== document.body)
+            )
+              focusedResult.current = null;
+          }}
+        >
+          {search.items.length > 0 && <span className="command-section-label">当前可见任务</span>}
+          {search.items.map((task) => (
             <button
               key={task.id}
+              data-task-id={task.id}
               onClick={() => {
                 go(`/tasks/${task.id}`);
-                onClose();
+                close();
               }}
             >
               <Icon name="file" />
@@ -132,15 +176,47 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
               <Icon name="arrow" size={15} />
             </button>
           ))}
-          {!items.length && (
-            <p className="muted compact-empty">
-              {!q.trim()
-                ? '输入关键词，搜索当前可见的任务。'
-                : busy
-                  ? '正在搜索…'
-                  : '没有找到匹配的任务。'}
-            </p>
-          )}
+        </div>
+        {search.error && (
+          <p className="command-search-error" role="alert">
+            {search.error}
+          </p>
+        )}
+        <div className="command-search-footer">
+          <p
+            id={`${id}-status`}
+            role="status"
+            aria-label="任务搜索分页状态"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {status}
+          </p>
+          {search.needsRestart || (search.error && !search.items.length) ? (
+            <button
+              className="button secondary"
+              ref={restartRef}
+              aria-controls={`${id}-results`}
+              aria-describedby={`${id}-status`}
+              onClick={() => {
+                inputRef.current?.focus();
+                search.restart();
+              }}
+            >
+              {search.needsRestart ? '重新搜索' : '重试搜索'}
+            </button>
+          ) : search.nextCursor ? (
+            <button
+              className="button secondary"
+              disabled={!!search.busy}
+              aria-busy={search.busy === 'more'}
+              aria-controls={`${id}-results`}
+              aria-describedby={`${id}-status`}
+              onClick={search.loadMore}
+            >
+              {search.busy === 'more' ? '加载中…' : search.error ? '重试加载更多' : '加载更多任务'}
+            </button>
+          ) : null}
         </div>
       </div>
     </Dialog>

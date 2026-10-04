@@ -308,3 +308,8 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 迁移 18 在原 assistance_grants 增加 model_text，不改变 snapshot_reply 记录或旧授权。Run 增加可选 purpose=assist 和 assistanceId；Assistance 增加 recipientKind=ai 及固定输入/Run 关联。节点 policy 只有明确 textAssistance:true 才允许该种派发。命令使用独立文本环境 ID 而非项目目录，不能由浏览器填写路径/会话。
 
 新增 `GET /tasks/:id/ai-assistance-options` 和 `POST /tasks/:id/ai-assistances`（201 + AssistanceDetail）。创建严格限定来源哈希/任务修订、单片段、问题、节点/policyHash 与两项同意；事务同时保存授权、辅助 Run、派发、事件及回执。读取和取消复用 Assistance，不能通过真人 replies 接口触发模型。主编程查询排除 assist，完整执行历史保留。协议与剩余边界见 [AI 文本协助](../engineering/ai-text-assistance.md)。
+
+
+## 普通Task搜索分页
+
+`GET /api/v1/search?q=...&cursor=...` 继续使用现有当前可见Task集合；q按原规则去首尾空白、最多160字符并转小写，匹配标题、说明和编号拼接文本。首批不带cursor，响应为 `{ items: Task[], nextCursor: string | null }`，每批最多30项。cursor最多1024字符，绑定规范化查询和当前有序匹配DTO序列，不是访问凭据或历史快照。非法/不匹配查询返回INVALID_CURSOR/400，当前序列变化返回SEARCH_RESULTS_CHANGED/409；客户端清除旧批次并明确重新搜索。读取不更新业务表，无新增迁移/写操作。
