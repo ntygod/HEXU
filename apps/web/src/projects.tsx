@@ -229,29 +229,36 @@ export function ProjectPage({ id }: { id: string }) {
           onSelect={(source) => setTab('sources', source)}
         />
       ) : tab === 'results' ? (
-        <div className="work-result-grid stagger">
-          {results.map((result) => (
-            <ResultCard key={result.id} result={result} />
-          ))}
-          {!results.length && (
-            <Empty
-              icon="box"
-              title="这个项目还没有成果"
-              description="在任务里把进展分享出来，反馈会留在原任务上。"
-              action={
-                <Button
-                  variant="primary"
-                  disabled={!editable}
-                  onClick={() => {
-                    setTab('tasks');
-                  }}
-                >
-                  去任务里推进
-                </Button>
-              }
-            />
-          )}
-        </div>
+        <>
+          <div className="work-section-heading">
+            <Link to={`/results?projectId=${encodeURIComponent(project.id)}`}>
+              在成果库中查找 <Icon name="arrow" size={15} />
+            </Link>
+          </div>
+          <div className="work-result-grid stagger">
+            {results.map((result) => (
+              <ResultCard key={result.id} result={result} />
+            ))}
+            {!results.length && (
+              <Empty
+                icon="box"
+                title="这个项目还没有成果"
+                description="在任务里把进展分享出来，反馈会留在原任务上。"
+                action={
+                  <Button
+                    variant="primary"
+                    disabled={!editable}
+                    onClick={() => {
+                      setTab('tasks');
+                    }}
+                  >
+                    去任务里推进
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        </>
       ) : tab === 'overview' ? (
         <div className="project-overview">
           <section className="work-section">

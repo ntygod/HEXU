@@ -81,6 +81,8 @@ jobs:
             artifacts/231-workbench-participating-mobile-light.png
             artifacts/232-workbench-cancelled-dark.png
             artifacts/233-workbench-cancelled-mobile-light.png
+            artifacts/234-result-library-search-dark.png
+            artifacts/235-result-library-search-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -247,6 +249,17 @@ jobs:
             test-results/workbench-轻量新建*/trace.zip
             test-results/workbench-轻量新建*/test-failed-*.png
             test-results/workbench-轻量新建*/error-context.md
+          retention-days: 7
+
+      - name: Upload result-library-search failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-result-library-search-failures
+          path: |
+            test-results/result-library-search-*/trace.zip
+            test-results/result-library-search-*/test-failed-*.png
+            test-results/result-library-search-*/error-context.md
           retention-days: 7
 
   check:

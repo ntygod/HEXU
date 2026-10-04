@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ResultDetail } from '../../../packages/contracts/src/results.js';
 import { Button, Empty, Icon, Skeleton, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp, canEditTask, go } from './state.js';
@@ -8,33 +8,140 @@ import { PrepareIntegration } from './integrations.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { OrderPreview } from './preview.js';
 import { ResultCard } from './work-cards.js';
+import {
+  filterResultLibrary,
+  parseResultLibraryFilters,
+  RESULT_LIBRARY_QUERY_LIMIT,
+  resultBodyMatchSnippet,
+  resultLibraryUrl,
+} from './result-library-filters.js';
 import './work-pages.css';
+import './result-library.css';
 
 export function Results() {
   const { data } = useApp();
+  const [search, setSearch] = useState(() => location.search);
+  const queryInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const update = () => setSearch(location.search);
+    window.addEventListener('popstate', update);
+    return () => window.removeEventListener('popstate', update);
+  }, []);
+  // Re-derive from current data so project availability and matches stay current.
+  const filters = parseResultLibraryFilters(search, data.projects);
+  const hasProjectFilter = new URLSearchParams(search).has('projectId');
+  const project = data.projects.find((item) => item.id === filters.projectId);
+  const results = filterResultLibrary(data.results, data.tasks, filters);
+  const scopeResults = filterResultLibrary(data.results, data.tasks, { ...filters, q: '' });
+  const tasksById = new Map(data.tasks.map((task) => [task.id, task]));
+  const query = filters.q.trim();
+  const scope = project
+    ? `${project.name}${project.archivedAt ? ' · 已归档' : ''}`
+    : '全部项目与个人工作';
+  function update(changes: { q?: string; projectId?: string }, replace = false) {
+    const url = resultLibraryUrl(location.href, changes);
+    history[replace ? 'replaceState' : 'pushState'](history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+  function clear() {
+    update({ q: '', projectId: '' });
+    queryInput.current?.focus();
+  }
   return (
     <div className="work-page">
       <header className="work-page-heading">
         <div>
           <span className="eyebrow">来自任务中的真实记录</span>
           <h1>成果</h1>
-          <p>查看已分享的进展，提出反馈并继续工作。</p>
+          <p>按项目与关键词查找成果，查看已分享的进展并继续工作。</p>
         </div>
-        <span className="badge neutral">{data.results.length} 项成果</span>
       </header>
+      <section className="result-library-filters" aria-label="成果筛选">
+        <div className="result-library-controls">
+          <label className="result-library-project">
+            项目
+            <select
+              aria-label="成果项目筛选"
+              value={filters.projectId || (hasProjectFilter ? 'invalid' : '')}
+              onChange={(event) => update({ projectId: event.target.value })}
+            >
+              <option value="">全部项目与个人工作</option>
+              {hasProjectFilter && filters.error && !project && (
+                <option value={filters.projectId || 'invalid'} disabled>
+                  链接中的项目筛选无效
+                </option>
+              )}
+              {data.projects.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                  {item.archivedAt ? ' · 已归档' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="result-library-query">
+            关键词
+            <input
+              ref={queryInput}
+              type="search"
+              aria-label="搜索成果"
+              aria-describedby="result-library-search-help"
+              value={filters.q}
+              maxLength={RESULT_LIBRARY_QUERY_LIMIT}
+              placeholder="成果标题、正文或任务标题、编号…"
+              onChange={(event) => update({ q: event.target.value }, true)}
+            />
+          </label>
+          {filters.active && <Button onClick={clear}>清除成果筛选</Button>}
+        </div>
+        <p className="result-library-help" id="result-library-search-help">
+          搜索成果当前版本的标题、正文，以及关联任务的标题和编号；不包含历史版本。
+        </p>
+        <p className="result-library-count" role="status" aria-label="成果筛选计数">
+          {filters.error
+            ? '当前筛选无效 · 0 项成果'
+            : query
+              ? `${scope} · 匹配 ${results.length} / ${scopeResults.length} 项成果`
+              : `${scope} · ${scopeResults.length} 项成果`}
+        </p>
+        {filters.error && <p role="alert">{filters.error}</p>}
+      </section>
       <div className="work-result-grid stagger">
-        {data.results.map((result) => (
-          <ResultCard key={result.id} result={result} />
+        {results.map((result) => (
+          <ResultCard
+            key={result.id}
+            result={result}
+            showContext
+            bodyMatch={resultBodyMatchSnippet(result, tasksById.get(result.taskId), filters.q)}
+          />
         ))}
       </div>
-      {!data.results.length && (
+      {!results.length && (
         <Empty
-          title="还没有分享成果"
-          description="在任务中保存一份成果说明，就会出现在这里。"
+          title={
+            filters.error
+              ? '无法应用成果筛选'
+              : !scopeResults.length
+                ? project
+                  ? '这个项目还没有可见成果'
+                  : '还没有分享成果'
+                : '没有匹配的成果'
+          }
+          description={
+            filters.error
+              ? '请修改筛选条件或清除筛选后继续查找。'
+              : !scopeResults.length
+                ? project
+                  ? '当前项目没有可查看的成果，可以选择其他项目或清除筛选。'
+                  : '在任务中保存一份成果说明，就会出现在这里。'
+                : `在“${scope}”中没有找到包含“${query}”的当前成果，试试其他关键词。`
+          }
           action={
-            <Link className="button soft" to="/projects">
-              去看项目 <Icon name="arrow" size={15} />
-            </Link>
+            !filters.active ? (
+              <Link className="button soft" to="/projects">
+                去看项目 <Icon name="arrow" size={15} />
+              </Link>
+            ) : undefined
           }
         />
       )}
