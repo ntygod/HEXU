@@ -164,7 +164,11 @@ async function captureExpanded(page: Page, task: Task, path: string, mobile = fa
   const link = taskRow(page, task);
   const footer = section(page).locator('.workbench-task-list-footer');
   await link.scrollIntoViewIfNeeded();
-  await footer.scrollIntoViewIfNeeded();
+  // Put the evidence inside the viewport, not against its bottom edge.
+  // CI197's default scroll stopped with a partially clipped desktop footer.
+  await footer.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
   await expect(link).toHaveAttribute('href', `/tasks/${task.id}`);
   await expect(link.locator('strong')).toHaveText(task.title);
   await expect(link).toContainText('个人工作');

@@ -55,7 +55,7 @@
 | 父 [PR61](https://github.com/ntygod/HEXU/pull/61) 关注筛选 | head `017df91c6a497b8b9d75bd6b3243dd8d1e2516c8`、tree `6bdd38ffcf278932acac44fc79adc6d1d4d1a320`；[CI193 / 37213770407](https://github.com/ntygod/HEXU/actions/runs/37213770407) 工程 **637/637**、Chromium **233/233、18.8m** 与汇总全绿。219/220 原图于 16:00 UTC 实际查看；最终正文已更新并回读。详见[记录](history/2026-10-04-project-task-attention-filter.md) |
 | 父 [PR62](https://github.com/ntygod/HEXU/pull/62) 版本固定链接 | head `928c2719c714e951833ec0989182fe6b400d43e6`、tree `ac4d149308edf89e3dbc51b5318390e74ed2952b`；[CI194 / 37215837307](https://github.com/ntygod/HEXU/actions/runs/37215837307) 工程 **637/637**、Chromium **234/234、17.2m** 与汇总全绿。221/222 和107/108 原图于 16:31 UTC 实际查看；最终正文已回读，见[记录](history/2026-10-04-result-version-link.md) |
 | 父 [PR63](https://github.com/ntygod/HEXU/pull/63) 说明命中片段 | head `e3afb212312ed7cf3278947e67a5b7c1f624133b`、tree `d77f80e6086695b8d2cb2ab980c5c8de0d465127`；[CI196 / 37219902233](https://github.com/ntygod/HEXU/actions/runs/37219902233) 工程 **647/647**、Chromium **237/237、18.7m** 与汇总全绿。最终223/224和211原图于17:37 UTC实际查看；最终正文17:38 UTC更新并回读。首轮旧ACK测试失败和修正见[记录](history/2026-10-04-project-task-match-snippets.md) |
-| 当前工作台任务列表 | 保留原mine/team与状态/活动条件及顺序，默认8项、逐批展开/收起并显示当前列表计数；不新增数据查询，前8项外的无项目任务可沿原链接打开。当前实现和检查进行中，精确head完整验收尚待完成，见[记录](history/2026-10-04-workbench-task-list.md) |
+| 当前工作台任务列表 | 保留原mine/team与状态/活动条件及顺序，默认8项、逐批展开/收起并显示当前列表计数；不新增数据查询，前8项外的无项目任务可沿原链接打开。首轮CI197工程647通过、浏览器242通过/1桌面截图入屏断言失败；实际小包trace/像素已读，只修截图滚动准备并保留全部断言，最终新head完整验收尚待完成，见[记录](history/2026-10-04-workbench-task-list.md) |
 
 旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58/60/61/62/63 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
 
