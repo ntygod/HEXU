@@ -16,7 +16,8 @@ import { Brand, Button, Icon } from '../../../packages/ui/src/index.js';
 interface IdentityContextValue {
   state: IdentityState;
   spaceId: string;
-  refresh(preferred?: string): Promise<void>;
+  /** Whether this response still owns the current identity/space selection. */
+  refresh(preferred?: string): Promise<boolean>;
   switchSpace(id: string): void;
   signOut(): Promise<void>;
 }
@@ -63,12 +64,14 @@ export function IdentityGate({ children }: { children: ReactNode }) {
     try {
       const next = await request<IdentityState>('/identity');
       // A newer identity read, explicit space choice or sign-out owns the UI.
-      if (id !== refreshId.current) return;
+      if (id !== refreshId.current) return false;
       select(next, preferred);
       setState(next);
       setError('');
+      return true;
     } catch (error) {
       if (id === refreshId.current) throw error;
+      return false;
     }
   };
   useEffect(() => {
@@ -257,8 +260,7 @@ function AccountEntry() {
                     method: 'POST',
                     body: { token, name, password },
                   });
-                  await refresh(result.spaceId);
-                  home();
+                  if (await refresh(result.spaceId)) home();
                 } else {
                   await request(setup ? '/identity/setup' : '/identity/sign-in', {
                     method: 'POST',
@@ -266,8 +268,7 @@ function AccountEntry() {
                       ? { name, email, password, code: code.trim() }
                       : { email, password },
                   });
-                  await refresh();
-                  home();
+                  if (await refresh()) home();
                 }
               } catch (e) {
                 setError((e as Error).message);

@@ -199,7 +199,13 @@ async function events(page: Page) {
     () => (window as unknown as { __identityEvents: string[] }).__identityEvents,
   );
 }
-async function unchanged(page: Page, account: Account, spaceId: string, before: string[]) {
+async function unchanged(
+  page: Page,
+  account: Account,
+  spaceId: string,
+  before: string[],
+  path = '/',
+) {
   await page.evaluate(
     () =>
       new Promise<void>((resolve) =>
@@ -208,7 +214,7 @@ async function unchanged(page: Page, account: Account, spaceId: string, before: 
   );
   // Observe immediately after delivery; retrying assertions could hide a teardown.
   expect(await events(page)).toEqual(before);
-  expect(new URL(page.url()).pathname).toBe('/');
+  expect(new URL(page.url()).pathname).toBe(path);
   expect(await space(page).inputValue()).toBe(spaceId);
   expect(await page.locator('.workbench-profile').getAttribute('title')).toBe(account.user.name);
   expect(await fresh(page).isVisible()).toBe(true);
@@ -358,6 +364,7 @@ for (const reset of ['space', 'identity'] as const) {
         await space(page).selectOption(`personal-${f.bob.user.id}`);
         await expect(space(page)).toHaveValue(`personal-${f.bob.user.id}`);
       }
+      await settings(page);
       await draft(page);
       const before = await events(page);
       await old.deliver();
@@ -366,6 +373,7 @@ for (const reset of ['space', 'identity'] as const) {
         reset === 'identity' ? f.alice : f.bob,
         reset === 'identity' ? f.alice.spaceId : `personal-${f.bob.user.id}`,
         before,
+        '/settings',
       );
     });
   });

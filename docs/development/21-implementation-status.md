@@ -29,7 +29,7 @@
 | 确认弹窗的未知结果恢复 | 完成/取消确认首次发送固定动作/正文/幂等键，关闭后同 Task 状态入口先恢复原包；有效成功 ACK 后读取失败只 GET 刷新 | PR56 已验收，来源 [PR55](https://github.com/ntygod/HEXU/pull/55)；另补 complete/cancel/reopen 旧回执事务内当前编辑权复核；Provider 内存按身份/空间隔离，当前撤权清除，不跨硬刷新，见[用法](../engineering/task-completion-confirmation.md) |
 | 直接状态的原请求恢复 | start/reopen/无活动 complete 首次点击仍立即 POST；发送前固定原 Task/动作/正文/修订/键，只有未知结果或有效 ACK 后 GET 失败才显示恢复；所有同 Task 状态入口先恢复原包 | PR57 已验收、冻结未合并；start 只把 Task 标记为 in_progress，不启动 Run。复用上述 Provider/outcome/当前权限与 GET-only 路径，无新后端/API/schema，见[记录](history/2026-10-02-direct-task-status-recovery.md) |
 | 普通创建的原请求恢复 | 第一次 POST 前保存创建正文/幂等键；所有新建入口优先恢复同身份/空间中的未结原包，未知结果确认同一请求，有效 ACK 后只 GET；创建请求的旧身份/空间拒绝事件不会清掉新 Provider | PR58 已验收、冻结未合并，属于 04-01/03；Provider 临时内存不跨硬刷新，无后端/字段/schema/协议扩展，见[记录](history/2026-10-03-task-creation-request-recovery.md)及其 PR 最终验收 |
-| 账号/空间迟到响应 | 普通 HTTP 失效通知按发送时账号/空间代次隔离；旧身份查询不覆盖后来的查询、空间选择或退出 | 属于 03-01；本机实际账号 9/9 新 E2E 通过，完整 CI 待补；当前拒绝仍恢复登录/清空旧空间，原 ApiError 与服务端权限保持，见[记录](history/2026-10-04-identity-late-response.md) |
+| 账号/空间迟到响应 | 普通 HTTP 失效通知按发送时账号/空间代次隔离；旧身份查询不覆盖后来的查询、空间选择或退出，也不触发旧调用者的导航 | 属于 03-01；本机实际账号 9/9 新 E2E 通过，完整 CI 待补；当前拒绝仍恢复登录/清空旧空间，原 ApiError 与服务端权限保持，见[记录](history/2026-10-04-identity-late-response.md) |
 
 上表前四项属于已验收、未合并的 PR56，第五项属于 PR57，第六项属于 PR58；最后一项是用户指定的迟到响应修正。父 PR 仅从 main 提取 PR40/41/48/49/50/55 及 [PR33](https://github.com/ntygod/HEXU/pull/33) 普通事务回调这个最小依赖；本轮不修改冻结 PR56/57/58 或其他旧堆叠分支，没有新增数据库 schema/迁移。本轮不检查或修改暂停的原生、文件、私有材料和 registry 范围，[问题52](https://github.com/ntygod/HEXU/issues/52) 保持暂停，也不作整包安全结论。
 
@@ -50,7 +50,7 @@
 | 父 [PR56](https://github.com/ntygod/HEXU/pull/56) 冻结树 `96b7cb89` | 远端 head `a06998ab9035bb3164a271d77ec884204febfaad` 与本地 `cb650c5` 同树。[CI183 / 37051207701](https://github.com/ntygod/HEXU/actions/runs/37051207701)：工程 **618/618**、Chromium **172/172** 与汇总全部 success；107/108、201—211 共 13 张原图于 19:19 UTC 实际查看，PR 正文于 19:21 UTC 回读。草稿未合并，详细耗时、artifact 与早期本地失败见[父记录](history/2026-10-02-task-reliability-integration.md) |
 | 父 [PR57](https://github.com/ntygod/HEXU/pull/57) 冻结树 `49c2d825` | head `0947dd5b238aab88947caebfe9d979005040c0e3`。[CI185 / 37101126911](https://github.com/ntygod/HEXU/actions/runs/37101126911) 的 engineering/browser/check 均终态 success；用户交接记录工程 **622/622**，浏览器日志复核 **199/199、17.4m**。精确 head 的 212—214 与 206/207/209/210/211 共 8 张原图于 2026-10-03 06:28 UTC 实际查看，PR 正文于 06:29:57 UTC 补充并回读；artifact 指纹与先前失败见[直接状态记录](history/2026-10-02-direct-task-status-recovery.md) |
 | 父 [PR58](https://github.com/ntygod/HEXU/pull/58) 冻结 head `7f7b9328` | [CI188 / 37108859359](https://github.com/ntygod/HEXU/actions/runs/37108859359)：工程 **622/622**、Chromium **227/227** 与汇总全部 success；215/216 原图与冻结输入可读性的验收以其 PR 正文为据。首次选择器失败及后续修正保留在[创建恢复记录](history/2026-10-03-task-creation-request-recovery.md) |
-| 当前迟到响应修正 | 在父源码上运行本次 9 条真实账号 E2E：**2 通过、7 失败**；修复后 **9/9 通过、14.4 秒**。普通 POST/GET 的旧真实 401/空间撤权 403、同账号重新登录及旧身份成功快照都已复现；当前拒绝对照保持。类型、独立 E2E 严格类型、格式、UI token 与构建通过；完整 CI 与交接结果由本轮 PR 正文补齐，见[记录](history/2026-10-04-identity-late-response.md) |
+| 当前迟到响应修正 | 在父源码上运行本次 9 条真实账号 E2E：**2 通过、7 失败**；加强的导航断言在初版另复现 2 条失败。最终 **9/9 通过、14.3 秒**。普通 POST/GET 的旧真实 401/空间撤权 403、同账号重新登录及旧身份成功快照都已复现；当前拒绝对照保持。类型、独立 E2E 严格类型、格式、UI token 与构建通过；完整 CI 与交接结果由本轮 PR 正文补齐，见[记录](history/2026-10-04-identity-late-response.md) |
 
 旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
 
