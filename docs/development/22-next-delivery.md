@@ -2,27 +2,25 @@
 
 更新：2026-10-04。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：验收项目任务状态筛选与已取消任务导航
+## 下一项：发布并验收已检查的关注内容筛选候选
 
-从已验收、冻结 [PR58](https://github.com/ntygod/HEXU/pull/58) 的 `7f7b9328033e48fbcde26be021e30d0ade9c51d8` 开独立兄弟分支。该能力来源于既有 04-03/06 规划与旧 [PR42](https://github.com/ntygod/HEXU/pull/42) 普通产品行为，本轮只选择性恢复状态展示，不搬整提交或其他依赖。用户 [PR59](https://github.com/ntygod/HEXU/pull/59) 保留原 head；本分支没有纳入或重新验证其身份修正。
+基于已验收、冻结 [PR60](https://github.com/ntygod/HEXU/pull/60) head `59ef20a7ae55ad6cfd77a2acc768e0d610a36cd5`、tree `12440955d081d55bccd39a1e0ca218a17b434319` 开独立分支，仅选择性恢复旧 PR42 中关注文本有无的普通 UI 查找。现有列表/看板显示 attention，但没有相应筛选入口；不为此引入新模型或后台能力。
 
-父 PR58 精确 CI188 已完成 622/622 工程、227/227 Chromium、汇总与最终 215/216 原图验收，详见[记录](history/2026-10-03-task-creation-request-recovery.md#ci188最终验收与冻结)。main、既有草稿保持原提交，不合并或部署。受限身份诊断与问题52、原生/文件/私有材料/registry 审阅继续暂停。
+父 PR60 的 [CI192](https://github.com/ntygod/HEXU/actions/runs/37183505095) 工程 629/629、Chromium 230/230 与汇总通过，最终 217/218 原图已实际查看。用户已明确允许自主发布/更新开发 PR 功能说明、测试结果与验收记录；父正文于 15:35 UTC 更新并回读一致。本轮代码、定向测试及静态复核已完成，继续独立草稿与精确 head 完整 CI。main、既有草稿保持原提交，不合并或部署，用户 PR59、受限身份诊断和问题52/文件/原生/私有材料/registry 审阅不动。
 
 ## 本轮范围与验收
 
-1. 项目当前可见 Task 的列表/看板共享状态选择，并与原人员/关键词取交集；默认不含已取消，明确选择 todo/in_progress/done/cancelled。没有 API、数据库、身份或状态命令改动。
-2. URL 保存状态和视图，切视图、刷新及返回/前进一致；空、重复、未知或多余空白的状态明确报错并显示零匹配。清除保留其他导航参数与锚点。
-3. 已取消看板列只读，原任务链接可达；筛选不改 Task 内容、修订、状态或 Run，项目总览/成果保持原范围。
-4. 定向纯逻辑、类型/格式/UI token/构建和独立复核后，在独立 draft 验证本分支的精确 head CI。现有工作流不引用被拦诊断，且本分支不包含 PR59 新身份用例；不能据此替代 PR59 或受限范围的验收。
-5. 原图 **217-project-task-status-dark.png** 与 **218-project-task-status-mobile-light.png** 分别展示实际取消卡片/筛选和 390px 浅色可达导航，截图前检查目标可见、命中和内容宽度。实际检查与任何失败只记录在[本轮历史](history/2026-10-04-project-task-status-navigation.md)，不把编译/发现或父 CI 当本轮通过。
-
-CI191 工程 629/629、浏览器 229/230，唯一失败是测试把 option 的禁用断言经 label 重定向到了应启用的 select。实际 trace/像素和锁定测试库源码已核对，现只修选中 option 原生属性与 select 可用性的准确断言，所有非法值/修复/清除要求保留；产品不变，最终新 head 完整 CI 与 217/218 仍待验收，详见[失败记录](history/2026-10-04-project-task-status-navigation.md#ci191修正-option-禁用断言的目标)。
+1. 仅判断现有 Task.attention 去空白后是否有文本，提供全部 / 有关注内容 / 无关注内容，与当前状态、人员和关键词交集；不推断等待/阻塞/暂停，不读取 Run。
+2. URL `attention=present|absent`，缺省不筛；空、未知、重复或多余空白值明确报错并零匹配。清除、刷新、前进/返回及列表/看板一致，保留其他导航参数与锚点。
+3. 当前可见文本更新后按新投影匹配；筛选不发业务写请求、不改 TaskDetail，保留默认排除取消、显式取消列只读及项目总览/成果原范围。
+4. 本地已完成 15/15 定向（8 新关注用例 + 7 原状态）、完整类型/格式/UI token/构建与独立静态复核。3 条新普通项目 E2E 通过严格类型/发现，全量发现 233 条、尚未运行；没有本地 Chromium、身份安全或文件诊断，不把发现当执行。
+5. 计划原图 **219-project-task-attention-dark.png** 与 **220-project-task-attention-mobile-light.png** 展示实际关注筛选/文本与 390px 可达性；随本轮精确 CI 实际生成/查看。当前没有新远端验收，证据归[本轮记录](history/2026-10-04-project-task-attention-filter.md)。
 
 ## 开始时读取
 
 - [04 任务工作包](04-tasks-requirements.md)、[UI](../harness/ui.md)、[项目任务](../harness/projects-tasks.md)和[开发流程](../harness/development.md)。
-- [筛选用法](../engineering/task-participants.md#项目任务状态选择)、[项目视图](../../apps/web/src/projects.tsx)、[筛选组件](../../apps/web/src/project-task-filters.tsx)与本轮纯状态 helper 和浏览器测试。
-- 不修改 `state.tsx`、身份/client 请求归属、后台权限、模型调度或文件原语；不从已冻结旧堆叠恢复暂停审阅。
+- [筛选用法](../engineering/task-participants.md#项目任务关注内容选择)、[项目视图](../../apps/web/src/projects.tsx)、[筛选组件](../../apps/web/src/project-task-filters.tsx)和本轮纯 helper/测试。
+- 不修改 state/client/身份、后台权限、调度或文件原语，不恢复被拦诊断；排序的持久 rank/revision 与竞争处理另列后续，不能顺手扩大。
 
 ## 剩余交付队列
 

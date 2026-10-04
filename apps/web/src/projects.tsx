@@ -4,6 +4,7 @@ import { ProjectSources } from './project-sources.js';
 import { ProjectAgreements } from './project-agreements.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
 import { matchesProjectTaskStatus, projectTaskStatusColumns } from './project-task-status.js';
+import { matchesProjectTaskAttention } from './project-task-attention.js';
 import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
 import { Avatar, Button, Empty, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
@@ -127,7 +128,8 @@ export function ProjectPage({ id }: { id: string }) {
     history.pushState({}, '', url);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
-  const { view, setView, filters, setFilter, status, setStatus, clear } = useProjectTaskFilters();
+  const { view, setView, filters, setFilter, status, setStatus, attention, setAttention, clear } =
+    useProjectTaskFilters();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
@@ -155,7 +157,10 @@ export function ProjectPage({ id }: { id: string }) {
   const visibleTasks = data.tasks.filter((task) => task.projectId === id);
   const allTasks = visibleTasks.filter((task) => task.status !== 'cancelled');
   const tasks = visibleTasks.filter(
-    (task) => matchesTaskPeopleFilters(task, filters) && matchesProjectTaskStatus(task, status),
+    (task) =>
+      matchesTaskPeopleFilters(task, filters) &&
+      matchesProjectTaskStatus(task, status) &&
+      matchesProjectTaskAttention(task, attention),
   );
   const results = data.results.filter((result) =>
     allTasks.some((task) => task.id === result.taskId),
@@ -290,13 +295,24 @@ export function ProjectPage({ id }: { id: string }) {
               setFilter={setFilter}
               status={status}
               setStatus={setStatus}
+              attention={attention}
+              setAttention={setAttention}
               clear={clear}
             />
             <span className="muted">{tasks.length} 项任务</span>
           </div>
-          {status.kind === 'invalid' ? (
+          {status.kind === 'invalid' || attention.kind === 'invalid' ? (
             <div role="alert">
-              <Empty icon="list" title="状态筛选无效" description="请重新选择状态或清除筛选。" />
+              {status.kind === 'invalid' && (
+                <Empty icon="list" title="状态筛选无效" description="请重新选择状态或清除筛选。" />
+              )}
+              {attention.kind === 'invalid' && (
+                <Empty
+                  icon="list"
+                  title="关注筛选无效"
+                  description="请重新选择关注情况或清除筛选。"
+                />
+              )}
             </div>
           ) : view === 'board' ? (
             <div
