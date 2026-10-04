@@ -553,7 +553,7 @@ test('浏览器先失去原请求后服务器才收到它，随后明确确认�
 test('完成ACK已确认后Workbench失败只刷新GET，手机浅色仍显示已知结果与锁定选择', async ({
   page,
 }) => {
-  await run(page, async (f) => {
+  await run(page, async (f, owned) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page, f, 'light');
     const outgoing = writes(page, f),
@@ -562,23 +562,59 @@ test('完成ACK已确认后Workbench失败只刷新GET，手机浅色仍显示�
       originalHistory = await history(f);
     let reads = 0;
     const pattern = `${origin}/api/v1/workbench`;
+    const responseGate = gate();
+    let injecting = true,
+      pauseResponses = false,
+      delayedReads = 0,
+      disposed = false;
+    const pendingReads: Promise<void>[] = [],
+      readErrors: unknown[] = [];
     const failRead = async (route: Route) => {
-      const response = await route.fetch();
-      expect(response.status()).toBe(200);
-      reads++;
-      await route.fulfill({
-        status: 503,
-        json: { error: { code: 'TEMPORARY_FAILURE', message: '已接收命令，工作台暂时读取失败' } },
+      if (!injecting) return route.continue();
+      const work = (async () => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        reads++;
+        if (pauseResponses) {
+          delayedReads++;
+          await responseGate.promise;
+        }
+        await route.fulfill({
+          status: 503,
+          json: { error: { code: 'TEMPORARY_FAILURE', message: '已接收命令，工作台暂时读取失败' } },
+        });
+      })().catch((error) => {
+        readErrors.push(error);
       });
+      pendingReads.push(work);
+      await work;
     };
     await page.route(pattern, failRead);
+    const failures: Disposable = {
+      async dispose(failed) {
+        if (disposed) return;
+        disposed = true;
+        // Keep the interceptor registered until every captured fetch/fulfill
+        // has settled. Unroute must not handle an already owned read first.
+        injecting = false;
+        responseGate.resolve();
+        await Promise.all(pendingReads);
+        try {
+          await page.unroute(pattern, failRead);
+        } catch (error) {
+          readErrors.push(error);
+        }
+        reportCleanup(readErrors, failed);
+      },
+    };
+    owned.push(failures);
     await openDialog(page, 'complete');
     await choice(page, 'complete').uncheck();
     const ack = page.waitForResponse(
       (reply) => reply.url() === endpoint(f, 'complete') && reply.status() === 200,
     );
-    await confirm(page, 'complete').click();
-    expect(await (await ack).json()).toMatchObject({
+    const [receipt] = await Promise.all([ack, confirm(page, 'complete').click()]);
+    expect(await receipt.json()).toMatchObject({
       id: before.id,
       status: 'done',
       revision: before.revision + 1,
@@ -595,10 +631,22 @@ test('完成ACK已确认后Workbench失败只刷新GET，手机浅色仍显示�
     await dismiss(page, 'complete').click();
     await entry(page, 'cancel').click();
     await expect(accepted(page, 'complete')).toBeVisible();
-    await page.unroute(pattern, failRead);
-    const get = page.waitForResponse((reply) => reply.url() === pattern && reply.status() === 200);
+    // Exercise the overlap deterministically with a real GET whose successful
+    // backend response is still owned by the temporary-failure interceptor.
+    pauseResponses = true;
     await refresh(page, 'complete').click();
-    await (await get).finished();
+    await expect
+      .poll(() => {
+        reportCleanup(readErrors, false);
+        return delayedReads;
+      })
+      .toBeGreaterThan(0);
+    await failures.dispose(false);
+    await expect(accepted(page, 'complete')).toBeVisible();
+    await expect(refresh(page, 'complete')).toBeEnabled();
+    const get = page.waitForResponse((reply) => reply.url() === pattern && reply.status() === 200);
+    const [response] = await Promise.all([get, refresh(page, 'complete').click()]);
+    await response.finished();
     await expect(dialog(page, 'complete')).toHaveCount(0);
     await expect(status(page)).toHaveText('已完成');
     expect(outgoing).toHaveLength(1);

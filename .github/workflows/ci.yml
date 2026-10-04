@@ -124,9 +124,9 @@ jobs:
         with:
           name: hexu-task-status-request-recovery-failures
           path: |
-            test-results/task-status-request-recovery-*/trace.zip
-            test-results/task-status-request-recovery-*/test-failed-*.png
-            test-results/task-status-request-recovery-*/error-context.md
+            test-results/task-status-request-recove*/trace.zip
+            test-results/task-status-request-recove*/test-failed-*.png
+            test-results/task-status-request-recove*/error-context.md
           retention-days: 7
       - name: Upload branch-results failures
         uses: actions/upload-artifact@v4
