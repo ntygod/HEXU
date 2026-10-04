@@ -244,7 +244,10 @@ test('非法状态链接明确报错且无匹配，清除全部筛选保留视�
     await expect(page.getByRole('alert')).toContainText('状态筛选无效');
     await expect(page.getByRole('alert')).toContainText('请重新选择状态或清除筛选。');
     await expect(statusFilter(page).locator('option:checked')).toHaveText('链接中的状态无效');
-    await expect(statusFilter(page).locator('option:checked')).toBeDisabled();
+    await expect(statusFilter(page)).toBeEnabled();
+    // toBeDisabled follows this option's wrapping label to its enabled select.
+    // Check the option's own native state; the select must still allow recovery.
+    await expect(statusFilter(page).locator('option:checked')).toHaveJSProperty('disabled', true);
     await expect(page.locator('.project-toolbar')).toContainText('0 项任务');
     await expectIds(listLinks(page), []);
     await expectIds(boardLinks(page), []);

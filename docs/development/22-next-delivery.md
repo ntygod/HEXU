@@ -16,6 +16,8 @@
 4. 定向纯逻辑、类型/格式/UI token/构建和独立复核后，在独立 draft 验证本分支的精确 head CI。现有工作流不引用被拦诊断，且本分支不包含 PR59 新身份用例；不能据此替代 PR59 或受限范围的验收。
 5. 原图 **217-project-task-status-dark.png** 与 **218-project-task-status-mobile-light.png** 分别展示实际取消卡片/筛选和 390px 浅色可达导航，截图前检查目标可见、命中和内容宽度。实际检查与任何失败只记录在[本轮历史](history/2026-10-04-project-task-status-navigation.md)，不把编译/发现或父 CI 当本轮通过。
 
+CI191 工程 629/629、浏览器 229/230，唯一失败是测试把 option 的禁用断言经 label 重定向到了应启用的 select。实际 trace/像素和锁定测试库源码已核对，现只修选中 option 原生属性与 select 可用性的准确断言，所有非法值/修复/清除要求保留；产品不变，最终新 head 完整 CI 与 217/218 仍待验收，详见[失败记录](history/2026-10-04-project-task-status-navigation.md#ci191修正-option-禁用断言的目标)。
+
 ## 开始时读取
 
 - [04 任务工作包](04-tasks-requirements.md)、[UI](../harness/ui.md)、[项目任务](../harness/projects-tasks.md)和[开发流程](../harness/development.md)。
