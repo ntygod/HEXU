@@ -26,14 +26,16 @@ export function Workbench() {
   const { data } = useApp();
   const [tab, setTab] = useState<WorkbenchTaskScope>('mine');
   const [creating, setCreating] = useState(false);
-  const tasks = data.tasks.filter(
+  const scopedTasks = data.tasks.filter((task) =>
+    matchesWorkbenchTaskScope(task, tab, data.user.id),
+  );
+  const tasks = scopedTasks.filter(
     (task) =>
-      (task.status !== 'cancelled' ||
-        data.runs.some(
-          (run) =>
-            run.taskId === task.id && (isActiveRun(run.state) || run.observation === 'unknown'),
-        )) &&
-      matchesWorkbenchTaskScope(task, tab, data.user.id),
+      task.status !== 'cancelled' ||
+      data.runs.some(
+        (run) =>
+          run.taskId === task.id && (isActiveRun(run.state) || run.observation === 'unknown'),
+      ),
   );
   const active = tasks.filter(
     (task) =>
@@ -108,11 +110,13 @@ export function Workbench() {
               </>
             ) : tab === 'participating' ? (
               <Empty
-                title={tasks.length ? '暂无可继续的参与任务' : '还没有参与的任务'}
+                title={scopedTasks.length ? '暂无可继续的参与任务' : '还没有参与的任务'}
                 description={
                   tasks.length
                     ? '已参与的任务仍可在下方查看。'
-                    : '可在项目任务详情的「参与者」中加入。'
+                    : scopedTasks.length
+                      ? '可在下方勾选「包括已取消任务」查看。'
+                      : '可在项目任务详情的「参与者」中加入。'
                 }
               />
             ) : (
@@ -130,6 +134,7 @@ export function Workbench() {
           <WorkbenchTaskList
             key={tab}
             tasks={tasks}
+            tasksIncludingCancelled={scopedTasks}
             emptyDescription={
               tab === 'participating'
                 ? '还没有参与的任务。可在项目任务详情的「参与者」中加入。'

@@ -79,6 +79,8 @@ jobs:
             artifacts/229-workbench-task-list-mobile-light.png
             artifacts/230-workbench-participating-dark.png
             artifacts/231-workbench-participating-mobile-light.png
+            artifacts/232-workbench-cancelled-dark.png
+            artifacts/233-workbench-cancelled-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -223,6 +225,17 @@ jobs:
             test-results/workbench-participating-*/trace.zip
             test-results/workbench-participating-*/test-failed-*.png
             test-results/workbench-participating-*/error-context.md
+          retention-days: 7
+
+      - name: Upload workbench-cancelled-tasks failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-workbench-cancelled-tasks-failures
+          path: |
+            test-results/workbench-cancelled-tasks-*/trace.zip
+            test-results/workbench-cancelled-tasks-*/test-failed-*.png
+            test-results/workbench-cancelled-tasks-*/error-context.md
           retention-days: 7
 
   check:

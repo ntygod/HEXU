@@ -83,6 +83,10 @@ Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeR
 
 参与页签只匹配当前可见Task投影中明确的本人participantUserIds；负责人、消息作者和他人参与均不补造关系。保留原mine/team、cancelled活动例外和顺序，继续卡/关注/成果采用同一选定集合。无当前可继续项与无参与任务分别说明；页签切换复用首批重置，不新增查询、业务写入或持久偏好。用法见[我参与的任务](../engineering/workbench-participating.md)。
 
+## 工作台包括已取消任务
+
+原负责/参与/团队范围先于最近列表选择；默认保持现有取消活动/未知执行例外，显式勾选才展示该范围全部当前可见Task。不可把取消行追加在末尾破坏原顺序，或将该选择用于继续卡、关注、成果和活动计数。切选项重置批次并清理展开焦点意图，焦点留在保留的checkbox；切页签沿原key重置未勾选和首批。零项、只有隐藏取消项与没有可继续参与任务分别说明，不改原Task链接/状态命令。用法见[取消任务浏览](../engineering/workbench-cancelled-tasks.md)。
+
 ## 如何验证与回写
 
 普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程，直接路径见[直接状态恢复](../../tests/e2e/direct-task-status-recovery.spec.ts)；直接 start/reopen/无活动 complete 的请求未到服务、提交后回包丢失与已接受后 GET 故障分别验证；关闭/导航/重复点击、后来标题/修订、当前撤权和迟到回应用真实请求边界区分。普通创建浏览器入口见[创建恢复](../../tests/e2e/task-creation-request-recovery.spec.ts)，另区分未达服务、已提交回包丢失和有效 ACK 后 GET 故障；核对原键/原正文、唯一 Task/回执/编号/outbox 效果、所有新建入口恢复、权限清理及迟到回应。源函数/HTTP 诊断只证明该诊断的请求与事务行为，不能替代 React/浏览器流程。

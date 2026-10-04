@@ -9,9 +9,11 @@ const TASK_BATCH_SIZE = 8;
 
 export function WorkbenchTaskList({
   tasks,
+  tasksIncludingCancelled,
   emptyDescription = '还没有任务。创建后，工作记录会留在这里。',
 }: {
   tasks: Task[];
+  tasksIncludingCancelled?: Task[];
   emptyDescription?: string;
 }) {
   const id = useId();
@@ -19,9 +21,15 @@ export function WorkbenchTaskList({
   const listRef = useRef<HTMLDivElement>(null);
   const focusNewRow = useRef<number | null>(null);
   const [visibleLimit, setVisibleLimit] = useState(TASK_BATCH_SIZE);
-  const visibleTasks = tasks.slice(0, visibleLimit);
-  const hasMore = visibleTasks.length < tasks.length;
+  const [includeCancelled, setIncludeCancelled] = useState(false);
+  const selectedTasks = includeCancelled ? (tasksIncludingCancelled ?? tasks) : tasks;
+  const visibleTasks = selectedTasks.slice(0, visibleLimit);
+  const hasMore = visibleTasks.length < selectedTasks.length;
   const canCollapse = visibleTasks.length > TASK_BATCH_SIZE;
+  const listEmptyDescription =
+    !includeCancelled && tasksIncludingCancelled?.length
+      ? '当前范围内只有已取消的任务。勾选「包括已取消任务」查看。'
+      : emptyDescription;
 
   useLayoutEffect(() => {
     if (focusNewRow.current === null) return;
@@ -29,7 +37,7 @@ export function WorkbenchTaskList({
       listRef.current?.querySelectorAll<HTMLAnchorElement>('a.work-task-row')[focusNewRow.current];
     (row ?? headingRef.current)?.focus();
     focusNewRow.current = null;
-  }, [visibleLimit, tasks.length]);
+  }, [visibleLimit, selectedTasks.length]);
 
   return (
     <section className="work-section workbench-task-section" aria-labelledby={`${id}-heading`}>
@@ -41,15 +49,30 @@ export function WorkbenchTaskList({
           查看项目 <Icon name="chevron" size={14} />
         </Link>
       </div>
+      {tasksIncludingCancelled !== undefined && (
+        <label className="check-line workbench-task-list-option">
+          <input
+            type="checkbox"
+            checked={includeCancelled}
+            aria-controls={`${id}-list`}
+            onChange={(event) => {
+              focusNewRow.current = null;
+              setIncludeCancelled(event.target.checked);
+              setVisibleLimit(TASK_BATCH_SIZE);
+            }}
+          />
+          包括已取消任务
+        </label>
+      )}
       <div className="work-task-list" id={`${id}-list`} ref={listRef}>
         {visibleTasks.map((task) => (
           <TaskRow key={task.id} task={task} />
         ))}
-        {!tasks.length && <p className="work-empty-text">{emptyDescription}</p>}
+        {!selectedTasks.length && <p className="work-empty-text">{listEmptyDescription}</p>}
       </div>
       <div className="workbench-task-list-footer">
         <p id={`${id}-count`} role="status" aria-live="polite" aria-atomic="true">
-          当前列表：已显示 {visibleTasks.length} / {tasks.length} 项
+          当前列表：已显示 {visibleTasks.length} / {selectedTasks.length} 项
         </p>
         {(hasMore || canCollapse) && (
           <div className="workbench-task-list-actions">
