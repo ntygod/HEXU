@@ -13,11 +13,18 @@ import { Link, useApp } from './state.js';
 import { NewTask } from './forms.js';
 import { ResultCard } from './work-cards.js';
 import { WorkbenchTaskList } from './workbench-task-list.js';
+import { matchesWorkbenchTaskScope, type WorkbenchTaskScope } from './workbench-task-scope.js';
 import './work-pages.css';
+
+const workbenchScopeLabels: Record<WorkbenchTaskScope, string> = {
+  mine: '我的工作',
+  participating: '我参与的',
+  team: '团队概览',
+};
 
 export function Workbench() {
   const { data } = useApp();
-  const [tab, setTab] = useState<'mine' | 'team'>('mine');
+  const [tab, setTab] = useState<WorkbenchTaskScope>('mine');
   const [creating, setCreating] = useState(false);
   const tasks = data.tasks.filter(
     (task) =>
@@ -26,7 +33,7 @@ export function Workbench() {
           (run) =>
             run.taskId === task.id && (isActiveRun(run.state) || run.observation === 'unknown'),
         )) &&
-      (tab === 'mine' ? task.ownerUserId === data.user.id : task.visibility === 'project'),
+      matchesWorkbenchTaskScope(task, tab, data.user.id),
   );
   const active = tasks.filter(
     (task) =>
@@ -49,7 +56,7 @@ export function Workbench() {
       <header className="work-page-heading">
         <div>
           <span className="eyebrow">{data.space?.name ?? '本地开发预览'}</span>
-          <h1>{tab === 'mine' ? '我的工作' : '团队概览'}</h1>
+          <h1>{workbenchScopeLabels[tab]}</h1>
           <p>继续一项任务，或把下一个想法记录下来。</p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
@@ -60,6 +67,9 @@ export function Workbench() {
       <div className="work-tabs">
         <button aria-pressed={tab === 'mine'} onClick={() => setTab('mine')}>
           我的工作
+        </button>
+        <button aria-pressed={tab === 'participating'} onClick={() => setTab('participating')}>
+          我参与的
         </button>
         <button aria-pressed={tab === 'team'} onClick={() => setTab('team')}>
           团队概览
@@ -96,6 +106,15 @@ export function Workbench() {
                   </Link>
                 </div>
               </>
+            ) : tab === 'participating' ? (
+              <Empty
+                title={tasks.length ? '暂无可继续的参与任务' : '还没有参与的任务'}
+                description={
+                  tasks.length
+                    ? '已参与的任务仍可在下方查看。'
+                    : '可在项目任务详情的「参与者」中加入。'
+                }
+              />
             ) : (
               <Empty
                 title="从一项工作开始"
@@ -108,7 +127,15 @@ export function Workbench() {
               />
             )}
           </section>
-          <WorkbenchTaskList key={tab} tasks={tasks} />
+          <WorkbenchTaskList
+            key={tab}
+            tasks={tasks}
+            emptyDescription={
+              tab === 'participating'
+                ? '还没有参与的任务。可在项目任务详情的「参与者」中加入。'
+                : undefined
+            }
+          />
         </div>
         <aside className="home-attention">
           <div className="work-section-heading">

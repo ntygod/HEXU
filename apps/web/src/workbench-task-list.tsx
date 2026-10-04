@@ -7,7 +7,13 @@ import './workbench-task-list.css';
 
 const TASK_BATCH_SIZE = 8;
 
-export function WorkbenchTaskList({ tasks }: { tasks: Task[] }) {
+export function WorkbenchTaskList({
+  tasks,
+  emptyDescription = '还没有任务。创建后，工作记录会留在这里。',
+}: {
+  tasks: Task[];
+  emptyDescription?: string;
+}) {
   const id = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -39,9 +45,7 @@ export function WorkbenchTaskList({ tasks }: { tasks: Task[] }) {
         {visibleTasks.map((task) => (
           <TaskRow key={task.id} task={task} />
         ))}
-        {!tasks.length && (
-          <p className="work-empty-text">还没有任务。创建后，工作记录会留在这里。</p>
-        )}
+        {!tasks.length && <p className="work-empty-text">{emptyDescription}</p>}
       </div>
       <div className="workbench-task-list-footer">
         <p id={`${id}-count`} role="status" aria-live="polite" aria-atomic="true">
