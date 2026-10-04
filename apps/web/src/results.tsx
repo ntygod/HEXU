@@ -118,20 +118,28 @@ export function ResultPage({ id, revisionId }: { id: string; revisionId?: string
           </Button>
         </div>
       </header>
-      <label className="field result-version-picker">
-        查看固定版本
-        <select
-          aria-label="查看固定版本"
-          value={version.id}
-          onChange={(e) => go(`/results/${id}/versions/${e.target.value}`)}
-        >
-          {revisions.map((v) => (
-            <option value={v.id} key={v.id}>
-              v{v.revision} · {v.title} · {time(v.createdAt)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="result-version-navigation">
+        <label className="field result-version-picker">
+          查看固定版本
+          <select
+            aria-label="查看固定版本"
+            value={version.id}
+            onChange={(e) => go(`/results/${id}/versions/${e.target.value}`)}
+          >
+            {revisions.map((v) => (
+              <option value={v.id} key={v.id}>
+                v{v.revision} · {v.title} · {time(v.createdAt)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="result-version-address">
+          <Link className="button soft" to={`/results/${result.id}/versions/${version.id}`}>
+            打开此版本固定链接
+          </Link>
+          <p>此地址始终打开当前查看的版本。</p>
+        </div>
+      </div>
       {version.revision !== result.revision && (
         <p className="work-branch-notice">
           正在查看历史版本 v{version.revision}，最新为 v{result.revision}

@@ -1,6 +1,6 @@
 # 21｜当前实现进度
 
-更新：2026-10-04。main 保持 `a3ae2e8`，已验收的 [PR56](https://github.com/ntygod/HEXU/pull/56)、[PR57](https://github.com/ntygod/HEXU/pull/57)、[PR58](https://github.com/ntygod/HEXU/pull/58) 与 [PR60](https://github.com/ntygod/HEXU/pull/60) 均冻结、保持草稿。PR60 精确 head `59ef20a7ae55ad6cfd77a2acc768e0d610a36cd5` 的 CI192 工程 **629/629**、Chromium **230/230** 与汇总成功，最终 217/218 原图已实际查看；验收正文已于 15:35 UTC 更新并回读一致。当前从 PR60 独立补项目任务“有/无关注内容”筛选，只作用于已有可见数据，本轮本地候选与定向/静态验证已完成，现进入独立草稿发布与精确 head CI；证据见[独立记录](history/2026-10-04-project-task-attention-filter.md)。
+更新：2026-10-04。main 保持 `a3ae2e8`，PR56/57/58/60 与已验收的 [PR61](https://github.com/ntygod/HEXU/pull/61) 均冻结、保持草稿。PR61 精确 head `017df91c6a497b8b9d75bd6b3243dd8d1e2516c8` 的 CI193 工程 **637/637**、Chromium **233/233** 与汇总成功，最终 219/220 原图已实际查看，最终正文 16:00 UTC 更新并回读。当前从 PR61 独立补成果详情的当前版本固定链接，只使用已加载的 Result/版本 ID；证据见[本轮记录](history/2026-10-04-result-version-link.md)。
 
 用户提交的兄弟 [PR59](https://github.com/ntygod/HEXU/pull/59) 保持 head `39334c8b7dafe1487401fbd581844feb7877bd98`，CI190 元数据为 success；本分支没有纳入、修改或重新验证其身份修正。原平台受限诊断及文件/原生/私有材料/registry 审阅继续暂停，本轮不替代这些验收。原工作项见 [19](19-work-items.md)，唯一下一项见 [22](22-next-delivery.md)。
 
@@ -32,7 +32,7 @@
 | 直接状态的原请求恢复 | start/reopen/无活动 complete 首次点击仍立即 POST；发送前固定原 Task/动作/正文/修订/键，只有未知结果或有效 ACK 后 GET 失败才显示恢复；所有同 Task 状态入口先恢复原包 | PR57 已验收、冻结未合并；start 只把 Task 标记为 in_progress，不启动 Run。复用上述 Provider/outcome/当前权限与 GET-only 路径，无新后端/API/schema，见[记录](history/2026-10-02-direct-task-status-recovery.md) |
 | 普通创建的原请求恢复 | PR58在第一次 POST 前保存创建正文/幂等键；所有新建入口优先恢复同身份/空间中的未结原包，未知结果确认同一请求，有效 ACK 后只 GET；创建请求的旧身份/空间拒绝事件不会清掉新 Provider | PR58 已验收、冻结未合并；属于 04-01/03；Provider 临时内存不跨硬刷新，无后端/字段/schema/协议扩展，见[记录](history/2026-10-03-task-creation-request-recovery.md) |
 
-上表前四项属于已验收、未合并的 PR56，第五项属于已验收、未合并的 PR57；最后一项属于已验收、未合并的 PR58。父 PR 仅从 main 提取 PR40/41/48/49/50/55 及 [PR33](https://github.com/ntygod/HEXU/pull/33) 普通事务回调这个最小依赖；当前关注筛选后续不修改冻结 PR56/57/58/60 或其他旧堆叠功能，没有新增数据库 schema/迁移。本轮不检查或修改暂停的原生、文件、私有材料和 registry 范围，[问题52](https://github.com/ntygod/HEXU/issues/52) 保持暂停，也不作整包安全结论。
+上表前四项属于已验收、未合并的 PR56，第五项属于已验收、未合并的 PR57；最后一项属于已验收、未合并的 PR58。父 PR 仅从 main 提取 PR40/41/48/49/50/55 及 [PR33](https://github.com/ntygod/HEXU/pull/33) 普通事务回调这个最小依赖；当前成果导航后续不修改冻结 PR56/57/58/60/61 或其他旧堆叠功能，没有新增数据库 schema/迁移。本轮不检查或修改暂停的原生、文件、私有材料和 registry 范围，[问题52](https://github.com/ntygod/HEXU/issues/52) 保持暂停，也不作整包安全结论。
 
 ## 模式与验证边界
 
@@ -52,9 +52,10 @@
 | 父 [PR57](https://github.com/ntygod/HEXU/pull/57) 冻结树 `49c2d825` | head `0947dd5b238aab88947caebfe9d979005040c0e3`。[CI185 / 37101126911](https://github.com/ntygod/HEXU/actions/runs/37101126911) 的 engineering/browser/check 均终态 success；用户交接记录工程 **622/622**，浏览器日志复核 **199/199、17.4m**。精确 head 的 212—214 与 206/207/209/210/211 共 8 张原图于 2026-10-03 06:28 UTC 实际查看，PR 正文于 06:29:57 UTC 补充并回读；artifact 指纹与先前失败见[直接状态记录](history/2026-10-02-direct-task-status-recovery.md) |
 | 父 [PR58](https://github.com/ntygod/HEXU/pull/58) 冻结树 `12682f6a` | head `7f7b9328033e48fbcde26be021e30d0ade9c51d8`。[CI188 / 37108859359](https://github.com/ntygod/HEXU/actions/runs/37108859359)：工程 **622/622**、Chromium **227/227、18.3m** 与汇总全绿；最终 215/216 原图于 2026-10-03 08:33 UTC 实际查看，PR 正文于 08:35 UTC 更新并回读。创建只保留内存原包，不跨硬刷新；首轮失败与修正保留在[记录](history/2026-10-03-task-creation-request-recovery.md) |
 | 父 [PR60](https://github.com/ntygod/HEXU/pull/60) 冻结树 `12440955` | head `59ef20a7ae55ad6cfd77a2acc768e0d610a36cd5` 的 [CI192 / 37183505095](https://github.com/ntygod/HEXU/actions/runs/37183505095) 工程 **629/629**、Chromium **230/230、17.4m** 与汇总全绿；最终 217/218 于 2026-10-04 07:00 UTC 实际查看。项目状态筛选与取消只读导航已验收；首次测试断言失败与修正见[记录](history/2026-10-04-project-task-status-navigation.md)。最终 PR 验收正文曾被发布审核拒绝；获得用户明确许可后，2026-10-04 15:35 UTC 原正文更新成功并回读一致 |
-| 当前项目任务关注内容筛选 | 仅按现有 attention 去空白后是否有文本，与状态/人员/关键词取交集；不推断等待/阻塞或读取 Run，不改变 API/身份/数据模型。本地 15/15 定向（8 新增）、完整格式/类型/UI token/构建与独立静态复核通过；3 新 E2E 严格类型/发现通过，全量仅发现 233 条、未运行。尚无本轮 CI 或原图，见[记录](history/2026-10-04-project-task-attention-filter.md) |
+| 父 [PR61](https://github.com/ntygod/HEXU/pull/61) 关注筛选 | head `017df91c6a497b8b9d75bd6b3243dd8d1e2516c8`、tree `6bdd38ffcf278932acac44fc79adc6d1d4d1a320`；[CI193 / 37213770407](https://github.com/ntygod/HEXU/actions/runs/37213770407) 工程 **637/637**、Chromium **233/233、18.8m** 与汇总全绿。219/220 原图于 16:00 UTC 实际查看；最终正文已更新并回读。详见[记录](history/2026-10-04-project-task-attention-filter.md) |
+| 当前成果版本固定链接 | 已加载详情提供当前所看版本的显式固定路由，单版本也能打开/复制链接；不改变版本、反馈、读取模型或访问权限。本地类型/格式/UI token/构建通过，两条受影响 E2E 严格类型/发现通过，全量发现 234 条、未执行；精确 head CI 与 221/222 实图待验收，见[记录](history/2026-10-04-result-version-link.md) |
 
-旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58/60 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
+旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58/60/61 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
 
 ### 已入 main 的历史证据
 
@@ -84,6 +85,6 @@ CI187 历史补记（最终 CI188 见上表）：`11eaddbd` 的工程 622/622、
 
 ## 进度口径与更新
 
-原 102 行按本候选实际状态统计为 **2 完成 / 78 部分实现 / 22 未实现**。本次增强已有 04-03/04-06 的部分实现，不新增完成项；旧堆叠 2/80/20 不能移用于 main 候选。13-04已有比较/选择及干净固定提交的新会话接续；13-05已有固定源/目标与完整对象只读预检，实际应用和冲突解决仍缺。方案等待/原生恢复、脏现场、AI差异建议及完整代码产物仍待补齐。其他原项仍有完整历史、自动编排、跨平台/跨电脑等剩余范围。工作项大小不同，不能折算产品完成百分比。
+原 102 行按本候选实际状态统计为 **2 完成 / 78 部分实现 / 22 未实现**。本次增强已有 14-02 的部分实现，不新增完成项；旧堆叠 2/80/20 不能移用于 main 候选。13-04已有比较/选择及干净固定提交的新会话接续；13-05已有固定源/目标与完整对象只读预检，实际应用和冲突解决仍缺。方案等待/原生恢复、脏现场、AI差异建议及完整代码产物仍待补齐。其他原项仍有完整历史、自动编排、跨平台/跨电脑等剩余范围。工作项大小不同，不能折算产品完成百分比。
 
 能力及验证更新本页和 19；下一项只改 22；用法放工程指南，开发约束放相应 harness。不会根据节点连通、协议替身或历史报告声称跨电脑产品或真实模型联调完成。

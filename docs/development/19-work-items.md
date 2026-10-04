@@ -95,7 +95,7 @@
 | HX-DEV-13-05 | 固定版本的选择性整合 | RN/BE | 部分实现 | 已固定一个源成果版本、本人目标提交/恢复副本，复用完整保留/接收对象与共同起点，记录文件级三方预检、冲突/省略、不可变报告和取消历史；目标现场/权限/回执重新核验。尚无实际应用、文件/提交选择、冲突解决、多来源编排或部分写入恢复。 | [整合事务](../../packages/db/src/integrations.ts) / [预检](../../apps/runner/src/agent/integration-preflight.ts) / [用法](../engineering/integration-preflight.md) |
 | HX-DEV-13-06 | 分支停止、丢弃与清理保护 | RN/FE | 部分实现 | 未持有现场的planned可放弃；准备可取消/处置失败材料，已发布代码保留。首轮及选定成果后的Run可独立停止；准备失败可重新预览并明确发起，未知进程不解锁，不重放付费执行。已登记目录清理、待发包处置、脏现场与完整恢复仍缺。 | [本机](../../apps/runner/src/agent/branch-workspace.ts) / [接续回归](../../tests/branch-continuation-runner.test.ts) |
 | HX-DEV-14-01 | Result/Revision 与基础产物 | BE | 部分实现 | Result/不可变Revision及旧版兼容已有；方案可关联固定提交/副本，追加每版本一份的不可变代码对比报告，文本blob哈希和发布预算受控。文件下载/托管、未提交捕获、完整diff、真实预览与多附件模型仍缺。 | [版本仓储](../../packages/db/src/result-revisions.ts) / [代码契约](../../packages/contracts/src/result-code.ts) |
-| HX-DEV-14-02 | 成果卡、版本与说明编辑 | FE | 部分实现 | W1成果入口、版本切换/深链接、历史正文/来源与方案追加版本已有；代码引用选择、副本当前状态、节点共享的两侧文件正文和省略项可查看。故障保留、撤权清除、未知回执对账；非方案编辑、完整文件/diff/真实预览仍缺。 | [成果](../../apps/web/src/results.tsx) / [代码对比](../../apps/web/src/result-code.tsx) |
+| HX-DEV-14-02 | 成果卡、版本与说明编辑 | FE | 部分实现 | W1成果入口、版本切换/深链接、历史正文/来源与方案追加版本已有；详情新增当前所看版本的显式固定链接，单版本亦可直接打开/复制；代码引用选择、副本当前状态、节点共享的两侧文件正文和省略项可查看。故障保留、撤权清除、未知回执对账；非方案编辑、完整文件/diff/真实预览仍缺。 | [成果](../../apps/web/src/results.tsx) / [代码对比](../../apps/web/src/result-code.tsx) |
 | HX-DEV-14-03 | 预览会话与主动隧道 | RN/BE | 未实现 | 通用预览会话与主动隧道未实现；订单示例页不是用户项目预览。 | —（尚无可用实现） |
 | HX-DEV-14-04 | 预览独立身份与失效回退 | BE/FE | 未实现 | 独立预览身份、授权失效与真实预览回退未实现。 | —（尚无可用实现） |
 | HX-DEV-14-05 | 版本反馈、回复与后续任务 | FE/BE | 部分实现 | 新成果反馈绑定明确ResultRevision，切换/刷新不漂移，旧未指定版本反馈单列；仍保存在原Task，完成无需报告。文件区域锚点、独立回复关系与建立后续任务仍缺。 | [反馈](../../apps/web/src/results.tsx) / [讨论](../../apps/web/src/discussion.tsx) |

@@ -2,25 +2,25 @@
 
 更新：2026-10-04。本页维护唯一下一项与后续队列；当前能力/验证见 [21](21-implementation-status.md)，原 ID 与完整剩余范围见 [19](19-work-items.md)。用户明确任务优先于默认计划。
 
-## 下一项：发布并验收已检查的关注内容筛选候选
+## 下一项：成果详情的当前版本固定链接
 
-基于已验收、冻结 [PR60](https://github.com/ntygod/HEXU/pull/60) head `59ef20a7ae55ad6cfd77a2acc768e0d610a36cd5`、tree `12440955d081d55bccd39a1e0ca218a17b434319` 开独立分支，仅选择性恢复旧 PR42 中关注文本有无的普通 UI 查找。现有列表/看板显示 attention，但没有相应筛选入口；不为此引入新模型或后台能力。
+基于已验收、冻结 [PR61](https://github.com/ntygod/HEXU/pull/61) head `017df91c6a497b8b9d75bd6b3243dd8d1e2516c8`、tree `6bdd38ffcf278932acac44fc79adc6d1d4d1a320` 开独立分支。父 CI193 已通过 637 工程 / 233 Chromium，219/220 原图实际查看并写回 PR 描述。当前只补 14-02 现有成果版本导航的可发现性，不从旧堆叠搬后台或文件能力。
 
-父 PR60 的 [CI192](https://github.com/ntygod/HEXU/actions/runs/37183505095) 工程 629/629、Chromium 230/230 与汇总通过，最终 217/218 原图已实际查看。用户已明确允许自主发布/更新开发 PR 功能说明、测试结果与验收记录；父正文于 15:35 UTC 更新并回读一致。本轮代码、定向测试及静态复核已完成，继续独立草稿与精确 head 完整 CI。main、既有草稿保持原提交，不合并或部署，用户 PR59、受限身份诊断和问题52/文件/原生/私有材料/registry 审阅不动。
+普通 `/results/:id` 加载后只在 React 内存固定所看版本，单版本选择器无法通过重新选择当前值生成固定地址。详情增加已加载版本的普通链接，用户可打开或使用浏览器复制链接；无需新 API、自动重定向或剪贴板访问。
 
 ## 本轮范围与验收
 
-1. 仅判断现有 Task.attention 去空白后是否有文本，提供全部 / 有关注内容 / 无关注内容，与当前状态、人员和关键词交集；不推断等待/阻塞/暂停，不读取 Run。
-2. URL `attention=present|absent`，缺省不筛；空、未知、重复或多余空白值明确报错并零匹配。清除、刷新、前进/返回及列表/看板一致，保留其他导航参数与锚点。
-3. 当前可见文本更新后按新投影匹配；筛选不发业务写请求、不改 TaskDetail，保留默认排除取消、显式取消列只读及项目总览/成果原范围。
-4. 本地已完成 15/15 定向（8 新关注用例 + 7 原状态）、完整类型/格式/UI token/构建与独立静态复核。3 条新普通项目 E2E 通过严格类型/发现，全量发现 233 条、尚未运行；没有本地 Chromium、身份安全或文件诊断，不把发现当执行。
-5. 计划原图 **219-project-task-attention-dark.png** 与 **220-project-task-attention-mobile-light.png** 展示实际关注筛选/文本与 390px 可达性；随本轮精确 CI 实际生成/查看。当前没有新远端验收，证据归[本轮记录](history/2026-10-04-project-task-attention-filter.md)。
+1. 链接目标只取详情实际 result.id/version.id，加载期没有未定义 ID 链接；单版本、所看历史版和切换后的新版各指向自己的固定路由。
+2. 普通 v1 HTTP 夹具验证键盘打开、刷新、前进/返回及手机点击；链接/筛选导航不写 Task/Result/反馈，完整详情前后相同。
+3. 历史版只在既有成果 UI 用例补 href 和加载期断言，不修改其版本创建、协议夹具或文件准备路径。
+4. 首轮截图 **221-result-version-link-dark.png** 与 **222-result-version-link-mobile-light.png** 先滚动并验证新入口/说明实际可见，检查 390px 可用宽度、命中与无溢出；不要求远处页脚同时在屏幕内。
+5. 完成本地类型/格式/UI token/构建与独立复核，随后独立草稿、精确 head 完整 CI 和实际图验收。未运行的阶段据实保留，证据归[本轮记录](history/2026-10-04-result-version-link.md)。
 
 ## 开始时读取
 
-- [04 任务工作包](04-tasks-requirements.md)、[UI](../harness/ui.md)、[项目任务](../harness/projects-tasks.md)和[开发流程](../harness/development.md)。
-- [筛选用法](../engineering/task-participants.md#项目任务关注内容选择)、[项目视图](../../apps/web/src/projects.tsx)、[筛选组件](../../apps/web/src/project-task-filters.tsx)和本轮纯 helper/测试。
-- 不修改 state/client/身份、后台权限、调度或文件原语，不恢复被拦诊断；排序的持久 rank/revision 与竞争处理另列后续，不能顺手扩大。
+- [14 成果工作包](14-results-feedback.md)、[成果](../harness/results.md)、[UI](../harness/ui.md)和[开发流程](../harness/development.md)。
+- [成果页](../../apps/web/src/results.tsx)、[版本样式](../../apps/web/src/result-versions.css)和普通固定链接用例。
+- 用户 PR59、原平台受限身份诊断以及问题52/文件/原生/私有材料/registry 审阅保持暂停；不修改 state/client/后台模型或把导航链接当公开分享。main 和既有草稿不合并、不部署。
 
 ## 剩余交付队列
 

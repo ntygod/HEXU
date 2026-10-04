@@ -387,6 +387,8 @@ test('方案固定版本可查看来源、保留失败事实，旧反馈和刷�
     await expect(
       page.getByRole('heading', { name: '分批导出成果 · 当前成果', exact: true }),
     ).toBeVisible();
+    const fixedLink = page.getByRole('link', { name: '打开此版本固定链接', exact: true });
+    await expect(fixedLink).toHaveAttribute('href', new URL(firstURL).pathname);
     await page.getByText('查看已固定的共享输出', { exact: true }).click();
     await expect(page.getByLabel('固定成果来源')).toContainText('协议夹具失败，保留已有输出。');
     await expect(page.getByLabel('固定成果来源')).toContainText('代码文件尚未固定');
@@ -424,12 +426,14 @@ test('方案固定版本可查看来源、保留失败事实，旧反馈和刷�
       // screen. Exercise that boundary explicitly instead of racing an eager read.
       await expect(page.getByLabel('正在打开成果', { exact: true })).toBeVisible();
       await expect(picker).toHaveCount(0);
+      await expect(fixedLink).toHaveCount(0);
     } finally {
       releaseRead();
     }
     await expect(page).toHaveURL(secondURL);
     await expect(picker).toHaveValue(secondRevisionId);
     await expect(page.getByText('第二版补充说明，旧版保持可读', { exact: true })).toBeVisible();
+    await expect(fixedLink).toHaveAttribute('href', new URL(secondURL).pathname);
     await page.unroute(secondRead);
     await expect(page.getByText('第一版需要补充取消说明', { exact: true })).toHaveCount(0);
     // Match the immutable ID, never a label derived from a possibly empty list.
@@ -438,10 +442,12 @@ test('方案固定版本可查看来源、保留失败事实，旧反馈和刷�
     await expect(picker).toHaveValue(firstRevisionId);
     await expect(page.getByText('第一版需要补充取消说明', { exact: true })).toBeVisible();
     await expect(page.getByText('第一版人工说明', { exact: true })).toBeVisible();
+    await expect(fixedLink).toHaveAttribute('href', new URL(firstURL).pathname);
     await page.reload();
     await expect(
       page.getByRole('heading', { name: '分批导出成果 · 版本 1', exact: true }),
     ).toBeVisible();
+    await expect(fixedLink).toHaveAttribute('href', new URL(firstURL).pathname);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mkdir('artifacts', { recursive: true });
     await page.screenshot({ path: 'artifacts/107-branch-result-dark.png', fullPage: true });

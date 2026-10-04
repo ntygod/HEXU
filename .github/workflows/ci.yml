@@ -71,6 +71,8 @@ jobs:
             artifacts/218-project-task-status-mobile-light.png
             artifacts/219-project-task-attention-dark.png
             artifacts/220-project-task-attention-mobile-light.png
+            artifacts/221-result-version-link-dark.png
+            artifacts/222-result-version-link-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -174,6 +176,17 @@ jobs:
             test-results/project-task-attention-*/test-failed-*.png
             test-results/project-task-attention-*/error-context.md
           retention-days: 7
+      - name: Upload result-version-link failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-result-version-link-failures
+          path: |
+            test-results/result-version-link-*/trace.zip
+            test-results/result-version-link-*/test-failed-*.png
+            test-results/result-version-link-*/error-context.md
+          retention-days: 7
+
   check:
     needs: [engineering, browser]
     if: always()
