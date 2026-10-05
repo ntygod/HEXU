@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { DomainError, type Message } from '../../contracts/src/index.js';
+import type { AgreementSearchHit } from '../../contracts/src/agreement-search.js';
+import type { TaskSearchScope } from '../../contracts/src/task-search.js';
 import {
   parseAgreementCreate,
   parseAgreementEdit,
@@ -70,6 +72,49 @@ export class ProjectAgreementsStore {
       .get(id, projectId, this.store.spaceId) as { body: string } | undefined;
     if (!row) throw new DomainError('NOT_FOUND', '约定不存在或不可访问', 404);
     return decode(row);
+  }
+  currentSearchItems(selection: TaskSearchScope): AgreementSearchHit[] {
+    if (selection.scope === 'personal')
+      throw new DomainError('INVALID_INPUT', '项目约定不支持无项目个人范围');
+    const projects = this.store
+      .projects()
+      .filter((project) => selection.scope !== 'project' || project.id === selection.projectId);
+    if (!projects.length) return [];
+    for (const project of projects) this.check(project.id);
+    const projectsById = new Map(projects.map((project) => [project.id, project]));
+    const rows = this.store.db
+      .prepare(
+        `SELECT body FROM project_agreements WHERE space_id=? AND project_id IN (${projects.map(() => '?').join(',')}) ORDER BY rowid DESC`,
+      )
+      .all(this.store.spaceId, ...projectsById.keys()) as { body: string }[];
+    return rows.map((row) => {
+      const agreement = decode(row);
+      const project = projectsById.get(agreement.projectId)!;
+      return {
+        id: agreement.id,
+        projectId: agreement.projectId,
+        title: agreement.title,
+        content: agreement.content,
+        revision: agreement.revision,
+        state: agreement.state,
+        updatedAt: agreement.updatedAt,
+        project: {
+          id: project.id,
+          name: project.name,
+          ...(project.archivedAt === undefined ? {} : { archivedAt: project.archivedAt }),
+        },
+      };
+    });
+  }
+  version(projectId: string): number {
+    this.check(projectId);
+    return (
+      (
+        this.store.db
+          .prepare('SELECT version FROM project_agreement_versions WHERE project_id=?')
+          .get(projectId) as { version: number } | undefined
+      )?.version ?? 0
+    );
   }
   list(projectId: string, query: ReturnType<typeof parseAgreementQuery>): AgreementPage {
     this.check(projectId);

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { DomainError } from '../../contracts/src/index.js';
 import { canonicalJson } from '../../domain/src/index.js';
 
-type AnchorField = 'afterTaskId' | 'afterResultId';
+type AnchorField = 'afterTaskId' | 'afterResultId' | 'afterAgreementId';
 interface Cursor {
   v: 1;
   queryHash: string;

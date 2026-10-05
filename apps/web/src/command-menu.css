@@ -101,24 +101,28 @@
 }
 .command-task-meta,
 .command-result-meta,
-.command-result-task {
+.command-result-task,
+.command-agreement-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--hx-space-2);
 }
 .command-task-context,
-.command-result-context {
+.command-result-context,
+.command-agreement-context {
   grid-column: 2 / -1;
 }
 .command-task-source,
 .command-task-revision,
 .command-result-meta,
-.command-result-task {
+.command-result-task,
+.command-agreement-meta {
   color: var(--hx-text-secondary);
   font-size: var(--hx-font-secondary);
   overflow-wrap: anywhere;
 }
-.command-results > .command-result-row {
+.command-results > .command-result-row,
+.command-results > .command-agreement-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 .command-results .command-section-label {
@@ -181,7 +185,8 @@
     justify-self: start;
   }
   .command-task-context,
-  .command-result-context {
+  .command-result-context,
+  .command-agreement-context {
     grid-column: 1 / -1;
   }
 }

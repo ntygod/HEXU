@@ -33,7 +33,7 @@ const emptyView = <Item>(scope: string, searching: boolean): SearchView<Item> =>
   focusItemId: null,
 });
 
-/** The command dialog's ordinary page-read lifecycle, shared by its two row types. */
+/** The command dialog's ordinary page-read lifecycle, shared by its row types. */
 export function useSearchPages<Item extends { id: string }>(
   type: SearchType,
   query: string,
@@ -76,7 +76,7 @@ export function useSearchPages<Item extends { id: string }>(
         : read.selection.scope === 'personal'
           ? '&scope=personal'
           : '';
-    const typeParam = read.type === 'result' ? '&type=result' : '';
+    const typeParam = read.type === 'task' ? '' : `&type=${read.type}`;
     const path = `/search?q=${encodeURIComponent(read.query)}${typeParam}${scopeParams}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
     void request<{ items: Item[]; nextCursor: string | null }>(path, { signal: controller.signal })
       .then((page) => {

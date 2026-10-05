@@ -104,6 +104,7 @@ export interface Workbench {
   user: User;
   members: User[];
   projects: Project[];
+  projectAgreementVersions?: Array<{ projectId: string; version: number }>;
   tasks: Task[];
   results: Result[];
   runs: Run[];

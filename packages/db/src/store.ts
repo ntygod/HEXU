@@ -985,7 +985,7 @@ export class Store {
     };
   }
   workbench(): Workbench {
-    return {
+    const workbench: Workbench = {
       mode: this.teamMode ? 'team-local' : 'local-preview',
       ...(this.teamMode
         ? { space: this.permissions.space(), spaces: this.collaboration.spaces(this.actorId) }
@@ -1001,6 +1001,11 @@ export class Store {
       results: this.results(),
       runs: this.tasks().flatMap((task) => this.runs(task.id)),
     };
+    workbench.projectAgreementVersions = workbench.projects.map((project) => ({
+      projectId: project.id,
+      version: this.projectAgreements.version(project.id),
+    }));
+    return workbench;
   }
   private profile(user: IdentityUser) {
     return { id: user.id, name: user.name, initial: user.name.slice(0, 1), color: 'violet' };

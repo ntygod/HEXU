@@ -318,4 +318,9 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 Task搜索的范围扩展：可选`scope=all|personal|project`，缺省all；personal只取当前集合中projectId为null的Task，project必须带非空、无首尾空白、最多150字符的projectId；all/personal不接受projectId。重复/非法/不完整范围返回INVALID_INPUT/400，合法但无匹配ID返回空页，不放大为全局。游标摘要同时绑定规范化q、scope与projectId，范围先于匹配序列摘要和分页；此前只绑定q的旧书签明确INVALID_CURSOR后重搜。未新增权限来源、资源端点或数据库模型。
 
 
-全局搜索类型扩展：`GET /api/v1/search?type=task|result`，缺省或显式task沿原Task响应与书签，空/重复/未知类型INVALID_INPUT/400。result复用q/scope/projectId/cursor规则，先关联当前Task再按范围和成果库原独立字段谓词匹配；响应items为当前Result字段加最小task上下文 `{id,title,shortId,projectId}`，nextCursor仍可空。游标包含result类型及当前Result/父Task来源指纹，跨类型400、结果变化409。当前Result只有numeric revision，API不伪造固定版本ID，也不检索旧版本正文。
+全局搜索类型扩展：`GET /api/v1/search?type=task|result|agreement`，缺省或显式task沿原Task响应与书签，空/重复/未知类型INVALID_INPUT/400。result复用q/scope/projectId/cursor规则，先关联当前Task再按范围和成果库原独立字段谓词匹配；响应items为当前Result字段加最小task上下文 `{id,title,shortId,projectId}`，nextCursor仍可空。游标包含result类型及当前Result/父Task来源指纹，跨类型400、结果变化409。当前Result只有numeric revision，API不伪造固定版本ID，也不检索旧版本正文。
+
+
+约定全局查找扩展：agreement类型复用q/scope/projectId/cursor，个人scope明确INVALID_INPUT/400；只读当前可见项目的project_agreements当前行，按全局rowid降序，在匹配与30项分页前取项目范围。标题与content沿原约定拼接文字规则匹配，active/inactive/superseded各当前记录一次；响应明确最小id/projectId/title/content/revision/state/updatedAt与project{id,name,archivedAt?}，不发送origin/来源讨论节选或历史。afterAgreementId书签独立绑定type/query/scope及当前有序DTO，错配400、变化409；原Task/Result书签保持。
+
+Workbench只读响应新增可选projectAgreementVersions数组 `{projectId,version}`，仅对同响应当前可见项目返回既有约定变更版本，不包含正文；没有版本行时的0只用于已经过原项目读取检查的项目。旧/未就绪响应缺字段或缺所选项目元数据不能当作0。普通SSE后的Workbench读取传递变化，新约定搜索按相关项目版本及来源标签取消旧页；该信号按项目粒度，既非查询专属版本，也不保证永远在线同步。无新端点、迁移、身份源或业务写入。

@@ -57,6 +57,7 @@ import { parseTaskSearchQuery } from '../../../packages/contracts/src/task-searc
 import { parseSearchType } from '../../../packages/contracts/src/result-search.js';
 import { pageTaskSearch } from '../../../packages/db/src/task-search.js';
 import { pageResultSearch } from '../../../packages/db/src/result-search.js';
+import { pageAgreementSearch } from '../../../packages/db/src/agreement-search.js';
 import { MockAdapter } from '../../../packages/adapters/mock/src/index.js';
 
 export async function createApp(
@@ -765,6 +766,8 @@ export async function createApp(
   app.get('/api/v1/search', async (request) => {
     const tasks = store.tasks();
     const type = parseSearchType(request.query);
+    if (type === 'agreement')
+      return pageAgreementSearch(store, parseTaskSearchQuery(request.query));
     const query = parseTaskSearchQuery(request.query);
     return type === 'result'
       ? pageResultSearch(store.results(), tasks, query)

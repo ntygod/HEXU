@@ -5,6 +5,7 @@ import { Dialog, Icon, StatusBadge, type IconName } from '../../../packages/ui/s
 import { go, useApp } from './state.js';
 import { useTaskSearchPages } from './task-search-pages.js';
 import { useResultSearchPages } from './result-search-pages.js';
+import { useAgreementSearchPages } from './agreement-search-pages.js';
 import {
   taskSearchProjectLabel,
   taskSearchResultContext,
@@ -13,16 +14,29 @@ import {
 import { TaskDescriptionMatch } from './task-match-snippet-view.js';
 import { resultSearchResultContext, resultSearchScopeContext } from './result-search-context.js';
 import { ResultBodyMatch } from './result-match-snippet-view.js';
+import {
+  agreementSearchPath,
+  agreementSearchResultContext,
+  agreementSearchScopeContext,
+} from './agreement-search-context.js';
+import { AgreementBodyMatch } from './agreement-match-snippet-view.js';
 import './command-menu.css';
 export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
   const { data } = useApp();
   const [q, setQ] = useState('');
   const [searchType, setSearchType] = useState<SearchType>('task');
   const [selection, setSelection] = useState<TaskSearchScope>({ scope: 'all', projectId: null });
+  const agreementContext = agreementSearchScopeContext(
+    selection,
+    data.projects,
+    data.projectAgreementVersions,
+  );
   const context =
     searchType === 'task'
       ? taskSearchScopeContext(selection, data.projects)
-      : resultSearchScopeContext(selection, data.projects);
+      : searchType === 'result'
+        ? resultSearchScopeContext(selection, data.projects)
+        : agreementContext;
   const taskSearch = useTaskSearchPages(
     q,
     data.tasks,
@@ -36,8 +50,16 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
     selection,
     context.available && searchType === 'result',
   );
-  const search = searchType === 'task' ? taskSearch : resultSearch;
-  const itemLabel = searchType === 'task' ? '任务' : '成果';
+  const agreementSearch = useAgreementSearchPages(
+    q,
+    data.projects,
+    data.projectAgreementVersions,
+    selection,
+    searchType === 'agreement',
+  );
+  const search =
+    searchType === 'task' ? taskSearch : searchType === 'result' ? resultSearch : agreementSearch;
+  const itemLabel = searchType === 'task' ? '任务' : searchType === 'result' ? '成果' : '约定';
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -115,7 +137,9 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
     }
   }, [search.needsRestart, search.focusItemId]);
   const status = !context.available
-    ? '所选项目当前不可用，请选择其他搜索范围。'
+    ? searchType === 'agreement'
+      ? agreementContext.unavailableMessage
+      : '所选项目当前不可用，请选择其他搜索范围。'
     : !q.trim()
       ? `输入关键词，搜索当前范围内可见的${itemLabel}。`
       : search.needsRestart
@@ -148,7 +172,9 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
             placeholder={
               searchType === 'task'
                 ? '任务标题、说明、编号，或新建、项目、设置…'
-                : '成果当前标题、正文、关联任务标题或编号…'
+                : searchType === 'result'
+                  ? '成果当前标题、正文、关联任务标题或编号…'
+                  : '项目约定当前标题或正文…'
             }
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -161,7 +187,8 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
             aria-label="搜索类型"
             value={searchType}
             onChange={(event) => {
-              const nextType = event.target.value === 'result' ? 'result' : 'task';
+              const value = event.target.value;
+              const nextType = value === 'result' || value === 'agreement' ? value : 'task';
               if (nextType === searchType) return;
               search.cancel();
               setSearchType(nextType);
@@ -169,6 +196,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           >
             <option value="task">任务</option>
             <option value="result">成果（当前版本）</option>
+            <option value="agreement">约定（当前记录）</option>
           </select>
         </label>
         <label className="command-search-scope">
@@ -190,11 +218,12 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           >
             <option value="all">全部当前可见{itemLabel}</option>
             <option value="personal">无项目个人{itemLabel}</option>
-            {selection.scope === 'project' && !context.available && (
-              <option value={`project:${selection.projectId}`} disabled>
-                项目不可用
-              </option>
-            )}
+            {selection.scope === 'project' &&
+              !data.projects.some((project) => project.id === selection.projectId) && (
+                <option value={`project:${selection.projectId}`} disabled>
+                  项目不可用
+                </option>
+              )}
             {data.projects.map((project) => (
               <option key={project.id} value={`project:${project.id}`}>
                 {taskSearchProjectLabel(project)}
@@ -312,6 +341,38 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
                     <span className="command-task-source">{resultContext.sourceLabel}</span>
                     {resultContext.bodyMatch && (
                       <ResultBodyMatch snippet={resultContext.bodyMatch} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          {searchType === 'agreement' &&
+            agreementSearch.items.map((agreement) => {
+              const resultContext = agreementSearchResultContext(agreement, q);
+              return (
+                <button
+                  key={`agreement:${agreement.id}`}
+                  className="command-agreement-row"
+                  data-agreement-id={agreement.id}
+                  data-search-id={agreement.id}
+                  onClick={() => {
+                    go(agreementSearchPath(agreement));
+                    close();
+                  }}
+                >
+                  <Icon name="file" />
+                  <div className="command-agreement-heading">
+                    <strong>{agreement.title}</strong>
+                    <div className="command-agreement-meta">
+                      <span>{resultContext.stateLabel}</span>
+                      <span>{resultContext.revisionLabel}</span>
+                    </div>
+                  </div>
+                  <Icon name="arrow" size={15} />
+                  <div className="command-agreement-context">
+                    <span className="command-task-source">{resultContext.sourceLabel}</span>
+                    {resultContext.bodyMatch && (
+                      <AgreementBodyMatch snippet={resultContext.bodyMatch} />
                     )}
                   </div>
                 </button>
