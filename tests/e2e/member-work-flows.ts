@@ -390,10 +390,16 @@ export function registerMemberWorkTests() {
       await page.goForward();
       await expect(page).toHaveURL(`${origin}/tasks/${shared.id}`);
       await expect(page.getByRole('heading', { name: shared.title, exact: true })).toBeVisible();
-      // Opening a copied member URL in a new same-identity tab uses the original
-      // member route and current selected team, without a synthetic response.
+      // A copied member URL identifies the member within the selected space.
+      // Select this team's ordinary scope in the new same-identity tab first;
+      // the member URL does not carry or change that workspace selection.
       const sharedPage = await f.context.newPage();
       try {
+        await sharedPage.goto(origin);
+        await sharedPage.getByLabel('当前工作空间', { exact: true }).selectOption(f.space.id);
+        await expect(sharedPage.getByLabel('当前工作空间', { exact: true })).toHaveValue(
+          f.space.id,
+        );
         await sharedPage.goto(memberURL);
         await expectRows(sharedPage, eight);
         await expect(
