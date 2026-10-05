@@ -23,6 +23,7 @@
 | 从工作台浏览前8项以外的当前任务 | [工作台任务列表](workbench-task-list.md) |
 | 从工作台找回本人参与的任务 | [我参与的任务](workbench-participating.md) |
 | 找回更早的已取消个人任务 | [已取消任务浏览](workbench-cancelled-tasks.md) |
+| 从成员找到跨项目的当前负责/参与任务 | [成员工作](member-work-view.md) |
 | 普通 Task 创建的未知结果确认与已接受后刷新 | [创建恢复](task-creation-request-recovery.md) |
 | Task 工作说明固定基线、冲突与原请求确认 | [工作说明编辑](task-edit-baseline.md) |
 | Task 完成/取消、已取消重开与未知结果确认 | [状态确认](task-completion-confirmation.md) |

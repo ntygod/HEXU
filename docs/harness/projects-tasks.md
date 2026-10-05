@@ -91,6 +91,10 @@ Task PATCH 在事务内读取旧回执前核对当前编辑权；普通 `beforeR
 
 搜索先取得原Store.tasks当前可见集合，再使用共享原字段matcher；不改rowid顺序或借DTO时间字段重排。30项游标绑定规范化查询与完整当前匹配DTO序列；序列变化使游标失效，不拼接不同版本页。前端只用当前data.tasks的同matcher投影失效旧查询会话，不新增身份源或修改共享client。普通查询/关闭/追加响应按会话取消，追加5xx可原cursor重试，400/409清除旧批次并明确重搜。范围只在原当前集合内按projectId或null交集，先于摘要和分页，游标也绑定scope/projectId；当前项目选项失效不静默变为全局。来源/Task修订用现有当前DTO，说明片段只解释独立命中，不改变原全局跨字段谓词。真实HTTP多页和只读检查见[分页用法](../engineering/task-search-pagination.md)。
 
+## 成员当前工作浏览
+
+成员入口只投影当前Workbench成员与可见Task，原顺序按负责人/明确参与取并集，同Task一次且关系可同时展示。缺参与字段不补造关系，缺成员不回退本人，缺非空项目不解释为个人。数量标明当前已加载可见，不作成员绩效或完整工作量；Task关联Run不证明成员是执行者，未知仍未知。沿原Task导航，页面本身没有新查询/写命令、身份源或状态推断。用法见[成员工作](../engineering/member-work-view.md)。
+
 ## 如何验证与回写
 
 普通 Task 修正复用[编辑](../../tests/task-edit-baseline.test.ts)、[创建预算](../../tests/task-create-budget.test.ts)、[状态原回执](../../tests/task-status-replay.test.ts)与对应浏览器流程，直接路径见[直接状态恢复](../../tests/e2e/direct-task-status-recovery.spec.ts)；直接 start/reopen/无活动 complete 的请求未到服务、提交后回包丢失与已接受后 GET 故障分别验证；关闭/导航/重复点击、后来标题/修订、当前撤权和迟到回应用真实请求边界区分。普通创建浏览器入口见[创建恢复](../../tests/e2e/task-creation-request-recovery.spec.ts)，另区分未达服务、已提交回包丢失和有效 ACK 后 GET 故障；核对原键/原正文、唯一 Task/回执/编号/outbox 效果、所有新建入口恢复、权限清理及迟到回应。源函数/HTTP 诊断只证明该诊断的请求与事务行为，不能替代 React/浏览器流程。

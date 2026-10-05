@@ -89,6 +89,8 @@ jobs:
             artifacts/239-task-search-scope-mobile-light.png
             artifacts/240-current-result-search-dark.png
             artifacts/241-current-result-search-mobile-light.png
+            artifacts/242-member-work-dark.png
+            artifacts/243-member-work-mobile-light.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -299,6 +301,20 @@ jobs:
             test-results/current-result-search-*/trace.zip
             test-results/current-result-search-*/test-failed-*.png
             test-results/current-result-search-*/error-context.md
+          retention-days: 7
+
+      - name: Upload member-work failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-member-work-failures
+          path: |
+            test-results/member-work-flows-*/trace.zip
+            test-results/member-work-flows-*/test-failed-*.png
+            test-results/member-work-flows-*/error-context.md
+            test-results/team-member-work*/trace.zip
+            test-results/team-member-work*/test-failed-*.png
+            test-results/team-member-work*/error-context.md
           retention-days: 7
 
   check:

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Empty } from '../../../packages/ui/src/index.js';
 import { Link, usePath, useRouteChrome } from './state.js';
 import { Workbench } from './workbench.js';
+import { MemberWork } from './member-work.js';
 import { Projects, ProjectPage } from './projects.js';
 import { Results, ResultPage } from './results.js';
 import { BranchComparisonPage } from './branch-comparison.js';
@@ -32,7 +33,11 @@ export function App() {
     <>
       <AppShell key={path} onSearch={() => setSearchOpen(true)}>
         {active === 'workbench' ? (
-          <Workbench />
+          segment[1] === 'members' ? (
+            <MemberWork memberId={segment[2]} key={path} />
+          ) : (
+            <Workbench />
+          )
         ) : active === 'projects' ? (
           segment[1] ? (
             <ProjectPage id={segment[1]} key={segment[1]} />

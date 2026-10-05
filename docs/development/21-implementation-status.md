@@ -1,6 +1,6 @@
 # 21｜当前实现进度
 
-更新：2026-10-05。main保持`a3ae2e8`，PR56/57/58/60/61/62/63/64/65/66/67/68及已验收[PR69](https://github.com/ntygod/HEXU/pull/69)均冻结草稿。PR69最终head `9274cf4030f4bf5fbc006d6e7170a62be376729a`、tree `d4e8110221ae7dd8c5af0058d829469859c37099` 的CI205工程 **688/688**、Chromium **263/263**和汇总成功；238/239及同head236/237原图23:34 UTC实际查看，正文23:35:50更新、23:36回读。当前补全局入口中的当前Result类型与范围分页，见[本轮记录](history/2026-10-04-current-result-search.md)。
+更新：2026-10-05。main保持`a3ae2e8`，PR56/57/58/60/61/62/63/64/65/66/67/68/69及已验收[PR70](https://github.com/ntygod/HEXU/pull/70)均冻结草稿。PR70最终head `d9604bc36b6f68785d1261ff068c951f0bb29037`、tree `3ede81551116f70c11686b742b9250c361818276` 的CI206工程 **699/699**、Chromium **268/268**和汇总成功；240/241及同head236–239共6张原图00:35 UTC实际查看，正文00:38:23更新、00:38:56回读。当前从70补成员到其当前可见任务的浏览路径，见[本轮记录](history/2026-10-05-member-work-view.md)。
 
 用户提交的兄弟 [PR59](https://github.com/ntygod/HEXU/pull/59) 保持 head `39334c8b7dafe1487401fbd581844feb7877bd98`，CI190 元数据为 success；本分支没有纳入、修改或重新验证其身份修正。原平台受限诊断及文件/原生/私有材料/registry 审阅继续暂停，本轮不替代这些验收。原工作项见 [19](19-work-items.md)，唯一下一项见 [22](22-next-delivery.md)。
 
@@ -61,9 +61,10 @@
 | 父PR67成果库查找 | 项目/关键词交集、当前成果与Task字段、来源/有界片段、URL恢复及预选项目入口；原详情与固定版本链接复用。[CI202](https://github.com/ntygod/HEXU/actions/runs/37234521020)工程661/661、Chromium254/254及汇总成功；234/235原图已查看，最终正文已回读，见[记录](history/2026-10-04-result-library-search.md) |
 | 父PR68 Task搜索分页 | 原当前可见Task集合/顺序，每页30项，查询/当前序列绑定与失效重搜；[CI204](https://github.com/ntygod/HEXU/actions/runs/37240032813)672/672工程、259/259Chromium与汇总成功，236/237最终原图和正文回读已完成；首轮手机滚动末端留白修正见[记录](history/2026-10-04-task-search-pagination.md) |
 | 父PR69 Task范围与来源查找 | 默认全部、项目或无项目范围在分页前交集；当前来源/修订及正文片段解释结果。[CI205](https://github.com/ntygod/HEXU/actions/runs/37242868500)688/688工程、263/263Chromium和汇总成功，238/239及236/237原图和最终正文回读已完成，见[记录](history/2026-10-04-task-search-scope.md) |
-| 当前全局Result查找 | 显式Task/Result类型，默认Task原样；当前Result关联已有可见Task后取范围与独立字段交集，再30项稳定分页。当前版本/Task来源/正文命中及原详情导航；本地检查、独立审阅、精确head完整CI和240/241实图待完成，见[记录](history/2026-10-04-current-result-search.md) |
+| 父PR70当前Result全局查找 | 显式Task/Result类型，当前范围、30项分页及来源/版本/正文命中；[CI206](https://github.com/ntygod/HEXU/actions/runs/37246291505)699/699工程、268/268Chromium和汇总成功，240/241及236–239原图和最终正文回读已完成，见[记录](history/2026-10-04-current-result-search.md) |
+| 当前成员工作浏览 | 工作台成员目录与可定位成员URL，当前可见负责/明确参与Task并集、来源/关系和8项逐批，沿原Task详情；8项纯投影及本地类型/UI/构建已通过，真实team-local浏览器、精确head完整CI与242/243实图待完成，见[记录](history/2026-10-05-member-work-view.md) |
 
-旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58/60/61/62/63/64/65/66/67/68/69 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
+旧的 25 个草稿 PR（#29—#51、#54、#55）保持冻结、未合并；父 PR56/57/58/60/61/62/63/64/65/66/67/68/69/70 也保持冻结草稿。本次后续不批准或合入整个堆叠。正式个人客户端、远程团队服务与有效账户 provider 互操作仍缺，历史通过记录不改变这些边界。
 
 ### 已入 main 的历史证据
 

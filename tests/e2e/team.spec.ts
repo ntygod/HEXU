@@ -1,6 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
+import { registerMemberWorkTests } from './member-work-flows.js';
 const origin = 'http://127.0.0.1:4311';
 const password = 'Fictional Browser Password 2026!';
 const setupCode = 'fictional-browser-setup-code-not-real-0123456789';
@@ -590,3 +591,5 @@ test('真实项目成员改派、撤权清理与退出显示，负责人不自�
     await context.close();
   }
 });
+
+registerMemberWorkTests();

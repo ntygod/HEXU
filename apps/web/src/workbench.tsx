@@ -76,6 +76,9 @@ export function Workbench() {
         <button aria-pressed={tab === 'team'} onClick={() => setTab('team')}>
           团队概览
         </button>
+        <Link to="/workbench/members" className="member-work-entry">
+          成员工作
+        </Link>
         <span className="spacer" />
         <span className="muted">
           {tasks.filter((task) => task.status === 'in_progress').length} 项进行中 ·{' '}
