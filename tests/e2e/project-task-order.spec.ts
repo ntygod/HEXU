@@ -408,6 +408,133 @@ async function doubleActivate(control: Locator) {
     (element as HTMLButtonElement).click();
   });
 }
+type DragObservation = {
+  sourceId: string;
+  targetId: string;
+  starts: number;
+  overs: number;
+  drops: number;
+  ends: number;
+  untrusted: boolean;
+};
+type DragProbeWindow = Window & {
+  __projectOrderDrag?: { observed: DragObservation; remove(): void };
+};
+async function dragCard(page: Page, task: Task, anchor: Task, accepted: boolean) {
+  const source = handle(page, task);
+  const target = card(page, anchor);
+  await expect(source).toBeEnabled();
+  await expect(source).toHaveAttribute('draggable', 'true');
+  await source.scrollIntoViewIfNeeded();
+  await expect(source).toBeInViewport({ ratio: 1 });
+  expect(
+    await source.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return element.contains(
+        document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+      );
+    }),
+  ).toBe(true);
+  await page.evaluate(
+    ({ sourceId, targetId }) => {
+      const source = document.querySelector(
+        `.project-task-card[data-task-id="${CSS.escape(sourceId)}"] .project-task-order-handle`,
+      );
+      const target = document.querySelector(
+        `.project-task-card[data-task-id="${CSS.escape(targetId)}"]`,
+      );
+      if (!source || !target) throw new Error('排序拖动的当前卡片不存在');
+      const observed: DragObservation = {
+        sourceId,
+        targetId,
+        starts: 0,
+        overs: 0,
+        drops: 0,
+        ends: 0,
+        untrusted: false,
+      };
+      const start = (event: Event) => {
+        ++observed.starts;
+        observed.untrusted ||= !event.isTrusted;
+      };
+      const over = (event: Event) => {
+        ++observed.overs;
+        observed.untrusted ||= !event.isTrusted;
+      };
+      const drop = (event: Event) => {
+        ++observed.drops;
+        observed.untrusted ||= !event.isTrusted;
+      };
+      const end = (event: Event) => {
+        ++observed.ends;
+        observed.untrusted ||= !event.isTrusted;
+      };
+      source.addEventListener('dragstart', start);
+      source.addEventListener('dragend', end);
+      target.addEventListener('dragover', over);
+      target.addEventListener('drop', drop);
+      (window as DragProbeWindow).__projectOrderDrag = {
+        observed,
+        remove() {
+          source.removeEventListener('dragstart', start);
+          source.removeEventListener('dragend', end);
+          target.removeEventListener('dragover', over);
+          target.removeEventListener('drop', drop);
+          delete (window as DragProbeWindow).__projectOrderDrag;
+        },
+      };
+    },
+    { sourceId: task.id, targetId: anchor.id },
+  );
+  const observation = () =>
+    page.evaluate(() => (window as DragProbeWindow).__projectOrderDrag!.observed);
+  let held = false;
+  let failed = false;
+  try {
+    const box = (await source.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    held = true;
+    // Cross the real native drag threshold before scrolling. dragTo scrolls
+    // the distant target first, which moved this pressed source by 787px in CI.
+    await page.mouse.move(x + 8, y, { steps: 4 });
+    await expect.poll(async () => (await observation()).starts).toBe(1);
+    await target.scrollIntoViewIfNeeded();
+    const destination = (await target.boundingBox())!;
+    const targetX = destination.x + 30;
+    const targetY = destination.y + 12;
+    await page.mouse.move(targetX, targetY, { steps: 8 });
+    await page.mouse.move(targetX + 1, targetY, { steps: 2 });
+    await expect.poll(async () => (await observation()).overs).toBeGreaterThan(0);
+    if (accepted) await expect(target).toHaveAttribute('data-order-drop', 'before');
+    else await expect(target).not.toHaveAttribute('data-order-drop', /.+/);
+    await page.mouse.up();
+    held = false;
+    await expect.poll(async () => (await observation()).ends).toBe(1);
+    await expect.poll(async () => (await observation()).drops).toBe(accepted ? 1 : 0);
+    expect((await observation()).untrusted).toBe(false);
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    const errors: unknown[] = [];
+    if (held) {
+      try {
+        await page.mouse.up();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    try {
+      await page.evaluate(() => (window as DragProbeWindow).__projectOrderDrag?.remove());
+    } catch (error) {
+      errors.push(error);
+    }
+    reportCleanup(errors, failed);
+  }
+}
 function failure(route: Route) {
   return route.fulfill({
     status: 500,
@@ -610,19 +737,21 @@ test('看板真实拖动只在同列保存，跨列不写状态，移动后的�
 }) => {
   await f.open(page, '');
   await activate(page);
-  await expect(handle(page, f.a)).toHaveAttribute('draggable', 'true');
-  await handle(page, f.a).dragTo(card(page, f.progress), { targetPosition: { x: 30, y: 12 } });
+  await dragCard(page, f.a, f.progress, false);
   expect(f.writes).toEqual([]);
   expect(await f.order()).toEqual(f.initial);
-  const accepted = page.waitForResponse(
-    (response) => response.url() === `${f.url()}/move` && response.status() === 200,
-  );
-  const ready = page.waitForResponse(
-    (response) => response.url() === f.url() && response.status() === 200,
-  );
-  await handle(page, f.a).dragTo(card(page, f.c), { targetPosition: { x: 30, y: 12 } });
-  const receipt = (await (await accepted).json()) as ProjectTaskMoveReceipt;
-  await ready;
+  const responses = Promise.all([
+    page.waitForResponse(
+      (response) => response.url() === `${f.url()}/move` && response.status() === 200,
+    ),
+    page.waitForResponse((response) => response.url() === f.url() && response.status() === 200),
+  ]);
+  // Observe both response waits immediately, including if a native-event
+  // assertion fails first. The original gesture failure remains the failure.
+  void responses.catch(() => {});
+  await dragCard(page, f.a, f.c, true);
+  const [accepted] = await responses;
+  const receipt = (await accepted.json()) as ProjectTaskMoveReceipt;
   expect(receipt).toMatchObject({
     taskId: f.a.id,
     anchorTaskId: f.c.id,
