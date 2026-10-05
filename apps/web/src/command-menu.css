@@ -99,19 +99,27 @@
 .command-results > button > div {
   min-width: 0;
 }
-.command-task-meta {
+.command-task-meta,
+.command-result-meta,
+.command-result-task {
   display: flex;
   flex-wrap: wrap;
   gap: var(--hx-space-2);
 }
-.command-task-context {
+.command-task-context,
+.command-result-context {
   grid-column: 2 / -1;
 }
 .command-task-source,
-.command-task-revision {
+.command-task-revision,
+.command-result-meta,
+.command-result-task {
   color: var(--hx-text-secondary);
   font-size: var(--hx-font-secondary);
   overflow-wrap: anywhere;
+}
+.command-results > .command-result-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 .command-results .command-section-label {
   overflow-wrap: anywhere;
@@ -172,7 +180,8 @@
     grid-column: 2;
     justify-self: start;
   }
-  .command-task-context {
+  .command-task-context,
+  .command-result-context {
     grid-column: 1 / -1;
   }
 }

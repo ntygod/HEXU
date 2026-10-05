@@ -316,3 +316,6 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 
 
 Task搜索的范围扩展：可选`scope=all|personal|project`，缺省all；personal只取当前集合中projectId为null的Task，project必须带非空、无首尾空白、最多150字符的projectId；all/personal不接受projectId。重复/非法/不完整范围返回INVALID_INPUT/400，合法但无匹配ID返回空页，不放大为全局。游标摘要同时绑定规范化q、scope与projectId，范围先于匹配序列摘要和分页；此前只绑定q的旧书签明确INVALID_CURSOR后重搜。未新增权限来源、资源端点或数据库模型。
+
+
+全局搜索类型扩展：`GET /api/v1/search?type=task|result`，缺省或显式task沿原Task响应与书签，空/重复/未知类型INVALID_INPUT/400。result复用q/scope/projectId/cursor规则，先关联当前Task再按范围和成果库原独立字段谓词匹配；响应items为当前Result字段加最小task上下文 `{id,title,shortId,projectId}`，nextCursor仍可空。游标包含result类型及当前Result/父Task来源指纹，跨类型400、结果变化409。当前Result只有numeric revision，API不伪造固定版本ID，也不检索旧版本正文。

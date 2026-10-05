@@ -1,4 +1,5 @@
 import type { Project, Result, Task } from '../../../packages/contracts/src/index.js';
+import { matchesResultSearchQuery } from '../../../packages/domain/src/result-search.js';
 import { textMatchSnippet, type TextMatchSnippet } from './text-match-snippet.js';
 
 /** Match the keyword input's UTF-16 maxLength; the snippet has its own grapheme budget. */
@@ -91,12 +92,7 @@ export function filterResultLibrary(
   return results.filter((result) => {
     const task = tasksById.get(result.taskId);
     if (filters.projectId && task?.projectId !== filters.projectId) return false;
-    return (
-      !needle ||
-      matchesText(result.title, needle) ||
-      matchesText(result.body, needle) ||
-      (!!task && (matchesText(task.title, needle) || matchesText(task.shortId, needle)))
-    );
+    return matchesResultSearchQuery(result, task, needle);
   });
 }
 

@@ -1,21 +1,43 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
+import type { SearchType } from '../../../packages/contracts/src/result-search.js';
 import type { TaskSearchScope } from '../../../packages/contracts/src/task-search.js';
 import { Dialog, Icon, StatusBadge, type IconName } from '../../../packages/ui/src/index.js';
 import { go, useApp } from './state.js';
 import { useTaskSearchPages } from './task-search-pages.js';
+import { useResultSearchPages } from './result-search-pages.js';
 import {
   taskSearchProjectLabel,
   taskSearchResultContext,
   taskSearchScopeContext,
 } from './task-search-context.js';
 import { TaskDescriptionMatch } from './task-match-snippet-view.js';
+import { resultSearchResultContext, resultSearchScopeContext } from './result-search-context.js';
+import { ResultBodyMatch } from './result-match-snippet-view.js';
 import './command-menu.css';
 export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
   const { data } = useApp();
   const [q, setQ] = useState('');
+  const [searchType, setSearchType] = useState<SearchType>('task');
   const [selection, setSelection] = useState<TaskSearchScope>({ scope: 'all', projectId: null });
-  const context = taskSearchScopeContext(selection, data.projects);
-  const search = useTaskSearchPages(q, data.tasks, selection, context.available);
+  const context =
+    searchType === 'task'
+      ? taskSearchScopeContext(selection, data.projects)
+      : resultSearchScopeContext(selection, data.projects);
+  const taskSearch = useTaskSearchPages(
+    q,
+    data.tasks,
+    selection,
+    context.available && searchType === 'task',
+  );
+  const resultSearch = useResultSearchPages(
+    q,
+    data.results,
+    data.tasks,
+    selection,
+    context.available && searchType === 'result',
+  );
+  const search = searchType === 'task' ? taskSearch : resultSearch;
+  const itemLabel = searchType === 'task' ? '任务' : '成果';
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -85,17 +107,17 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
   }, [search.scope]);
   useLayoutEffect(() => {
     if (search.needsRestart) restartRef.current?.focus();
-    else if (search.focusTaskId) {
+    else if (search.focusItemId) {
       const row = Array.from(
         listRef.current?.querySelectorAll<HTMLButtonElement>('button') ?? [],
-      ).find((button) => button.dataset.taskId === search.focusTaskId);
+      ).find((button) => button.dataset.searchId === search.focusItemId);
       row?.focus();
     }
-  }, [search.needsRestart, search.focusTaskId]);
+  }, [search.needsRestart, search.focusItemId]);
   const status = !context.available
     ? '所选项目当前不可用，请选择其他搜索范围。'
     : !q.trim()
-      ? '输入关键词，搜索当前范围内可见的任务。'
+      ? `输入关键词，搜索当前范围内可见的${itemLabel}。`
       : search.needsRestart
         ? '搜索结果已失效，请重新搜索。'
         : search.busy === 'initial'
@@ -103,8 +125,8 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           : !search.items.length
             ? search.error
               ? '搜索失败，请重试。'
-              : '没有找到匹配的任务。'
-            : `已显示 ${search.items.length} 项任务，${
+              : `没有找到匹配的${itemLabel}。`
+            : `已显示 ${search.items.length} 项${itemLabel}，${
                 search.busy === 'more'
                   ? '正在加载更多…'
                   : search.error
@@ -123,16 +145,36 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
             autoFocus
             aria-label="全局搜索"
             maxLength={160}
-            placeholder="任务标题、说明、编号，或新建、项目、设置…"
+            placeholder={
+              searchType === 'task'
+                ? '任务标题、说明、编号，或新建、项目、设置…'
+                : '成果当前标题、正文、关联任务标题或编号…'
+            }
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <kbd>ESC</kbd>
         </label>
         <label className="command-search-scope">
-          <span>任务搜索范围</span>
+          <span>搜索类型</span>
           <select
-            aria-label="任务搜索范围"
+            aria-label="搜索类型"
+            value={searchType}
+            onChange={(event) => {
+              const nextType = event.target.value === 'result' ? 'result' : 'task';
+              if (nextType === searchType) return;
+              search.cancel();
+              setSearchType(nextType);
+            }}
+          >
+            <option value="task">任务</option>
+            <option value="result">成果（当前版本）</option>
+          </select>
+        </label>
+        <label className="command-search-scope">
+          <span>{itemLabel}搜索范围</span>
+          <select
+            aria-label={`${itemLabel}搜索范围`}
             title={context.label}
             value={
               selection.scope === 'project' ? `project:${selection.projectId}` : selection.scope
@@ -146,8 +188,8 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
               );
             }}
           >
-            <option value="all">全部当前可见任务</option>
-            <option value="personal">无项目个人任务</option>
+            <option value="all">全部当前可见{itemLabel}</option>
+            <option value="personal">无项目个人{itemLabel}</option>
             {selection.scope === 'project' && !context.available && (
               <option value={`project:${selection.projectId}`} disabled>
                 项目不可用
@@ -179,7 +221,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           id={`${id}-results`}
           ref={listRef}
           role="region"
-          aria-label="任务搜索结果"
+          aria-label={`${itemLabel}搜索结果`}
           aria-busy={!!search.busy}
           onFocusCapture={(event) => {
             if (event.target instanceof HTMLElement) focusedResult.current = event.target;
@@ -202,36 +244,79 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           {search.items.length > 0 && (
             <span className="command-section-label">{context.label}</span>
           )}
-          {search.items.map((task) => {
-            const resultContext = taskSearchResultContext(task, data.projects, q);
-            return (
-              <button
-                key={task.id}
-                data-task-id={task.id}
-                onClick={() => {
-                  go(`/tasks/${task.id}`);
-                  close();
-                }}
-              >
-                <Icon name="file" />
-                <div className="command-task-heading">
-                  <strong>{task.title}</strong>
-                  <div className="command-task-meta">
-                    <small>{task.shortId}</small>
-                    <span className="command-task-revision">修订 {task.revision}</span>
+          {searchType === 'task' &&
+            taskSearch.items.map((task) => {
+              const resultContext = taskSearchResultContext(task, data.projects, q);
+              return (
+                <button
+                  key={task.id}
+                  data-task-id={task.id}
+                  data-search-id={task.id}
+                  onClick={() => {
+                    go(`/tasks/${task.id}`);
+                    close();
+                  }}
+                >
+                  <Icon name="file" />
+                  <div className="command-task-heading">
+                    <strong>{task.title}</strong>
+                    <div className="command-task-meta">
+                      <small>{task.shortId}</small>
+                      <span className="command-task-revision">修订 {task.revision}</span>
+                    </div>
                   </div>
-                </div>
-                <StatusBadge status={task.status} />
-                <Icon name="arrow" size={15} />
-                <div className="command-task-context">
-                  <span className="command-task-source">{resultContext.sourceLabel}</span>
-                  {resultContext.descriptionMatch && (
-                    <TaskDescriptionMatch snippet={resultContext.descriptionMatch} />
-                  )}
-                </div>
-              </button>
-            );
-          })}
+                  <StatusBadge status={task.status} />
+                  <Icon name="arrow" size={15} />
+                  <div className="command-task-context">
+                    <span className="command-task-source">{resultContext.sourceLabel}</span>
+                    {resultContext.descriptionMatch && (
+                      <TaskDescriptionMatch snippet={resultContext.descriptionMatch} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          {searchType === 'result' &&
+            resultSearch.items.map((result) => {
+              const resultContext = resultSearchResultContext(
+                result,
+                result.task,
+                data.projects,
+                q,
+              );
+              return (
+                <button
+                  key={`result:${result.id}`}
+                  className="command-result-row"
+                  data-result-id={result.id}
+                  data-search-id={result.id}
+                  onClick={() => {
+                    go(`/results/${result.id}`);
+                    close();
+                  }}
+                >
+                  <Icon name="box" />
+                  <div className="command-result-heading">
+                    <strong>{result.title}</strong>
+                    <div className="command-result-meta">
+                      <span className="command-result-version">当前版本 {result.revision}</span>
+                      <span>{resultContext.kindLabel}</span>
+                    </div>
+                  </div>
+                  <Icon name="arrow" size={15} />
+                  <div className="command-result-context">
+                    <div className="command-result-task">
+                      <small>{result.task.shortId}</small>
+                      <span>{result.task.title}</span>
+                    </div>
+                    <span className="command-task-source">{resultContext.sourceLabel}</span>
+                    {resultContext.bodyMatch && (
+                      <ResultBodyMatch snippet={resultContext.bodyMatch} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
         </div>
         {search.error && (
           <p className="command-search-error" role="alert">
@@ -242,7 +327,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
           <p
             id={`${id}-status`}
             role="status"
-            aria-label="任务搜索分页状态"
+            aria-label={`${itemLabel}搜索分页状态`}
             aria-live="polite"
             aria-atomic="true"
           >
@@ -270,7 +355,11 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
               aria-describedby={`${id}-status`}
               onClick={search.loadMore}
             >
-              {search.busy === 'more' ? '加载中…' : search.error ? '重试加载更多' : '加载更多任务'}
+              {search.busy === 'more'
+                ? '加载中…'
+                : search.error
+                  ? '重试加载更多'
+                  : `加载更多${itemLabel}`}
             </button>
           ) : null}
         </div>

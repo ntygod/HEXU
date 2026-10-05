@@ -54,7 +54,9 @@ import {
 } from '../../../packages/contracts/src/index.js';
 import { Store } from '../../../packages/db/src/store.js';
 import { parseTaskSearchQuery } from '../../../packages/contracts/src/task-search.js';
+import { parseSearchType } from '../../../packages/contracts/src/result-search.js';
 import { pageTaskSearch } from '../../../packages/db/src/task-search.js';
+import { pageResultSearch } from '../../../packages/db/src/result-search.js';
 import { MockAdapter } from '../../../packages/adapters/mock/src/index.js';
 
 export async function createApp(
@@ -761,7 +763,12 @@ export async function createApp(
       );
   });
   app.get('/api/v1/search', async (request) => {
-    return pageTaskSearch(store.tasks(), parseTaskSearchQuery(request.query));
+    const tasks = store.tasks();
+    const type = parseSearchType(request.query);
+    const query = parseTaskSearchQuery(request.query);
+    return type === 'result'
+      ? pageResultSearch(store.results(), tasks, query)
+      : pageTaskSearch(tasks, query);
   });
   for (const url of ['/api/v1/events', '/api/v1/tasks/:taskId/events'])
     app.get(url, async (request, reply) => {

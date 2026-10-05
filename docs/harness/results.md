@@ -35,3 +35,8 @@
 方案比较/选择按[并行 harness](parallel.md)，选择只固定版本，不自动整合/执行/停止。相关测试为[成果事务](../../tests/branch-results.test.ts)、[选择事务](../../tests/branch-comparison.test.ts)与[浏览器流程](../../tests/e2e/branch-results.spec.ts)。控制层夹具明确预置现场绑定并发送协议事件，不计作真实文件恢复或模型生成；原 Linux 进程/文件测试保留在 branch-workspaces。
 
 检查错来源、旧修订、事务回滚、当前权限/旧回执、输出边界、迁移和旧反馈；界面验证临时错误/未知回复/撤权与窄屏。并发测试允许任一请求先完成认证，只断言唯一提交与实际胜出请求的回执；自建浏览器夹具先关闭其上下文/连接，再关闭服务。仅按实际改动选择验证，进度回写 [19](../development/19-work-items.md)/[21](../development/21-implementation-status.md)，下一项在 [22](../development/22-next-delivery.md)。
+
+
+## 当前Result全局查找
+
+只取原Store.results()/tasks()当前集合，按Task关联后取项目/个人交集，再用当前Result标题/正文或Task标题/编号的独立字段谓词分页；复用与成果库相同的纯matcher，不能把Task拼接谓词移用于Result。游标包含当前Result和相关父Task来源；缺父Task不当个人，当前版本数字不当固定RevisionID。新入口进入原/results/:id，纯文本有界片段不改变匹配集合；类型切换取消旧普通读取，原Task默认和选择器保持。使用与验证见[全局搜索](../engineering/task-search-pagination.md)，不因此恢复历史/身份/文件审阅。
