@@ -346,14 +346,22 @@ function failure(route: Route) {
 
 // Screenshot plan: 247 dark desktop shows populated version references; 248 light
 // mobile shows the actual link and local controls; 249 light mobile shows the
-// frozen original package with its recovery action. Each target is scrolled into
+// frozen original package with its recovery action; 250 shows the filled desktop form.
+// Each target is scrolled into
 // view, hit-tested and checked for overflow; no distant header/footer requirement.
 test('报告与发布链接以纯文本展示，真实增删只改变固定版本的可选关联', async ({
   page,
   references: f,
 }) => {
   await f.open();
-  await addLink(page, report);
+  await edit(page, report);
+  const kindBox = await form(page).getByLabel('链接类型', { exact: true }).boundingBox();
+  const titleBox = await form(page).getByLabel('链接标题', { exact: true }).boundingBox();
+  expect(Math.abs(kindBox!.y - titleBox!.y)).toBeLessThanOrEqual(1);
+  await screenshot(page, save(page), form(page), '250-result-reference-form-dark.png');
+  await save(page).click();
+  await expect(row(page, report)).toBeVisible();
+  await expect(form(page)).toHaveCount(0);
   await addLink(page, release);
   const first = await f.list();
   expect(first).toHaveLength(2);

@@ -322,6 +322,7 @@ export function ResultReferencePanel({
             <label className="field result-reference-wide">
               来源说明（可选）
               <textarea
+                aria-label="来源说明（可选）"
                 value={draft.sourceNote ?? ''}
                 maxLength={1000}
                 rows={3}

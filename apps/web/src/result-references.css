@@ -96,6 +96,9 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: var(--hx-space-3);
 }
+.result-reference-fields > .field {
+  margin-top: 0;
+}
 .result-reference-wide {
   grid-column: 1 / -1;
 }

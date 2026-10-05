@@ -97,6 +97,7 @@ jobs:
             artifacts/247-result-reference-links-dark.png
             artifacts/248-result-reference-links-mobile-light.png
             artifacts/249-result-reference-links-pending-mobile.png
+            artifacts/250-result-reference-form-dark.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
