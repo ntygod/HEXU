@@ -94,6 +94,9 @@ jobs:
             artifacts/244-current-agreement-search-dark.png
             artifacts/245-current-agreement-search-mobile-light.png
             artifacts/246-current-agreement-search-personal-mobile.png
+            artifacts/247-result-reference-links-dark.png
+            artifacts/248-result-reference-links-mobile-light.png
+            artifacts/249-result-reference-links-pending-mobile.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -329,6 +332,17 @@ jobs:
             test-results/current-agreement-search-*/trace.zip
             test-results/current-agreement-search-*/test-failed-*.png
             test-results/current-agreement-search-*/error-context.md
+          retention-days: 7
+
+      - name: Upload result-reference-links failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-result-reference-links-failures
+          path: |
+            test-results/result-reference-links-*/trace.zip
+            test-results/result-reference-links-*/test-failed-*.png
+            test-results/result-reference-links-*/error-context.md
           retention-days: 7
 
   check:

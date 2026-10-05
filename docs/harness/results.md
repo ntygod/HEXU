@@ -40,3 +40,10 @@
 ## 当前Result全局查找
 
 只取原Store.results()/tasks()当前集合，按Task关联后取项目/个人交集，再用当前Result标题/正文或Task标题/编号的独立字段谓词分页；复用与成果库相同的纯matcher，不能把Task拼接谓词移用于Result。游标包含当前Result和相关父Task来源；缺父Task不当个人，当前版本数字不当固定RevisionID。新入口进入原/results/:id，纯文本有界片段不改变匹配集合；类型切换取消旧普通读取，原Task默认和选择器保持。使用与验证见[全局搜索](../engineering/task-search-pagination.md)，不因此恢复历史/身份/文件审阅。
+
+
+## 手动报告与发布链接
+
+可选手动引用属于实际加载的ResultRevision，独立于不可变正文；不从Result数字修订猜ID或在版本切换时复制引用。读/编辑沿父Task原guard，原回执前的事务内当前检查、目标绑定、原正文/键、引用/移除/outbox/回执原子性保留。有效列表每版最多20，移除保留记录；同一移除重复请求不增加事件。
+
+链接只允许完整HTTP(S)并纯文本呈现，不抓取、自动预览、检查可用性或推断发布/报告结论；手动来源、外部未知、未检查分别可见。表单未结包固定原版本/正文/键，成功ACK后读失败只GET；关闭同版本表单可恢复，换版本卸载旧临时状态，旧普通响应不能更新新页面。引用缺失不阻止完成Task。实现见[契约](../../packages/contracts/src/result-references.ts)、[仓储](../../packages/db/src/result-references.ts)、[界面](../../apps/web/src/result-references.tsx)，操作与边界见[用法](../engineering/result-reference-links.md)。本片不扩共享身份逻辑或暂停诊断。

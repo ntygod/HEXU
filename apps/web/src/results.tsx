@@ -4,6 +4,7 @@ import { Button, Empty, Icon, Skeleton, StatusBadge } from '../../../packages/ui
 import { Link, time, useApp, canEditTask, go } from './state.js';
 import { useAssistanceRead } from './assistance-common.js';
 import { ResultSource } from './result-source.js';
+import { ResultReferencePanel } from './result-references.js';
 import { PrepareIntegration } from './integrations.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { OrderPreview } from './preview.js';
@@ -319,6 +320,13 @@ export function ResultPage({ id, revisionId }: { id: string; revisionId?: string
           <p className="result-source">反馈保存在原任务，不会自动发送给执行工具。</p>
         </aside>
       </div>
+      <ResultReferencePanel
+        key={`${result.id}:${version.id}`}
+        resultId={result.id}
+        revisionId={version.id}
+        revision={version.revision}
+        editable={editable}
+      />
     </div>
   );
 }

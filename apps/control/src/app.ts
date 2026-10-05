@@ -3,6 +3,7 @@ import { attachHandoffs } from './handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
+import { ResultReferences } from '../../../packages/db/src/result-references.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
@@ -749,6 +750,35 @@ export async function createApp(
       param(request.params, 'resultId'),
       param(request.params, 'revisionId'),
     ),
+  );
+  app.get('/api/v1/results/:resultId/versions/:revisionId/references', async (request) =>
+    new ResultReferences(store).list(
+      param(request.params, 'resultId'),
+      param(request.params, 'revisionId'),
+    ),
+  );
+  app.post('/api/v1/results/:resultId/versions/:revisionId/references', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        new ResultReferences(store).add(
+          param(request.params, 'resultId'),
+          param(request.params, 'revisionId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
+  app.post(
+    '/api/v1/results/:resultId/versions/:revisionId/references/:referenceId/remove',
+    async (request) =>
+      new ResultReferences(store).remove(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'referenceId'),
+        request.body,
+        key(request.headers),
+      ),
   );
   app.post('/api/v1/tasks/:taskId/results', async (request, reply) => {
     const body = record(request.body);

@@ -605,4 +605,18 @@ CREATE TRIGGER integration_report_immutable BEFORE UPDATE ON integration_operati
 -- No existing Result, Run, restore or choice is relabelled as an integration.
 `,
   },
+  {
+    version: 32,
+    sql: `
+CREATE UNIQUE INDEX result_revisions_reference_identity ON result_revisions(result_id,id);
+CREATE TABLE result_references (
+ id TEXT PRIMARY KEY, result_id TEXT NOT NULL REFERENCES results(id),
+ result_revision_id TEXT NOT NULL, removed_at TEXT, body TEXT NOT NULL,
+ FOREIGN KEY(result_id,result_revision_id) REFERENCES result_revisions(result_id,id)
+);
+CREATE INDEX result_references_active ON result_references(result_id,result_revision_id)
+ WHERE removed_at IS NULL;
+-- Removal retains the original manual association and records who removed it and when.
+`,
+  },
 ];

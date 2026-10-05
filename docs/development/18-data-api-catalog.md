@@ -324,3 +324,12 @@ Task搜索的范围扩展：可选`scope=all|personal|project`，缺省all；per
 约定全局查找扩展：agreement类型复用q/scope/projectId/cursor，个人scope明确INVALID_INPUT/400；只读当前可见项目的project_agreements当前行，按全局rowid降序，在匹配与30项分页前取项目范围。标题与content沿原约定拼接文字规则匹配，active/inactive/superseded各当前记录一次；响应明确最小id/projectId/title/content/revision/state/updatedAt与project{id,name,archivedAt?}，不发送origin/来源讨论节选或历史。afterAgreementId书签独立绑定type/query/scope及当前有序DTO，错配400、变化409；原Task/Result书签保持。
 
 Workbench只读响应新增可选projectAgreementVersions数组 `{projectId,version}`，仅对同响应当前可见项目返回既有约定变更版本，不包含正文；没有版本行时的0只用于已经过原项目读取检查的项目。旧/未就绪响应缺字段或缺所选项目元数据不能当作0。普通SSE后的Workbench读取传递变化，新约定搜索按相关项目版本及来源标签取消旧页；该信号按项目粒度，既非查询专属版本，也不保证永远在线同步。无新端点、迁移、身份源或业务写入。
+
+
+## 14-06 固定版本的手动报告/发布链接
+
+`GET/POST /api/v1/results/:resultId/versions/:revisionId/references`读取或添加当前固定版本有效链接；GET返回`{items,limit:20}`，POST接受`{kind:'report'|'release',title,url,environment?,sourceNote?}`。标题160、HTTP(S)地址2048、环境120、来源说明1000字符；地址不接受内嵌账号密码、空白或控制字符，服务不请求该地址。`POST .../references/:referenceId/remove`接受空对象并返回保留的移除记录。
+
+迁移32新增独立result_references及同Result/Revision外键，旧正文链接不推断为历史引用。记录固定resultId/resultRevisionId/taskId、原文字、`source:'manual'`、`externalState:'unknown'`、`availability:'not_checked'`、真实记录/移除人和时间。有效引用按记录顺序倒序，最多20个；移除保留记录。
+
+两个写命令沿现有Idempotency-Key；作用域按Result/动作固定，指纹包含实际版本ID和原请求对象。现有父Task读/编辑guard在原事务旧回执之前复核；引用/移除、outbox与回执原子提交。不同版本或改包复用键拒绝；同包重放返回原回执，重复移除不再产生事件。结果正文/版本/Task/Run状态不随引用修改。
