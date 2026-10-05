@@ -272,6 +272,7 @@ export function ResultReferencePanel({
             <label className="field">
               链接类型
               <select
+                aria-label="链接类型"
                 value={draft.kind}
                 disabled={locked}
                 onChange={(event) =>

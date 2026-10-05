@@ -234,7 +234,7 @@ const test = base.extend<{ references: Fixture }>({
 async function routeFixture(
   page: Page,
   f: Fixture,
-  url: string,
+  url: string | ((url: URL) => boolean),
   handle: (route: Route) => Promise<void>,
   release: () => void = () => {},
 ) {
@@ -563,7 +563,11 @@ for (const action of ['add', 'remove'] as const) {
     let accepted = false,
       failReads = true,
       failedReads = 0;
-    const pattern = `${origin}/api/v1/${f.references()}**`;
+    const listPath = `/api/v1/${f.references()}`;
+    const writePath = seeded ? `${listPath}/${seeded.id}/remove` : listPath;
+    // Match the exact list and write paths; a suffix glob does not cross /referenceId/remove.
+    const pattern = (url: URL) =>
+      url.origin === origin && (url.pathname === listPath || url.pathname === writePath);
     await routeFixture(page, f, pattern, async (route) => {
       if (route.request().method() === 'POST') {
         records.push(packet(route.request()));

@@ -427,3 +427,38 @@ test('migration 32 starts with no inferred links and preserves existing immutabl
     migrated.close();
   }
 });
+
+test('legacy result and new reference migrations rebuild together without inferred references', async (t) => {
+  const { app, store, path, result, task } = await fixture(t);
+  const parents = parentSnapshot(store);
+  assert.deepEqual(store.db.prepare('SELECT * FROM result_references').all(), []);
+  await app.close();
+  const baseline = new DatabaseSync(path);
+  baseline.exec(`DROP TABLE result_references;
+    DROP TABLE work_branch_choices;
+    DROP TABLE result_revisions;
+    ALTER TABLE node_dispatches DROP COLUMN terminal_sequence;
+    DELETE FROM schema_migrations WHERE version IN (29,32);`);
+  baseline.close();
+  const migrated = new Store(path);
+  try {
+    const version = new ResultRevisions(migrated).current(result);
+    assert.equal(version.resultId, result.id);
+    assert.equal(version.taskId, task.id);
+    assert.equal(version.revision, result.revision);
+    assert.equal(version.title, result.title);
+    assert.equal(version.body, result.body);
+    assert.deepEqual(version.source, { kind: 'legacy' });
+    assert.equal(version.createdBy, null);
+    assert.deepEqual(new ResultReferences(migrated).list(result.id, version.id).items, []);
+    const after = parentSnapshot(migrated);
+    assert.deepEqual(after.results, parents.results);
+    assert.deepEqual(after.tasks, parents.tasks);
+    assert.deepEqual(after.runs, parents.runs);
+    assert.deepEqual(after.messages, parents.messages);
+    assert.deepEqual(after.completions, parents.completions);
+    assert.equal(migrated.db.prepare('PRAGMA foreign_key_check').all().length, 0);
+  } finally {
+    migrated.close();
+  }
+});
