@@ -48,6 +48,7 @@
 | 已结算方案Run的只读来源、共享输出与事件边界 | [成果来源预览](branch-result-sources.md) |
 | 固定成果版本、来源/反馈、方案比较与选择 | [方案成果](branch-results.md) |
 | 为固定成果版本添加可选报告或发布地址 | [手动链接](result-reference-links.md) |
+| 保存项目任务顺序，处理并发移动与中断 | [项目任务排序](project-task-order.md) |
 | 按项目/关键词找回当前成果并打开原详情 | [成果库查找](result-library-search.md) |
 | 按类型、项目和关键词辨认并继续找回当前任务/成果/约定 | [全局搜索与分页](task-search-pagination.md) |
 | 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |

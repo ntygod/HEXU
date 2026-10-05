@@ -619,4 +619,20 @@ CREATE INDEX result_references_active ON result_references(result_id,result_revi
 -- Removal retains the original manual association and records who removed it and when.
 `,
   },
+  {
+    version: 33,
+    sql: `
+CREATE TABLE project_task_order_sets (
+ project_id TEXT PRIMARY KEY REFERENCES projects(id),
+ revision INTEGER NOT NULL CHECK(revision>=1)
+);
+CREATE TABLE project_task_ranks (
+ project_id TEXT NOT NULL REFERENCES projects(id), task_id TEXT NOT NULL REFERENCES tasks(id),
+ rank INTEGER NOT NULL CHECK(rank BETWEEN -9007199254740991 AND 9007199254740991),
+ PRIMARY KEY(project_id,task_id)
+);
+CREATE INDEX project_task_ranks_order ON project_task_ranks(project_id,rank);
+-- No inferred moves or writes on read: absent ranks preserve existing rowid DESC order.
+`,
+  },
 ];

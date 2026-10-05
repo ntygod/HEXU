@@ -98,6 +98,9 @@ jobs:
             artifacts/248-result-reference-links-mobile-light.png
             artifacts/249-result-reference-links-pending-mobile.png
             artifacts/250-result-reference-form-dark.png
+            artifacts/251-project-task-order-list-dark.png
+            artifacts/252-project-task-order-mobile-light.png
+            artifacts/253-project-task-order-board-dark.png
             artifacts/107-branch-result-dark.png
             artifacts/108-branch-result-mobile.png
           retention-days: 7
@@ -344,6 +347,17 @@ jobs:
             test-results/result-reference-links-*/trace.zip
             test-results/result-reference-links-*/test-failed-*.png
             test-results/result-reference-links-*/error-context.md
+          retention-days: 7
+
+      - name: Upload project-task-order failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-project-task-order-failures
+          path: |
+            test-results/project-task-order-*/trace.zip
+            test-results/project-task-order-*/test-failed-*.png
+            test-results/project-task-order-*/error-context.md
           retention-days: 7
 
   check:

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
 import { ProjectAgreements } from './project-agreements.js';
@@ -14,6 +14,12 @@ import { ProjectAccess } from './team.js';
 import { ResultCard, TaskRow } from './work-cards.js';
 import { taskDescriptionMatchSnippet } from './task-match-snippet.js';
 import { TaskDescriptionMatch } from './task-match-snippet-view.js';
+import { useProjectTaskOrder } from './project-task-order-state.js';
+import {
+  ProjectTaskOrderActions,
+  ProjectTaskOrderPanel,
+  useProjectOrderControls,
+} from './project-task-order.js';
 import './work-pages.css';
 
 export function Projects() {
@@ -101,6 +107,10 @@ export function Projects() {
 }
 
 export function ProjectPage({ id }: { id: string }) {
+  return <ProjectPageContent key={id} id={id} />;
+}
+
+function ProjectPageContent({ id }: { id: string }) {
   const { data, changeStatus } = useApp();
   const readLocation = () => {
     const query = new URLSearchParams(location.search);
@@ -139,6 +149,25 @@ export function ProjectPage({ id }: { id: string }) {
   useEffect(() => {
     if (!manageable) setSettingsOpen(false);
   }, [manageable]);
+  const visibleTasks = useMemo(
+    () => data.tasks.filter((task) => task.projectId === id),
+    [data.tasks, id],
+  );
+  const order = useProjectTaskOrder({
+    projectId: id,
+    available: !!project,
+    canOrder: !!project && project.access !== 'view',
+    tasks: visibleTasks,
+    editableIds: visibleTasks.filter((task) => canEditTask(data, task)).map((task) => task.id),
+    scope: JSON.stringify([tab, view, filters, status, attention]),
+  });
+  const tasks = order.orderedTasks.filter(
+    (task) =>
+      matchesTaskPeopleFilters(task, filters) &&
+      matchesProjectTaskStatus(task, status) &&
+      matchesProjectTaskAttention(task, attention),
+  );
+  const orderControls = useProjectOrderControls(order, tasks, view);
   if (!project)
     return (
       <Empty
@@ -156,14 +185,7 @@ export function ProjectPage({ id }: { id: string }) {
     data.mode === 'team-local'
       ? data.members.filter((member) => project.memberIds?.includes(member.id))
       : data.members;
-  const visibleTasks = data.tasks.filter((task) => task.projectId === id);
   const allTasks = visibleTasks.filter((task) => task.status !== 'cancelled');
-  const tasks = visibleTasks.filter(
-    (task) =>
-      matchesTaskPeopleFilters(task, filters) &&
-      matchesProjectTaskStatus(task, status) &&
-      matchesProjectTaskAttention(task, attention),
-  );
   const results = data.results.filter((result) =>
     allTasks.some((task) => task.id === result.taskId),
   );
@@ -310,6 +332,7 @@ export function ProjectPage({ id }: { id: string }) {
             />
             <span className="muted">{tasks.length} 项任务</span>
           </div>
+          <ProjectTaskOrderPanel controls={orderControls} />
           {status.kind === 'invalid' || attention.kind === 'invalid' ? (
             <div role="alert">
               {status.kind === 'invalid' && (
@@ -323,9 +346,9 @@ export function ProjectPage({ id }: { id: string }) {
                 />
               )}
             </div>
-          ) : view === 'board' ? (
+          ) : !order.displayable ? null : view === 'board' ? (
             <div
-              className={`project-board stagger${status.kind === 'status' ? ' project-board-filtered' : ''}`}
+              className={`project-board stagger${status.kind === 'status' ? ' project-board-filtered' : ''}${order.open ? ' project-board-ordering' : ''}`}
             >
               {projectTaskStatusColumns(status).map((status) => (
                 <section className="project-column" key={status}>
@@ -338,7 +361,11 @@ export function ProjectPage({ id }: { id: string }) {
                     .map((task) => {
                       const descriptionMatch = taskDescriptionMatchSnippet(task, filters.q);
                       return (
-                        <article className="project-task-card spotlight" key={task.id}>
+                        <article
+                          className="project-task-card spotlight"
+                          key={task.id}
+                          {...orderControls.target(task)}
+                        >
                           <Link to={`/tasks/${task.id}`}>
                             <span className="work-task-id">{task.shortId}</span>
                             <h3>{task.title}</h3>
@@ -373,6 +400,7 @@ export function ProjectPage({ id }: { id: string }) {
                               </select>
                             )}
                           </footer>
+                          <ProjectTaskOrderActions task={task} controls={orderControls} />
                         </article>
                       );
                     })}
@@ -384,13 +412,27 @@ export function ProjectPage({ id }: { id: string }) {
             </div>
           ) : (
             <div className="work-task-list task-list">
-              {tasks.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
-                />
-              ))}
+              {tasks.map((task) =>
+                order.open ? (
+                  <div
+                    className="project-task-order-row"
+                    key={task.id}
+                    {...orderControls.target(task)}
+                  >
+                    <TaskRow
+                      task={task}
+                      descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
+                    />
+                    <ProjectTaskOrderActions task={task} controls={orderControls} />
+                  </div>
+                ) : (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
+                  />
+                ),
+              )}
               {!tasks.length && (
                 <Empty
                   icon="list"

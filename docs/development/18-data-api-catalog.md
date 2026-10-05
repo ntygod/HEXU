@@ -333,3 +333,13 @@ Workbench只读响应新增可选projectAgreementVersions数组 `{projectId,vers
 迁移32新增独立result_references及同Result/Revision外键，旧正文链接不推断为历史引用。记录固定resultId/resultRevisionId/taskId、原文字、`source:'manual'`、`externalState:'unknown'`、`availability:'not_checked'`、真实记录/移除人和时间。有效引用按记录顺序倒序，最多20个；移除保留记录。
 
 两个写命令沿现有Idempotency-Key；作用域按Result/动作固定，指纹包含实际版本ID和原请求对象。现有父Task读/编辑guard在原事务旧回执之前复核；引用/移除、outbox与回执原子提交。不同版本或改包复用键拒绝；同包重放返回原回执，重复移除不再产生事件。结果正文/版本/Task/Run状态不随引用修改。
+
+## 04-03 项目任务的持久排序
+
+`GET /api/v1/projects/:projectId/task-order` 返回 `{projectId,revision,baseline,taskIds}`，只包含原授权集合中的同项目任务，无查询参数。未排序项目沿原 rowid 倒序，虚拟排序 revision=1；读取使用一致 SQLite 快照，不建立排序行。迁移33新增独立 `project_task_order_sets` 与 `project_task_ranks`，不改变 Task JSON/修订。
+
+`POST .../task-order/move` 只接受 `{taskId,anchorTaskId,placement:'before'|'after',expectedRevision,expectedBaseline}`；ID最多150字符且不同，baseline为64位小写十六进制，独立正文预算4096字节。使用原 `Idempotency-Key`；当前项目编辑及所移动Task编辑guard在事务旧回执之前复核，参照Task须当前可读且同项目。新移动不接受cancelled任务。
+
+baseline绑定当前可读有序ID及状态；当前修订或基线变化返回 `PROJECT_TASK_ORDER_CONFLICT/409`。一次移动仅改变指定Task的位置，其余任务相对顺序保持，包括UI筛选隐藏项。稳定整数rank必要时同事务重排间距；实际移动、独立修订、项目outbox和回执原子提交。无变化不增修订、不发事件或建立rank，但保留原回执。
+
+返回 `{projectId,taskId,anchorTaskId,placement,revision,baseline,changed}`，不携带历史可见ID列表。原始解码请求用于幂等指纹；相同包重放确认原回执，不重做移动，改包同键拒绝。普通Task内容变化不会改排序基线；新任务追加在已有rank之后，未排序的新任务彼此仍沿原rowid顺序。协议与UI限制见[项目任务排序](../engineering/project-task-order.md)。

@@ -405,7 +405,7 @@ test('migration 32 starts with no inferred links and preserves existing immutabl
   const { app, store, path } = await fixture(t);
   const before = parentSnapshot(store);
   await app.close();
-  // Recreate the exact version-31 schema baseline by removing only the new, empty structures.
+  // Rebuild the pre-32 Result structures, retaining any later unrelated migrations.
   const baseline = new DatabaseSync(path);
   baseline.exec(`DROP TABLE result_references;
     DROP INDEX result_revisions_reference_identity;
@@ -417,7 +417,7 @@ test('migration 32 starts with no inferred links and preserves existing immutabl
     assert.deepEqual(migrated.db.prepare('SELECT * FROM result_references').all(), []);
     assert.equal(
       (
-        migrated.db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {
+        migrated.db.prepare('SELECT version FROM schema_migrations WHERE version=32').get() as {
           version: number;
         }
       ).version,

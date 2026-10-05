@@ -7,6 +7,8 @@ import { ResultReferences } from '../../../packages/db/src/result-references.js'
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
+import { parseProjectTaskOrderQuery } from '../../../packages/contracts/src/project-task-order.js';
+import { ProjectTaskOrderStore } from '../../../packages/db/src/project-task-order.js';
 import {
   parseDraftPageQuery,
   parseDraftHistoryQuery,
@@ -511,6 +513,20 @@ export async function createApp(
   app.get('/api/v1/projects/:projectId/task-people', async (request) =>
     store.taskParticipants.people(param(request.params, 'projectId')),
   );
+  const projectTaskOrder = new ProjectTaskOrderStore(store);
+  app.get('/api/v1/projects/:projectId/task-order', async (request) => {
+    parseProjectTaskOrderQuery(request.query);
+    return projectTaskOrder.view(param(request.params, 'projectId'));
+  });
+  // Accommodates even fully escaped legal IDs, baseline, keys and placement (< 3 KiB).
+  app.post('/api/v1/projects/:projectId/task-order/move', { bodyLimit: 4096 }, async (request) => {
+    parseProjectTaskOrderQuery(request.query);
+    return projectTaskOrder.move(
+      param(request.params, 'projectId'),
+      request.body,
+      key(request.headers),
+    );
+  });
   app.post('/api/v1/tasks/:taskId/assignment', async (request) =>
     store.taskAssignment.assign(
       param(request.params, 'taskId'),
