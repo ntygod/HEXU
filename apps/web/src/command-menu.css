@@ -1,3 +1,37 @@
+.dialog[open]:has(.command-search-body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog:has(.command-search-body) > .dialog-heading {
+  flex-shrink: 0;
+}
+.command-search-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.command-search-body > :not(.command-results) {
+  flex-shrink: 0;
+}
+.command-search-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  margin-top: var(--hx-space-3);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.command-search-scope > span {
+  flex-shrink: 0;
+}
+.command-search-scope select {
+  flex: 1;
+  width: 0;
+  max-width: 100%;
+}
 .command-search-field {
   display: flex;
   align-items: center;
@@ -25,12 +59,20 @@
 .command-results {
   margin-top: var(--hx-space-4);
   max-height: min(420px, 50dvh);
+  min-height: 0;
+  padding-block-end: var(--hx-space-1);
   overflow: auto;
+  overscroll-behavior: contain;
+}
+.command-results:empty {
+  margin-top: 0;
+  padding-block-end: 0;
 }
 .command-results > button {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--hx-space-3);
+  gap: var(--hx-space-2) var(--hx-space-3);
   padding: var(--hx-space-3) var(--hx-space-2);
   width: 100%;
   border: 0;
@@ -55,8 +97,36 @@
   background: var(--hx-surface-hover);
 }
 .command-results > button > div {
-  flex: 1;
   min-width: 0;
+}
+.command-task-meta,
+.command-result-meta,
+.command-result-task,
+.command-agreement-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.command-task-context,
+.command-result-context,
+.command-agreement-context {
+  grid-column: 2 / -1;
+}
+.command-task-source,
+.command-task-revision,
+.command-result-meta,
+.command-result-task,
+.command-agreement-meta {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.command-results > .command-result-row,
+.command-results > .command-agreement-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.command-results .command-section-label {
+  overflow-wrap: anywhere;
 }
 .command-results strong {
   display: block;
@@ -65,16 +135,58 @@
 }
 .command-results small {
   color: var(--hx-text-secondary);
+  overflow-wrap: anywhere;
 }
 .command-results > p {
   padding: var(--hx-space-3);
   color: var(--hx-text-secondary);
 }
+.command-search-body > .command-search-error {
+  color: var(--hx-danger-text);
+  margin-top: var(--hx-space-3);
+  overflow-wrap: anywhere;
+}
+.command-search-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  margin-top: var(--hx-space-3);
+}
+.command-search-footer > p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.command-search-footer > .button {
+  max-width: 100%;
+  white-space: normal;
+}
 @media (max-width: 500px) {
-  .command-results > button {
-    flex-wrap: wrap;
+  .command-search-scope select,
+  .command-search-field input,
+  .command-results > button,
+  .command-search-footer > .button {
+    min-height: var(--hx-touch-target);
   }
-  .command-results > button > div {
-    flex-basis: 60%;
+  .dialog:has(.command-search-body) > .dialog-heading > .icon-button {
+    min-width: var(--hx-touch-target);
+    min-height: var(--hx-touch-target);
+  }
+  .command-results > button {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .command-task-heading {
+    grid-column: 2 / -1;
+  }
+  .command-results > button > .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .command-task-context,
+  .command-result-context,
+  .command-agreement-context {
+    grid-column: 1 / -1;
   }
 }

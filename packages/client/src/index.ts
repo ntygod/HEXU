@@ -32,8 +32,14 @@ export const taskAssignmentHistory = (id: string, before?: number, signal?: Abor
   );
 
 let activeSpace = '';
-export function setActiveSpace(id: string) {
+let activeUser = '';
+let accessGeneration = 0;
+export function setActiveSpace(id: string, userId = '') {
+  // Returning to the same space after sign-out or another space is a new
+  // context too. Space equality alone cannot identify a late response's owner.
+  if (id !== activeSpace || userId !== activeUser) accessGeneration++;
   activeSpace = id;
+  activeUser = userId;
 }
 export function getActiveSpace() {
   return activeSpace;
@@ -49,8 +55,16 @@ export class ApiError extends Error {
 }
 export async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; key?: string; signal?: AbortSignal } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    key?: string;
+    signal?: AbortSignal;
+    /** Guard only global identity events for an owned request; failures still throw. */
+    shouldNotifyAccessLoss?: () => boolean;
+  } = {},
 ): Promise<T> {
+  const generation = accessGeneration;
   const headers: Record<string, string> = { 'X-Hexu-Client': 'web' };
   if (activeSpace) headers['X-Hexu-Space'] = activeSpace;
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
@@ -65,7 +79,13 @@ export async function request<T>(
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    if (!path.startsWith('/identity')) {
+    // Global invalidation belongs to the identity/space that sent the request.
+    // The original error still reaches its caller after a context replacement.
+    if (
+      generation === accessGeneration &&
+      !path.startsWith('/identity') &&
+      options.shouldNotifyAccessLoss?.() !== false
+    ) {
       if (response.status === 401) window.dispatchEvent(new Event('hexu-auth-required'));
       if (data?.error?.code === 'SPACE_ACCESS_REVOKED')
         window.dispatchEvent(new Event('hexu-space-revoked'));

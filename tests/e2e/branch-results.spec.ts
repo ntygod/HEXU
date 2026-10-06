@@ -378,11 +378,17 @@ test('方案固定版本可查看来源、保留失败事实，旧反馈和刷�
     await card.getByLabel('方案成果说明', { exact: true }).fill('第一版人工说明');
     await card.getByLabel('方案成果已知限制', { exact: true }).fill('取消操作还需完善');
     await card.getByRole('button', { name: '保存成果版本', exact: true }).click();
-    await card.getByRole('link', { name: '分批导出成果 · v1', exact: true }).click();
-    const firstURL = page.url();
+    const firstLink = card.getByRole('link', { name: '分批导出成果 · v1', exact: true });
+    await expect(firstLink).toHaveAttribute('href', /\/results\/[^/]+\/versions\/[^/]+$/);
+    const firstURL = new URL((await firstLink.getAttribute('href'))!, origin).href,
+      firstRevisionId = new URL(firstURL).pathname.split('/').at(-1)!;
+    await firstLink.click();
+    await expect(page).toHaveURL(firstURL);
     await expect(
       page.getByRole('heading', { name: '分批导出成果 · 当前成果', exact: true }),
     ).toBeVisible();
+    const fixedLink = page.getByRole('link', { name: '打开此版本固定链接', exact: true });
+    await expect(fixedLink).toHaveAttribute('href', new URL(firstURL).pathname);
     await page.getByText('查看已固定的共享输出', { exact: true }).click();
     await expect(page.getByLabel('固定成果来源')).toContainText('协议夹具失败，保留已有输出。');
     await expect(page.getByLabel('固定成果来源')).toContainText('代码文件尚未固定');
@@ -400,20 +406,48 @@ test('方案固定版本可查看来源、保留失败事实，旧反馈和刷�
     await expect(card.getByLabel('方案成果说明', { exact: true })).toHaveValue('第一版人工说明');
     await card.getByLabel('方案成果说明', { exact: true }).fill('第二版补充说明，旧版保持可读');
     await card.getByRole('button', { name: '保存成果版本', exact: true }).click();
-    await card.getByRole('link', { name: '分批导出成果 · v2', exact: true }).click();
-    await expect(page.getByText('第一版需要补充取消说明', { exact: true })).toHaveCount(0);
-    await page.getByLabel('查看固定版本', { exact: true }).selectOption({
-      label: (await page.getByLabel('查看固定版本').locator('option').allTextContents()).find((t) =>
-        t.startsWith('v1'),
-      )!,
+    const secondLink = card.getByRole('link', { name: '分批导出成果 · v2', exact: true });
+    await expect(secondLink).toHaveAttribute('href', /\/results\/[^/]+\/versions\/[^/]+$/);
+    const secondURL = new URL((await secondLink.getAttribute('href'))!, origin).href,
+      secondRevisionId = new URL(secondURL).pathname.split('/').at(-1)!,
+      secondRead = `${origin}/api/v1${new URL(secondURL).pathname}`;
+    const picker = page.getByLabel('查看固定版本', { exact: true });
+    let releaseRead!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      releaseRead = resolve;
     });
+    await page.route(secondRead, async (route) => {
+      await reading;
+      await route.continue();
+    });
+    try {
+      await secondLink.click();
+      // A missing old feedback or empty option list also matches the loading
+      // screen. Exercise that boundary explicitly instead of racing an eager read.
+      await expect(page.getByLabel('正在打开成果', { exact: true })).toBeVisible();
+      await expect(picker).toHaveCount(0);
+      await expect(fixedLink).toHaveCount(0);
+    } finally {
+      releaseRead();
+    }
+    await expect(page).toHaveURL(secondURL);
+    await expect(picker).toHaveValue(secondRevisionId);
+    await expect(page.getByText('第二版补充说明，旧版保持可读', { exact: true })).toBeVisible();
+    await expect(fixedLink).toHaveAttribute('href', new URL(secondURL).pathname);
+    await page.unroute(secondRead);
+    await expect(page.getByText('第一版需要补充取消说明', { exact: true })).toHaveCount(0);
+    // Match the immutable ID, never a label derived from a possibly empty list.
+    await picker.selectOption({ value: firstRevisionId });
     await expect(page).toHaveURL(firstURL);
+    await expect(picker).toHaveValue(firstRevisionId);
     await expect(page.getByText('第一版需要补充取消说明', { exact: true })).toBeVisible();
     await expect(page.getByText('第一版人工说明', { exact: true })).toBeVisible();
+    await expect(fixedLink).toHaveAttribute('href', new URL(firstURL).pathname);
     await page.reload();
     await expect(
       page.getByRole('heading', { name: '分批导出成果 · 版本 1', exact: true }),
     ).toBeVisible();
+    await expect(fixedLink).toHaveAttribute('href', new URL(firstURL).pathname);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mkdir('artifacts', { recursive: true });
     await page.screenshot({ path: 'artifacts/107-branch-result-dark.png', fullPage: true });

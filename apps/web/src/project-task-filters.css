@@ -20,6 +20,9 @@
   color: var(--hx-text-secondary);
   font-size: var(--hx-font-secondary);
 }
+.project-board.project-board-filtered {
+  grid-template-columns: minmax(0, 1fr);
+}
 @media (max-width: 600px) {
   .project-people-filters {
     width: 100%;

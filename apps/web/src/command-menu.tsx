@@ -1,19 +1,92 @@
-import { useEffect, useState } from 'react';
-import type { Task } from '../../../packages/contracts/src/index.js';
-import { request } from '../../../packages/client/src/index.js';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
+import type { SearchType } from '../../../packages/contracts/src/result-search.js';
+import type { TaskSearchScope } from '../../../packages/contracts/src/task-search.js';
 import { Dialog, Icon, StatusBadge, type IconName } from '../../../packages/ui/src/index.js';
 import { go, useApp } from './state.js';
+import { useTaskSearchPages } from './task-search-pages.js';
+import { useResultSearchPages } from './result-search-pages.js';
+import { useAgreementSearchPages } from './agreement-search-pages.js';
+import {
+  taskSearchProjectLabel,
+  taskSearchResultContext,
+  taskSearchScopeContext,
+} from './task-search-context.js';
+import { TaskDescriptionMatch } from './task-match-snippet-view.js';
+import { resultSearchResultContext, resultSearchScopeContext } from './result-search-context.js';
+import { ResultBodyMatch } from './result-match-snippet-view.js';
+import {
+  agreementSearchPath,
+  agreementSearchResultContext,
+  agreementSearchScopeContext,
+} from './agreement-search-context.js';
+import { AgreementBodyMatch } from './agreement-match-snippet-view.js';
 import './command-menu.css';
 export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): void }) {
   const { data } = useApp();
+  const [q, setQ] = useState('');
+  const [searchType, setSearchType] = useState<SearchType>('task');
+  const [selection, setSelection] = useState<TaskSearchScope>({ scope: 'all', projectId: null });
+  const agreementContext = agreementSearchScopeContext(
+    selection,
+    data.projects,
+    data.projectAgreementVersions,
+  );
+  const context =
+    searchType === 'task'
+      ? taskSearchScopeContext(selection, data.projects)
+      : searchType === 'result'
+        ? resultSearchScopeContext(selection, data.projects)
+        : agreementContext;
+  const taskSearch = useTaskSearchPages(
+    q,
+    data.tasks,
+    selection,
+    context.available && searchType === 'task',
+  );
+  const resultSearch = useResultSearchPages(
+    q,
+    data.results,
+    data.tasks,
+    selection,
+    context.available && searchType === 'result',
+  );
+  const agreementSearch = useAgreementSearchPages(
+    q,
+    data.projects,
+    data.projectAgreementVersions,
+    selection,
+    searchType === 'agreement',
+  );
+  const search =
+    searchType === 'task' ? taskSearch : searchType === 'result' ? resultSearch : agreementSearch;
+  const itemLabel = searchType === 'task' ? '任务' : searchType === 'result' ? '成果' : '约定';
+  const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const restartRef = useRef<HTMLButtonElement>(null);
+  const focusedResult = useRef<HTMLElement | null>(null);
+  const committedScope = useRef(search.scope);
+  const renderedScope = useRef(search.scope);
+  renderedScope.current = search.scope;
+  const close = () => {
+    search.cancel();
+    onClose();
+  };
   const commands: { name: string; icon: IconName; action: () => void }[] = [
-    { name: '新建任务', icon: 'plus', action: onNewTask },
+    {
+      name: '新建任务',
+      icon: 'plus',
+      action: () => {
+        search.cancel();
+        onNewTask();
+      },
+    },
     {
       name: '打开工作台',
       icon: 'home',
       action: () => {
         go('/');
-        onClose();
+        close();
       },
     },
     {
@@ -21,7 +94,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       icon: 'folder',
       action: () => {
         go('/projects');
-        onClose();
+        close();
       },
     },
     {
@@ -29,7 +102,7 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       icon: 'box',
       action: () => {
         go('/results');
-        onClose();
+        close();
       },
     },
     {
@@ -37,68 +110,127 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
       icon: 'settings',
       action: () => {
         go('/settings');
-        onClose();
+        close();
       },
     },
   ];
-  const [q, setQ] = useState(''),
-    [items, setItems] = useState<Task[]>([]),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  useEffect(() => {
-    const controller = new AbortController();
-    if (!q.trim()) {
-      setItems([]);
-      setBusy(false);
-      setError('');
-      return () => controller.abort();
+  useLayoutEffect(() => {
+    if (committedScope.current !== search.scope) {
+      const previousResult = focusedResult.current;
+      if (
+        previousResult &&
+        !previousResult.isConnected &&
+        (!document.activeElement || document.activeElement === document.body)
+      )
+        inputRef.current?.focus();
+      focusedResult.current = null;
+      committedScope.current = search.scope;
     }
-    setBusy(true);
-    setItems([]);
-    setError('');
-    const timer = setTimeout(
-      () =>
-        request<{ items: Task[] }>(`/search?q=${encodeURIComponent(q.trim())}`, {
-          signal: controller.signal,
-        })
-          .then((result) => {
-            if (!controller.signal.aborted) {
-              setItems(result.items);
-              setError('');
-            }
-          })
-          .catch((error) => {
-            if (error.name !== 'AbortError') {
-              setItems([]);
-              setError(error.message);
-            }
-          })
-          .finally(() => {
-            if (!controller.signal.aborted) setBusy(false);
-          }),
-      150,
-    );
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [q]);
+  }, [search.scope]);
+  useLayoutEffect(() => {
+    if (search.needsRestart) restartRef.current?.focus();
+    else if (search.focusItemId) {
+      const row = Array.from(
+        listRef.current?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+      ).find((button) => button.dataset.searchId === search.focusItemId);
+      row?.focus();
+    }
+  }, [search.needsRestart, search.focusItemId]);
+  const status = !context.available
+    ? searchType === 'agreement'
+      ? agreementContext.unavailableMessage
+      : '所选项目当前不可用，请选择其他搜索范围。'
+    : !q.trim()
+      ? `输入关键词，搜索当前范围内可见的${itemLabel}。`
+      : search.needsRestart
+        ? '搜索结果已失效，请重新搜索。'
+        : search.busy === 'initial'
+          ? '正在搜索…'
+          : !search.items.length
+            ? search.error
+              ? '搜索失败，请重试。'
+              : `没有找到匹配的${itemLabel}。`
+            : `已显示 ${search.items.length} 项${itemLabel}，${
+                search.busy === 'more'
+                  ? '正在加载更多…'
+                  : search.error
+                    ? '可重试加载更多'
+                    : search.nextCursor
+                      ? '可继续加载'
+                      : '已加载全部结果'
+              }`;
   return (
-    <Dialog title="搜索与快捷操作" onClose={onClose} wide>
-      <div className="dialog-body">
+    <Dialog title="搜索与快捷操作" onClose={close} wide>
+      <div className="dialog-body command-search-body">
         <label className="command-search-field">
           <Icon name="search" />
           <input
+            ref={inputRef}
             autoFocus
             aria-label="全局搜索"
             maxLength={160}
-            placeholder="任务标题、编号，或新建、项目、设置…"
+            placeholder={
+              searchType === 'task'
+                ? '任务标题、说明、编号，或新建、项目、设置…'
+                : searchType === 'result'
+                  ? '成果当前标题、正文、关联任务标题或编号…'
+                  : '项目约定当前标题或正文…'
+            }
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <kbd>ESC</kbd>
         </label>
-        {error && <p role="alert">{error}</p>}
+        <label className="command-search-scope">
+          <span>搜索类型</span>
+          <select
+            aria-label="搜索类型"
+            value={searchType}
+            onChange={(event) => {
+              const value = event.target.value;
+              const nextType = value === 'result' || value === 'agreement' ? value : 'task';
+              if (nextType === searchType) return;
+              search.cancel();
+              setSearchType(nextType);
+            }}
+          >
+            <option value="task">任务</option>
+            <option value="result">成果（当前版本）</option>
+            <option value="agreement">约定（当前记录）</option>
+          </select>
+        </label>
+        <label className="command-search-scope">
+          <span>{itemLabel}搜索范围</span>
+          <select
+            aria-label={`${itemLabel}搜索范围`}
+            title={context.label}
+            value={
+              selection.scope === 'project' ? `project:${selection.projectId}` : selection.scope
+            }
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelection(
+                value === 'all' || value === 'personal'
+                  ? { scope: value, projectId: null }
+                  : { scope: 'project', projectId: value.slice('project:'.length) },
+              );
+            }}
+          >
+            <option value="all">全部当前可见{itemLabel}</option>
+            <option value="personal">无项目个人{itemLabel}</option>
+            {selection.scope === 'project' &&
+              !data.projects.some((project) => project.id === selection.projectId) && (
+                <option value={`project:${selection.projectId}`} disabled>
+                  项目不可用
+                </option>
+              )}
+            {data.projects.map((project) => (
+              <option key={project.id} value={`project:${project.id}`}>
+                {taskSearchProjectLabel(project)}
+              </option>
+            ))}
+          </select>
+        </label>
         {commands.some((command) => command.name.includes(q.trim())) && (
           <div className="command-actions" aria-label="快捷操作">
             <span className="command-section-label">快捷操作</span>
@@ -113,34 +245,184 @@ export function Search({ onClose, onNewTask }: { onClose(): void; onNewTask(): v
               ))}
           </div>
         )}
-        <div className="command-results">
-          {items.length > 0 && <span className="command-section-label">当前可见任务</span>}
-          {items.map((task) => (
+        <div
+          className="command-results"
+          id={`${id}-results`}
+          ref={listRef}
+          role="region"
+          aria-label={`${itemLabel}搜索结果`}
+          aria-busy={!!search.busy}
+          onFocusCapture={(event) => {
+            if (event.target instanceof HTMLElement) focusedResult.current = event.target;
+          }}
+          onBlurCapture={(event) => {
+            if (
+              event.relatedTarget instanceof Node &&
+              event.currentTarget.contains(event.relatedTarget)
+            )
+              return;
+            // Removing a focused row may omit blur or dispatch it during the
+            // reset commit. Keep that row until the layout check can recover it.
+            if (
+              renderedScope.current === committedScope.current ||
+              (event.relatedTarget && event.relatedTarget !== document.body)
+            )
+              focusedResult.current = null;
+          }}
+        >
+          {search.items.length > 0 && (
+            <span className="command-section-label">{context.label}</span>
+          )}
+          {searchType === 'task' &&
+            taskSearch.items.map((task) => {
+              const resultContext = taskSearchResultContext(task, data.projects, q);
+              return (
+                <button
+                  key={task.id}
+                  data-task-id={task.id}
+                  data-search-id={task.id}
+                  onClick={() => {
+                    go(`/tasks/${task.id}`);
+                    close();
+                  }}
+                >
+                  <Icon name="file" />
+                  <div className="command-task-heading">
+                    <strong>{task.title}</strong>
+                    <div className="command-task-meta">
+                      <small>{task.shortId}</small>
+                      <span className="command-task-revision">修订 {task.revision}</span>
+                    </div>
+                  </div>
+                  <StatusBadge status={task.status} />
+                  <Icon name="arrow" size={15} />
+                  <div className="command-task-context">
+                    <span className="command-task-source">{resultContext.sourceLabel}</span>
+                    {resultContext.descriptionMatch && (
+                      <TaskDescriptionMatch snippet={resultContext.descriptionMatch} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          {searchType === 'result' &&
+            resultSearch.items.map((result) => {
+              const resultContext = resultSearchResultContext(
+                result,
+                result.task,
+                data.projects,
+                q,
+              );
+              return (
+                <button
+                  key={`result:${result.id}`}
+                  className="command-result-row"
+                  data-result-id={result.id}
+                  data-search-id={result.id}
+                  onClick={() => {
+                    go(`/results/${result.id}`);
+                    close();
+                  }}
+                >
+                  <Icon name="box" />
+                  <div className="command-result-heading">
+                    <strong>{result.title}</strong>
+                    <div className="command-result-meta">
+                      <span className="command-result-version">当前版本 {result.revision}</span>
+                      <span>{resultContext.kindLabel}</span>
+                    </div>
+                  </div>
+                  <Icon name="arrow" size={15} />
+                  <div className="command-result-context">
+                    <div className="command-result-task">
+                      <small>{result.task.shortId}</small>
+                      <span>{result.task.title}</span>
+                    </div>
+                    <span className="command-task-source">{resultContext.sourceLabel}</span>
+                    {resultContext.bodyMatch && (
+                      <ResultBodyMatch snippet={resultContext.bodyMatch} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          {searchType === 'agreement' &&
+            agreementSearch.items.map((agreement) => {
+              const resultContext = agreementSearchResultContext(agreement, q);
+              return (
+                <button
+                  key={`agreement:${agreement.id}`}
+                  className="command-agreement-row"
+                  data-agreement-id={agreement.id}
+                  data-search-id={agreement.id}
+                  onClick={() => {
+                    go(agreementSearchPath(agreement));
+                    close();
+                  }}
+                >
+                  <Icon name="file" />
+                  <div className="command-agreement-heading">
+                    <strong>{agreement.title}</strong>
+                    <div className="command-agreement-meta">
+                      <span>{resultContext.stateLabel}</span>
+                      <span>{resultContext.revisionLabel}</span>
+                    </div>
+                  </div>
+                  <Icon name="arrow" size={15} />
+                  <div className="command-agreement-context">
+                    <span className="command-task-source">{resultContext.sourceLabel}</span>
+                    {resultContext.bodyMatch && (
+                      <AgreementBodyMatch snippet={resultContext.bodyMatch} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+        {search.error && (
+          <p className="command-search-error" role="alert">
+            {search.error}
+          </p>
+        )}
+        <div className="command-search-footer">
+          <p
+            id={`${id}-status`}
+            role="status"
+            aria-label={`${itemLabel}搜索分页状态`}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {status}
+          </p>
+          {search.needsRestart || (search.error && !search.items.length) ? (
             <button
-              key={task.id}
+              className="button secondary"
+              ref={restartRef}
+              aria-controls={`${id}-results`}
+              aria-describedby={`${id}-status`}
               onClick={() => {
-                go(`/tasks/${task.id}`);
-                onClose();
+                inputRef.current?.focus();
+                search.restart();
               }}
             >
-              <Icon name="file" />
-              <div>
-                <strong>{task.title}</strong>
-                <small>{task.shortId}</small>
-              </div>
-              <StatusBadge status={task.status} />
-              <Icon name="arrow" size={15} />
+              {search.needsRestart ? '重新搜索' : '重试搜索'}
             </button>
-          ))}
-          {!items.length && (
-            <p className="muted compact-empty">
-              {!q.trim()
-                ? '输入关键词，搜索当前可见的任务。'
-                : busy
-                  ? '正在搜索…'
-                  : '没有找到匹配的任务。'}
-            </p>
-          )}
+          ) : search.nextCursor ? (
+            <button
+              className="button secondary"
+              disabled={!!search.busy}
+              aria-busy={search.busy === 'more'}
+              aria-controls={`${id}-results`}
+              aria-describedby={`${id}-status`}
+              onClick={search.loadMore}
+            >
+              {search.busy === 'more'
+                ? '加载中…'
+                : search.error
+                  ? '重试加载更多'
+                  : `加载更多${itemLabel}`}
+            </button>
+          ) : null}
         </div>
       </div>
     </Dialog>

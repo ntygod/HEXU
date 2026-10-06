@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
 import { ProjectAgreements } from './project-agreements.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
+import { matchesProjectTaskStatus, projectTaskStatusColumns } from './project-task-status.js';
+import { matchesProjectTaskAttention } from './project-task-attention.js';
 import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
 import { Avatar, Button, Empty, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
@@ -10,6 +12,14 @@ import { Link, useApp, canEditTask } from './state.js';
 import { NewProject, NewTask } from './forms.js';
 import { ProjectAccess } from './team.js';
 import { ResultCard, TaskRow } from './work-cards.js';
+import { taskDescriptionMatchSnippet } from './task-match-snippet.js';
+import { TaskDescriptionMatch } from './task-match-snippet-view.js';
+import { useProjectTaskOrder } from './project-task-order-state.js';
+import {
+  ProjectTaskOrderActions,
+  ProjectTaskOrderPanel,
+  useProjectOrderControls,
+} from './project-task-order.js';
 import './work-pages.css';
 
 export function Projects() {
@@ -97,6 +107,10 @@ export function Projects() {
 }
 
 export function ProjectPage({ id }: { id: string }) {
+  return <ProjectPageContent key={id} id={id} />;
+}
+
+function ProjectPageContent({ id }: { id: string }) {
   const { data, changeStatus } = useApp();
   const readLocation = () => {
     const query = new URLSearchParams(location.search);
@@ -126,7 +140,8 @@ export function ProjectPage({ id }: { id: string }) {
     history.pushState({}, '', url);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
-  const { view, setView, filters, setFilter, clear } = useProjectTaskFilters();
+  const { view, setView, filters, setFilter, status, setStatus, attention, setAttention, clear } =
+    useProjectTaskFilters();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
@@ -134,6 +149,25 @@ export function ProjectPage({ id }: { id: string }) {
   useEffect(() => {
     if (!manageable) setSettingsOpen(false);
   }, [manageable]);
+  const visibleTasks = useMemo(
+    () => data.tasks.filter((task) => task.projectId === id),
+    [data.tasks, id],
+  );
+  const order = useProjectTaskOrder({
+    projectId: id,
+    available: !!project,
+    canOrder: !!project && project.access !== 'view',
+    tasks: visibleTasks,
+    editableIds: visibleTasks.filter((task) => canEditTask(data, task)).map((task) => task.id),
+    scope: JSON.stringify([tab, view, filters, status, attention]),
+  });
+  const tasks = order.orderedTasks.filter(
+    (task) =>
+      matchesTaskPeopleFilters(task, filters) &&
+      matchesProjectTaskStatus(task, status) &&
+      matchesProjectTaskAttention(task, attention),
+  );
+  const orderControls = useProjectOrderControls(order, tasks, view);
   if (!project)
     return (
       <Empty
@@ -151,10 +185,7 @@ export function ProjectPage({ id }: { id: string }) {
     data.mode === 'team-local'
       ? data.members.filter((member) => project.memberIds?.includes(member.id))
       : data.members;
-  const allTasks = data.tasks.filter(
-    (task) => task.projectId === id && task.status !== 'cancelled',
-  );
-  const tasks = allTasks.filter((task) => matchesTaskPeopleFilters(task, filters));
+  const allTasks = visibleTasks.filter((task) => task.status !== 'cancelled');
   const results = data.results.filter((result) =>
     allTasks.some((task) => task.id === result.taskId),
   );
@@ -220,29 +251,36 @@ export function ProjectPage({ id }: { id: string }) {
           onSelect={(source) => setTab('sources', source)}
         />
       ) : tab === 'results' ? (
-        <div className="work-result-grid stagger">
-          {results.map((result) => (
-            <ResultCard key={result.id} result={result} />
-          ))}
-          {!results.length && (
-            <Empty
-              icon="box"
-              title="这个项目还没有成果"
-              description="在任务里把进展分享出来，反馈会留在原任务上。"
-              action={
-                <Button
-                  variant="primary"
-                  disabled={!editable}
-                  onClick={() => {
-                    setTab('tasks');
-                  }}
-                >
-                  去任务里推进
-                </Button>
-              }
-            />
-          )}
-        </div>
+        <>
+          <div className="work-section-heading">
+            <Link to={`/results?projectId=${encodeURIComponent(project.id)}`}>
+              在成果库中查找 <Icon name="arrow" size={15} />
+            </Link>
+          </div>
+          <div className="work-result-grid stagger">
+            {results.map((result) => (
+              <ResultCard key={result.id} result={result} />
+            ))}
+            {!results.length && (
+              <Empty
+                icon="box"
+                title="这个项目还没有成果"
+                description="在任务里把进展分享出来，反馈会留在原任务上。"
+                action={
+                  <Button
+                    variant="primary"
+                    disabled={!editable}
+                    onClick={() => {
+                      setTab('tasks');
+                    }}
+                  >
+                    去任务里推进
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        </>
       ) : tab === 'overview' ? (
         <div className="project-overview">
           <section className="work-section">
@@ -286,13 +324,33 @@ export function ProjectPage({ id }: { id: string }) {
               projectId={id}
               filters={filters}
               setFilter={setFilter}
+              status={status}
+              setStatus={setStatus}
+              attention={attention}
+              setAttention={setAttention}
               clear={clear}
             />
             <span className="muted">{tasks.length} 项任务</span>
           </div>
-          {view === 'board' ? (
-            <div className="project-board stagger">
-              {(['todo', 'in_progress', 'done'] as const).map((status) => (
+          <ProjectTaskOrderPanel controls={orderControls} />
+          {status.kind === 'invalid' || attention.kind === 'invalid' ? (
+            <div role="alert">
+              {status.kind === 'invalid' && (
+                <Empty icon="list" title="状态筛选无效" description="请重新选择状态或清除筛选。" />
+              )}
+              {attention.kind === 'invalid' && (
+                <Empty
+                  icon="list"
+                  title="关注筛选无效"
+                  description="请重新选择关注情况或清除筛选。"
+                />
+              )}
+            </div>
+          ) : !order.displayable ? null : view === 'board' ? (
+            <div
+              className={`project-board stagger${status.kind === 'status' ? ' project-board-filtered' : ''}${order.open ? ' project-board-ordering' : ''}`}
+            >
+              {projectTaskStatusColumns(status).map((status) => (
                 <section className="project-column" key={status}>
                   <header>
                     <StatusBadge status={status} />
@@ -300,34 +358,52 @@ export function ProjectPage({ id }: { id: string }) {
                   </header>
                   {tasks
                     .filter((task) => task.status === status)
-                    .map((task) => (
-                      <article className="project-task-card spotlight" key={task.id}>
-                        <Link to={`/tasks/${task.id}`}>
-                          <span className="work-task-id">{task.shortId}</span>
-                          <h3>{task.title}</h3>
-                          <p>{task.description || '打开任务查看讨论与成果。'}</p>
-                          {task.attention && <span className="badge amber">{task.attention}</span>}
-                        </Link>
-                        <footer>
-                          <Avatar
-                            user={data.members.find((member) => member.id === task.ownerUserId)}
-                            size="small"
-                          />
-                          <select
-                            aria-label={`${task.shortId} 状态`}
-                            value={task.status}
-                            disabled={!canEditTask(data, task)}
-                            onChange={(event) =>
-                              void changeStatus(task, event.target.value as TaskStatus)
-                            }
-                          >
-                            <option value="todo">待处理</option>
-                            <option value="in_progress">进行中</option>
-                            <option value="done">已完成</option>
-                          </select>
-                        </footer>
-                      </article>
-                    ))}
+                    .map((task) => {
+                      const descriptionMatch = taskDescriptionMatchSnippet(task, filters.q);
+                      return (
+                        <article
+                          className="project-task-card spotlight"
+                          key={task.id}
+                          {...orderControls.target(task)}
+                        >
+                          <Link to={`/tasks/${task.id}`}>
+                            <span className="work-task-id">{task.shortId}</span>
+                            <h3>{task.title}</h3>
+                            {descriptionMatch ? (
+                              <TaskDescriptionMatch snippet={descriptionMatch} />
+                            ) : (
+                              <p>{task.description || '打开任务查看讨论与成果。'}</p>
+                            )}
+                            {task.attention && (
+                              <span className="badge amber">{task.attention}</span>
+                            )}
+                          </Link>
+                          <footer>
+                            <Avatar
+                              user={data.members.find((member) => member.id === task.ownerUserId)}
+                              size="small"
+                            />
+                            {task.status === 'cancelled' ? (
+                              <span className="muted">打开任务详情查看讨论与成果</span>
+                            ) : (
+                              <select
+                                aria-label={`${task.shortId} 状态`}
+                                value={task.status}
+                                disabled={!canEditTask(data, task)}
+                                onChange={(event) =>
+                                  void changeStatus(task, event.target.value as TaskStatus)
+                                }
+                              >
+                                <option value="todo">待处理</option>
+                                <option value="in_progress">进行中</option>
+                                <option value="done">已完成</option>
+                              </select>
+                            )}
+                          </footer>
+                          <ProjectTaskOrderActions task={task} controls={orderControls} />
+                        </article>
+                      );
+                    })}
                   {!tasks.some((task) => task.status === status) && (
                     <p className="work-empty-text">暂无任务</p>
                   )}
@@ -336,9 +412,27 @@ export function ProjectPage({ id }: { id: string }) {
             </div>
           ) : (
             <div className="work-task-list task-list">
-              {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
+              {tasks.map((task) =>
+                order.open ? (
+                  <div
+                    className="project-task-order-row"
+                    key={task.id}
+                    {...orderControls.target(task)}
+                  >
+                    <TaskRow
+                      task={task}
+                      descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
+                    />
+                    <ProjectTaskOrderActions task={task} controls={orderControls} />
+                  </div>
+                ) : (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
+                  />
+                ),
+              )}
               {!tasks.length && (
                 <Empty
                   icon="list"

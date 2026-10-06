@@ -1,64 +1,124 @@
 import { NativeContinue } from './native.js';
-import { useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Result, Run, Scenario, Task, Tool } from '../../../packages/contracts/src/index.js';
 import { request } from '../../../packages/client/src/index.js';
 import { Button, Dialog, Icon, ToolMark } from '../../../packages/ui/src/index.js';
 import { useApp, go, useTaskDraft } from './state.js';
+import { canCreateTask } from './task-creation.js';
+import './task-creation.css';
 export function NewTask({ onClose, projectId }: { onClose: () => void; projectId?: string }) {
-  const { data, refresh, notice } = useApp();
+  const { data, taskCreation, notice } = useApp();
+  const { view, open, close, detach, submit } = taskCreation;
+  const [id] = useState(() => crypto.randomUUID());
+  const closeCallback = useRef(onClose);
+  closeCallback.current = onClose;
+  const closeEntry = useCallback(() => closeCallback.current(), []);
   const [title, setTitle] = useState(''),
     [description, setDescription] = useState(''),
-    [project, setProject] = useState(projectId ?? ''),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [project, setProject] = useState(projectId ?? '');
+  useLayoutEffect(() => {
+    open(id, closeEntry);
+    return () => detach(id);
+  }, [id, open, detach, closeEntry]);
+  const pending = view.pending;
+  const body = pending?.packet.body ?? { title, description, projectId: project || null };
+  const busy = !!pending?.operationId;
+  const editable = canCreateTask(data, body.projectId);
+  useEffect(() => {
+    if (view.blocked || !editable) {
+      setTitle('');
+      setDescription('');
+      setProject('');
+    }
+    if (!editable && view.sessionId === id) {
+      close(id);
+      notice('项目当前不可编辑，已清除本次任务输入', true);
+    }
+  }, [editable, view.blocked, view.sessionId, id, close, notice]);
+  useEffect(() => {
+    if (view.sessionId !== id || !view.rejectedBody) return;
+    setTitle(view.rejectedBody.title);
+    setDescription(view.rejectedBody.description);
+    setProject(view.rejectedBody.projectId ?? '');
+  }, [id, view.sessionId, view.rejectedBody]);
+  if (view.sessionId !== id || !editable) return null;
+  if (view.blocked)
+    return (
+      <Dialog title="确认任务创建" onClose={() => close(id)}>
+        <div className="dialog-body">
+          <p role="alert">任务创建权限已失效，请重新查看后再创建</p>
+        </div>
+        <div className="dialog-footer">
+          <Button onClick={() => close(id)}>关闭</Button>
+        </div>
+      </Dialog>
+    );
   return (
-    <Dialog title="开始一项工作" onClose={() => !busy && onClose()}>
+    <Dialog title={pending ? '确认任务创建' : '开始一项工作'} onClose={() => close(id)}>
       <form
-        onSubmit={async (event) => {
+        className="task-creation-form"
+        onSubmit={(event) => {
           event.preventDefault();
-          setBusy(true);
-          setError('');
-          try {
-            const task = await request<Task>(`/spaces/${data.space?.id ?? 'space-demo'}/tasks`, {
-              method: 'POST',
-              body: { title, description, projectId: project || null },
-            });
-            await refresh();
-            onClose();
-            go(`/tasks/${task.id}`);
-            notice('任务已创建并保存');
-          } catch (error) {
-            setError((error as Error).message);
-          } finally {
-            setBusy(false);
-          }
+          void submit(id, { title, description, projectId: project || null }, !!pending);
         }}
       >
         <div className="dialog-body">
-          <p className="muted">一句话就可以开始，细节在工作中慢慢补充。</p>
+          {!pending && (
+            <p className="muted">
+              一句话就可以开始，细节在工作中慢慢补充。创建只保存任务，不会启动执行。
+            </p>
+          )}
+          {pending && (
+            <section aria-label={pending.receipt ? '任务创建请求已确认' : '任务创建请求待确认'}>
+              <p role="status">
+                {pending.receipt
+                  ? `原请求已确认创建任务 ${pending.receipt.shortId}。`
+                  : busy
+                    ? '原创建请求已提交，正在等待可核对的回执。'
+                    : '尚未确认原创建请求是否成功，原标题、说明和项目已锁定。'}
+              </p>
+              <p>
+                {pending.receipt
+                  ? '刷新只读取已创建的任务，不会再次提交创建请求。'
+                  : '确认将使用相同的原请求内容核对创建结果，不会换成新的创建请求。'}
+              </p>
+              <p>本次只创建任务，不启动执行。暂时关闭不会撤回请求，之后从任一创建入口继续确认。</p>
+            </section>
+          )}
           <label className="field">
             要做什么
             <input
-              autoFocus
+              autoFocus={!pending}
               name="title"
               placeholder="例如：修复筛选条件变化后的分页"
               required
               maxLength={160}
-              value={title}
+              value={body.title}
+              disabled={!!pending}
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
           <label className="field">
             放在哪里
-            <select value={project} onChange={(e) => setProject(e.target.value)}>
-              <option value="">我的个人工作</option>
-              {data.projects
-                .filter((item) => item.access !== 'view')
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
+            <select
+              value={body.projectId ?? ''}
+              disabled={!!pending}
+              onChange={(e) => setProject(e.target.value)}
+            >
+              {pending ? (
+                <option value={body.projectId ?? ''}>{pending.packet.projectName}</option>
+              ) : (
+                <>
+                  <option value="">我的个人工作</option>
+                  {data.projects
+                    .filter((item) => canCreateTask(data, item.id))
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                </>
+              )}
             </select>
           </label>
           <label className="field">
@@ -66,28 +126,31 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
             <textarea
               rows={4}
               maxLength={12000}
-              value={description}
+              value={body.description}
+              disabled={!!pending}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="背景、目标，或想先处理的部分…"
             />
           </label>
-          {error && (
+          {(pending?.error || view.error) && (
             <p className="form-error" role="alert">
-              {error}
+              {pending?.error || view.error}
             </p>
           )}
-          <p className="hint">
-            <Icon name="people" size={15} />
-            负责人自动设为你，不需要先填写验收表。
-          </p>
+          {!pending && (
+            <p className="hint">
+              <Icon name="people" size={15} />
+              负责人自动设为你，不需要先填写验收表。
+            </p>
+          )}
         </div>
         <div className="dialog-footer">
-          <Button onClick={onClose} type="button" disabled={busy}>
-            取消
+          <Button onClick={() => close(id)} type="button">
+            {pending ? '暂时关闭' : '取消'}
           </Button>
-          <Button variant="primary" type="submit" busy={busy} disabled={!title.trim()}>
-            <Icon name="plus" />
-            创建任务
+          <Button variant="primary" type="submit" busy={busy} disabled={!body.title.trim()}>
+            {!pending && <Icon name="plus" />}
+            {pending ? (pending.receipt ? '刷新已创建任务' : '确认原创建结果') : '创建任务'}
           </Button>
         </div>
       </form>
@@ -367,85 +430,6 @@ export function ShareResult({ task, onClose }: { task: Task; onClose: () => void
           <Button type="submit" variant="primary" busy={busy}>
             <Icon name="upload" />
             分享成果
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-export function EditTask({ task, onClose }: { task: Task; onClose: () => void }) {
-  const { data, refresh, notice } = useApp();
-  const [title, setTitle] = useState(task.title),
-    [description, setDescription] = useState(task.description),
-    [attention, setAttention] = useState(task.attention ?? ''),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  return (
-    <Dialog title="编辑工作说明" onClose={() => !busy && onClose()}>
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setBusy(true);
-          try {
-            await request(`/tasks/${task.id}`, {
-              method: 'PATCH',
-              body: {
-                expectedRevision: task.revision,
-                title,
-                description,
-                attention: attention || null,
-              },
-            });
-            await refresh();
-            onClose();
-            notice('工作说明已保存');
-          } catch (error) {
-            setError((error as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <div className="dialog-body">
-          <label className="field">
-            标题
-            <input
-              required
-              maxLength={160}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            说明
-            <textarea
-              rows={5}
-              maxLength={12000}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            需要关注什么 <span>可选</span>
-            <input
-              maxLength={300}
-              value={attention}
-              onChange={(e) => setAttention(e.target.value)}
-              placeholder="例如：等待接口字段确认"
-            />
-          </label>
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-        <div className="dialog-footer">
-          <Button type="button" onClick={onClose}>
-            取消
-          </Button>
-          <Button type="submit" variant="primary" busy={busy}>
-            保存修改
           </Button>
         </div>
       </form>

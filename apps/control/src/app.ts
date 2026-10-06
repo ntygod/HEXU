@@ -3,9 +3,12 @@ import { attachHandoffs } from './handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
 import { attachIntegrations } from './integrations.js';
 import { ResultRevisions } from '../../../packages/db/src/result-revisions.js';
+import { ResultReferences } from '../../../packages/db/src/result-references.js';
 import { attachAssistance } from './assistance.js';
 import { parseAssignmentHistoryQuery } from '../../../packages/contracts/src/task-assignment.js';
 import { parseProjectRevisionQuery } from '../../../packages/contracts/src/project.js';
+import { parseProjectTaskOrderQuery } from '../../../packages/contracts/src/project-task-order.js';
+import { ProjectTaskOrderStore } from '../../../packages/db/src/project-task-order.js';
 import {
   parseDraftPageQuery,
   parseDraftHistoryQuery,
@@ -53,6 +56,11 @@ import {
   text,
 } from '../../../packages/contracts/src/index.js';
 import { Store } from '../../../packages/db/src/store.js';
+import { parseTaskSearchQuery } from '../../../packages/contracts/src/task-search.js';
+import { parseSearchType } from '../../../packages/contracts/src/result-search.js';
+import { pageTaskSearch } from '../../../packages/db/src/task-search.js';
+import { pageResultSearch } from '../../../packages/db/src/result-search.js';
+import { pageAgreementSearch } from '../../../packages/db/src/agreement-search.js';
 import { MockAdapter } from '../../../packages/adapters/mock/src/index.js';
 
 export async function createApp(
@@ -473,7 +481,7 @@ export async function createApp(
       nextCursor: items.length > limit ? items[limit - 1]!.id : null,
     };
   });
-  app.post('/api/v1/spaces/:spaceId/tasks', async (request, reply) => {
+  app.post('/api/v1/spaces/:spaceId/tasks', { bodyLimit: 96 * 1024 }, async (request, reply) => {
     if (param(request.params, 'spaceId') !== store.spaceId)
       throw new DomainError('NOT_FOUND', '工作空间不存在', 404);
     return reply
@@ -505,6 +513,20 @@ export async function createApp(
   app.get('/api/v1/projects/:projectId/task-people', async (request) =>
     store.taskParticipants.people(param(request.params, 'projectId')),
   );
+  const projectTaskOrder = new ProjectTaskOrderStore(store);
+  app.get('/api/v1/projects/:projectId/task-order', async (request) => {
+    parseProjectTaskOrderQuery(request.query);
+    return projectTaskOrder.view(param(request.params, 'projectId'));
+  });
+  // Accommodates even fully escaped legal IDs, baseline, keys and placement (< 3 KiB).
+  app.post('/api/v1/projects/:projectId/task-order/move', { bodyLimit: 4096 }, async (request) => {
+    parseProjectTaskOrderQuery(request.query);
+    return projectTaskOrder.move(
+      param(request.params, 'projectId'),
+      request.body,
+      key(request.headers),
+    );
+  });
   app.post('/api/v1/tasks/:taskId/assignment', async (request) =>
     store.taskAssignment.assign(
       param(request.params, 'taskId'),
@@ -518,7 +540,7 @@ export async function createApp(
       parseAssignmentHistoryQuery(request.query),
     ),
   );
-  app.patch('/api/v1/tasks/:taskId', async (request) => {
+  app.patch('/api/v1/tasks/:taskId', { bodyLimit: 96 * 1024 }, async (request) => {
     const body = record(request.body);
     const data: {
       expectedRevision: number;
@@ -745,6 +767,35 @@ export async function createApp(
       param(request.params, 'revisionId'),
     ),
   );
+  app.get('/api/v1/results/:resultId/versions/:revisionId/references', async (request) =>
+    new ResultReferences(store).list(
+      param(request.params, 'resultId'),
+      param(request.params, 'revisionId'),
+    ),
+  );
+  app.post('/api/v1/results/:resultId/versions/:revisionId/references', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        new ResultReferences(store).add(
+          param(request.params, 'resultId'),
+          param(request.params, 'revisionId'),
+          request.body,
+          key(request.headers),
+        ),
+      ),
+  );
+  app.post(
+    '/api/v1/results/:resultId/versions/:revisionId/references/:referenceId/remove',
+    async (request) =>
+      new ResultReferences(store).remove(
+        param(request.params, 'resultId'),
+        param(request.params, 'revisionId'),
+        param(request.params, 'referenceId'),
+        request.body,
+        key(request.headers),
+      ),
+  );
   app.post('/api/v1/tasks/:taskId/results', async (request, reply) => {
     const body = record(request.body);
     return reply
@@ -759,17 +810,14 @@ export async function createApp(
       );
   });
   app.get('/api/v1/search', async (request) => {
-    const q = text(record(request.query).q, '搜索', 160).toLocaleLowerCase();
-    return {
-      items: store
-        .tasks()
-        .filter((task) =>
-          (task.title + ' ' + task.description + ' ' + task.shortId)
-            .toLocaleLowerCase()
-            .includes(q),
-        )
-        .slice(0, 30),
-    };
+    const tasks = store.tasks();
+    const type = parseSearchType(request.query);
+    if (type === 'agreement')
+      return pageAgreementSearch(store, parseTaskSearchQuery(request.query));
+    const query = parseTaskSearchQuery(request.query);
+    return type === 'result'
+      ? pageResultSearch(store.results(), tasks, query)
+      : pageTaskSearch(tasks, query);
   });
   for (const url of ['/api/v1/events', '/api/v1/tasks/:taskId/events'])
     app.get(url, async (request, reply) => {

@@ -20,6 +20,13 @@
 | --- | --- |
 | 项目名称/说明与角色 | [项目设置入口](team-local.md#项目基本设置与修订) |
 | 归档/恢复及运行影响 | [项目归档](project-archive.md) |
+| 从工作台浏览前8项以外的当前任务 | [工作台任务列表](workbench-task-list.md) |
+| 从工作台找回本人参与的任务 | [我参与的任务](workbench-participating.md) |
+| 找回更早的已取消个人任务 | [已取消任务浏览](workbench-cancelled-tasks.md) |
+| 从成员找到跨项目的当前负责/参与任务 | [成员工作](member-work-view.md) |
+| 普通 Task 创建的未知结果确认与已接受后刷新 | [创建恢复](task-creation-request-recovery.md) |
+| Task 工作说明固定基线、冲突与原请求确认 | [工作说明编辑](task-edit-baseline.md) |
+| Task 完成/取消、已取消重开与未知结果确认 | [状态确认](task-completion-confirmation.md) |
 | 改派与参与者/筛选 | [负责人](task-assignment.md)、[参与](task-participants.md) |
 | 文本/链接资料、版本与删除恢复 | [项目资料](project-sources.md) |
 | 从讨论明确发布/替代约定 | [项目约定](project-agreements.md) |
@@ -40,6 +47,10 @@
 | 方案独立目录、登记、本人首轮 Run 与并发 | [方案现场](branch-workspaces.md) |
 | 已结算方案Run的只读来源、共享输出与事件边界 | [成果来源预览](branch-result-sources.md) |
 | 固定成果版本、来源/反馈、方案比较与选择 | [方案成果](branch-results.md) |
+| 为固定成果版本添加可选报告或发布地址 | [手动链接](result-reference-links.md) |
+| 保存项目任务顺序，处理并发移动与中断 | [项目任务排序](project-task-order.md) |
+| 按项目/关键词找回当前成果并打开原详情 | [成果库查找](result-library-search.md) |
+| 按类型、项目和关键词辨认并继续找回当前任务/成果/约定 | [全局搜索与分页](task-search-pagination.md) |
 | 方案成果关联固定提交、对象状态与节点共享差异 | [固定代码](result-code.md) |
 | 选定成果后，在原目录明确开始下一轮 | [方案接续](branch-continuation.md) |
 | 固定成果到本人目标提交的只读冲突检查 | [整合预检](integration-preflight.md) |

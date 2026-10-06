@@ -23,7 +23,7 @@ jobs:
       - run: npm run check
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,7 +33,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --reporter=line,html
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -43,6 +45,321 @@ jobs:
             test-results/
             artifacts/
           retention-days: 7
+      - name: Upload Task reliability previews
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hexu-task-reliability-previews
+          path: |
+            artifacts/201-*.png
+            artifacts/202-*.png
+            artifacts/203-*.png
+            artifacts/204-*.png
+            artifacts/205-*.png
+            artifacts/206-*.png
+            artifacts/207-*.png
+            artifacts/208-*.png
+            artifacts/209-*.png
+            artifacts/210-*.png
+            artifacts/211-*.png
+            artifacts/212-*.png
+            artifacts/213-*.png
+            artifacts/214-*.png
+            artifacts/215-*.png
+            artifacts/216-*.png
+            artifacts/217-project-task-status-dark.png
+            artifacts/218-project-task-status-mobile-light.png
+            artifacts/219-project-task-attention-dark.png
+            artifacts/220-project-task-attention-mobile-light.png
+            artifacts/221-result-version-link-dark.png
+            artifacts/222-result-version-link-mobile-light.png
+            artifacts/223-project-task-match-dark.png
+            artifacts/224-project-task-match-mobile-light.png
+            artifacts/228-workbench-task-list-dark.png
+            artifacts/229-workbench-task-list-mobile-light.png
+            artifacts/230-workbench-participating-dark.png
+            artifacts/231-workbench-participating-mobile-light.png
+            artifacts/232-workbench-cancelled-dark.png
+            artifacts/233-workbench-cancelled-mobile-light.png
+            artifacts/234-result-library-search-dark.png
+            artifacts/235-result-library-search-mobile-light.png
+            artifacts/236-task-search-pagination-dark.png
+            artifacts/237-task-search-pagination-mobile-light.png
+            artifacts/238-task-search-scope-dark.png
+            artifacts/239-task-search-scope-mobile-light.png
+            artifacts/240-current-result-search-dark.png
+            artifacts/241-current-result-search-mobile-light.png
+            artifacts/242-member-work-dark.png
+            artifacts/243-member-work-mobile-light.png
+            artifacts/244-current-agreement-search-dark.png
+            artifacts/245-current-agreement-search-mobile-light.png
+            artifacts/246-current-agreement-search-personal-mobile.png
+            artifacts/247-result-reference-links-dark.png
+            artifacts/248-result-reference-links-mobile-light.png
+            artifacts/249-result-reference-links-pending-mobile.png
+            artifacts/250-result-reference-form-dark.png
+            artifacts/251-project-task-order-list-dark.png
+            artifacts/252-project-task-order-mobile-light.png
+            artifacts/253-project-task-order-board-dark.png
+            artifacts/107-branch-result-dark.png
+            artifacts/108-branch-result-mobile.png
+          retention-days: 7
+      - name: Upload task-edit-baseline failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-edit-baseline-failures
+          path: |
+            test-results/task-edit-baseline-*/trace.zip
+            test-results/task-edit-baseline-*/test-failed-*.png
+            test-results/task-edit-baseline-*/error-context.md
+          retention-days: 7
+      - name: Upload cancelled-task-reopen failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-cancelled-task-reopen-failures
+          path: |
+            test-results/cancelled-task-reopen-*/trace.zip
+            test-results/cancelled-task-reopen-*/test-failed-*.png
+            test-results/cancelled-task-reopen-*/error-context.md
+          retention-days: 7
+      - name: Upload task-completion-dialog failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-completion-dialog-failures
+          path: |
+            test-results/task-completion-dialog-*/trace.zip
+            test-results/task-completion-dialog-*/test-failed-*.png
+            test-results/task-completion-dialog-*/error-context.md
+          retention-days: 7
+      - name: Upload task-cancellation failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-cancellation-failures
+          path: |
+            test-results/task-cancellation-*/trace.zip
+            test-results/task-cancellation-*/test-failed-*.png
+            test-results/task-cancellation-*/error-context.md
+          retention-days: 7
+      - name: Upload task-status-request-recovery failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-status-request-recovery-failures
+          path: |
+            test-results/task-status-request-recove*/trace.zip
+            test-results/task-status-request-recove*/test-failed-*.png
+            test-results/task-status-request-recove*/error-context.md
+          retention-days: 7
+      - name: Upload branch-results failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-branch-results-failures
+          path: |
+            test-results/branch-results-*/trace.zip
+            test-results/branch-results-*/test-failed-*.png
+            test-results/branch-results-*/error-context.md
+          retention-days: 7
+      - name: Upload direct-task-status-recovery failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-direct-task-status-recovery-failures
+          path: |
+            test-results/direct-task-status-recovery-*/trace.zip
+            test-results/direct-task-status-recovery-*/test-failed-*.png
+            test-results/direct-task-status-recovery-*/error-context.md
+          retention-days: 7
+      - name: Upload task-creation-request-recovery failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-creation-request-recovery-failures
+          path: |
+            test-results/task-creation-request-reco*/trace.zip
+            test-results/task-creation-request-reco*/test-failed-*.png
+            test-results/task-creation-request-reco*/error-context.md
+          retention-days: 7
+      - name: Upload project-task-status failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-project-task-status-failures
+          path: |
+            test-results/project-task-status-*/trace.zip
+            test-results/project-task-status-*/test-failed-*.png
+            test-results/project-task-status-*/error-context.md
+          retention-days: 7
+      - name: Upload project-task-attention failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-project-task-attention-failures
+          path: |
+            test-results/project-task-attention-*/trace.zip
+            test-results/project-task-attention-*/test-failed-*.png
+            test-results/project-task-attention-*/error-context.md
+          retention-days: 7
+      - name: Upload result-version-link failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-result-version-link-failures
+          path: |
+            test-results/result-version-link-*/trace.zip
+            test-results/result-version-link-*/test-failed-*.png
+            test-results/result-version-link-*/error-context.md
+          retention-days: 7
+      - name: Upload project-task-match-snippets failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-project-task-match-snippets-failures
+          path: |
+            test-results/project-task-match-snippet*/trace.zip
+            test-results/project-task-match-snippet*/test-failed-*.png
+            test-results/project-task-match-snippet*/error-context.md
+          retention-days: 7
+
+      - name: Upload workbench-task-list failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-workbench-task-list-failures
+          path: |
+            test-results/workbench-task-list-*/trace.zip
+            test-results/workbench-task-list-*/test-failed-*.png
+            test-results/workbench-task-list-*/error-context.md
+          retention-days: 7
+
+      - name: Upload workbench-participating failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-workbench-participating-failures
+          path: |
+            test-results/workbench-participating-*/trace.zip
+            test-results/workbench-participating-*/test-failed-*.png
+            test-results/workbench-participating-*/error-context.md
+          retention-days: 7
+
+      - name: Upload workbench-cancelled-tasks failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-workbench-cancelled-tasks-failures
+          path: |
+            test-results/workbench-cancelled-tasks-*/trace.zip
+            test-results/workbench-cancelled-tasks-*/test-failed-*.png
+            test-results/workbench-cancelled-tasks-*/error-context.md
+          retention-days: 7
+
+      - name: Upload empty-workbench creation failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-empty-workbench-creation-failures
+          path: |
+            test-results/workbench-轻量新建*/trace.zip
+            test-results/workbench-轻量新建*/test-failed-*.png
+            test-results/workbench-轻量新建*/error-context.md
+          retention-days: 7
+
+      - name: Upload result-library-search failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-result-library-search-failures
+          path: |
+            test-results/result-library-search-*/trace.zip
+            test-results/result-library-search-*/test-failed-*.png
+            test-results/result-library-search-*/error-context.md
+          retention-days: 7
+
+      - name: Upload task-search-pagination failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-search-pagination-failures
+          path: |
+            test-results/task-search-pagination-*/trace.zip
+            test-results/task-search-pagination-*/test-failed-*.png
+            test-results/task-search-pagination-*/error-context.md
+          retention-days: 7
+
+      - name: Upload task-search-scope failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-task-search-scope-failures
+          path: |
+            test-results/task-search-scope-*/trace.zip
+            test-results/task-search-scope-*/test-failed-*.png
+            test-results/task-search-scope-*/error-context.md
+          retention-days: 7
+
+      - name: Upload current-result-search failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-current-result-search-failures
+          path: |
+            test-results/current-result-search-*/trace.zip
+            test-results/current-result-search-*/test-failed-*.png
+            test-results/current-result-search-*/error-context.md
+          retention-days: 7
+
+      - name: Upload member-work failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-member-work-failures
+          path: |
+            test-results/member-work-flows-*/trace.zip
+            test-results/member-work-flows-*/test-failed-*.png
+            test-results/member-work-flows-*/error-context.md
+            test-results/team-member-work*/trace.zip
+            test-results/team-member-work*/test-failed-*.png
+            test-results/team-member-work*/error-context.md
+          retention-days: 7
+
+      - name: Upload current-agreement-search failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-current-agreement-search-failures
+          path: |
+            test-results/current-agreement-search-*/trace.zip
+            test-results/current-agreement-search-*/test-failed-*.png
+            test-results/current-agreement-search-*/error-context.md
+          retention-days: 7
+
+      - name: Upload result-reference-links failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-result-reference-links-failures
+          path: |
+            test-results/result-reference-links-*/trace.zip
+            test-results/result-reference-links-*/test-failed-*.png
+            test-results/result-reference-links-*/error-context.md
+          retention-days: 7
+
+      - name: Upload project-task-order failures
+        uses: actions/upload-artifact@v4
+        if: always() && (failure() || cancelled())
+        with:
+          name: hexu-project-task-order-failures
+          path: |
+            test-results/project-task-order-*/trace.zip
+            test-results/project-task-order-*/test-failed-*.png
+            test-results/project-task-order-*/error-context.md
+          retention-days: 7
+
   check:
     needs: [engineering, browser]
     if: always()

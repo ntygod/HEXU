@@ -46,6 +46,12 @@ Task-description adoption durably pauses pending preview/node Operations in the 
 
 Keep draft and target baselines fixed in the W1 drawer; conflicts retain local edits/ranges for explicit comparison, not silent rebasing. Unknown replies confirm the identical body/key. Authority or identity/space changes discard unsaved editors. Current targets are task descriptions and project sources; requirements/results, automated drafting and batch adoption remain pending. The next delivery is maintained only in [22](../development/22-next-delivery.md).
 
+## 当前约定全局查找
+
+全局查找只读已明确发布的当前project_agreements，沿现有可见项目读取边界先取范围再匹配和分页；不要从源Task是否仍可见重新推断已发布记录，也不返回/检索origin节选或旧修订。有效/停用/被替代状态分别标示，当前记录不等于当前有效。个人范围显式不适用，原详情深链接不造历史ID。
+
+Workbench只读项目约定版本数字来自既有版本表，缺元数据不伪造0；相关项目版本与来源标签使搜索重读，无关Task不打断。同项目其他约定变化可能重读，不声称查询专属或永远实时同步。没有新增发布/采用/选材动作、身份源或异步探针。用法见[全局搜索](../engineering/task-search-pagination.md#约定当前记录)。
+
 ## 如何验证与回写
 
 复用同名 [资料测试](../../tests/project-sources.test.ts)、[约定测试](../../tests/project-agreements.test.ts)、[快照测试](../../tests/project-materials.test.ts)、[草稿测试](../../tests/ai-drafts.test.ts)；选择文本时覆盖 [文字簇/换行映射](../../tests/draft-selection.test.ts)。UI 使用已有对应浏览器用例，验证冲突保留和相同请求确认。

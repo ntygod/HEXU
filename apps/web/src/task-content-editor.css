@@ -1,0 +1,58 @@
+.task-edit-form {
+  min-width: 0;
+}
+.task-edit-baseline,
+.task-edit-conflict {
+  padding: var(--hx-space-3);
+  margin-bottom: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-surface-raised);
+  overflow-wrap: anywhere;
+}
+.task-edit-conflict {
+  border-color: var(--hx-warning);
+}
+.task-edit-form h3,
+.task-edit-form h4 {
+  margin: 0 0 var(--hx-space-2);
+  font-size: inherit;
+}
+.task-edit-form p {
+  line-height: 1.6;
+}
+.task-edit-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hx-space-3);
+  margin-block: var(--hx-space-3);
+}
+.task-edit-comparison section {
+  min-width: 0;
+}
+.task-edit-comparison dl {
+  margin: 0;
+}
+.task-edit-comparison dt {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.task-edit-comparison dd {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: var(--hx-space-1) 0 var(--hx-space-3);
+  line-height: 1.6;
+}
+.task-edit-actions,
+.task-edit-form .dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+@media (max-width: 650px) {
+  .task-edit-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

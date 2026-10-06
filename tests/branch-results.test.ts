@@ -331,11 +331,13 @@ test('迁移只保存旧成果的已知版本与无版本反馈，保留方案�
       f.api.store.createResult(f.task.id, '历史记录', '只知道第三版正文', randomUUID()),
     );
     const comment = f.as(() => f.api.store.addMessage(f.task.id, '旧反馈', r.id, randomUUID()));
+    // The legacy fixture must remove newer dependants before rebuilding its parent table.
+    assert.equal(f.api.store.db.prepare('SELECT COUNT(*) AS n FROM result_references').get()!.n, 0);
     const path = join(f.api.dir, 'migration.sqlite');
     f.api.store.db.prepare('VACUUM INTO ?').run(path);
     const db = new DatabaseSync(path);
     db.exec(
-      'DROP TABLE work_branch_choices; DROP TABLE result_revisions; ALTER TABLE node_dispatches DROP COLUMN terminal_sequence; DELETE FROM schema_migrations WHERE version=29;',
+      'DROP TABLE result_references; DROP TABLE work_branch_choices; DROP TABLE result_revisions; ALTER TABLE node_dispatches DROP COLUMN terminal_sequence; DELETE FROM schema_migrations WHERE version IN (29,32);',
     );
     db.prepare('UPDATE results SET body=? WHERE id=?').run(
       JSON.stringify({ ...r, revision: 3 }),
@@ -357,6 +359,7 @@ test('迁移只保存旧成果的已知版本与无版本反馈，保留方案�
           upgraded.db.prepare(`SELECT * FROM ${table}`).all(),
           f.api.store.db.prepare(`SELECT * FROM ${table}`).all(),
         );
+      assert.deepEqual(upgraded.db.prepare('SELECT * FROM result_references').all(), []);
       assert.equal(upgraded.db.prepare('PRAGMA foreign_key_check').all().length, 0);
     } finally {
       upgraded.close();

@@ -3,7 +3,14 @@ import type {
   ProjectTaskPeople,
   TaskPeopleFilters,
 } from '../../../packages/contracts/src/task-participants.js';
+import type { TaskStatus } from '../../../packages/contracts/src/index.js';
 import { Button, Icon } from '../../../packages/ui/src/index.js';
+import { parseProjectTaskStatus, type ProjectTaskStatusSelection } from './project-task-status.js';
+import {
+  parseProjectTaskAttention,
+  type ProjectTaskAttention,
+  type ProjectTaskAttentionSelection,
+} from './project-task-attention.js';
 import { useApp, useLoad } from './state.js';
 import './project-task-filters.css';
 
@@ -15,6 +22,8 @@ function readFilters() {
       ownerUserId: query.get('ownerUserId')?.trim() ?? '',
       participantUserId: query.get('participantUserId')?.trim() ?? '',
     },
+    status: parseProjectTaskStatus(query),
+    attention: parseProjectTaskAttention(query),
     view: query.get('view') === 'list' ? 'list' : 'board',
   };
 }
@@ -40,7 +49,10 @@ export function useProjectTaskFilters() {
     setView: (view: string) => update({ view: view === 'board' ? '' : view }),
     setFilter: (key: keyof TaskPeopleFilters, value: string) =>
       update({ [key]: value }, key === 'q'),
-    clear: () => update({ q: '', ownerUserId: '', participantUserId: '' }),
+    setStatus: (status: TaskStatus | '') => update({ status }),
+    setAttention: (attention: ProjectTaskAttention | '') => update({ attention }),
+    clear: () =>
+      update({ q: '', ownerUserId: '', participantUserId: '', status: '', attention: '' }),
   };
 }
 const ownerLabels = { available: '', read_only: ' · 当前只读', removed: ' · 已退出项目' };
@@ -48,11 +60,19 @@ export function ProjectTaskFilters({
   projectId,
   filters,
   setFilter,
+  status,
+  setStatus,
+  attention,
+  setAttention,
   clear,
 }: {
   projectId: string;
   filters: TaskPeopleFilters;
   setFilter(key: keyof TaskPeopleFilters, value: string): void;
+  status: ProjectTaskStatusSelection;
+  setStatus(status: TaskStatus | ''): void;
+  attention: ProjectTaskAttentionSelection;
+  setAttention(attention: ProjectTaskAttention | ''): void;
   clear(): void;
 }) {
   const { refresh } = useApp();
@@ -60,6 +80,50 @@ export function ProjectTaskFilters({
   return (
     <>
       <div className="project-people-filters">
+        <label>
+          状态
+          <select
+            aria-label="任务状态筛选"
+            value={
+              status.kind === 'status' ? status.status : status.kind === 'invalid' ? 'invalid' : ''
+            }
+            onChange={(event) => setStatus(event.target.value as TaskStatus | '')}
+          >
+            <option value="">默认状态（不含已取消）</option>
+            {status.kind === 'invalid' && (
+              <option value="invalid" disabled>
+                链接中的状态无效
+              </option>
+            )}
+            <option value="todo">待处理</option>
+            <option value="in_progress">进行中</option>
+            <option value="done">已完成</option>
+            <option value="cancelled">已取消</option>
+          </select>
+        </label>
+        <label>
+          关注
+          <select
+            aria-label="关注内容筛选"
+            value={
+              attention.kind === 'attention'
+                ? attention.attention
+                : attention.kind === 'invalid'
+                  ? 'invalid'
+                  : ''
+            }
+            onChange={(event) => setAttention(event.target.value as ProjectTaskAttention | '')}
+          >
+            <option value="">全部关注情况</option>
+            {attention.kind === 'invalid' && (
+              <option value="invalid" disabled>
+                链接中的关注筛选无效
+              </option>
+            )}
+            <option value="present">有关注内容</option>
+            <option value="absent">无关注内容</option>
+          </select>
+        </label>
         <label>
           负责人
           <select
@@ -111,9 +175,11 @@ export function ProjectTaskFilters({
           placeholder="标题、编号或说明…"
         />
       </label>
-      {(filters.q || filters.ownerUserId || filters.participantUserId) && (
-        <Button onClick={clear}>清除筛选</Button>
-      )}
+      {(filters.q ||
+        filters.ownerUserId ||
+        filters.participantUserId ||
+        status.kind !== 'default' ||
+        attention.kind !== 'default') && <Button onClick={clear}>清除筛选</Button>}
       {error && (
         <span className="project-filter-error" role="alert">
           成员筛选信息读取失败{' '}

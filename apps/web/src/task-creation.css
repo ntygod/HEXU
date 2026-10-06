@@ -1,0 +1,7 @@
+/* Frozen request fields remain readable while the original creation is confirmed. */
+.task-creation-form input:disabled,
+.task-creation-form select:disabled,
+.task-creation-form textarea:disabled {
+  color: var(--hx-text-primary);
+  opacity: 1;
+}

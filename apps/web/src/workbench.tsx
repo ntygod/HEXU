@@ -11,21 +11,31 @@ import {
 import { isActiveRun } from '../../../packages/domain/src/index.js';
 import { Link, useApp } from './state.js';
 import { NewTask } from './forms.js';
-import { ResultCard, TaskRow } from './work-cards.js';
+import { ResultCard } from './work-cards.js';
+import { WorkbenchTaskList } from './workbench-task-list.js';
+import { matchesWorkbenchTaskScope, type WorkbenchTaskScope } from './workbench-task-scope.js';
 import './work-pages.css';
+
+const workbenchScopeLabels: Record<WorkbenchTaskScope, string> = {
+  mine: '我的工作',
+  participating: '我参与的',
+  team: '团队概览',
+};
 
 export function Workbench() {
   const { data } = useApp();
-  const [tab, setTab] = useState<'mine' | 'team'>('mine');
+  const [tab, setTab] = useState<WorkbenchTaskScope>('mine');
   const [creating, setCreating] = useState(false);
-  const tasks = data.tasks.filter(
+  const scopedTasks = data.tasks.filter((task) =>
+    matchesWorkbenchTaskScope(task, tab, data.user.id),
+  );
+  const tasks = scopedTasks.filter(
     (task) =>
-      (task.status !== 'cancelled' ||
-        data.runs.some(
-          (run) =>
-            run.taskId === task.id && (isActiveRun(run.state) || run.observation === 'unknown'),
-        )) &&
-      (tab === 'mine' ? task.ownerUserId === data.user.id : task.visibility === 'project'),
+      task.status !== 'cancelled' ||
+      data.runs.some(
+        (run) =>
+          run.taskId === task.id && (isActiveRun(run.state) || run.observation === 'unknown'),
+      ),
   );
   const active = tasks.filter(
     (task) =>
@@ -48,7 +58,7 @@ export function Workbench() {
       <header className="work-page-heading">
         <div>
           <span className="eyebrow">{data.space?.name ?? '本地开发预览'}</span>
-          <h1>{tab === 'mine' ? '我的工作' : '团队概览'}</h1>
+          <h1>{workbenchScopeLabels[tab]}</h1>
           <p>继续一项任务，或把下一个想法记录下来。</p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
@@ -60,9 +70,15 @@ export function Workbench() {
         <button aria-pressed={tab === 'mine'} onClick={() => setTab('mine')}>
           我的工作
         </button>
+        <button aria-pressed={tab === 'participating'} onClick={() => setTab('participating')}>
+          我参与的
+        </button>
         <button aria-pressed={tab === 'team'} onClick={() => setTab('team')}>
           团队概览
         </button>
+        <Link to="/workbench/members" className="member-work-entry">
+          成员工作
+        </Link>
         <span className="spacer" />
         <span className="muted">
           {tasks.filter((task) => task.status === 'in_progress').length} 项进行中 ·{' '}
@@ -95,6 +111,17 @@ export function Workbench() {
                   </Link>
                 </div>
               </>
+            ) : tab === 'participating' ? (
+              <Empty
+                title={scopedTasks.length ? '暂无可继续的参与任务' : '还没有参与的任务'}
+                description={
+                  tasks.length
+                    ? '已参与的任务仍可在下方查看。'
+                    : scopedTasks.length
+                      ? '可在下方勾选「包括已取消任务」查看。'
+                      : '可在项目任务详情的「参与者」中加入。'
+                }
+              />
             ) : (
               <Empty
                 title="从一项工作开始"
@@ -107,22 +134,16 @@ export function Workbench() {
               />
             )}
           </section>
-          <section className="work-section">
-            <div className="work-section-heading">
-              <h2>最近任务</h2>
-              <Link to="/projects">
-                查看项目 <Icon name="chevron" size={14} />
-              </Link>
-            </div>
-            <div className="work-task-list">
-              {tasks.slice(0, 8).map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-              {!tasks.length && (
-                <p className="work-empty-text">还没有任务。创建后，工作记录会留在这里。</p>
-              )}
-            </div>
-          </section>
+          <WorkbenchTaskList
+            key={tab}
+            tasks={tasks}
+            tasksIncludingCancelled={scopedTasks}
+            emptyDescription={
+              tab === 'participating'
+                ? '还没有参与的任务。可在项目任务详情的「参与者」中加入。'
+                : undefined
+            }
+          />
         </div>
         <aside className="home-attention">
           <div className="work-section-heading">

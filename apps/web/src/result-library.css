@@ -1,0 +1,60 @@
+.result-library-filters {
+  margin-bottom: var(--hx-space-5);
+}
+.result-library-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--hx-space-3);
+}
+.result-library-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.result-library-project {
+  flex: 1 1 180px;
+}
+.result-library-query {
+  flex: 2 1 260px;
+}
+.result-library-controls input,
+.result-library-controls select {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.result-library-help,
+.result-library-count {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  margin-top: var(--hx-space-3);
+  overflow-wrap: anywhere;
+}
+.result-library-context {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  margin-bottom: var(--hx-space-3);
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+  overflow-wrap: anywhere;
+}
+.result-library-context strong {
+  color: var(--hx-text-primary);
+  font-weight: 500;
+}
+/* The shared helper bounds the snippet; line clamping could hide its match. */
+.work-result-card > p.result-library-body-match {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.result-library-body-match mark {
+  color: var(--hx-brand-text);
+  background: var(--hx-brand-soft);
+}

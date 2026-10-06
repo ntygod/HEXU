@@ -308,3 +308,38 @@ SQLite 迁移 13 增加 project_sources/project_source_revisions。资料有独�
 迁移 18 在原 assistance_grants 增加 model_text，不改变 snapshot_reply 记录或旧授权。Run 增加可选 purpose=assist 和 assistanceId；Assistance 增加 recipientKind=ai 及固定输入/Run 关联。节点 policy 只有明确 textAssistance:true 才允许该种派发。命令使用独立文本环境 ID 而非项目目录，不能由浏览器填写路径/会话。
 
 新增 `GET /tasks/:id/ai-assistance-options` 和 `POST /tasks/:id/ai-assistances`（201 + AssistanceDetail）。创建严格限定来源哈希/任务修订、单片段、问题、节点/policyHash 与两项同意；事务同时保存授权、辅助 Run、派发、事件及回执。读取和取消复用 Assistance，不能通过真人 replies 接口触发模型。主编程查询排除 assist，完整执行历史保留。协议与剩余边界见 [AI 文本协助](../engineering/ai-text-assistance.md)。
+
+
+## 普通Task搜索分页
+
+`GET /api/v1/search?q=...&cursor=...` 继续使用现有当前可见Task集合；q按原规则去首尾空白、最多160字符并转小写，匹配标题、说明和编号拼接文本。首批不带cursor，响应为 `{ items: Task[], nextCursor: string | null }`，每批最多30项。cursor最多1024字符，绑定规范化查询和当前有序匹配DTO序列，不是访问凭据或历史快照。非法/不匹配查询返回INVALID_CURSOR/400，当前序列变化返回SEARCH_RESULTS_CHANGED/409；客户端清除旧批次并明确重新搜索。读取不更新业务表，无新增迁移/写操作。
+
+
+Task搜索的范围扩展：可选`scope=all|personal|project`，缺省all；personal只取当前集合中projectId为null的Task，project必须带非空、无首尾空白、最多150字符的projectId；all/personal不接受projectId。重复/非法/不完整范围返回INVALID_INPUT/400，合法但无匹配ID返回空页，不放大为全局。游标摘要同时绑定规范化q、scope与projectId，范围先于匹配序列摘要和分页；此前只绑定q的旧书签明确INVALID_CURSOR后重搜。未新增权限来源、资源端点或数据库模型。
+
+
+全局搜索类型扩展：`GET /api/v1/search?type=task|result|agreement`，缺省或显式task沿原Task响应与书签，空/重复/未知类型INVALID_INPUT/400。result复用q/scope/projectId/cursor规则，先关联当前Task再按范围和成果库原独立字段谓词匹配；响应items为当前Result字段加最小task上下文 `{id,title,shortId,projectId}`，nextCursor仍可空。游标包含result类型及当前Result/父Task来源指纹，跨类型400、结果变化409。当前Result只有numeric revision，API不伪造固定版本ID，也不检索旧版本正文。
+
+
+约定全局查找扩展：agreement类型复用q/scope/projectId/cursor，个人scope明确INVALID_INPUT/400；只读当前可见项目的project_agreements当前行，按全局rowid降序，在匹配与30项分页前取项目范围。标题与content沿原约定拼接文字规则匹配，active/inactive/superseded各当前记录一次；响应明确最小id/projectId/title/content/revision/state/updatedAt与project{id,name,archivedAt?}，不发送origin/来源讨论节选或历史。afterAgreementId书签独立绑定type/query/scope及当前有序DTO，错配400、变化409；原Task/Result书签保持。
+
+Workbench只读响应新增可选projectAgreementVersions数组 `{projectId,version}`，仅对同响应当前可见项目返回既有约定变更版本，不包含正文；没有版本行时的0只用于已经过原项目读取检查的项目。旧/未就绪响应缺字段或缺所选项目元数据不能当作0。普通SSE后的Workbench读取传递变化，新约定搜索按相关项目版本及来源标签取消旧页；该信号按项目粒度，既非查询专属版本，也不保证永远在线同步。无新端点、迁移、身份源或业务写入。
+
+
+## 14-06 固定版本的手动报告/发布链接
+
+`GET/POST /api/v1/results/:resultId/versions/:revisionId/references`读取或添加当前固定版本有效链接；GET返回`{items,limit:20}`，POST接受`{kind:'report'|'release',title,url,environment?,sourceNote?}`。标题160、HTTP(S)地址2048、环境120、来源说明1000字符；地址不接受内嵌账号密码、空白或控制字符，服务不请求该地址。`POST .../references/:referenceId/remove`接受空对象并返回保留的移除记录。
+
+迁移32新增独立result_references及同Result/Revision外键，旧正文链接不推断为历史引用。记录固定resultId/resultRevisionId/taskId、原文字、`source:'manual'`、`externalState:'unknown'`、`availability:'not_checked'`、真实记录/移除人和时间。有效引用按记录顺序倒序，最多20个；移除保留记录。
+
+两个写命令沿现有Idempotency-Key；作用域按Result/动作固定，指纹包含实际版本ID和原请求对象。现有父Task读/编辑guard在原事务旧回执之前复核；引用/移除、outbox与回执原子提交。不同版本或改包复用键拒绝；同包重放返回原回执，重复移除不再产生事件。结果正文/版本/Task/Run状态不随引用修改。
+
+## 04-03 项目任务的持久排序
+
+`GET /api/v1/projects/:projectId/task-order` 返回 `{projectId,revision,baseline,taskIds}`，只包含原授权集合中的同项目任务，无查询参数。未排序项目沿原 rowid 倒序，虚拟排序 revision=1；读取使用一致 SQLite 快照，不建立排序行。迁移33新增独立 `project_task_order_sets` 与 `project_task_ranks`，不改变 Task JSON/修订。
+
+`POST .../task-order/move` 只接受 `{taskId,anchorTaskId,placement:'before'|'after',expectedRevision,expectedBaseline}`；ID最多150字符且不同，baseline为64位小写十六进制，独立正文预算4096字节。使用原 `Idempotency-Key`；当前项目编辑及所移动Task编辑guard在事务旧回执之前复核，参照Task须当前可读且同项目。新移动不接受cancelled任务。
+
+baseline绑定当前可读有序ID及状态；当前修订或基线变化返回 `PROJECT_TASK_ORDER_CONFLICT/409`。一次移动仅改变指定Task的位置，其余任务相对顺序保持，包括UI筛选隐藏项。稳定整数rank必要时同事务重排间距；实际移动、独立修订、项目outbox和回执原子提交。无变化不增修订、不发事件或建立rank，但保留原回执。
+
+返回 `{projectId,taskId,anchorTaskId,placement,revision,baseline,changed}`，不携带历史可见ID列表。原始解码请求用于幂等指纹；相同包重放确认原回执，不重做移动，改包同键拒绝。普通Task内容变化不会改排序基线；新任务追加在已有rank之后，未排序的新任务彼此仍沿原rowid顺序。协议与UI限制见[项目任务排序](../engineering/project-task-order.md)。

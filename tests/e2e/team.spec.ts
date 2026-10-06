@@ -1,6 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
+import { registerMemberWorkTests } from './member-work-flows.js';
 const origin = 'http://127.0.0.1:4311';
 const password = 'Fictional Browser Password 2026!';
 const setupCode = 'fictional-browser-setup-code-not-real-0123456789';
@@ -379,7 +380,16 @@ test('撤销项目权限清除已打开的任务，移除成员后返回个人�
       f.space.id,
     );
     await expect(member.getByRole('heading', { name: f.task.title, exact: true })).toHaveCount(0);
-    await expect(member.getByText('暂时无法打开任务', { exact: true })).toBeVisible();
+    // Current Workbench omission revokes access before TaskDetail's own denial settles.
+    await expect(
+      member.getByRole('heading', { name: '当前无法访问此任务', exact: true }),
+    ).toBeVisible();
+    await expect(member.locator('.task-page')).toHaveCount(0);
+    await expect(member.locator('body')).not.toContainText(f.task.title);
+    const revokedTask = await member.request.get(`${origin}/api/v1/tasks/${f.task.id}`, {
+      headers: headers(f.space.id),
+    });
+    expect(revokedTask.status()).toBe(404);
     await post(page, `spaces/${f.space.id}/members/${f.memberIdentity.id}/remove`, {}, f.space.id);
     await expect(member.getByLabel('当前工作空间')).toHaveValue(`personal-${f.memberIdentity.id}`);
     await member.reload();
@@ -581,3 +591,5 @@ test('真实项目成员改派、撤权清理与退出显示，负责人不自�
     await context.close();
   }
 });
+
+registerMemberWorkTests();
