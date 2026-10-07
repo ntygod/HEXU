@@ -11,8 +11,10 @@
 
 /* fd 3 is the pinned existing destination directory. The anonymous inode has
  * no replaceable staging name. Only linkat publishes it, with EEXIST refusal.
- * Exit 20 proves no link was attempted/succeeded; every other error is unknown. */
+ * Exit 20 is reserved for pre-publication refusals or EEXIST. Every other
+ * failed publication attempt is unknown, including a possible named inode. */
 static int refused(void) { puts("not_published"); return 20; }
+static int unknown(void) { puts("published_unknown"); return 21; }
 static int local_fs(int fd) {
   struct statfs s;
   if (fstatfs(fd, &s)) return 0;
@@ -22,7 +24,7 @@ static int local_fs(int fd) {
 }
 int main(int argc, char **argv) {
   if (argc == 2 && !strcmp(argv[1], "--version")) {
-    puts("hexu-integration-add-v1"); return 0;
+    puts("hexu-integration-add-v2"); return 0;
   }
   struct stat parent, file;
   if ((argc != 4 && argc != 5) || getuid() != geteuid() || fstat(3, &parent) ||
@@ -74,7 +76,10 @@ int main(int argc, char **argv) {
   char source[64];
   snprintf(source, sizeof source, "/proc/self/fd/%d", fd);
   if (linkat(AT_FDCWD, source, 3, argv[1], AT_SYMLINK_FOLLOW)) {
-    close(fd); return refused();
+    /* The namespace change may precede an I/O error. Only EEXIST proves
+     * this link was refused; otherwise retain durable intent and the lock. */
+    const int link_error = errno;
+    close(fd); return link_error == EEXIST ? refused() : unknown();
   }
   if (fsync(3)) { close(fd); puts("published_sync_unknown"); return 21; }
   printf("published %ju:%ju\n", (uintmax_t)file.st_dev, (uintmax_t)file.st_ino);
