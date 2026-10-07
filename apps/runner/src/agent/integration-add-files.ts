@@ -12,10 +12,10 @@ export function checkIntegrationAddHelper() {
     timeout: 5000,
     env: { LC_ALL: 'C' },
   });
-  if (r.error || r.status !== 0 || r.stdout.trim() !== 'hexu-integration-add-v1')
+  if (r.error || r.status !== 0 || r.stdout.trim() !== 'hexu-integration-add-v2')
     throw new DomainError(
       'INTEGRATION_HELPER_UNAVAILABLE',
-      '缺少Linux排他新增组件，请先构建；不降级为覆盖写入',
+      'Linux排他新增组件缺失或版本不匹配，请重新构建；不降级为覆盖写入',
     );
 }
 export function publishIntegrationAddition(

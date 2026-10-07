@@ -107,7 +107,7 @@ static int absent(int dir, const char *name) {
 }
 int main(int argc, char **argv) {
   if (argc == 2 && !strcmp(argv[1], "--version")) {
-    puts("hexu-integration-change-v1"); return 0;
+    puts("hexu-integration-change-v2"); return 0;
   }
   struct stat parent, backup, original, current, staged, saved;
   size_t before_len, after_len;
@@ -154,7 +154,10 @@ int main(int argc, char **argv) {
     if (!directories(&parent, &backup) || !named(3, argv[1], &original)) return refused();
     char fd_name[64];
     snprintf(fd_name, sizeof fd_name, "/proc/self/fd/%d", replacement);
-    if (linkat(AT_FDCWD, fd_name, 4, argv[2], AT_SYMLINK_FOLLOW)) return refused();
+    /* A named replacement may exist even when linkat reports an I/O error.
+     * EEXIST is a definite refusal; every other outcome keeps both places. */
+    if (linkat(AT_FDCWD, fd_name, 4, argv[2], AT_SYMLINK_FOLLOW))
+      return errno == EEXIST ? refused() : unknown();
     if (fsync(4) || fstat(replacement, &staged)) return unknown();
   }
   if (!directories(&parent, &backup) || !exact_file(source, input, before_len, &current) ||

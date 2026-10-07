@@ -58,10 +58,10 @@ export function checkIntegrationChangeHelper() {
     timeout: 5000,
     env: { LC_ALL: 'C' },
   });
-  if (r.error || r.status !== 0 || r.stdout.trim() !== 'hexu-integration-change-v1')
+  if (r.error || r.status !== 0 || r.stdout.trim() !== 'hexu-integration-change-v2')
     throw new DomainError(
       'INTEGRATION_HELPER_UNAVAILABLE',
-      '缺少Linux保留原文件的替换组件，请先构建；不降级为覆盖/删除',
+      'Linux保留原文件的替换组件缺失或版本不匹配，请重新构建；不降级为覆盖/删除',
     );
 }
 function verifiedEntry(entry: RestoreEntry, bytes: Buffer): asserts entry is FileEntry {
