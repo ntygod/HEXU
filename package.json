@@ -48,7 +48,8 @@
     "runner:branch-workspace-cleanup": "node dist/apps/runner/src/prepare-branch-workspace.js cleanup",
     "runner:branch-bind": "node dist/apps/runner/src/prepare-branch-workspace.js bind",
     "runner:result-code": "node dist/apps/runner/src/share-result-code.js",
-    "runner:integration-plan": "node dist/apps/runner/src/integration-preflight.js"
+    "runner:integration-plan": "node dist/apps/runner/src/integration-preflight.js",
+    "mcp": "node dist/apps/mcp/src/main.js"
   },
   "dependencies": {
     "better-auth": "1.7.6",

@@ -10,7 +10,7 @@ import {
 } from '../../../packages/identity/src/agent-assistance-connections.js';
 
 /** Explicit allowlist prevents parent metadata and human authority leaking through bearer reads. */
-function requestView(detail: AssistanceDetail) {
+export function requestView(detail: AssistanceDetail) {
   const item = detail.assistance,
     agent = item.agent;
   if (!agent) throw new DomainError('NOT_FOUND', '请求不存在', 404);
@@ -84,6 +84,9 @@ export function attachAgentAssistance(app: FastifyInstance, store: Store) {
   app.addHook('onRequest', async (r, reply) => {
     const url = new URL(r.url, 'http://localhost');
     if (!url.pathname.startsWith('/agent-assistance/')) return;
+    reply.header('x-hexu-agent-api', '1');
+    if (r.headers['x-hexu-agent-api'] !== undefined && r.headers['x-hexu-agent-api'] !== '1')
+      throw new DomainError('AGENT_API_VERSION_UNSUPPORTED', '需要 Agent API 版本 1', 409);
     if (!store.teamMode)
       throw new DomainError('REAL_IDENTITY_REQUIRED', '有限 Agent 通道仅在真实账号模式启用', 422);
     if (

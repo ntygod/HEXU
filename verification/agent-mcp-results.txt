@@ -1,0 +1,41 @@
+HEXU slice3 final local verification — 2026-10-08 UTC
+Base: 7874614016057405ad3353b22a1d67c66b2ecc3e
+
+Original server configuration:
+./node_modules/.bin/tsc -p tsconfig.server.json
+PASS (no replacement config or stripped app).
+Original Web configuration:
+./node_modules/.bin/tsc -p apps/web/tsconfig.json --noEmit
+PASS.
+node scripts/check-ui-tokens.mjs — PASS.
+./node_modules/.bin/vite build --config apps/web/vite.config.ts — PASS, 180 modules.
+Existing >500kB bundle warning remains.
+
+New + adjacent backend/protocol:
+node --test dist/tests/agent-mcp-protocol.test.js dist/tests/agent-requester-contracts.test.js dist/tests/agent-requester-http.test.js verification/agent-mcp-loop.test.mjs dist/tests/agent-assistance-contracts.test.js dist/tests/agent-assistance-store.test.js dist/tests/agent-assistance-http.test.js dist/tests/assistance.test.js dist/tests/ai-assistance.test.js dist/tests/assistance-adoption.test.js dist/tests/agent-capabilities.test.js
+Tests 86, passed 86, failed 0.
+New: 6 MCP protocol/transport, 3 requester contracts, 9 real BetterAuth/full-app HTTP, 3 independent stdio-process real control/SQLite tests.
+Adjacent: original 47 assistance/human/Claude/adoption + 18 capabilities.
+
+UI + original app/identity:
+Set HEXU_UI_TEST_TOOLS to a fixture tools package containing esbuild 0.25.10, React 19.2.0 and react-test-renderer 19.2.0.
+node --test verification/agent-requester-ui.test.mjs verification/agent-requester-ui-bridge.test.mjs verification/agent-negotiation-ui.test.mjs verification/agent-negotiation-ui-bridge.test.mjs verification/agent-real-app.test.mjs verification/agent-real-identity.test.mjs
+Tests 37, passed 37, failed 0.
+New UI: 13 renderer + 2 real createApp/BetterAuth/SQLite bridge.
+Existing: 11 negotiation renderer + 2 real bridge + 9 original app/identity.
+React renderer deprecation warning remains. These are not visual browser tests.
+
+Independent review closed P2 findings: optional MCP arguments; tool input error classification; material identity across reduced selections, human revisions and independent credentials.
+Fresh-dist independent probes confirmed mixed entry and credential ordering, legacy fail-closed views, rate limit, no new Run. No unresolved P1/P2.
+
+Migration 1–37 unchanged byte-for-byte; only migration38 appended.
+Old ID snapshots remain immutable, human/receiver access preserved.
+New requester auth uses explicit actual Agent actor; no ownerPrincipal impersonation.
+Unknown create outcome recovered by same operationKey/requestId/inputHash/materials; receipt reads and repeated create/accept/answer add no duplicate outbox/replies.
+
+Limits and failed setup attempt:
+- npm run build:server compiled TypeScript then failed because the recovered source snapshot lacks scripts/build-restore-helper.mjs. No replacement helper was fabricated or executed. Do not label the full script successful.
+- First integration UI command omitted HEXU_UI_TEST_TOOLS and failed with missing esbuild; correcting the fixture dependency path passed without app dependency/lock changes.
+- Single-request receiver credentials were explicitly pre-provisioned by fictional fixture owners. No autonomous bootstrap/new-request pickup exists.
+- No real model, native thread continuation, remote service, dot plugin/Events subscription, deployment or browser run. Fake protocol clients are not live user Agents.
+- No full check/CI, suspended Provider cross-identity late-response diagnostics, or #52 file-apply/recovery/security tests.

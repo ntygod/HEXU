@@ -10,6 +10,14 @@ import type { DelegationGrant, AgentParticipant } from '../../contracts/src/agen
 import type { ProjectSource } from '../../contracts/src/project-sources.js';
 import { canonicalJson, assertRevision } from '../../domain/src/index.js';
 import type { AgentAssistancePrincipal } from '../../identity/src/agent-assistance-connections.js';
+import {
+  revalidateAgentRequesterConnection,
+  assertAgentRequesterSelection,
+  type AgentRequesterPrincipal,
+} from '../../identity/src/agent-requester-connections.js';
+type AssistanceActor = AgentAssistancePrincipal | AgentRequesterPrincipal;
+const isRequester = (actor: AssistanceActor): actor is AgentRequesterPrincipal =>
+  'role' in actor && actor.role === 'requester';
 import type { Store } from './store.js';
 import type { AssistanceRecord } from './assistance.js';
 const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).digest('hex');
@@ -84,6 +92,46 @@ export class AgentAssistanceStore {
     if (!this.store.teamMode) throw new DomainError('TEAM_MODE_REQUIRED', '需要真实账号', 422);
     this.store.permissions.space();
     return { kind: 'human' as const, userId: this.store.actorId };
+  }
+  private author(actor?: AgentRequesterPrincipal): C.AgentAssistanceActor {
+    return actor
+      ? {
+          kind: 'agent',
+          participantId: actor.participantId,
+          ownerUserId: actor.ownerUserId,
+          connectionId: actor.connectionId,
+          connectionRevision: actor.connectionRevision,
+        }
+      : this.human();
+  }
+  /** Explicit requester authority, never a borrowed human principal. Also runs inside writes. */
+  private requesterTask(taskId: string, actor?: AgentRequesterPrincipal) {
+    if (!actor) {
+      this.human();
+      return this.store.getTask(taskId, true);
+    }
+    revalidateAgentRequesterConnection(this.store.db, actor);
+    if (actor.taskId !== taskId) throw missing();
+    const task = this.decode<Task>('SELECT body FROM tasks WHERE id=?', taskId);
+    if (
+      !task ||
+      task.spaceId !== actor.spaceId ||
+      task.projectId !== actor.projectId ||
+      task.visibility !== 'project'
+    )
+      throw missing();
+    this.authority(task, actor.bound.target, actor.ownerUserId, actor.participantId);
+    // Check the entire original selection before receipt replay, even after an Agent shrinks it.
+    this.selected(
+      task,
+      actor.bound.input,
+      true,
+      actor.bound.materials.map((material) => material.id),
+    );
+    return task;
+  }
+  validateRequester(actor: AgentRequesterPrincipal) {
+    return this.requesterTask(actor.taskId, actor);
   }
   private target(env: Envelope): C.AgentAssistanceTarget {
     return {
@@ -168,19 +216,53 @@ export class AgentAssistanceStore {
   private access(
     id: string,
     action: 'read' | 'respond' | 'manage' | 'credential',
-    actor?: AgentAssistancePrincipal,
+    actor?: AssistanceActor,
   ) {
     this.expire();
     const { item, env } = this.raw(id),
       task = this.task(item);
-    if (actor) {
-      this.revalidate(actor);
+    const requesterActor = actor && isRequester(actor) ? actor : undefined;
+    if (requesterActor) {
+      this.requesterTask(task.id, requesterActor);
       if (
-        actor.assistanceId !== id ||
+        env.requester_participant_id !== requesterActor.participantId ||
+        item.requester.id !== requesterActor.ownerUserId ||
+        !['read', 'manage'].includes(action)
+      )
+        throw missing();
+      const inputs = this.store.db
+        .prepare('SELECT body FROM assistance_input_revisions WHERE assistance_id=?')
+        .all(id) as { body: string }[];
+      for (const row of inputs) {
+        const input = JSON.parse(row.body) as InputRecord;
+        assertAgentRequesterSelection(
+          requesterActor,
+          task.id,
+          env.requester_participant_id,
+          this.target(env),
+          input.selection,
+        );
+        // A new limited credential must not reinterpret legacy ordinal IDs or an
+        // incompatible catalog. Human and receiver history remain unchanged.
+        if (
+          canonicalJson(input.materials.map((material) => material.id)) !==
+          canonicalJson(this.requesterMaterialIds(input.selection, requesterActor))
+        )
+          throw new DomainError(
+            'AGENT_SCOPE_REQUIRED',
+            '请求材料标识与此凭据的固定目录不一致',
+            403,
+          );
+      }
+    } else if (actor) {
+      const receiver = actor as AgentAssistancePrincipal;
+      this.revalidate(receiver);
+      if (
+        receiver.assistanceId !== id ||
         actor.participantId !== env.recipient_participant_id ||
         actor.spaceId !== item.spaceId ||
-        !actor.scopes.includes('material_read') ||
-        (action === 'respond' && !actor.scopes.includes('respond')) ||
+        !receiver.scopes.includes('material_read') ||
+        (action === 'respond' && !receiver.scopes.includes('respond')) ||
         !['read', 'respond'].includes(action)
       )
         throw missing();
@@ -197,25 +279,31 @@ export class AgentAssistanceStore {
       valid = false;
     }
     const parent = !actor && this.store.permissions.canTask(task);
-    const requester = !actor && item.requester.id === this.store.actorId;
+    const requester = !!requesterActor || (!actor && item.requester.id === this.store.actorId);
     const owner = !actor && item.recipient.id === this.store.actorId;
     if (
       !valid &&
-      !(action === 'read' && parent) &&
+      !(
+        action === 'read' &&
+        (parent || (requesterActor && JSON.parse(env.body).terminalReason === 'cancelled'))
+      ) &&
       !(
         action === 'manage' &&
-        parent &&
+        (parent || requesterActor) &&
         requester &&
         JSON.parse(env.body).terminalReason === 'cancelled'
       )
     )
       throw missing();
-    if (action === 'manage' && (!requester || !this.store.permissions.canTask(task, true)))
+    if (
+      action === 'manage' &&
+      (!requester || (!requesterActor && !this.store.permissions.canTask(task, true)))
+    )
       throw missing();
     if (action === 'credential' && !owner) throw missing();
     if (action === 'respond' && !actor && !owner) throw missing();
     if (action === 'read' && !actor && !parent && !owner) throw missing();
-    if (valid && (actor || owner)) {
+    if (valid && ((actor && !requesterActor) || owner)) {
       const scopes = action === 'respond' ? ['material_read', 'respond'] : ['material_read'];
       for (const scope of scopes) {
         const row = this.store.db
@@ -234,7 +322,7 @@ export class AgentAssistanceStore {
     payload: unknown,
     guard: () => void,
     action: () => { id: string },
-    actor?: AgentAssistancePrincipal,
+    actor?: AssistanceActor,
   ) {
     if (!key || key.length > 128 || !/^[\w.:-]+$/.test(key))
       throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', '操作需要有效的 Idempotency-Key');
@@ -286,7 +374,12 @@ export class AgentAssistanceStore {
     if (!input) throw missing();
     return input;
   }
-  private selected(task: Task, input: C.AgentAssistanceInputSelection, strictHash: boolean) {
+  private selected(
+    task: Task,
+    input: C.AgentAssistanceInputSelection,
+    strictHash: boolean,
+    materialIds?: string[],
+  ) {
     const message = this.decode<Message>(
       'SELECT body FROM messages WHERE id=? AND task_id=?',
       input.message.sourceMessageId,
@@ -326,7 +419,15 @@ export class AgentAssistanceStore {
         (text.endsWith('\r') && source.content[text.length] === '\n')
       )
         text = text.slice(0, -1);
-      materials.push({ id: `text-${materials.length}`, label: source.title, text });
+      materials.push({
+        // Source-derived opaque IDs are stable across subset order, owners' previews and credentials.
+        // Stored historical IDs still take precedence when validating immutable old inputs.
+        id:
+          materialIds?.[materials.length] ??
+          `text-${createHash('sha256').update(source.id).digest('hex')}`,
+        label: source.title,
+        text,
+      });
     }
     const projectHash = hash(materials.slice(1));
     if (strictHash && projectHash !== input.projectTexts.expectedHash)
@@ -343,12 +444,47 @@ export class AgentAssistanceStore {
     };
     return { snapshot, materials, selection, inputHash: hash({ selection, materials }) };
   }
-  preview(taskId: string, input: unknown) {
-    this.human();
+  private requesterMaterialIds(
+    input: C.AgentAssistanceInputSelection,
+    actor?: AgentRequesterPrincipal,
+  ) {
+    return actor
+      ? [
+          'message',
+          ...input.projectTexts.items.map(
+            (ref) =>
+              actor.bound.materials[
+                actor.bound.input.projectTexts.items.findIndex(
+                  (allowed) => canonicalJson(ref) === canonicalJson(allowed),
+                ) + 1
+              ]!.id,
+          ),
+        ]
+      : undefined;
+  }
+  preview(taskId: string, input: unknown, actor?: AgentRequesterPrincipal) {
     const data = C.parseAgentAssistancePreview(input);
-    const task = this.store.getTask(taskId, true);
-    this.authority(task, data.target, this.store.actorId, data.requesterParticipantId);
-    const result = this.selected(task, data.input, false);
+    const task = this.requesterTask(taskId, actor);
+    if (actor)
+      assertAgentRequesterSelection(
+        actor,
+        taskId,
+        data.requesterParticipantId,
+        data.target,
+        data.input,
+      );
+    this.authority(
+      task,
+      data.target,
+      actor?.ownerUserId ?? this.store.actorId,
+      data.requesterParticipantId,
+    );
+    const result = this.selected(
+      task,
+      data.input,
+      false,
+      this.requesterMaterialIds(data.input, actor),
+    );
     return {
       ...data,
       input: result.selection,
@@ -455,117 +591,151 @@ export class AgentAssistanceStore {
     );
     return response;
   }
-  create(taskId: string, input: unknown, key: string): AssistanceDetail {
+  create(
+    taskId: string,
+    input: unknown,
+    key: string,
+    actor?: AgentRequesterPrincipal,
+  ): AssistanceDetail {
     const data = C.parseAgentAssistanceCreate(input);
     const guard = () => {
-      this.human();
-      const task = this.store.getTask(taskId, true);
-      this.authority(task, data.target, this.store.actorId, data.requesterParticipantId);
-    };
-    const receipt = this.write(`create:${taskId}`, key, data, guard, () => {
-      const task = this.store.getTask(taskId, true);
-      assertRevision(task.revision, data.expectedTaskRevision);
-      const auth = this.authority(
+      const task = this.requesterTask(taskId, actor);
+      if (actor)
+        assertAgentRequesterSelection(
+          actor,
+          taskId,
+          data.requesterParticipantId,
+          data.target,
+          data.input,
+        );
+      this.authority(
         task,
         data.target,
-        this.store.actorId,
+        actor?.ownerUserId ?? this.store.actorId,
         data.requesterParticipantId,
       );
-      const selected = this.selected(task, data.input, true);
-      if (selected.inputHash !== data.expectedInputHash)
-        throw new DomainError('INPUT_STALE', '请确认当前选材预览', 409);
-      const count = this.store.db
-        .prepare(
-          "SELECT count(*) AS n FROM assistances WHERE space_id=? AND requester_id=? AND state IN ('open','responded')",
-        )
-        .get(task.spaceId, this.store.actorId) as { n: number };
-      if (count.n >= 50) throw new DomainError('ASSISTANCE_LIMIT', '请先处理已有未结束协助', 422);
-      const at = now();
-      const item: AssistanceRecord = {
-        id: randomUUID(),
-        recipientKind: 'agent',
-        taskId,
-        spaceId: task.spaceId,
-        question: data.input.question,
-        requester: this.person(this.store.actorId, task.spaceId),
-        recipient: this.person(auth.agent.ownerUserId, task.spaceId),
-        state: 'open',
-        revision: 1,
-        createdAt: at,
-        updatedAt: at,
-        sourceMessageId: data.input.message.sourceMessageId,
-        sourceRange: data.input.message.range,
-        taskRevision: task.revision,
-        snapshot: selected.snapshot,
-        snapshotHash: hash(selected.snapshot),
-      };
-      const env: Envelope = {
-        assistance_id: item.id,
-        request_id: randomUUID(),
-        recipient_participant_id: data.target.participantId,
-        requester_participant_id: data.requesterParticipantId,
-        grant_id: data.target.grantId,
-        capability_id: data.target.capabilityId,
-        capability_version: data.target.capabilityVersion,
-        endpoint_revision: data.target.endpointRevision,
-        grant_revision: data.target.grantRevision,
-        input_revision: 1,
-        access_revision: 1,
-        revoked_at: null,
-        body: '{}',
-      };
-      this.store.db
-        .prepare('INSERT INTO assistances VALUES(?,?,?,?,?,?,?)')
-        .run(
-          item.id,
-          item.spaceId,
-          taskId,
-          item.requester.id,
-          item.recipient.id,
-          item.state,
-          JSON.stringify(item),
+    };
+    const receipt = this.write(
+      `create:${taskId}`,
+      key,
+      data,
+      guard,
+      () => {
+        const task = this.requesterTask(taskId, actor);
+        assertRevision(task.revision, data.expectedTaskRevision);
+        const auth = this.authority(
+          task,
+          data.target,
+          actor?.ownerUserId ?? this.store.actorId,
+          data.requesterParticipantId,
         );
-      this.store.db
-        .prepare('INSERT INTO assistance_agent_requests VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        .run(...Object.values(env));
-      this.addInput(
-        item,
-        env,
-        {
+        const selected = this.selected(
+          task,
+          data.input,
+          true,
+          this.requesterMaterialIds(data.input, actor),
+        );
+        if (selected.inputHash !== data.expectedInputHash)
+          throw new DomainError('INPUT_STALE', '请确认当前选材预览', 409);
+        const count = this.store.db
+          .prepare(
+            "SELECT count(*) AS n FROM assistances WHERE space_id=? AND requester_id=? AND state IN ('open','responded')",
+          )
+          .get(task.spaceId, actor?.ownerUserId ?? this.store.actorId) as { n: number };
+        if (count.n >= 50) throw new DomainError('ASSISTANCE_LIMIT', '请先处理已有未结束协助', 422);
+        const at = now();
+        const item: AssistanceRecord = {
+          id: randomUUID(),
+          recipientKind: 'agent',
+          taskId,
+          spaceId: task.spaceId,
+          question: data.input.question,
+          requester: this.person(actor?.ownerUserId ?? this.store.actorId, task.spaceId),
+          recipient: this.person(auth.agent.ownerUserId, task.spaceId),
+          state: 'open',
           revision: 1,
-          inputHash: selected.inputHash,
-          selection: selected.selection,
-          materials: selected.materials,
           createdAt: at,
-          causeResponseId: null,
-          actor: this.human(),
-        },
-        auth.grant.expiresAt,
-      );
-      this.event(item, 'created', this.store.actorId);
-      if (auth.grant.autoAccept)
-        this.accept(
+          updatedAt: at,
+          sourceMessageId: data.input.message.sourceMessageId,
+          sourceRange: data.input.message.range,
+          taskRevision: task.revision,
+          snapshot: selected.snapshot,
+          snapshotHash: hash(selected.snapshot),
+        };
+        const env: Envelope = {
+          assistance_id: item.id,
+          request_id: randomUUID(),
+          recipient_participant_id: data.target.participantId,
+          requester_participant_id: data.requesterParticipantId,
+          grant_id: data.target.grantId,
+          capability_id: data.target.capabilityId,
+          capability_version: data.target.capabilityVersion,
+          endpoint_revision: data.target.endpointRevision,
+          grant_revision: data.target.grantRevision,
+          input_revision: 1,
+          access_revision: 1,
+          revoked_at: null,
+          body: '{}',
+        };
+        this.store.db
+          .prepare('INSERT INTO assistances VALUES(?,?,?,?,?,?,?)')
+          .run(
+            item.id,
+            item.spaceId,
+            taskId,
+            item.requester.id,
+            item.recipient.id,
+            item.state,
+            JSON.stringify(item),
+          );
+        this.store.db
+          .prepare('INSERT INTO assistance_agent_requests VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+          .run(...Object.values(env));
+        this.addInput(
           item,
           env,
           {
-            kind: 'policy',
-            ownerUserId: auth.agent.ownerUserId,
-            grantRevision: auth.grant.revision,
+            revision: 1,
+            inputHash: selected.inputHash,
+            selection: selected.selection,
+            materials: selected.materials,
+            createdAt: at,
+            causeResponseId: null,
+            actor: this.author(actor),
           },
-          true,
+          auth.grant.expiresAt,
         );
-      return { id: item.id };
-    });
-    return this.get(receipt.id);
+        this.event(item, 'created', actor?.participantId ?? this.store.actorId);
+        if (auth.grant.autoAccept)
+          this.accept(
+            item,
+            env,
+            {
+              kind: 'policy',
+              ownerUserId: auth.agent.ownerUserId,
+              grantRevision: auth.grant.revision,
+            },
+            true,
+          );
+        return { id: item.id };
+      },
+      actor,
+    );
+    return this.get(receipt.id, actor);
   }
-  get(id: string, actor?: AgentAssistancePrincipal): AssistanceDetail {
+  get(id: string, actor?: AssistanceActor): AssistanceDetail {
     const { item, env, task, valid, parent, requester, owner } = this.access(id, 'read', actor),
       input = this.inputRaw(id, env.input_revision),
       stage = this.stage(item, env);
     let sourceChanged: boolean | null = null;
     if (parent) {
       try {
-        this.selected(task, input.selection, true);
+        this.selected(
+          task,
+          input.selection,
+          true,
+          input.materials.map((material) => material.id),
+        );
         sourceChanged = false;
       } catch (error) {
         if (!(error instanceof DomainError)) throw error;
@@ -577,6 +747,7 @@ export class AgentAssistanceStore {
     const all = this.responses(id).filter(
       (r) =>
         parent ||
+        (actor && isRequester(actor)) ||
         !!this.store.db
           .prepare(
             "SELECT 1 FROM assistance_input_grants WHERE assistance_id=? AND input_revision=? AND subject_id=? AND scope='material_read' AND revoked_at IS NULL AND expires_at>?",
@@ -660,7 +831,7 @@ export class AgentAssistanceStore {
         snapshotHash: !actor && parent ? item.snapshotHash : '',
         sourceChanged,
         taskLink: parent ? { id: task.id, title: task.title, shortId: task.shortId } : null,
-        canReply: valid && item.state === 'open' && (!!actor || owner),
+        canReply: valid && item.state === 'open' && ((!!actor && !isRequester(actor)) || owner),
         canManage,
         canAdopt: false,
         canEditTask: !actor && this.store.permissions.canTask(task, true),
@@ -709,7 +880,12 @@ export class AgentAssistanceStore {
         if (current.inputHash !== data.expectedInputHash)
           throw new DomainError('INPUT_STALE', '输入版本已变化', 409);
         if (data.type === 'accept' || data.type === 'answer')
-          this.selected(task, current.selection, true);
+          this.selected(
+            task,
+            current.selection,
+            true,
+            current.materials.map((material) => material.id),
+          );
         if (item.state !== 'open')
           throw new DomainError('ASSISTANCE_CLOSED', '协助已结束或已回答', 409);
         const stage = this.stage(item, env);
@@ -764,17 +940,40 @@ export class AgentAssistanceStore {
     );
     return this.get(id, actor);
   }
-  revise(id: string, input: unknown, key: string) {
+  revise(id: string, input: unknown, key: string, actor?: AgentRequesterPrincipal) {
     const data = C.parseAgentAssistanceReviseInput(input);
     this.write(
       `revise:${id}`,
       key,
       data,
       () => {
-        this.access(id, 'manage');
+        const context = this.access(id, 'manage', actor);
+        if (actor) {
+          assertAgentRequesterSelection(
+            actor,
+            context.task.id,
+            context.env.requester_participant_id,
+            this.target(context.env),
+            data.input,
+          );
+          const current = this.inputRaw(id, context.env.input_revision);
+          if (
+            data.input.projectTexts.items.some(
+              (ref) =>
+                !current.selection.projectTexts.items.some(
+                  (previous) => canonicalJson(ref) === canonicalJson(previous),
+                ),
+            )
+          )
+            throw new DomainError(
+              'AGENT_SCOPE_REQUIRED',
+              '补充输入只能缩小本请求已有项目材料',
+              403,
+            );
+        }
       },
       () => {
-        const { item, env, task } = this.access(id, 'manage');
+        const { item, env, task } = this.access(id, 'manage', actor);
         assertRevision(item.revision, data.expectedRevision);
         assertRevision(env.input_revision, data.expectedInputRevision);
         assertRevision(env.access_revision, data.expectedAccessRevision);
@@ -784,7 +983,12 @@ export class AgentAssistanceStore {
         const stage = this.stage(item, env);
         if ((stage.pending?.id ?? null) !== data.causeResponseId)
           throw new DomainError('NEGOTIATION_CONFLICT', '请明确回应当前待补充请求', 409);
-        const selected = this.selected(task, data.input, true);
+        const selected = this.selected(
+          task,
+          data.input,
+          true,
+          this.requesterMaterialIds(data.input, actor),
+        );
         if (selected.inputHash !== data.expectedInputHash)
           throw new DomainError('INPUT_STALE', '请确认新输入预览', 409);
         env.input_revision++;
@@ -818,13 +1022,13 @@ export class AgentAssistanceStore {
             materials: selected.materials,
             createdAt: now(),
             causeResponseId: data.causeResponseId,
-            actor: this.human(),
+            actor: this.author(actor),
           },
           auth.grant.expiresAt,
         );
         item.revision++;
         item.updatedAt = now();
-        this.save(item, 'input_revised', this.store.actorId);
+        this.save(item, 'input_revised', actor?.participantId ?? this.store.actorId);
         if (auth.grant.autoAccept)
           this.accept(
             item,
@@ -838,29 +1042,37 @@ export class AgentAssistanceStore {
           );
         return { id };
       },
+      actor,
     );
-    return this.get(id);
+    return this.get(id, actor);
   }
-  change(id: string, input: unknown, key: string) {
+  change(id: string, input: unknown, key: string, actor?: AgentRequesterPrincipal) {
     const data = parseAssistanceStateChange(input);
+    if (actor && data.action !== 'cancel')
+      throw new DomainError('AGENT_SCOPE_REQUIRED', '发起凭据仅可取消请求', 403);
     this.write(
       `state:${id}`,
       key,
       data,
       () => {
-        this.access(id, 'manage');
+        this.access(id, 'manage', actor);
       },
       () => {
-        const { item } = this.access(id, 'manage');
+        const { item } = this.access(id, 'manage', actor);
         assertRevision(item.revision, data.expectedRevision);
         if (item.state === 'cancelled' || (item.state === 'closed' && data.action === 'close'))
           throw new DomainError('ASSISTANCE_CLOSED', '协助已结束', 409);
         if (data.action === 'cancel') {
           this.store.db
             .prepare(
-              "UPDATE assistance_agent_requests SET body=json_set(body,'$.terminalReason','cancelled','$.actorId',?),revoked_at=? WHERE assistance_id=? AND revoked_at IS NULL",
+              "UPDATE assistance_agent_requests SET body=json_set(body,'$.terminalReason','cancelled','$.actorId',?,'$.actor',json(?)),revoked_at=? WHERE assistance_id=? AND revoked_at IS NULL",
             )
-            .run(this.store.actorId, now(), id);
+            .run(
+              actor?.participantId ?? this.store.actorId,
+              JSON.stringify(this.author(actor)),
+              now(),
+              id,
+            );
         } else {
           item.state = 'closed';
           item.revision++;
@@ -868,12 +1080,13 @@ export class AgentAssistanceStore {
           this.store.db
             .prepare('DELETE FROM assistance_agent_capacity WHERE assistance_id=?')
             .run(id);
-          this.save(item, 'closed', this.store.actorId);
+          this.save(item, 'closed', actor?.participantId ?? this.store.actorId);
         }
         return { id };
       },
+      actor,
     );
-    return this.get(id);
+    return this.get(id, actor);
   }
   private credential(id: string) {
     const row = this.store.db

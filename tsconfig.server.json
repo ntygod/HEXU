@@ -22,7 +22,8 @@
     "tests/**/*.ts",
     "apps/runner/src/**/*.ts",
     "packages/adapters/claude-code/src/**/*.ts",
-    "packages/adapters/codex/src/**/*.ts"
+    "packages/adapters/codex/src/**/*.ts",
+    "apps/mcp/src/**/*.ts"
   ],
   "exclude": ["tests/e2e/**"]
 }

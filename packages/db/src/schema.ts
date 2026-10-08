@@ -842,4 +842,58 @@ CREATE TRIGGER assistance_agent_requester_revoked AFTER UPDATE OF revoked_at ON 
 END;
 `,
   },
+  {
+    version: 38,
+    sql: `
+-- Independent owner-issued, task/material/target bounded requester connections.
+-- No Task, Run, or Assistance state is duplicated here.
+CREATE TABLE agent_requester_credentials (
+ id TEXT PRIMARY KEY, participant_id TEXT NOT NULL REFERENCES agent_participants(id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), project_id TEXT NOT NULL REFERENCES projects(id),
+ revision INTEGER NOT NULL CHECK(revision>=1), endpoint_revision INTEGER NOT NULL,
+ token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, revoked_at TEXT, body TEXT NOT NULL
+);
+CREATE INDEX agent_requester_credentials_task ON agent_requester_credentials(task_id,participant_id);
+CREATE TRIGGER requester_project_member_removed AFTER DELETE ON collab_project_members BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=OLD.project_id AND revoked_at IS NULL AND participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=OLD.user_id);
+END;
+CREATE TRIGGER requester_project_member_downgraded AFTER UPDATE OF role ON collab_project_members
+ WHEN NEW.role='view' AND OLD.role!='view' BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=NEW.project_id AND revoked_at IS NULL AND participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=NEW.user_id);
+END;
+CREATE TRIGGER requester_participant_revoked AFTER UPDATE OF revoked_at ON agent_participants
+ WHEN NEW.revoked_at IS NOT NULL BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=NEW.revoked_at,revision=revision+1
+ WHERE revoked_at IS NULL AND (participant_id=NEW.id OR json_extract(body,'$.target.participantId')=NEW.id);
+END;
+CREATE TRIGGER requester_endpoint_changed AFTER UPDATE OF revision ON agent_endpoints
+ WHEN NEW.revision!=OLD.revision BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE revoked_at IS NULL AND (participant_id=NEW.participant_id OR json_extract(body,'$.target.participantId')=NEW.participant_id);
+END;
+CREATE TRIGGER requester_grant_changed AFTER UPDATE ON agent_delegation_grants
+ WHEN NEW.revoked_at IS NOT NULL OR NEW.revision!=OLD.revision BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=COALESCE(NEW.revoked_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')),revision=revision+1
+ WHERE revoked_at IS NULL AND json_extract(body,'$.target.grantId')=NEW.id;
+END;
+CREATE TRIGGER requester_capability_changed AFTER UPDATE OF version ON agent_capabilities
+ WHEN NEW.version!=OLD.version BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE revoked_at IS NULL AND json_extract(body,'$.target.capabilityId')=NEW.id;
+END;
+CREATE TRIGGER requester_project_archived AFTER UPDATE OF body ON projects
+ WHEN json_extract(NEW.body,'$.archivedAt') IS NOT NULL BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=NEW.id AND revoked_at IS NULL;
+END;
+CREATE TRIGGER requester_task_scope_changed AFTER UPDATE OF body ON tasks
+ WHEN json_extract(NEW.body,'$.visibility')!='project'
+ OR json_extract(NEW.body,'$.projectId') IS NOT json_extract(OLD.body,'$.projectId') BEGIN
+ UPDATE agent_requester_credentials SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE task_id=NEW.id AND revoked_at IS NULL;
+END;
+`,
+  },
 ];

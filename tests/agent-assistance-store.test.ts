@@ -697,7 +697,7 @@ test('project source selection is explicit pure text, immutable and version-boun
     );
     assert.deepEqual(
       preview.materials.map((m) => m.id),
-      ['message', 'text-1'],
+      ['message', `text-${createHash('sha256').update(source.id).digest('hex')}`],
     );
     assert.equal(preview.materials[1]!.text, 'finite');
     const body = {

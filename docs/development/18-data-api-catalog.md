@@ -430,3 +430,29 @@ baseline绑定当前可读有序ID及状态；当前修订或基线变化返回 
 正常补充输入不必轮换仍有效的request token，但每次访问重新核对应input grant；旧输入respond被撤销，新输入明确授权，获准历史read继续逐版本判定。轮换/显式撤权、原授权/端点/能力/成员失效会永久终止旧token，重新加入不复活。
 
 本片仍callable=false、0 Run、0模型；没有MCP桥、真实收件进程、events订阅、远端投递或自动结果消费。检查与剩余见[切片2记录](history/2026-10-08-agent-assistance-negotiation.md)。
+
+## 2026-10-08 切片3：有限发起授权与经典stdio MCP
+
+新增单Task、固定选材版本、单目标能力/grant、本人participant的 `AgentRequesterCredential`；迁移38仅追加独立hash-only凭据/失效触发器。最多24小时且不超过目标预授权期限；发行返回明文一次，回执只保存ID。原迁移1—37与capability_read、请求限定material_read/respond不扩权。
+
+所有者的浏览器认证接口：GET/POST `/api/v1/tasks/:taskId/agent-requester-credentials`；POST同资源`/:credentialId/revoke`。发行接受 `{participantId,preview:AgentAssistancePreviewCommand,expectedTaskRevision,expectedInputHash,shareConfirmed:true,expiresAt}`，返回201 `{credential,token}`；同键确认token为null。撤销接受 `{expectedRevision}`、返回 `{credential}`。列表不含密钥或原完整材料。
+
+独立 `/agent-requester/v1` 仅接受新 `hexu_requester_` Bearer、`x-hexu-agent-api:1`，禁止浏览器/节点/空间身份覆盖与query；每次和事务内重验当前授权。固定Task/target从凭据取得，不接受调用方覆盖。明细投影沿用有限请求view，不含父Task/Project/source/owner IDs。
+
+- GET `identity`：实际Agent参与/连接/代次/期限。
+- GET `capabilities`：当前固定目标的目录元数据；不是canRequest即授权。
+- GET `materials`：固定授权材料 `{materials,question,clarification}`。
+- POST `preview`：`{question,clarification,materialIds}`，返回 `{expectedTaskRevision,inputHash,question,clarification,materials}`。message必须保留，其他只可原列表子集。
+- POST `requests`：上面输入（首次clarification=null）加 `{expectedTaskRevision,expectedInputHash}`，原Idempotency-Key保存一次Assistance；Agent的分享来自所有者固定预授权，不接受新shareConfirmed自授权限。
+- GET `requests`：仅本人participant在固定Task及本授权范围内的请求。GET `requests/:requestId`取得同一业务记录。两者不创建第二inbox或接收者万能凭据。
+- POST `requests/:requestId/input-revisions`：输入加 `{expectedRevision,expectedInputRevision,expectedAccessRevision,expectedTaskRevision,causeResponseId,expectedInputHash}`；不可变新输入、原回应不改，材料只能进一步缩小。
+- POST `requests/:requestId/cancel`：`{expectedRevision}`。取消分享与后续回应，不是停止外部执行确认。
+- GET `receipts/:operationKey`：同connection的原create回执，返回 `{status:'not_recorded'}` 或 `{status:'recorded',request}`；当前权限和固定材料核对优先，不回放新动作。
+
+AgentAssistance原preview/create/revise/change显式接收经认证的requester actor；材料来源与事件保存真正Agent身份/connection revision，回执按connection隔离，不借ownerPrincipal假装真人。原human/Claude路径继续独立。
+
+经典MCP stdio入口 `[apps/mcp/src](../../apps/mcp/src)` 只声明tools；协议 `2025-11-25`，初始化/严格输入/请求角色/帧与响应预算一起校验。工具名字与完整schema唯一实现在 [tools.ts](../../apps/mcp/src/tools.ts)：发起9项，接收4项。操作说明与参数矩阵见[有限MCP入口](../engineering/agent-mcp.md)。桥无业务数据库、无模型/Run、不重试写入、不跟重定向，控制服务回环限制不变。
+
+接收端沿原单请求凭据，仅列表投影这一请求；新求助的权限bootstrap仍需所有者预置，不是自动收件。dot Events所需MCP2.0 `2026-07-28`、远程认证/事件投递与原线程消费均未实现，不把stdio经典握手当作真实dot插件接通。
+
+新preview的项目文本materialId为稳定opaque source摘要（不发送明文sourceId），同源跨子集/顺序/凭据和human/MCP入口保持一致。旧顺序ID输入不改写，历史严格校验沿用存储IDs；新requester访问逐输入核对credential-local映射，不自动接管不兼容旧别名请求。

@@ -72,17 +72,22 @@ export function AgentAssistanceProvider({ children }: { children: ReactNode }) {
         if (!packet || state.busy) continue;
         const assistance = /^\/assistances\/([^/]+)/.exec(packet.path);
         const create = /^create:([^:]+):(.+)$/.exec(scope);
+        const requester =
+          /^\/tasks\/([^/]+)\/agent-requester-credentials(?:\/[^/]+\/revoke)?$/.exec(packet.path);
         const path = assistance
           ? `/assistances/${assistance[1]}`
-          : create
-            ? `/tasks/${create[1]}/messages/${create[2]}/assistance-preview`
-            : null;
+          : requester
+            ? `/tasks/${requester[1]}/agent-requester-credentials`
+            : create
+              ? `/tasks/${create[1]}/messages/${create[2]}/assistance-preview`
+              : null;
         if (!path) continue;
         const revoke = () => {
           if (!controller.signal.aborted && store.active && store.get(scope).pending === packet)
             store.set(scope, { ...empty, denied: true });
         };
-        const task = create ? data.tasks.find((task) => task.id === create[1]) : undefined;
+        const taskId = requester ? decodeURIComponent(requester[1]!) : create?.[1];
+        const task = taskId ? data.tasks.find((task) => task.id === taskId) : undefined;
         if (task && !canEditTask(data, task)) {
           revoke();
           continue;

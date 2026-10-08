@@ -1,0 +1,38 @@
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ real requester UI: explicit fixed authorization issues only one credential, shows scope, and revokes it (625.516488ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ real requester UI: dropped committed issue replays exact original key and does not reveal token twice (346.921388ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ new authorization is unavailable before owner selection, full preview and separate consent (29.190449ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ requester without a registered endpoint cannot issue and sees the required setup (6.490552ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ new requester panel clears the one-time secret and confirmation when identity changes (14.271573ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ issuance freezes normalized preview and exact task/participant/target; no assistance is created (9.365075ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ duration is bounded by 24 hours and target grant expiry; expired time cannot issue (11.044713ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ changing scope or expiry resets permission confirmation (9.401918ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ double clicks issue only one fixed write and token never survives dismissal (11.915205ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ unknown issue survives dismissal and confirms original body/key without repeat token reveal (10.881416ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ metadata refresh failure preserves authorization input and blocks a new issue (5.167075ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ revoke has a separate explicit confirmation, fixed revision and immediately clears secret (14.996437ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ current permission loss clears the requester secret and pending authorization (9.280977ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ requester expiration removes one-time secret without another network response (78.730277ms)
+✔ drawer-closed unknown requester issuance is cleared by current task authorization loss (7.175083ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1554.82192

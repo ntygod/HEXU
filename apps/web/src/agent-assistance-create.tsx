@@ -24,6 +24,7 @@ import { savedDraftRange, moveDraftSelection } from './draft-selection.js';
 import { useAssistanceRead } from './assistance-common.js';
 import { AssistanceThread } from './assistance.js';
 import { AgentAssistanceFeedback, useAgentAssistanceCommand } from './agent-assistance-state.js';
+import { AgentRequesterCredentials } from './agent-requester-credentials.js';
 const zeroHash = '0'.repeat(64);
 export const agentTarget = (item: AgentCapabilityListing): AgentAssistanceTarget => ({
   participantId: item.participantId,
@@ -220,16 +221,19 @@ function AgentInputForm({
     [confirmed, setConfirmed] = useState(false),
     [previewBusy, setPreviewBusy] = useState(false),
     [error, setError] = useState('');
+  const [requesterBusy, setRequesterBusy] = useState(false),
+    [requesterLocked, setRequesterLocked] = useState(false);
   const generation = useRef(0),
     previewGuard = useRef(false);
-  const locked = command.busy || !!command.pending || previewBusy;
+  const externalLocked = command.busy || !!command.pending || previewBusy;
+  const locked = externalLocked || requesterLocked;
   const changed =
     base.sourceHash !== latest.sourceHash || base.taskRevision !== latest.taskRevision;
   const conflict = !!baseline && baseline.revision !== existing?.assistance.revision;
   useEffect(() => {
-    onBusy?.(command.busy || previewBusy);
+    onBusy?.(command.busy || previewBusy || requesterBusy);
     return () => onBusy?.(false);
-  }, [command.busy, previewBusy, onBusy]);
+  }, [command.busy, previewBusy, requesterBusy, onBusy]);
   useEffect(() => {
     generation.current++;
     setPreview(null);
@@ -573,6 +577,23 @@ function AgentInputForm({
               我已核对双方、完整文本和本轮分享范围
             </label>
           </section>
+        )}
+        {!existing && (
+          <AgentRequesterCredentials
+            task={task}
+            messageId={base.messageId}
+            preview={preview}
+            requesterName={own.find((agent) => agent.id === requester)?.name ?? ''}
+            requesterEndpointReady={own.some(
+              (agent) => agent.id === requester && !agent.revokedAt && !!agent.endpoint,
+            )}
+            recipientName={currentListing?.participantName ?? ''}
+            grantExpiresAt={currentListing?.expiresAt}
+            shareConfirmed={confirmed && !changed && !conflict && !targetChanged && !readError}
+            disabled={externalLocked}
+            onBusy={setRequesterBusy}
+            onLocked={setRequesterLocked}
+          />
         )}
         {(error || readError) && (
           <p role="alert" className="form-error">

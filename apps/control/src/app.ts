@@ -1,3 +1,5 @@
+import { attachAgentRequester } from './agent-requester.js';
+import { isAgentRequesterPath } from '../../../packages/identity/src/agent-requester-connections.js';
 import { attachAgentAssistance } from './agent-assistance.js';
 import { isAgentAssistancePath } from '../../../packages/identity/src/agent-assistance-connections.js';
 import { attachAgentCapabilities } from './agent-capabilities.js';
@@ -135,6 +137,12 @@ export async function createApp(
   const key = (headers: Record<string, unknown>) =>
     text(headers['idempotency-key'], '操作标识', 128);
   app.addHook('onRequest', async (request, reply) => {
+    const protocolPath = new URL(request.url, 'http://localhost').pathname;
+    if (
+      protocolPath.startsWith('/agent-requester/') ||
+      protocolPath.startsWith('/agent-assistance/')
+    )
+      reply.header('x-hexu-agent-api', '1');
     let hostname: string;
     try {
       hostname = new URL(`http://${request.headers.host ?? ''}`).hostname;
@@ -145,6 +153,10 @@ export async function createApp(
       throw new DomainError('LOCAL_ONLY', '当前版本仅支持本机开发预览', 403);
     const nodeProtocol = new URL(request.url, 'http://localhost').pathname.startsWith(
       '/runner/v1/',
+    );
+    const requesterProtocol = isAgentRequesterPath(
+      new URL(request.url, 'http://localhost').pathname,
+      request.method,
     );
     const assistanceProtocol = isAgentAssistancePath(
       new URL(request.url, 'http://localhost').pathname,
@@ -170,6 +182,7 @@ export async function createApp(
     if (
       !nodeProtocol &&
       !assistanceProtocol &&
+      !requesterProtocol &&
       identity &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       !request.headers.origin
@@ -182,6 +195,7 @@ export async function createApp(
     if (
       !nodeProtocol &&
       !assistanceProtocol &&
+      !requesterProtocol &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       request.headers['x-hexu-client'] !== 'web'
     )
@@ -196,6 +210,7 @@ export async function createApp(
   attachAgentCapabilities(app, store);
   attachAgentConnections(app, store);
   attachAgentAssistance(app, store);
+  attachAgentRequester(app, store);
   attachAssistance(app, store);
   const nodeExecution = attachNodes(app, store);
   attachCheckpoints(app, store);
