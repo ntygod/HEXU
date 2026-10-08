@@ -930,4 +930,5 @@ CREATE TRIGGER agent_consumption_cancel_immutable_delete BEFORE DELETE ON agent_
   },
   { version: 40, sql: AGENT_RECEIVER_MIGRATION },
   AGENT_EVENTS_MIGRATION,
+  { version: 42, sql: 'ALTER TABLE agent_event_subscriptions ADD COLUMN oauth_authority TEXT;' },
 ];

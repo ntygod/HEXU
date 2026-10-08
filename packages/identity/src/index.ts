@@ -96,9 +96,19 @@ export async function createIdentity(options: IdentityOptions) {
     throw error;
   }
   let oauth = null;
+  let oauthDb: DatabaseSync | undefined;
   try {
-    oauth = options.oauth ? await createOAuthIssuer(db, options.secret, options.oauth) : null;
+    if (options.oauth?.receiverDatabase) {
+      if (options.databasePath === ':memory:')
+        throw new Error('Bound OAuth requires a dedicated persistent identity handle');
+      oauthDb = new DatabaseSync(options.databasePath);
+      oauthDb.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;');
+    }
+    oauth = options.oauth
+      ? await createOAuthIssuer(oauthDb ?? db, options.secret, options.oauth)
+      : null;
   } catch (error) {
+    oauthDb?.close();
     db.close();
     throw error;
   }
@@ -180,6 +190,7 @@ export async function createIdentity(options: IdentityOptions) {
         asResponse: true,
       }),
     close() {
+      oauthDb?.close();
       db.close();
     },
   };

@@ -222,3 +222,12 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 在真实联调准备基线 `8ace878` 上，锁定1.7.6匹配包并复用既有Better Auth身份SQLite；隔离issuer/cookie签名、精确静态public client、发现/JWKS/S256/resource绑定、签名同意query的session绑定及单次nonce，新增内部Request/Response allowlist。实现入口：[OAuth契约](../../packages/identity/src/oauth.ts)，使用/限制：[工程说明](../engineering/agent-oauth-contract.md)。
 
 默认 `oauth:null`，现有本机/远端listener没有启用代码。仅完成第一步；没有OAuth receiver主体、业务scope交集、MCP challenge、逐次撤权或订阅撤权；refresh/revoke未开放。真实dot/Codex配置、浏览器同意、HTTPS部署、跨成员及原桌面聊天继续均未验收。实际检查、独立审查及修正见[本片记录](history/2026-10-08-agent-oauth-contract.md)。原102项状态不提高。
+
+
+## OAuth第二步：有限业务绑定、challenge与撤权（2026-10-08）
+
+基于第一步精确提交 `192c1e6` 的独立候选，将明确session consent绑定一个既有receiver/revision、原完整principal快照与OAuth同意代次；官方JWT加签随机binding ID，业务scope独立取交集。每次MCP、原回应事务/旧回执与事件发前重新核当前成员、连接、能力/grant版本、期限及撤销。提供内部session绑定的业务binding撤销，旧JWT/新同意不能使旧订阅复活。
+
+OAuth资源adapter只有显式程序化注入才启用；现有本机/remote listener、CLI与环境变量均未开放。公开仅必要metadata/工具描述，无匿名业务权限；401/403与工具级challenge已实现。订阅保存有限验证上下文，不存JWT，TTL不超过JWT；缺少原验证器的重启失败关闭。标准refresh/revoke与无人干预长期OAuth订阅未交付。
+
+无真实凭据fixture及原receiver/events/MCP/Assistance回归、原server/Web类型/构建分别记录在[本片历史](history/2026-10-08-agent-oauth-receiver.md)，实现/使用边界见[工程说明](../engineering/agent-oauth-receiver.md)。未部署、安装真实插件、迁移活动库、接用户电脑、第二真实成员或模型；已有浏览器拒绝与原聊天残余保留。原102项状态不提高。

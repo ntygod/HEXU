@@ -1,6 +1,6 @@
 # OAuth 第一步：认证库、发现与同意契约
 
-本片是默认关闭的可测试协议组合。没有给现有 MCP/receiver API 接上 OAuth，没有真实账号连接、部署、持久订阅或模型调用。第二步仍须实现有限主体绑定、MCP challenge、逐次授权及订阅撤权。完整真实联调闸门仍见[联调手册](agent-real-integration.md)。
+本页说明默认关闭的第一步协议组合。后续[第二步有限receiver绑定](agent-oauth-receiver.md)已实现独立主体映射、scope交集、MCP challenge及逐次/订阅撤权的内部契约；仍未给现有listener启用OAuth，没有真实账号连接、部署、持久订阅或模型调用。完整真实联调闸门仍见[联调手册](agent-real-integration.md)。
 
 ## 依赖与实现选择
 
@@ -54,12 +54,10 @@ GET consent返回真实client名称、精确callback/resource、请求scope、�
 
 库负责code的单次消费和PKCE验证；错verifier会消费该code。token请求若带resource必须精确相同，省略则沿用原code的resource绑定；JWT期限300秒，授权码120秒。JWT subject来自既有Better Auth user，client/audience/issuer/scope由库填写。JWT签名/issuer/audience/到期用注入本地JWKS的官方验证器测试，没有外部网络请求。
 
-## 第二步接口与未完成范围
+## 有限业务接入与未完成范围
 
-本片返回的JWT不是 `AgentReceiverPrincipal`，不会改写旧actor.scopes或调用其完整相等helper，没有旧Bearer与OAuth混用。已取得token仍无法读父Task/Project、收件或材料，因为既有服务没有接入该适配器。
+仅配置第一步、不注入 `receiverDatabase` 时，返回的JWT不是 `AgentReceiverPrincipal`，`resourceServer:null`；已有token仍无法读父Task/Project、收件或材料。第二步显式 opt-in 会要求同意时选择一个既有receiver/revision，保存原完整principal，并独立检查scope交集，细节见[有限接入](agent-oauth-receiver.md)。
 
-下一步必须以已验证 `(issuer, subject, client, resource)` 加明确同意关联一个既有有限receiver connection及revision；核对所有者、成员、project、grant、endpoint/capability和到期。保留原principal复验，并独立计算有效scope交集；OAuth scope不是业务授权。
+1.7.6 JWT access token的 `/oauth2/revoke` 返回 unsupported_token_type；只删OAuth consent或撤refresh也不能使已发JWT立即失效。标准revoke/refresh继续不开放、不宣告。第二步用当前binding代次与原receiver授权每次重验，并提供隔离session下的业务binding撤销，不把库JWT撤销误写成已支持。
 
-1.7.6 JWT access token的 `/oauth2/revoke` 返回 unsupported_token_type；只删OAuth consent或撤refresh也不能使已发JWT立即失效。因此本片不开放/宣告revoke，不提供refresh，不声称完成撤权。第二步需在每次调用、旧业务回执及投递前检查当前绑定/连接/撤权代次，保证已撤销订阅不再发送，并定义后才开放有效撤权/刷新接口。OAuth consent和未来业务binding的原子一致性也属于第二步，不能将本片interaction视作已建立业务绑定。
-
-实际HTTPS部署、浏览器登录/同意、真实dot/Codex、第二成员、跨环境、既有桌面聊天接回均尚未验收。测试结果及未运行检查见[本片记录](../development/history/2026-10-08-agent-oauth-contract.md)。
+实际HTTPS部署、浏览器登录/同意、真实dot/Codex、第二成员、跨环境、既有桌面聊天接回均尚未验收。第一步历史检查见[本片记录](../development/history/2026-10-08-agent-oauth-contract.md)，第二步当前检查见[后续记录](../development/history/2026-10-08-agent-oauth-receiver.md)。

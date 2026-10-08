@@ -9,6 +9,7 @@ import {
   revalidateAgentReceiverConnection,
   type AgentReceiverPrincipal,
 } from '../../identity/src/agent-receiver-connections.js';
+import type { ReceiverAuthorization } from '../../identity/src/oauth-receiver.js';
 import type { Store } from './store.js';
 export const AGENT_RECEIVER_MIGRATION = `
 CREATE TABLE agent_receiver_connections (
@@ -248,12 +249,14 @@ export class AgentReceiverStore {
     );
     return this.getCredential(participantId, id);
   }
-  get(actor: AgentReceiverPrincipal, requestId: string) {
+  get(actor: AgentReceiverPrincipal, requestId: string, authorization?: ReceiverAuthorization) {
+    authorization?.require('material_read');
     const id = this.store.agentAssistance.byRequestId(requestId),
       principal = deriveAgentReceiverRequestPrincipal(this.store.db, actor, id);
     return receiverRequestView(this.store.agentAssistance.get(id, principal));
   }
-  list(actor: AgentReceiverPrincipal) {
+  list(actor: AgentReceiverPrincipal, authorization?: ReceiverAuthorization) {
+    authorization?.require('material_read');
     revalidateAgentReceiverConnection(this.store.db, actor);
     const rows = this.store.db
       .prepare(
@@ -264,21 +267,38 @@ export class AgentReceiverStore {
     }[];
     return rows.flatMap((r) => {
       try {
-        return [this.get(actor, r.request_id)];
+        return [this.get(actor, r.request_id, authorization)];
       } catch (e) {
         if (e instanceof DomainError && e.code === 'NOT_FOUND') return [];
         throw e;
       }
     });
   }
-  input(actor: AgentReceiverPrincipal, requestId: string, revision: number) {
+  input(
+    actor: AgentReceiverPrincipal,
+    requestId: string,
+    revision: number,
+    authorization?: ReceiverAuthorization,
+  ) {
+    authorization?.require('material_read');
     const id = this.store.agentAssistance.byRequestId(requestId),
       principal = deriveAgentReceiverRequestPrincipal(this.store.db, actor, id);
     return this.store.agentAssistance.input(id, revision, principal);
   }
-  respond(actor: AgentReceiverPrincipal, requestId: string, input: unknown, key: string) {
+  respond(
+    actor: AgentReceiverPrincipal,
+    requestId: string,
+    input: unknown,
+    key: string,
+    authorization?: ReceiverAuthorization,
+  ) {
+    authorization?.require('respond');
     const id = this.store.agentAssistance.byRequestId(requestId),
       principal = deriveAgentReceiverRequestPrincipal(this.store.db, actor, id);
-    return receiverRequestView(this.store.agentAssistance.respond(id, input, key, principal));
+    return receiverRequestView(
+      this.store.agentAssistance.respond(id, input, key, principal, () =>
+        authorization?.require('respond'),
+      ),
+    );
   }
 }

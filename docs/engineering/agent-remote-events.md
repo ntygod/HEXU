@@ -6,7 +6,7 @@
 
 - 本机 Codex：既有经典 stdio MCP `2025-11-25`。发起者显式设置 `HEXU_TRANSPORT=remote`、`HEXU_CONTROL_URL=https://明确的服务地址` 后，经有限 requester API；仍须原 owner-issued `hexu_requester_` 凭据及原 thread/session 配置。默认仍只准回环 HTTP。经典 receiver 仅保留本机单请求预置兼容方式，不接受 remote 模式。
 - dot：独立 `/collaboration/mcp`，MCP2 `2026-07-28`。每次独立认证，不要求旧 initialize；支持 server/discover、tools/list/call 与 events/list/subscribe/unsubscribe。请求需现代 MCP-Protocol-Version、Mcp-Method、工具调用 Mcp-Name 及 params._meta 的协议版本/clientCapabilities。
-- 实现了有限 bearer 协议面，没有实现 OAuth 授权服务器或证明某真实 ChatGPT 账号接受该认证配置。正式接入必须核对插件支持的认证配置；不能把本机合成 bearer 证明当成真实安装成功。后续[OAuth第一步](agent-oauth-contract.md)已有默认关闭的独立认证契约，但本远端listener没有挂载它，有限主体映射/challenge/逐次撤权仍待第二步。
+- 实现了有限 bearer 协议面，没有实现 OAuth 授权服务器或证明某真实 ChatGPT 账号接受该认证配置。正式接入必须核对插件支持的认证配置；不能把本机合成 bearer 证明当成真实安装成功。后续[OAuth第一步](agent-oauth-contract.md)已有默认关闭的独立认证契约，但本远端listener没有挂载它，后续[第二步](agent-oauth-receiver.md)已有默认关闭的有限主体映射/challenge/逐次及订阅撤权契约；本远端listener仍未挂载。
 
 官方依据：[Events](https://developers.openai.com/plugins/build/mcp-events)、[MCP server](https://developers.openai.com/plugins/build/mcp-server)、[现代 HTTP](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)。
 

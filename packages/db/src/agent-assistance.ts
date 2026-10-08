@@ -890,13 +890,20 @@ export class AgentAssistanceStore {
       createdAt: input.createdAt,
     };
   }
-  respond(id: string, input: unknown, key: string, actor?: AgentAssistancePrincipal) {
+  respond(
+    id: string,
+    input: unknown,
+    key: string,
+    actor?: AgentAssistancePrincipal,
+    authorize?: () => void,
+  ) {
     const data = C.parseAgentAssistanceResponse(input);
     this.write(
       `respond:${id}`,
       key,
       data,
       () => {
+        authorize?.();
         this.access(id, 'respond', actor);
       },
       () => {

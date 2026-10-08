@@ -8,6 +8,12 @@ import { mcp } from '@better-auth/mcp';
 import { getOAuthProviderState } from '@better-auth/oauth-provider';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
 import { z } from 'zod';
+import { verifyJwsAccessToken } from 'better-auth/oauth2';
+import {
+  OAuthReceiverBindings,
+  oauthDenied,
+  type OAuthReceiverResource,
+} from './oauth-receiver.js';
 
 export const OAUTH_SCOPES = ['hexu:material_read', 'hexu:respond'] as const;
 export const OAUTH_PATH = '/collaboration-auth';
@@ -16,6 +22,8 @@ export interface OAuthIssuerOptions {
   origin: string;
   resource: string;
   client: { id: string; name: string; redirectUris: string[] };
+  /** Internal fixture/authorized deployment wiring only; never populated from HTTP or environment. */
+  receiverDatabase?: DatabaseSync;
 }
 const queryDigest = (value: string) =>
   digest(
@@ -63,7 +71,8 @@ export function validateOAuthIssuerOptions(input: OAuthIssuerOptions): OAuthIssu
   )
     throw new Error('A single explicitly configured public client is required');
   for (const redirect of input.client.redirectUris) httpsURL(redirect);
-  return structuredClone(input);
+  const { receiverDatabase, ...config } = input;
+  return { ...structuredClone(config), ...(receiverDatabase ? { receiverDatabase } : {}) };
 }
 
 /** Reuses existing Better Auth user/account records, with a distinct cookie signature namespace.
@@ -81,6 +90,19 @@ export async function createOAuthIssuer(
     .update('hexu:isolated-oauth-issuer:v1:' + issuer)
     .digest('hex');
   const provisioning = new AsyncLocalStorage<boolean>();
+  const tokenBinding = new AsyncLocalStorage<string>();
+  let bindings: OAuthReceiverBindings | undefined;
+  // A dedicated identity handle is required for bound mode. Serialize all issuer operations so
+  // provider writes cannot join another request's consent transaction on this handle.
+  let pending: Promise<unknown> = Promise.resolve();
+  const serial = <T>(work: () => Promise<T>): Promise<T> => {
+    const result = pending.then(work, work);
+    pending = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  };
   const auth = betterAuth({
     appName: 'HEXU collaboration OAuth',
     database: db,
@@ -142,6 +164,13 @@ export async function createOAuthIssuer(
         consentPage: `${issuer}/consent`,
         scopes: [...OAUTH_SCOPES],
         grantTypes: ['authorization_code'],
+        customAccessTokenClaims: options.receiverDatabase
+          ? (info) => {
+              const id = tokenBinding.getStore();
+              if (!id || !bindings) throw oauthDenied();
+              return bindings.claims(id, info.user?.id, info.scopes, info.resources);
+            }
+          : undefined,
         accessTokenExpiresIn: 300,
         codeExpiresIn: 120,
         refreshTokenReuseInterval: 0,
@@ -168,6 +197,14 @@ export async function createOAuthIssuer(
       query_hash TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL,
       nonce_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, query_expires_at INTEGER NOT NULL, consumed_at INTEGER
     )`);
+    if (options.receiverDatabase)
+      bindings = new OAuthReceiverBindings(
+        db,
+        options.receiverDatabase,
+        issuer,
+        options.client.id,
+        options.resource,
+      );
     db.exec('COMMIT');
   } catch (error) {
     db.exec('ROLLBACK');
@@ -282,14 +319,24 @@ export async function createOAuthIssuer(
       scopes: params.get('scope')!.split(' '),
       consentId: nonce,
       expiresAt: new Date(expiresAt).toISOString(),
-      businessAccess: 'not_bound',
+      businessAccess: bindings ? 'select_existing_receiver' : 'not_bound',
+      ...(bindings ? { receivers: bindings.choices(current.userId) } : {}),
     });
   }
   async function consent(request: Request) {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (
       !body ||
-      Object.keys(body).some((k) => !['consentId', 'oauthQuery', 'accept', 'scopes'].includes(k)) ||
+      Object.keys(body).some(
+        (k) =>
+          ![
+            'consentId',
+            'oauthQuery',
+            'accept',
+            'scopes',
+            ...(bindings ? ['receiver'] : []),
+          ].includes(k),
+      ) ||
       typeof body.oauthQuery !== 'string' ||
       typeof body.consentId !== 'string' ||
       typeof body.accept !== 'boolean' ||
@@ -325,19 +372,45 @@ export async function createOAuthIssuer(
         Date.now(),
       );
     if (claim.changes !== 1) return failure(409);
-    // Fail closed after a claimed interaction: unknown/failure requires a new authorize request.
-    return auth.handler(
-      new Request(issuer + '/oauth2/consent', {
-        method: 'POST',
-        headers: request.headers,
-        body: JSON.stringify({
-          accept: body.accept,
-          oauth_query: query,
-          ...(body.accept ? { scope: accepted.join(' ') } : {}),
+    // Claim remains consumed even if the provider or binding transaction fails.
+    const approve = () =>
+      auth.handler(
+        new Request(issuer + '/oauth2/consent', {
+          method: 'POST',
+          headers: request.headers,
+          body: JSON.stringify({
+            accept: body.accept,
+            oauth_query: query,
+            ...(body.accept ? { scope: accepted.join(' ') } : {}),
+          }),
         }),
-      }),
-    );
+      );
+    if (!bindings || !body.accept) return approve();
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const bindingId = bindings.create(current.userId, body.receiver, accepted);
+      const response = await approve();
+      const value = await response
+        .clone()
+        .json()
+        .catch(() => null);
+      if (!response.ok || typeof value?.url !== 'string') throw oauthDenied();
+      const callback = new URL(value.url);
+      if (
+        callback.origin + callback.pathname !== new URLSearchParams(query).get('redirect_uri') ||
+        !callback.searchParams.get('code') ||
+        callback.searchParams.get('error')
+      )
+        throw oauthDenied();
+      bindings.attachCode(bindingId, callback.searchParams.get('code')!);
+      db.exec('COMMIT');
+      return response;
+    } catch {
+      db.exec('ROLLBACK');
+      return failure(400, 'access_denied');
+    }
   }
+
   async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url),
       path = url.pathname;
@@ -355,7 +428,9 @@ export async function createOAuthIssuer(
     if (request.headers.has('dpop')) return failure(400);
     if (request.url.length > 12000) return failure(414);
     const browser =
-      path === `${issuer.slice(options.origin.length)}/consent` || path === OAUTH_PATH + '/sign-in';
+      path === `${issuer.slice(options.origin.length)}/consent` ||
+      path === OAUTH_PATH + '/sign-in' ||
+      path === OAUTH_PATH + '/receiver-binding/revoke';
     if (
       browser &&
       request.method === 'POST' &&
@@ -399,6 +474,34 @@ export async function createOAuthIssuer(
       }
       delete value.dpop_signing_alg_values_supported;
       return Response.json(value);
+    }
+    if (
+      bindings &&
+      path === OAUTH_PATH + '/receiver-bindings' &&
+      request.method === 'GET' &&
+      !url.search
+    ) {
+      const current = await session(request.headers);
+      if (!current) return failure(401, 'login_required');
+      return Response.json({ bindings: bindings.list(current.user.id) });
+    }
+    if (
+      bindings &&
+      path === OAUTH_PATH + '/receiver-binding/revoke' &&
+      request.method === 'POST' &&
+      !url.search
+    ) {
+      const current = await session(request.headers);
+      const body = await request.json().catch(() => null);
+      if (
+        !current ||
+        !body ||
+        typeof body.bindingId !== 'string' ||
+        Object.keys(body).some((k) => k !== 'bindingId')
+      )
+        return failure(400, 'access_denied');
+      bindings.revoke(current.user.id, body.bindingId);
+      return Response.json({ ok: true });
     }
     if (path === OAUTH_PATH + '/jwks' && request.method === 'GET' && !url.search)
       return auth.handler(request);
@@ -474,54 +577,141 @@ export async function createOAuthIssuer(
         (form.has('resource') && form.get('resource') !== options.resource)
       )
         return failure(400);
-      return auth.handler(request);
+      if (!bindings) return auth.handler(request);
+      let id: string;
+      try {
+        id = bindings.fromCode(form.get('code') ?? '');
+      } catch {
+        return failure(400, 'invalid_grant');
+      }
+      const response = await tokenBinding.run(id, () => auth.handler(request));
+      // Fail closed if receiver authority changed while the official provider was issuing.
+      try {
+        bindings.current(id);
+      } catch {
+        return failure(400, 'invalid_grant');
+      }
+      return response;
     }
     return failure(404, 'not_found');
   }
+  const resourceServer: OAuthReceiverResource | null = bindings
+    ? {
+        database: options.receiverDatabase!,
+        resource: options.resource,
+        issuer,
+        metadataURL: options.origin + '/.well-known/oauth-protected-resource/collaboration/mcp',
+        authenticate: (headers) =>
+          serial(async () => {
+            if (
+              headers.cookie ||
+              headers.origin ||
+              headers['sec-fetch-site'] ||
+              headers['x-hexu-runner'] ||
+              headers['x-hexu-space'] ||
+              headers['x-hexu-client'] ||
+              headers.dpop ||
+              typeof headers.authorization !== 'string' ||
+              !/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(
+                headers.authorization,
+              ) ||
+              headers.authorization.length > 12000
+            )
+              throw oauthDenied();
+            try {
+              if (!(await configuredClient())) throw oauthDenied();
+              const claims = await verifyJwsAccessToken(headers.authorization.slice(7), {
+                jwksFetch: async () => (await auth.handler(new Request(issuer + '/jwks'))).json(),
+                verifyOptions: {
+                  issuer,
+                  audience: options.resource,
+                  algorithms: ['EdDSA'],
+                  requiredClaims: ['sub', 'exp', 'iat', 'client_id', 'scope', 'hexu_binding'],
+                  typ: 'at+jwt',
+                  clockTolerance: 0,
+                },
+              });
+              // The official verifier normalizes client_id from azp. Enforce both original signed
+              // claims, rather than accidentally accepting a contradictory client_id.
+              const signed = JSON.parse(
+                Buffer.from(headers.authorization.slice(7).split('.')[1]!, 'base64url').toString(
+                  'utf8',
+                ),
+              );
+              if (
+                signed.client_id !== options.client.id ||
+                (signed.azp !== undefined && signed.azp !== options.client.id)
+              )
+                throw oauthDenied();
+              return bindings!.access(claims);
+            } catch {
+              throw oauthDenied();
+            }
+          }),
+        revalidateSubscription: (authority) => bindings!.require(authority, 'material_read'),
+      }
+    : null;
   return {
     issuer,
+    resourceServer,
     resource: options.resource,
     /** Explicit operator-only provisioning: never exposed by handler; requires an existing issuer session.
      * Static public client metadata only; no client secret, DCR, CIMD, grant or receiver credential.
      */
-    async provisionConfiguredClient(headers: Headers) {
-      if (!(await session(headers)))
-        throw new Error('Existing issuer session required for provisioning');
-      if (await configuredClient()) return { clientId: options.client.id };
-      await provisioning.run(true, () =>
-        auth.api.adminCreateOAuthClient({
-          headers,
-          body: {
-            client_name: options.client.name,
-            redirect_uris: options.client.redirectUris,
-            token_endpoint_auth_method: 'none',
-            grant_types: ['authorization_code'],
-            response_types: ['code'],
-            scope: OAUTH_SCOPES.join(' '),
-            require_pkce: true,
-            skip_consent: false,
-          },
-        }),
-      );
-      if (!(await configuredClient())) throw new Error('Client provisioning failed');
-      return { clientId: options.client.id };
-    },
-    async handler(request: Request) {
+    provisionConfiguredClient: (headers: Headers) =>
+      serial(async () => {
+        if (!(await session(headers)))
+          throw new Error('Existing issuer session required for provisioning');
+        if (await configuredClient()) return { clientId: options.client.id };
+        await provisioning.run(true, () =>
+          auth.api.adminCreateOAuthClient({
+            headers,
+            body: {
+              client_name: options.client.name,
+              redirect_uris: options.client.redirectUris,
+              token_endpoint_auth_method: 'none',
+              grant_types: ['authorization_code'],
+              response_types: ['code'],
+              scope: OAUTH_SCOPES.join(' '),
+              require_pkce: true,
+              skip_consent: false,
+            },
+          }),
+        );
+        if (!(await configuredClient())) throw new Error('Client provisioning failed');
+        return { clientId: options.client.id };
+      }),
+    handler: async (request: Request) => {
       let response: Response;
+      let bodyFailure: number | undefined;
       try {
         if (request.method === 'POST' && request.body) {
           const reader = request.body.getReader(),
             parts: Uint8Array[] = [];
           let size = 0;
-          for (;;) {
-            const chunk = await reader.read();
-            if (chunk.done) break;
-            size += chunk.value.byteLength;
-            if (size > 16384) {
-              await reader.cancel();
-              return failure(413);
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const deadline = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              bodyFailure = 408;
+              reject(new Error('Request body deadline'));
+            }, 5000);
+          });
+          try {
+            for (;;) {
+              const chunk = await Promise.race([reader.read(), deadline]);
+              if (chunk.done) break;
+              size += chunk.value.byteLength;
+              if (size > 16384) {
+                bodyFailure = 413;
+                throw new Error('Request body limit');
+              }
+              parts.push(chunk.value);
             }
-            parts.push(chunk.value);
+          } catch (error) {
+            void reader.cancel().catch(() => {});
+            throw error;
+          } finally {
+            clearTimeout(timer);
           }
           request = new Request(request.url, {
             method: request.method,
@@ -529,7 +719,8 @@ export async function createOAuthIssuer(
             body: Buffer.concat(parts),
           });
         }
-        response = await handle(request);
+        // Never let an unfinished client stream hold the shared DB/provider queue.
+        response = await serial(() => handle(request));
         if (response.status >= 400 && response.status < 500) {
           const body = await response
             .clone()
@@ -550,7 +741,7 @@ export async function createOAuthIssuer(
           response = failure(response.status, error);
         }
       } catch {
-        response = failure(400);
+        response = failure(bodyFailure ?? 400);
       }
       const headers = new Headers(response.headers);
       headers.set('Cache-Control', 'no-store');

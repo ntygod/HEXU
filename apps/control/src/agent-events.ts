@@ -8,6 +8,11 @@ import {
   revalidateAgentReceiverConnection,
   type AgentReceiverPrincipal,
 } from '../../../packages/identity/src/agent-receiver-connections.js';
+import type {
+  OAuthReceiverAccess,
+  OAuthReceiverResource,
+  OAuthSubscriptionAuthority,
+} from '../../../packages/identity/src/oauth-receiver.js';
 import {
   callbackURL,
   signingKey,
@@ -42,6 +47,7 @@ type Subscription = {
   revoked_at: string | null;
   private_body: string;
   verified_until: string;
+  oauth_authority: string | null;
 };
 type Private = { url: string; secret: string; previousSecret?: string; rotateUntil?: string };
 type Delivery = {
@@ -64,9 +70,12 @@ export class AgentEvents {
     readonly store: Store,
     private readonly encryptionKey: Buffer,
     private readonly sender: WebhookSender = postWebhook,
+    readonly oauth?: OAuthReceiverResource,
   ) {
     if (encryptionKey.length !== 32 || !store.teamMode)
       throw new Error('Events require team data and a 32-byte encryption key');
+    if (oauth && oauth.database !== store.db)
+      throw new Error('OAuth receiver database must match Events');
     this.receiver = new AgentReceiverStore(store);
     // Process death during delivery is unknown receipt, never inferred Agent completion.
     store.db
@@ -98,7 +107,13 @@ export class AgentEvents {
       | Subscription
       | undefined;
   }
-  private identity(actor: AgentReceiverPrincipal, input: unknown, subscribe: boolean) {
+  private identity(
+    actor: AgentReceiverPrincipal,
+    input: unknown,
+    subscribe: boolean,
+    access?: OAuthReceiverAccess,
+  ) {
+    access?.require('material_read');
     revalidateAgentReceiverConnection(this.store.db, actor);
     const p = record(input),
       delivery = record(p.delivery);
@@ -118,6 +133,9 @@ export class AgentEvents {
     const url = callbackURL(delivery.url).href;
     const identity = canonicalJson({
       connectionId: actor.connectionId,
+      ...(access
+        ? { oauthBinding: access.subscription.bindingId, issuer: access.subscription.issuer }
+        : {}),
       url,
       name: EVENT_NAME,
       arguments: {},
@@ -125,18 +143,23 @@ export class AgentEvents {
     const id = `sub_${createHash('sha256').update(identity).digest('hex')}`;
     return { p, delivery, url, id };
   }
-  async subscribe(actor: AgentReceiverPrincipal, input: unknown) {
-    const { p, delivery, url, id } = this.identity(actor, input, true);
+  async subscribe(actor: AgentReceiverPrincipal, input: unknown, access?: OAuthReceiverAccess) {
+    const { p, delivery, url, id } = this.identity(actor, input, true, access);
     signingKey(delivery.secret);
     const secret = delivery.secret as string;
     const ttl = p.ttlMs === undefined || p.ttlMs === null ? 3600000 : p.ttlMs;
     if (typeof ttl !== 'number' || !Number.isSafeInteger(ttl) || ttl <= 0) throw invalid();
     const expiry = new Date(
-      Math.min(Date.now() + Math.min(ttl, 86400000), Date.parse(actor.expiresAt)),
+      Math.min(
+        Date.now() + Math.min(ttl, 86400000),
+        Date.parse(actor.expiresAt),
+        access?.subscription.tokenExpiresAt ?? Infinity,
+      ),
     ).toISOString();
     let previous: Private | undefined,
       cached = false;
     const generation = this.store.atomic(() => {
+      access?.require('material_read');
       revalidateAgentReceiverConnection(this.store.db, actor);
       const old = this.row(id);
       if (old) {
@@ -155,6 +178,7 @@ export class AgentEvents {
       ).generation;
     });
     const authorize = () => {
+      access?.require('material_read');
       revalidateAgentReceiverConnection(this.store.db, actor);
       const intent = this.store.db
         .prepare('SELECT generation FROM agent_event_subscription_intents WHERE id=?')
@@ -183,8 +207,8 @@ export class AgentEvents {
       );
       this.store.db
         .prepare(
-          `INSERT INTO agent_event_subscriptions VALUES(?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(id) DO UPDATE SET connection_revision=excluded.connection_revision,generation=excluded.generation,expires_at=excluded.expires_at,revoked_at=NULL,private_body=excluded.private_body,verified_until=excluded.verified_until`,
+          `INSERT INTO agent_event_subscriptions (id,connection_id,connection_revision,participant_id,grant_id,identity_hash,generation,expires_at,revoked_at,private_body,verified_until,oauth_authority) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET connection_revision=excluded.connection_revision,generation=excluded.generation,expires_at=excluded.expires_at,revoked_at=NULL,private_body=excluded.private_body,verified_until=excluded.verified_until,oauth_authority=excluded.oauth_authority`,
         )
         .run(
           id,
@@ -198,13 +222,15 @@ export class AgentEvents {
           null,
           sealed,
           new Date(Date.now() + 300000).toISOString(),
+          access ? JSON.stringify(access.subscription) : null,
         );
     });
     return { id, refreshBefore: expiry, cursor: null, truncated: false };
   }
-  unsubscribe(actor: AgentReceiverPrincipal, input: unknown) {
-    const { id } = this.identity(actor, input, false);
+  unsubscribe(actor: AgentReceiverPrincipal, input: unknown, access?: OAuthReceiverAccess) {
+    const { id } = this.identity(actor, input, false, access);
     this.store.atomic(() => {
+      access?.require('material_read');
       revalidateAgentReceiverConnection(this.store.db, actor);
       this.store.db
         .prepare(
@@ -233,7 +259,14 @@ export class AgentEvents {
       current.generation !== s.generation
     )
       throw invalid();
-    const actor = agentReceiverConnectionById(this.store.db, s.connection_id);
+    let actor: AgentReceiverPrincipal;
+    if (s.oauth_authority) {
+      if (!this.oauth) throw invalid(); // Restart without the opted-in verifier must not revive OAuth deliveries.
+      actor = this.oauth.revalidateSubscription(
+        JSON.parse(s.oauth_authority) as OAuthSubscriptionAuthority,
+      );
+      if (actor.connectionId !== s.connection_id) throw invalid();
+    } else actor = agentReceiverConnectionById(this.store.db, s.connection_id);
     if (actor.connectionRevision !== s.connection_revision) throw invalid();
     this.receiver.get(actor, requestId); // Same finite request authority as tool reads, including current material/grant scope.
   }

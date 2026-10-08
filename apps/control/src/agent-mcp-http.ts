@@ -4,10 +4,41 @@ import { authenticateAgentReceiverConnection } from '../../../packages/identity/
 import { matches, toolsFor } from '../../mcp/src/tools.js';
 import { AgentEvents, EVENT_DEFINITION } from './agent-events.js';
 import { CallbackError } from './event-webhook.js';
+import {
+  oauthDenied,
+  type OAuthReceiverAccess,
+} from '../../../packages/identity/src/oauth-receiver.js';
 export const MCP_VERSION = '2026-07-28';
 export const MCP_PATH = '/collaboration/mcp';
 /** Separate stateless MCP2 surface. Classic 2025-11-25 stdio remains unchanged. */
 export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
+  const oauth = events.oauth;
+  const boundary = (headers: Record<string, unknown>, url: string, expectedPath: string) => {
+    if (
+      headers.host !== new URL(oauth!.resource).host ||
+      url !== expectedPath ||
+      headers.forwarded ||
+      Object.keys(headers).some((k) => k.startsWith('x-forwarded-')) ||
+      headers.origin ||
+      headers.cookie ||
+      headers['sec-fetch-site']
+    )
+      throw oauthDenied();
+  };
+  if (oauth)
+    app.get(new URL(oauth.metadataURL).pathname, async (req, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      try {
+        boundary(req.headers, req.url, new URL(oauth.metadataURL).pathname);
+      } catch {
+        return reply.code(403).send({ error: 'access_denied' });
+      }
+      return {
+        resource: oauth.resource,
+        authorization_servers: [oauth.issuer],
+        scopes_supported: ['hexu:material_read', 'hexu:respond'],
+      };
+    });
   const tools = toolsFor('receiver')
     .map((t) =>
       t.name === 'hexu_list_requests'
@@ -18,16 +49,37 @@ export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
           }
         : t,
     )
+    .map((t) => ({
+      ...t,
+      ...(oauth
+        ? {
+            securitySchemes: [
+              {
+                type: 'oauth2',
+                scopes:
+                  t.name === 'hexu_respond'
+                    ? ['hexu:material_read', 'hexu:respond']
+                    : ['hexu:material_read'],
+              },
+            ],
+          }
+        : {}),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
   app.post(MCP_PATH, { bodyLimit: 65536 }, async (req, reply) => {
     reply.header('Cache-Control', 'no-store');
     let id: unknown = null;
+    let method: unknown = null,
+      toolName: unknown = null;
     const fail = (status: number, code: number, message: string, data?: unknown) =>
       reply
         .code(status)
         .send({ jsonrpc: '2.0', id, error: { code, message, ...(data ? { data } : {}) } });
     try {
-      const actor = authenticateAgentReceiverConnection(events.store.db, req.headers);
+      if (oauth) boundary(req.headers, req.url, MCP_PATH);
+      const legacy = oauth
+        ? undefined
+        : authenticateAgentReceiverConnection(events.store.db, req.headers);
       const body = record(req.body);
       id = body.id ?? null;
       if (
@@ -67,7 +119,18 @@ export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
         (body.method === 'tools/call' && headerName !== p.name)
       )
         return fail(400, -32020, 'MCP headers mismatch');
+      method = body.method;
+      toolName = p.name;
       const { _meta: ignored, ...params } = p;
+      // Only protocol/tool metadata is public. No inbox, event subscription or tool result is anonymous.
+      const publicDiscovery =
+        oauth &&
+        !req.headers.authorization &&
+        ['server/discover', 'tools/list'].includes(body.method);
+      const access: OAuthReceiverAccess | undefined =
+        oauth && !publicDiscovery ? await oauth.authenticate(req.headers) : undefined;
+      const actor = access?.actor ?? legacy!;
+      access?.require('material_read');
       let result: unknown;
       switch (body.method) {
         case 'server/discover':
@@ -93,10 +156,10 @@ export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
           result = { events: [EVENT_DEFINITION] };
           break;
         case 'events/subscribe':
-          result = await events.subscribe(actor, params);
+          result = await events.subscribe(actor, params, access);
           break;
         case 'events/unsubscribe':
-          result = events.unsubscribe(actor, params);
+          result = events.unsubscribe(actor, params, access);
           break;
         case 'tools/list':
           if (
@@ -116,13 +179,18 @@ export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
           let data: unknown;
           switch (tool.name) {
             case 'hexu_list_requests':
-              data = { items: events.receiver.list(actor) };
+              data = { items: events.receiver.list(actor, access) };
               break;
             case 'hexu_get_request':
-              data = events.receiver.get(actor, a.requestId as string);
+              data = events.receiver.get(actor, a.requestId as string, access);
               break;
             case 'hexu_read_materials':
-              data = events.receiver.input(actor, a.requestId as string, a.inputRevision as number);
+              data = events.receiver.input(
+                actor,
+                a.requestId as string,
+                a.inputRevision as number,
+                access,
+              );
               break;
             case 'hexu_respond':
               data = events.receiver.respond(
@@ -130,6 +198,7 @@ export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
                 a.requestId as string,
                 a.response,
                 a.operationKey as string,
+                access,
               );
               break;
           }
@@ -145,6 +214,23 @@ export function attachAgentMcpHttp(app: FastifyInstance, events: AgentEvents) {
       }
       return { jsonrpc: '2.0', id, result };
     } catch (error) {
+      if (oauth && error instanceof DomainError && [401, 403].includes(error.status)) {
+        const scope =
+          toolName === 'hexu_respond' ? 'hexu:material_read hexu:respond' : 'hexu:material_read';
+        const challenge = `Bearer resource_metadata="${oauth.metadataURL}", scope="${scope}", error="${error.status === 403 ? 'insufficient_scope' : 'invalid_token'}", error_description="Current finite authorization required"`;
+        reply.header('WWW-Authenticate', challenge);
+        if (method === 'tools/call')
+          return reply.code(error.status).send({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              resultType: 'complete',
+              isError: true,
+              content: [{ type: 'text', text: 'Current finite authorization required' }],
+              _meta: { 'mcp/www_authenticate': [challenge] },
+            },
+          });
+      }
       if (error instanceof CallbackError)
         return fail(400, -32015, 'Callback verification failed', { reason: error.reason });
       if (error instanceof DomainError)
