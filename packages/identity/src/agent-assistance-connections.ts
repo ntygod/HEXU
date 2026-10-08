@@ -5,6 +5,8 @@ import { DomainError } from '../../contracts/src/index.js';
 export type AgentAssistanceScope = 'material_read' | 'respond';
 /** Internal authority only. Never serialize this object into a response or event. */
 export interface AgentAssistancePrincipal {
+  /** Bootstrap provenance; never grants human access. */
+  receiverConnection?: true;
   kind: 'agent';
   participantId: string;
   connectionId: string;

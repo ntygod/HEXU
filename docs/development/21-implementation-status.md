@@ -193,3 +193,9 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 基于片3 `f3c943d` 的独立候选增加原Task/Agent/opaque thread/session不可变绑定、原子创建、固定Assistance answer消费与ACK、取消未来回接和原Task最小投影；MCP在原调用内有界查询并返回数据，人工采用为独立可信external分支，不伪造成功assist Run。binding为host_reported，后续输出为external_self_report；真实Codex/dot原thread继续尚未验证，未实现跨回合唤起。
 
 最终107项后端定向、5项独立stdio进程与31项React renderer通过；原完整build:server（含静态helper编译）、server/Web类型、Vite181模块、tokens/格式通过。无真实模型/Run/用户电脑或浏览器验收；未知claim只核对不重复执行。详细证据、失败修正与残余见[本片历史](history/2026-10-08-agent-result-consumption.md)，操作与边界见[原工作回接](../engineering/agent-result-consumption.md)。独立feature未合并；片5与真实片4/7验收仍需继续。
+
+## 切片5：有限远端协议与Events本地验证（2026-10-08）
+
+基于片4 `bb1c6be` 增加先授权后新请求bootstrap，无逐请求token搬运；独立MCP2 HTTP `2026-07-28`与原业务读/澄清/回答；持久订阅、加密callback/secret、原outbox原子ID-only投递及未知收件恢复。单独直接TLS有限listener与显式remote requester桥不放宽preview/team-local；没有OAuth、真实插件安装或部署完成声明。
+
+实际证据及跨进程全链见[片5历史](history/2026-10-08-agent-remote-events.md)，配置/恢复见[工程说明](../engineering/agent-remote-events.md)。全部账号、key、callback和模型行为为可丢弃fixture；2xx仅收件，真实本机Codex/当前dot、第二真实成员、真实remote/模型继续及浏览器残余不变。原状态/片1—4证据不追溯覆盖。

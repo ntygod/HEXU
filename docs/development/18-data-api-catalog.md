@@ -474,3 +474,11 @@ AgentAssistance原preview/create/revise/change显式接收经认证的requester 
 GET `/api/v1/tasks/:taskId/agent-consumptions` 只给当前父Task读者原回接投影，隐藏原thread/session/credential。原采用接口新增认证external answer来源分支，固定source.external.response，不伪造assist Run。
 
 经典stdio requester现15工具（旧9 + bind/get_consumption/consume_answer/ack_consumption/cancel_consumption/wait_answer），receiver仍4；schema仍唯一在tools.ts。原host环境固定thread/session，工具参数不能提升或改绑。wait最多30秒/每秒一次；读取不启动/唤醒模型。真实模型及跨回合恢复、MCP2 Events尚未接入。
+
+## 切片5：receiver bootstrap、MCP2 Events与有限TLS入口
+
+迁移40增加有限 `agent_receiver_connections`，迁移41增加订阅、验证intent与投递观测表/原outbox原子trigger；不是新Task/Run/Assistance状态。旧1—39保留。owner issuance及有限 REST 详情见[工程说明](../engineering/agent-remote-events.md)。受认证receiver依当前grant派生单请求主体；token只hash，最长24小时；失权/降权永久吊销，不因重新加入复活。
+
+`POST /collaboration/mcp` 是独立MCP2 `2026-07-28`，不是旧stdio握手。提供server/discover、tools/list/call、events/list/subscribe/unsubscribe；工具4项复用receiver原业务。`hexu.assistance.changed`的input为空object，payload仅requestId，无replay cursor。订阅/回调验证、加密静态secret、轮换、同ID bounded retry与当前权限再验在[实现](../../apps/control/src/agent-events.ts)及[安全发送](../../apps/control/src/event-webhook.ts)。传输accepted不改Assistance业务完成。
+
+独立TLS应用只允许上述MCP及requester/receiver有限REST，拒绝human API、原生/runner、旧request-token远程receiver及不匹配Host/forwarded/browser headers。原createApp仍loopback。真实插件OAuth/账号连接、HTTPS部署及跨成员模型闭环未验；不要把协议fixture视为这些能力已完成。

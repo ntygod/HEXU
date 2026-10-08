@@ -1,4 +1,4 @@
-/** Stateless, loopback-only adapter. No cookies, redirect following, retries or model calls. */
+/** Stateless adapter: local by default, explicit HTTPS requester mode. No cookies, redirects, retries or model calls. */
 export interface BridgeConfiguration {
   baseURL: string;
   token: string;
@@ -23,9 +23,13 @@ export function bridgeConfiguration(env: NodeJS.ProcessEnv): BridgeConfiguration
   } catch {
     throw new BridgeError('CONFIGURATION_INVALID', 'Invalid HEXU control URL', 'not_sent');
   }
+  const remote = env.HEXU_TRANSPORT === 'remote';
+  if (env.HEXU_TRANSPORT && !['local', 'remote'].includes(env.HEXU_TRANSPORT))
+    throw new BridgeError('CONFIGURATION_INVALID', 'Unknown transport mode', 'not_sent');
   if (
-    url.protocol !== 'http:' ||
-    !['127.0.0.1', '[::1]'].includes(url.hostname) ||
+    (remote
+      ? url.protocol !== 'https:' || !url.hostname.includes('.')
+      : url.protocol !== 'http:' || !['127.0.0.1', '[::1]'].includes(url.hostname)) ||
     url.username ||
     url.password ||
     url.search ||
@@ -33,11 +37,19 @@ export function bridgeConfiguration(env: NodeJS.ProcessEnv): BridgeConfiguration
     url.pathname !== '/'
   )
     throw new BridgeError(
-      'LOCAL_ONLY',
-      'Only an explicit loopback HTTP origin is supported',
+      remote ? 'REMOTE_CONFIGURATION_INVALID' : 'LOCAL_ONLY',
+      remote
+        ? 'Remote transport requires an explicit HTTPS origin'
+        : 'Only an explicit loopback HTTP origin is supported',
       'not_sent',
     );
   const role = env.HEXU_AGENT_ROLE;
+  if (remote && role !== 'requester')
+    throw new BridgeError(
+      'CONFIGURATION_INVALID',
+      'Remote classic bridge supports requester only; receivers use MCP2 bootstrap tools',
+      'not_sent',
+    );
   const token = env.HEXU_AGENT_TOKEN ?? '';
   if (role !== 'requester' && role !== 'receiver')
     throw new BridgeError(

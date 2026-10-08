@@ -69,3 +69,7 @@ Windows 是需要独立解决的原生执行兼容问题。桌面壳跨平台，
 截至本次同步的 E2c1，应用仍只有回环 preview / team-local 和独立节点实验路径；Codex 保留会话及显式恢复有工程实现，真实账户互操作仍未验证。无桌面安装包、正式纯个人客户端或跨电脑团队平台。最新范围始终见 [21](../development/21-implementation-status.md)，不得用本 ADR 或演示图覆盖进度记录。
 
 后续改动若改变主入口、数据归属、跨端复用或执行边界，更新本 ADR 与对应契约／工作项。普通实现细节自主判断，不增加每次开发都要审批的流程。
+
+## 7. 有限协作独立服务增量（2026-10-08）
+
+切片5增加单实例、直接TLS的有限协作listener，复用原team数据库及Assistance业务服务；仅允许独立有限Agent认证，不公开Web管理/原生或节点控制。preview/team-local仍回环。远端requester走经典MCP薄桥，receiver走独立MCP2工具/Events与bootstrap。此变化不是桌面/完整团队远程部署完成，也不是OAuth或真实dot联调证明。[配置与待验边界](agent-remote-events.md)。

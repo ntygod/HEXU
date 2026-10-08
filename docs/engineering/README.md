@@ -73,3 +73,5 @@ ADR 保存作出决定时的背景与约束；其中的阶段进度不覆盖 21�
 | [ADR-0008](adr-0008-client-surfaces.md) | 桌面优先、可选团队服务与 Web |
 
 依赖与许可证见 [dependencies](dependencies.md)；团队如何评估产品/质量见 [内部评估边界](internal-evaluation.md)，不把它变成用户完成任务的必经流程。
+
+- [有限远端协作与 MCP Events](agent-remote-events.md)：独立TLS/receiver bootstrap、持久投递、备份与真实接入残余。

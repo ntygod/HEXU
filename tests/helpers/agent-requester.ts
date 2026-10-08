@@ -5,8 +5,8 @@ import { teamFixture } from './team.js';
 /** Disposable real BetterAuth members + full createApp/SQLite. No provider or host runtime. */
 export const REQUESTER_VISIBLE = 'Explicitly selected API excerpt.';
 export const REQUESTER_HIDDEN = ' Private unselected transcript.';
-export async function requesterFixture() {
-  const f = await teamFixture();
+export async function requesterFixture(events?: Parameters<typeof teamFixture>[1]) {
+  const f = await teamFixture(undefined, events);
   try {
     const { alice, bob } = await f.pair();
     const project = await f.project(alice);

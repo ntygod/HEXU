@@ -1,3 +1,4 @@
+import { revalidateAgentReceiverRequestPrincipal } from '../../identity/src/agent-receiver-connections.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DomainError, type Task, type Message } from '../../contracts/src/index.js';
 import {
@@ -199,6 +200,10 @@ export class AgentAssistanceStore {
       .run(now(), now());
   }
   revalidate(actor: AgentAssistancePrincipal) {
+    if (actor.receiverConnection) {
+      revalidateAgentReceiverRequestPrincipal(this.store.db, actor);
+      return;
+    }
     const row = this.store.db
       .prepare(
         'SELECT revision,scopes FROM assistance_agent_credentials WHERE id=? AND assistance_id=? AND participant_id=? AND revoked_at IS NULL AND expires_at>?',

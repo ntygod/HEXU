@@ -22,7 +22,10 @@ export function cookies(response: { headers: Record<string, unknown> }) {
     .map((v) => v.split(';')[0])
     .join('; ');
 }
-export async function teamFixture(origin = ORIGIN) {
+export async function teamFixture(
+  origin = ORIGIN,
+  events?: NonNullable<Parameters<typeof createApp>[0]>['events'],
+) {
   const dir = await mkdtemp(join(tmpdir(), 'hexu-identity-test-'));
   const dbPath = join(dir, 'workspace.sqlite'),
     identityPath = join(dir, 'identity.sqlite');
@@ -34,7 +37,12 @@ export async function teamFixture(origin = ORIGIN) {
     baseURL: origin,
     trustedOrigins: [origin],
   };
-  const app = await createApp({ store, identity: options, port: Number(new URL(origin).port) });
+  const app = await createApp({
+    store,
+    identity: options,
+    port: Number(new URL(origin).port),
+    events,
+  });
   const call = (
     path: string,
     account: Account | null = null,

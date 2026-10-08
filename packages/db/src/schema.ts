@@ -1,3 +1,5 @@
+import { AGENT_RECEIVER_MIGRATION } from './agent-receiver.js';
+import { AGENT_EVENTS_MIGRATION } from './agent-events-schema.js';
 /** Local-preview migration only. Production PostgreSQL is intentionally not implied. */
 export const migrations = [
   {
@@ -926,4 +928,6 @@ CREATE TRIGGER agent_consumption_cancel_immutable_update BEFORE UPDATE ON agent_
 CREATE TRIGGER agent_consumption_cancel_immutable_delete BEFORE DELETE ON agent_consumption_cancellations BEGIN SELECT RAISE(ABORT,'cancellation is immutable'); END;
 `,
   },
+  { version: 40, sql: AGENT_RECEIVER_MIGRATION },
+  AGENT_EVENTS_MIGRATION,
 ];

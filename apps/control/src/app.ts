@@ -1,3 +1,8 @@
+import { attachAgentReceiver } from './agent-receiver.js';
+import { isAgentReceiverPath } from '../../../packages/identity/src/agent-receiver-connections.js';
+import { AgentEvents } from './agent-events.js';
+import { attachAgentMcpHttp, MCP_PATH } from './agent-mcp-http.js';
+import type { WebhookSender } from './event-webhook.js';
 import { attachAgentRequester } from './agent-requester.js';
 import { isAgentRequesterPath } from '../../../packages/identity/src/agent-requester-connections.js';
 import { attachAgentAssistance } from './agent-assistance.js';
@@ -80,6 +85,7 @@ export async function createApp(
     logger?: boolean;
     native?: NativeOptions;
     identity?: IdentityOptions;
+    events?: { encryptionKey: Buffer; sender?: WebhookSender; automaticDrain?: boolean };
   } = {},
 ) {
   if (options.identity && options.native?.enabled)
@@ -154,6 +160,9 @@ export async function createApp(
     const nodeProtocol = new URL(request.url, 'http://localhost').pathname.startsWith(
       '/runner/v1/',
     );
+    const receiverProtocol =
+      isAgentReceiverPath(protocolPath, request.method) ||
+      (protocolPath === MCP_PATH && request.method === 'POST');
     const requesterProtocol = isAgentRequesterPath(
       new URL(request.url, 'http://localhost').pathname,
       request.method,
@@ -183,6 +192,7 @@ export async function createApp(
       !nodeProtocol &&
       !assistanceProtocol &&
       !requesterProtocol &&
+      !receiverProtocol &&
       identity &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       !request.headers.origin
@@ -196,6 +206,7 @@ export async function createApp(
       !nodeProtocol &&
       !assistanceProtocol &&
       !requesterProtocol &&
+      !receiverProtocol &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       request.headers['x-hexu-client'] !== 'web'
     )
@@ -211,6 +222,22 @@ export async function createApp(
   attachAgentConnections(app, store);
   attachAgentAssistance(app, store);
   attachAgentRequester(app, store);
+  attachAgentReceiver(app, store);
+  if (options.events) {
+    const events = new AgentEvents(store, options.events.encryptionKey, options.events.sender);
+    attachAgentMcpHttp(app, events);
+    const timer =
+      options.events.automaticDrain === false
+        ? null
+        : setInterval(() => {
+            void events.drain().catch(() => {});
+          }, 1000);
+    timer?.unref();
+    app.addHook('onClose', async () => {
+      if (timer) clearInterval(timer);
+      await events.idle();
+    });
+  }
   attachAssistance(app, store);
   const nodeExecution = attachNodes(app, store);
   attachCheckpoints(app, store);
@@ -908,7 +935,7 @@ export async function createApp(
       const ping = setInterval(() => reply.raw.write(': heartbeat\n\n'), 15000);
       ping.unref();
       reply.raw.on('close', () => {
-        clearInterval(timer);
+        if (timer) clearInterval(timer);
         clearInterval(ping);
         streams.delete(reply.raw);
       });

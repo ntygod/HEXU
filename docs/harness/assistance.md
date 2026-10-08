@@ -40,3 +40,7 @@ The W1 adoption editor keeps explicit multi-ranges and baseline on conflicts/tra
 ## 跨边界时再读
 
 分享不是完整任务访问，相关读取策略见 [身份](identity.md)；AI 派发涉及 [节点](nodes.md) 与 [Claude](claude.md)；多片段/CRLF 选择对照 [上下文](context.md)。
+
+## 有限接收连接与 Events
+
+receiver连接明确绑定当前project/participant/endpoint/capability/delegation grant，接收以后新建请求无需人工逐条搬token；各业务事务仍核请求专属材料scope和当前权限。旧capability_read不扩权。原outbox同事务生成ID-only事件；2xx仅收件，未知只能重试相同eventId，不能重复启动原工作。Events签名材料和callback必须加密保存，不输出到payload/日志；每连接前校验公共HTTPS地址并pin DNS，撤权后停止投递。协议/测试入口见[有限远端说明](../engineering/agent-remote-events.md)。
