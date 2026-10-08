@@ -10,6 +10,7 @@
 | UI/客户端应遵循什么？ | [Workbench W1](design/README.md)、[ADR-0008](engineering/adr-0008-client-surfaces.md) | 当前设计与客户端方向 |
 | 具体功能怎样使用？ | [使用与工程指南](engineering/README.md) | 当前操作方法、配置与限制 |
 | 接下来开发什么？ | [下一步 22](development/22-next-delivery.md) | 唯一下一交付范围 |
+| 跨 Agent 协作怎样拆分和接手？ | [交付拆分 25](development/25-agent-collaboration-delivery.md) | 原工作项组合、七个切片、依赖与同步说明 |
 | 某个原工作项完成到哪里？ | [工作清单 19](development/19-work-items.md) | 102 个原 ID、状态、依据、剩余 |
 | AI/开发者怎样接手？ | [AGENTS](../AGENTS.md)、[接手指南 24](development/24-ai-handoff.md) | 根路由与接手步骤 |
 | 这类修改有哪些不变量？ | [harness 目录](harness/README.md) | 按需加载的实现约束与验证入口 |

@@ -5,6 +5,40 @@
 
 本页包括完整目标草案和按批次追加的实现子集。历史小节中的“当前/未实现”只指对应时期；实际请求 schema 以 [contracts](../../packages/contracts/src) 和 [控制 API](../../apps/control/src) 为准，交付范围看 [21](21-implementation-status.md)，不要从旧小节推导当前缺少已完成能力。
 
+## D2：跨 Agent 协作的最小公共契约
+
+以下配合 [25 的交付拆分](25-agent-collaboration-delivery.md)，均是新增草案，不是已上线接口。先实现有限只读协助，再扩展分支/接手；一个逻辑操作在 HTTP、MCP 或所选远端协议上调用同一业务服务。
+
+| 概念 | 最小字段/关系 | 归属与边界 |
+| --- | --- | --- |
+| AgentParticipant | id、space、owner、可选原生实例引用、revision、可参与范围 | 03/16；稳定参与身份，区别于真人成员和执行配置 |
+| AgentEndpoint / Connection | participant、端点/协议版本、凭证引用、接收/查询方式、最后核对时间 | 16；地址、凭证与身份分别管理，换凭证不改作者 |
+| Capability | participant/endpoint、用途、input/output、版本、接收条件、费用主体、三维可用状态 | 16；提供方支持、HEXU 适配、本次授权/环境分开，不以端点自报代替验证 |
+| DelegationGrant | 发起/接收主体、允许能力与材料/输出范围、到期、策略版本、有限自动接受、资源限制 | 03/11；先一层只读协助，不借转发扩大权限 |
+| CollaborationRequestRef | id、businessRef、双方身份、输入/授权版本、root/parent、远端引用、投递观测 | 11/16；businessRef 首轮只指 Assistance，不复制 Task 或完成状态 |
+| 协商回应 | request、固定输入版本、accept/decline/request_input/propose_scope/answer、正文或产物、真实 actor、revision | 11；新输入另建修订，接受不等于实际开工 |
+| ExecutionRef | connection、远端 job/session/turn、来源、观测与时间 | 07/16；不受管外部执行不伪造 Run 或进程事实 |
+| 结果消费关联 | request、reply/ResultRevision、输入版本、目标原工作/Run 或外部执行引用、事实来源 | 11/14；区分输入绑定、可观察后续产出与 Agent 自报，不自动采用共享决定 |
+
+首轮业务状态仍属于 Assistance；接受/拒绝/澄清等回应及投递记录形成可读投影。协作记录不再维护一份与 Assistance/Run 竞争的完整生命周期。后续引入 WorkBranch/Handoff 时分别保留原领域后果。新增表或嵌入字段的选择在实际 schema 中确定，不按概念一对一创建服务或表。
+
+| 逻辑动作草案 | 作用 | 主要控制 |
+| --- | --- | --- |
+| capabilities.search | 查找当前可发现的能力 | 返回有限信息，无隐式读取资料或开工 |
+| context.read | 读取本次获授权材料版本 | 权限与授权版本复核，有限接收者不获得父 Task/Project 元数据 |
+| collaboration.request | 创建指定能力的协助请求 | 当前 Task 操作权、材料披露、双方预授权与幂等；正文不能指定虚假身份 |
+| collaboration.respond | 接受/拒绝/澄清/提议范围/回答 | 固定输入版本和当前接收方身份；超出授权不执行 |
+| collaboration.list / get | 查询自身相关请求和原请求结果 | 范围、分页、游标、当前权限；知道 ID 不授予访问 |
+| collaboration.cancel | 撤回请求或取消本平台后续动作 | 关联实际执行另发停止，返回各层实际结果 |
+| results.publish / read | 保存或取得授权范围内版本化产物 | 短回答可直接存协助回应；不隐含 Task 完成或代码写入 |
+| human.request_input | 把明确业务/授权缺口交给相应人 | 不把普通 Agent 交流变成逐步审批 |
+
+工具面按切片开放，具体 HTTP 路径、MCP 名称和严格 schema 在切片 1/2 锁定并随源码维护。协作凭证、浏览器会话和节点身份分别校验；有限接收者只看到不透明协助引用及明确分享内容。
+
+写入绑定作用域内的稳定请求键、正文哈希和 expectedRevision；业务记录/授权/回执/outbox 同事务。查询或回执先核对当前权限。远端超时先查原标识，不以本地幂等键声称远端恰好执行一次；事件保留来源与顺序，不能由迟到事件反转确认事实。
+
+首次原生回接可以使用 Agent 自身有界查询/等待，或实际适配的继续接口；输入绑定与实际消费分别留证。重启不自动启动结果未知的付费工作。MCP、A2A 和 provider 方法名均不能由上述逻辑名称推定。
+
 ## 1. 本文权威范围
 
 01—17 中的接口名称、字段和事件以本草案统一。实现开始后以 packages/contracts 的版本化 schema 和生成文档同步维护。产品行为仍以 v1.1 为准，本表不重新引入 Evidence/Acceptance。

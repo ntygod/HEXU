@@ -46,12 +46,20 @@ Webhook 校验签名、来源 connection 和目标仓库，先将 deliveryId 与
 | HX-DEV-16-01 | 模板、版本、输入/输出契约和步骤列表编辑 | template API/editor | 05、07 |
 | HX-DEV-16-02 | 实例调度、普通 Run 复用、并发/迭代边界与人回复 | workflow coordinator | 16-01、11、13 |
 | HX-DEV-16-03 | 实例继续/跳过/取消、子执行联动和版本保留 | instance commands/UI | 16-02 |
-| HX-DEV-16-04 | Connection/ExternalReference、受控凭证与首个 Git/PR 连接器 | connector port、首个实现 | 03、04、14 |
-| HX-DEV-16-05 | Webhook 持久化、验签、去重、乱序处理与可选完成规则 | integration inbox、rule handler | 16-04、07/04 |
-| HX-DEV-16-06 | 可选 CI/发布引用、外部通知、断开与同步状态页 | integration UI/handlers | 16-04/05、15 |
+| HX-DEV-16-04 | Connection/ExternalReference、独立 Agent 身份/端点/能力及 API/MCP 接入；原 Git/PR 连接器目标保留 | 参与身份、connector port、实际端点适配 | 03、04；协作先接 11，Git/PR 用 14 |
+| HX-DEV-16-05 | 协作请求持久投递与查询核对、来源/幂等/乱序；原 Webhook 与可选完成规则保留 | integration inbox、请求适配、rule handler | 16-04、11；执行事件用 07 |
+| HX-DEV-16-06 | Agent 能力三维状态、登记/断开、原生入口和同步界面；原 CI/发布/通知保留 | integration UI/handlers | 16-04/05、15 的必要投影 |
 
 ## 7. 不做什么
 
 不先建设插件市场、任意代码工作流平台或多厂商账号共享网关。已有项目中的 Hooks/MCP 也需要显示来源和权限；安装某个扩展不是授权它访问所有资料。
 
 工作模板服务于减少重复动作，不将内部团队的质量评估程序固化成每个任务必经的模板。
+
+## 8. 外部 Agent 接入增量
+
+按 [跨 Agent 协作与云端接入规划](../product/10-agent-collaboration-plan.md)，16 的身份/连接/投递子集进入[首个真实跨成员里程碑](25-agent-collaboration-delivery.md)，不等待 13 完整并行或 16-01—03 模板。独立身份、端点与能力分开，原生入口能主动请求、回应并取得结果；本地取件只是工程步骤。原 Git/PR、CI 和模板目标均保留。
+
+16-05 承接协作信封的可靠投递、回执与未知结果查询，业务协商仍归 11，执行仍归 07；16-06 承接连接、能力和原生入口。三者使用同一领域权限，不建立第二套任务/完成状态。可调用云运行时后续与 07/12/14/17 组合；外部回应不伪造受管 Run，也不自动启用模板调度。
+
+本地桥、远程 MCP、托管执行 API 与可选 A2A 使用同一业务权限和协作对象，按实际提供方能力分别适配。当前切片和顺序仅在 [22](22-next-delivery.md) 维护，原 ID 与状态仍在 [19](19-work-items.md)。

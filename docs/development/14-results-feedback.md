@@ -1,5 +1,7 @@
 # 14｜成果版本、功能预览与团队反馈
 
+**D2 增量：** [结果回接](25-agent-collaboration-delivery.md#slice-4)先交付带外部身份/请求/输入版本的文本或结构化成果及消费关联，映射 14-01/05；[任务内呈现](25-agent-collaboration-delivery.md#slice-6)使用 14-02/05。短回答可保留为 Assistance 回应，不强制创建文件或预览。后续原生特色能力才扩展相应产物类型，原工作包目标仍保留。
+
 > D1 · M1 基础、M3 完整 · 关联 HX-F09 · 依赖：04、05、07、10 的页面/结果接口。  
 > [计划入口](README.md) · [UI 目标](../product/04-ux-and-design.md) · [API](18-data-api-catalog.md)
 
