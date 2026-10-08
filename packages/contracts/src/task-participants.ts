@@ -1,4 +1,5 @@
 import { DomainError, enumValue, record, revision, text } from './index.js';
+import { parseTaskLabel } from './task-labels.js';
 import type { ProjectRole } from './identity.js';
 
 export type ParticipationState = 'active' | 'left' | 'removed' | 'access_revoked';
@@ -47,6 +48,7 @@ export interface ParticipantHistory {
   nextCursor: number | null;
 }
 export interface TaskPeopleFilters {
+  label?: string;
   q?: string;
   ownerUserId?: string;
   participantUserId?: string;
@@ -86,6 +88,7 @@ export function parseTaskPeopleFilters(value: unknown): TaskPeopleFilters {
       ? undefined
       : text(value, label, max);
   return {
+    ...(query.label === undefined ? {} : { label: parseTaskLabel(query.label) }),
     q: optional(query.q, '搜索', 160),
     ownerUserId: optional(query.ownerUserId, '负责人', 100),
     participantUserId: optional(query.participantUserId, '参与者', 100),

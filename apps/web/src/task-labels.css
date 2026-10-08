@@ -1,0 +1,57 @@
+.task-label-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1);
+  min-width: 0;
+}
+.task-label-chips .badge {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.task-label-editor {
+  font-size: var(--hx-font-body);
+}
+.task-label-editor .dialog-body {
+  display: grid;
+  align-content: start;
+  gap: var(--hx-space-3);
+}
+.task-label-editor .dialog-body > button {
+  justify-self: start;
+}
+.task-label-editor p,
+.task-label-editor h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.task-label-draft {
+  display: grid;
+  gap: var(--hx-space-2);
+}
+.task-label-draft > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+}
+.task-label-draft > div > span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.task-label-draft button {
+  flex-shrink: 0;
+}
+.task-label-conflict {
+  display: grid;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-subtle);
+  border-radius: var(--hx-radius-control);
+  background: var(--hx-surface-raised);
+}
+.task-label-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}

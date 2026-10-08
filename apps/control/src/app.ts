@@ -469,7 +469,7 @@ export async function createApp(
       items = items.filter((task) => task.projectId === id);
     }
     items = items
-      .map((task) => store.taskParticipants.decorate(task))
+      .map((task) => store.taskLabels.decorate(store.taskParticipants.decorate(task)))
       .filter((task) => matchesTaskPeopleFilters(task, peopleFilters));
     if (query.cursor) {
       const position = items.findIndex((task) => task.id === query.cursor);
@@ -493,6 +493,12 @@ export async function createApp(
   );
   app.get('/api/v1/tasks/:taskId/assignment', async (request) =>
     store.taskAssignment.options(param(request.params, 'taskId')),
+  );
+  app.get('/api/v1/tasks/:taskId/labels', async (request) =>
+    store.taskLabels.view(param(request.params, 'taskId')),
+  );
+  app.post('/api/v1/tasks/:taskId/labels', async (request) =>
+    store.taskLabels.change(param(request.params, 'taskId'), request.body, key(request.headers)),
   );
   app.get('/api/v1/tasks/:taskId/participants', async (request) =>
     store.taskParticipants.view(param(request.params, 'taskId')),

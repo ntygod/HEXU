@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
 import { ProjectAgreements } from './project-agreements.js';
+import { TaskLabelChips } from './task-labels.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
 import { matchesProjectTaskStatus, projectTaskStatusColumns } from './project-task-status.js';
 import { matchesProjectTaskAttention } from './project-task-attention.js';
@@ -140,8 +141,19 @@ function ProjectPageContent({ id }: { id: string }) {
     history.pushState({}, '', url);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
-  const { view, setView, filters, setFilter, status, setStatus, attention, setAttention, clear } =
-    useProjectTaskFilters();
+  const {
+    view,
+    setView,
+    filters,
+    setFilter,
+    status,
+    setStatus,
+    attention,
+    setAttention,
+    label,
+    setLabel,
+    clear,
+  } = useProjectTaskFilters();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
@@ -159,10 +171,11 @@ function ProjectPageContent({ id }: { id: string }) {
     canOrder: !!project && project.access !== 'view',
     tasks: visibleTasks,
     editableIds: visibleTasks.filter((task) => canEditTask(data, task)).map((task) => task.id),
-    scope: JSON.stringify([tab, view, filters, status, attention]),
+    scope: JSON.stringify([tab, view, filters, status, attention, label]),
   });
   const tasks = order.orderedTasks.filter(
     (task) =>
+      label.kind !== 'invalid' &&
       matchesTaskPeopleFilters(task, filters) &&
       matchesProjectTaskStatus(task, status) &&
       matchesProjectTaskAttention(task, attention),
@@ -326,6 +339,8 @@ function ProjectPageContent({ id }: { id: string }) {
               setFilter={setFilter}
               status={status}
               setStatus={setStatus}
+              label={label}
+              setLabel={setLabel}
               attention={attention}
               setAttention={setAttention}
               clear={clear}
@@ -333,8 +348,11 @@ function ProjectPageContent({ id }: { id: string }) {
             <span className="muted">{tasks.length} 项任务</span>
           </div>
           <ProjectTaskOrderPanel controls={orderControls} />
-          {status.kind === 'invalid' || attention.kind === 'invalid' ? (
+          {status.kind === 'invalid' || attention.kind === 'invalid' || label.kind === 'invalid' ? (
             <div role="alert">
+              {label.kind === 'invalid' && (
+                <Empty icon="list" title="标签筛选无效" description="请重新选择标签或清除筛选。" />
+              )}
               {status.kind === 'invalid' && (
                 <Empty icon="list" title="状态筛选无效" description="请重新选择状态或清除筛选。" />
               )}
@@ -374,6 +392,7 @@ function ProjectPageContent({ id }: { id: string }) {
                             ) : (
                               <p>{task.description || '打开任务查看讨论与成果。'}</p>
                             )}
+                            <TaskLabelChips labels={task.labelNames} />
                             {task.attention && (
                               <span className="badge amber">{task.attention}</span>
                             )}

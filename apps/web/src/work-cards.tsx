@@ -1,3 +1,4 @@
+import { TaskLabelChips } from './task-labels.js';
 import type { Result, Task } from '../../../packages/contracts/src/index.js';
 import { Avatar, Icon, RunBadge, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp } from './state.js';
@@ -29,6 +30,7 @@ export function TaskRow({
             data.projects.find((project) => project.id === task.projectId)?.name ||
             '个人工作'}
         </small>
+        <TaskLabelChips labels={task.labelNames} />
         {descriptionMatch && <TaskDescriptionMatch snippet={descriptionMatch} />}
       </div>
       {run && (

@@ -388,14 +388,17 @@ async function fixture(page: Page, projectAgreementCount: number) {
       });
       expect(response.ok(), await response.text()).toBe(true);
       const saved = (await response.json()) as Task;
-      const { participantUserIds, ...storedBefore } = before.task;
+      const { participantUserIds, labelNames, labelsRevision, ...storedBefore } = before.task;
       expect(saved).toEqual({
         ...storedBefore,
         ...changes,
         revision: before.task.revision + 1,
         updatedAt: saved.updatedAt,
       });
-      const expected = { ...before, task: { ...saved, participantUserIds } };
+      const expected = {
+        ...before,
+        task: { ...saved, participantUserIds, labelNames, labelsRevision },
+      };
       expect(await get<TaskDetail>(page, `tasks/${task.id}`)).toEqual(expected);
       expectedTasks.set(task.id, expected);
       return saved;
