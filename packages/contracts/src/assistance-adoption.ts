@@ -12,6 +12,11 @@ import {
 } from './assistance.js';
 
 export interface AssistanceAdoptionSource {
+  /** Authenticated external answer provenance; never a fabricated successful Run. */
+  external?: {
+    requestId: string;
+    response: import('./agent-assistance.js').AgentAssistanceResponseRecord;
+  };
   assistanceId: string;
   assistanceRevision: number;
   snapshotHash: string;

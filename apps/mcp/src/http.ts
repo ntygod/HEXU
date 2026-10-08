@@ -4,6 +4,8 @@ export interface BridgeConfiguration {
   token: string;
   role: 'requester' | 'receiver';
   requestId?: string;
+  /** Set by the original host, never by received collaboration content. */
+  origin?: { provider: 'codex' | 'external'; threadRef: string; sessionRef: string };
 }
 export class BridgeError extends Error {
   constructor(
@@ -57,7 +59,34 @@ export function bridgeConfiguration(env: NodeJS.ProcessEnv): BridgeConfiguration
       'Receiver requires the exact pre-authorized request ID',
       'not_sent',
     );
-  return { baseURL: url.origin, token, role, ...(role === 'receiver' ? { requestId } : {}) };
+  const fields = [env.HEXU_ORIGIN_PROVIDER, env.HEXU_ORIGIN_THREAD, env.HEXU_ORIGIN_SESSION];
+  let origin: BridgeConfiguration['origin'];
+  if (fields.some((v) => v !== undefined)) {
+    const [provider, threadRef, sessionRef] = fields;
+    if (
+      role !== 'requester' ||
+      !['codex', 'external'].includes(provider ?? '') ||
+      !threadRef ||
+      !sessionRef ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,149}$/.test(threadRef) ||
+      threadRef.includes('..') ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,149}$/.test(sessionRef) ||
+      sessionRef.includes('..')
+    )
+      throw new BridgeError(
+        'CONFIGURATION_INVALID',
+        'Original host binding is incomplete or invalid',
+        'not_sent',
+      );
+    origin = { provider: provider as 'codex' | 'external', threadRef, sessionRef };
+  }
+  return {
+    baseURL: url.origin,
+    token,
+    role,
+    ...(role === 'receiver' ? { requestId } : {}),
+    ...(origin ? { origin } : {}),
+  };
 }
 export class HexuTransport {
   constructor(readonly config: BridgeConfiguration) {}
@@ -65,9 +94,10 @@ export class HexuTransport {
     path: string,
     body?: unknown,
     operationKey?: string,
+    timeoutMs = 10_000,
   ): Promise<Record<string, unknown>> {
     const writing = body !== undefined;
-    const timeout = AbortSignal.timeout(10_000);
+    const timeout = AbortSignal.timeout(Math.max(1, Math.floor(Math.min(10_000, timeoutMs))));
     let response: Response;
     try {
       response = await fetch(`${this.config.baseURL}${path}`, {

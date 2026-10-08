@@ -19,7 +19,70 @@ const hash = (v: unknown) => createHash('sha256').update(canonicalJson(v)).diges
 
 export class AssistanceAdoptionsStore {
   constructor(private readonly store: Store) {}
+  private assertAccess(taskId: string, id: string, write = false) {
+    if (!this.store.agentAssistance.isAgent(id)) {
+      this.store.assistance.adoptionContext(taskId, id, write);
+      return;
+    }
+    this.store.getTask(taskId, write);
+    const item = this.store.agentAssistance.get(id).assistance;
+    if (item.taskLink?.id !== taskId)
+      throw new DomainError('NOT_FOUND', '协助不属于当前任务或不可访问', 404);
+  }
+  private externalPreview(
+    taskId: string,
+    id: string,
+    responseId: string,
+  ): AssistanceAdoptionPreview {
+    this.assertAccess(taskId, id, true);
+    const item = this.store.agentAssistance.get(id).assistance;
+    const agent = item.agent!;
+    const response = agent.responses.find((r) => r.id === responseId);
+    if (
+      !response ||
+      response.type !== 'answer' ||
+      response.actor.kind !== 'agent' ||
+      response.actor.participantId !== agent.recipientParticipantId ||
+      !response.body.trim()
+    )
+      throw new DomainError(
+        'ASSISTANCE_NOT_SUGGESTION',
+        '仅可采用已认证接收 Agent 保存的回答',
+        422,
+      );
+    const reply: AssistanceReply = {
+      id: response.id,
+      revision: response.inputRevision,
+      actorType: 'agent',
+      author: { id: response.actor.ownerUserId, name: item.recipient.name },
+      body: response.body,
+      createdAt: response.createdAt,
+    };
+    return {
+      source: {
+        assistanceId: id,
+        assistanceRevision: item.revision,
+        snapshotHash: item.snapshotHash,
+        snapshot: item.snapshot,
+        question: item.question,
+        sourceChanged: item.sourceChanged,
+        reply,
+        replyHash: hash({ reply, response }),
+        external: { requestId: agent.requestId, response },
+      },
+      target: taskDescriptionTarget(this.store, taskId, true),
+      canAdopt:
+        !item.accessEnded &&
+        item.state !== 'cancelled' &&
+        item.sourceChanged === false &&
+        response.inputRevision === agent.currentInputRevision &&
+        response.inputHash === agent.inputHash &&
+        response.accessRevision === agent.accessRevision,
+    };
+  }
   preview(taskId: string, assistanceId: string, replyId: string): AssistanceAdoptionPreview {
+    if (this.store.agentAssistance.isAgent(assistanceId))
+      return this.externalPreview(taskId, assistanceId, replyId);
     const { item, accessEnded } = this.store.assistance.adoptionContext(taskId, assistanceId, true);
     const row = this.store.db
       .prepare(
@@ -69,7 +132,7 @@ export class AssistanceAdoptionsStore {
   }
   adopt(taskId: string, assistanceId: string, input: unknown, key: string): AssistanceAdoption {
     // Even an old receipt requires current parent-task editing and source-reading authority.
-    this.store.assistance.adoptionContext(taskId, assistanceId, true);
+    this.assertAccess(taskId, assistanceId, true);
     const data = parseAssistanceAdoption(input);
     const receipt = this.store.mutate(
       `assistance.adopt:${assistanceId}`,
@@ -142,7 +205,7 @@ export class AssistanceAdoptionsStore {
     return this.get(taskId, assistanceId, receipt.id);
   }
   get(taskId: string, assistanceId: string, id: string): AssistanceAdoption {
-    this.store.assistance.adoptionContext(taskId, assistanceId);
+    this.assertAccess(taskId, assistanceId);
     const row = this.store.db
       .prepare('SELECT body FROM assistance_adoptions WHERE id=? AND assistance_id=? AND task_id=?')
       .get(id, assistanceId, taskId) as { body: string } | undefined;
@@ -154,7 +217,7 @@ export class AssistanceAdoptionsStore {
     assistanceId: string,
     query: { cursor: string | null; limit: number },
   ): AssistanceAdoptionPage {
-    this.store.assistance.adoptionContext(taskId, assistanceId);
+    this.assertAccess(taskId, assistanceId);
     let before = Number.MAX_SAFE_INTEGER;
     if (query.cursor) {
       const row = this.store.db

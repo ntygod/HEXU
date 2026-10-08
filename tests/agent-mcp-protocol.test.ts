@@ -46,7 +46,7 @@ test('MCP configuration is numeric loopback only and credentials remain role-spe
 test('MCP schemas exactly match finite modes, nested response shapes and revision budgets', () => {
   const requester = toolsFor('requester'),
     receiver = toolsFor('receiver');
-  assert.equal(requester.length, 9);
+  assert.equal(requester.length, 15);
   assert.equal(receiver.length, 4);
   assert.ok(!receiver.some((t) => t.name === 'hexu_create_request'));
   const empty = requester.find((t) => t.name === 'hexu_read_materials')!.inputSchema;
@@ -112,7 +112,7 @@ test('MCP lifecycle, role tool allowlist and notifications cannot execute work',
     await session.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }),
     undefined,
   );
-  assert.equal((await rpc(4, 'tools/list')).result.tools.length, 9);
+  assert.equal((await rpc(4, 'tools/list')).result.tools.length, 15);
   assert.equal((await rpc(5, 'resources/list')).error.code, -32601);
   assert.equal((await rpc(6, 'events/subscribe')).error.code, -32601);
   assert.equal(

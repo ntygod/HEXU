@@ -596,6 +596,7 @@ export class AgentAssistanceStore {
     input: unknown,
     key: string,
     actor?: AgentRequesterPrincipal,
+    onCreated?: (requestId: string) => void,
   ): AssistanceDetail {
     const data = C.parseAgentAssistanceCreate(input);
     const guard = () => {
@@ -717,6 +718,9 @@ export class AgentAssistanceStore {
             },
             true,
           );
+        // Trusted internal extension executes before the original receipt/outbox transaction commits.
+        // Used only to bind requester original work atomically; never starts execution.
+        onCreated?.(env.request_id);
         return { id: item.id };
       },
       actor,

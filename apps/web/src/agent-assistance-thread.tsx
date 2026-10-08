@@ -1,3 +1,5 @@
+import { AdoptAssistance, AssistanceAdoptionHistory } from './assistance-adoption.js';
+import { AgentConsumptionStatus } from './agent-consumption.js';
 import { AgentAssistanceCredentials } from './agent-assistance-credentials.js';
 import { useEffect, useState } from 'react';
 import type { AssistanceDetail } from '../../../packages/contracts/src/assistance.js';
@@ -43,7 +45,9 @@ export function AgentAssistanceThread({
     [question, setQuestion] = useState(''),
     [materialIds, setMaterialIds] = useState<string[]>(agent.materials.map((m) => m.id)),
     [editing, setEditing] = useState(false),
-    [end, setEnd] = useState<'close' | 'cancel' | null>(null);
+    [end, setEnd] = useState<'close' | 'cancel' | null>(null),
+    [adoptReplyId, setAdoptReplyId] = useState<string | null>(null),
+    [adoptionBusy, setAdoptionBusy] = useState(false);
   const command = useAgentAssistanceCommand<AssistanceDetail>(`respond:${item.id}`, (next) => {
     setBase(next.assistance);
     setBody('');
@@ -54,12 +58,12 @@ export function AgentAssistanceThread({
   });
   const [editorBusy, setEditorBusy] = useState(false),
     [credentialBusy, setCredentialBusy] = useState(false);
-  const locked = command.busy || !!command.pending || editorBusy || credentialBusy;
+  const locked = command.busy || !!command.pending || editorBusy || credentialBusy || adoptionBusy;
   const conflict = base.revision !== item.revision;
   useEffect(() => {
-    onBusy?.(command.busy || editorBusy || credentialBusy);
+    onBusy?.(command.busy || editorBusy || credentialBusy || adoptionBusy);
     return () => onBusy?.(false);
-  }, [command.busy, editorBusy, credentialBusy, onBusy]);
+  }, [command.busy, editorBusy, credentialBusy, adoptionBusy, onBusy]);
   useEffect(() => {
     if (!body && !question && !end && !editing && !locked) {
       setBase(item);
@@ -75,8 +79,9 @@ export function AgentAssistanceThread({
       setEnd(null);
       setEditing(false);
     }
+    if (!item.canEditTask || item.accessEnded) setAdoptReplyId(null);
     if (item.accessEnded) command.revoke();
-  }, [item.canReply, item.canManage, item.accessEnded]);
+  }, [item.canReply, item.canManage, item.canEditTask, item.accessEnded]);
   if (command.denied)
     return <p role="alert">当前请求授权已结束，编辑内容已清除。请重新读取协助。</p>;
   const task = item.taskLink ? data.tasks.find((t) => t.id === item.taskLink!.id) : undefined;
@@ -127,7 +132,7 @@ export function AgentAssistanceThread({
       </p>
       <p className="assistance-warning">
         not_integrated · callable=false。保存、接受或预授权自动接受均是业务记录，不代表真实 Agent
-        收件或模型运行；回答不会自动采用或继续原任务。
+        收件或模型运行；原工作消费记录与人工采用分开核对，不以保存回答证明模型已继续。
       </p>
       <section aria-label="Agent 当前固定输入" className="assistance-snapshot">
         {agent.clarification && <p>{agent.clarification}</p>}
@@ -173,6 +178,20 @@ export function AgentAssistanceThread({
               · {time(response.createdAt)}
             </p>
             {response.body && <pre>{response.body}</pre>}
+            {item.canEditTask &&
+              !item.accessEnded &&
+              item.state !== 'cancelled' &&
+              response.type === 'answer' &&
+              response.actor.kind === 'agent' &&
+              response.inputRevision === agent.currentInputRevision && (
+                <Button
+                  type="button"
+                  disabled={locked || !!readError}
+                  onClick={() => setAdoptReplyId(response.id)}
+                >
+                  选择外部回答采用到任务说明
+                </Button>
+              )}
             {response.scope && (
               <>
                 <p>待发起者明确确认的问题：{response.scope.question}</p>
@@ -370,6 +389,19 @@ export function AgentAssistanceThread({
           </Button>
         </section>
       )}
+      {item.taskLink && (
+        <AgentConsumptionStatus taskId={item.taskLink.id} requestId={agent.requestId} />
+      )}
+      {adoptReplyId && item.taskLink && item.canEditTask && !item.accessEnded && (
+        <AdoptAssistance
+          taskId={item.taskLink.id}
+          id={item.id}
+          replyId={adoptReplyId}
+          onBusy={setAdoptionBusy}
+          onClose={() => setAdoptReplyId(null)}
+        />
+      )}
+      {item.taskLink && <AssistanceAdoptionHistory taskId={item.taskLink.id} id={item.id} />}
       <AgentAssistanceCredentials
         id={item.id}
         agent={agent}

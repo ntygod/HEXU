@@ -187,3 +187,9 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 基于片2 `7874614`：单Task、固定消息/项目文本版本与固定目标能力的独立requester预授权；最小UI明确发行/撤销；真实Agent来源与连接作用域回执；经典stdio MCP `2025-11-25`的9项发起/4项单请求接收工具。领域仍为原Assistance，MCP无第二状态库、无模型启动。材料读取/回应投影不含父任务元数据；未知创建结果按原operationKey只读核对。
 
 实际协议链使用独立stdio进程→原完整createApp/BetterAuth/SQLite，可验证澄清/新输入/回答、重启核对和撤销；它仍是可丢弃无模型fixture。接收token由所有者预置，不自动接收新求助；真实本机Codex/dot、dot MCP2 Events/远端传输、原线程消费和浏览器视觉验收均未完成。原片1/2/普通候选能力与验证边界不追溯改写。详见[本轮记录](history/2026-10-08-agent-mcp-entry.md)与[当前使用说明](../engineering/agent-mcp.md)。
+
+## 切片4：当前调用内原工作回接（2026-10-08）
+
+基于片3 `f3c943d` 的独立候选增加原Task/Agent/opaque thread/session不可变绑定、原子创建、固定Assistance answer消费与ACK、取消未来回接和原Task最小投影；MCP在原调用内有界查询并返回数据，人工采用为独立可信external分支，不伪造成功assist Run。binding为host_reported，后续输出为external_self_report；真实Codex/dot原thread继续尚未验证，未实现跨回合唤起。
+
+最终107项后端定向、5项独立stdio进程与31项React renderer通过；原完整build:server（含静态helper编译）、server/Web类型、Vite181模块、tokens/格式通过。无真实模型/Run/用户电脑或浏览器验收；未知claim只核对不重复执行。详细证据、失败修正与残余见[本片历史](history/2026-10-08-agent-result-consumption.md)，操作与边界见[原工作回接](../engineering/agent-result-consumption.md)。独立feature未合并；片5与真实片4/7验收仍需继续。

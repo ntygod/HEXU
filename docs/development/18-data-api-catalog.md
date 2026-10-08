@@ -456,3 +456,21 @@ AgentAssistance原preview/create/revise/change显式接收经认证的requester 
 接收端沿原单请求凭据，仅列表投影这一请求；新求助的权限bootstrap仍需所有者预置，不是自动收件。dot Events所需MCP2.0 `2026-07-28`、远程认证/事件投递与原线程消费均未实现，不把stdio经典握手当作真实dot插件接通。
 
 新preview的项目文本materialId为稳定opaque source摘要（不发送明文sourceId），同源跨子集/顺序/凭据和human/MCP入口保持一致。旧顺序ID输入不改写，历史严格校验沿用存储IDs；新requester访问逐输入核对credential-local映射，不自动接管不兼容旧别名请求。
+
+## 2026-10-08 切片4：原工作绑定与固定回答消费
+
+契约 [agent-consumption.ts](../../packages/contracts/src/agent-consumption.ts)，操作语义见[原工作回接](../engineering/agent-result-consumption.md)。迁移39只有原Assistance附属绑定、一次消费、ACK及独立取消记录，均不可变；不新增Task/Run或第二套成果生命周期。
+
+有限requester通道新增：
+- POST `bound-requests`：严格 `{request:AgentRequesterCreate,origin:{provider,threadRef,sessionRef}}`，201 `{request,binding,consumption}`；原请求与绑定同事务。旧`requests`保持兼容。
+- POST `requests/:requestId/binding`：`{origin}`，仅原创建Agent/连接、答案前；不可改绑。
+- GET `requests/:requestId/consumption`：`{binding,consumption}`，当前权限/材料先核对。
+- POST 同请求`consume`：`{responseId,inputRevision,inputHash,accessRevision,bindingId}`，一次claim。
+- POST 同请求`ack`：`{consumptionId,bindingId,threadRef,sessionRef,turnRef,output}`，有限后续输出观测。
+- POST 同请求`cancel-consumption`：`{bindingId}`，只取消未来回接。
+
+写动作需原Idempotency-Key，返回view加`delivery:first|replay`；replay从不授权重复执行。binding.source=`host_reported`，ACK.evidence=`external_self_report`。短答案以固定Assistance response ID/input版本/hash为成果引用；原Task来自认证凭据，不接受客户端覆盖。bearer来源投影隐藏ownerUserId；不扩大旧capability_read、receiver material_read/respond或浏览器权限。
+
+GET `/api/v1/tasks/:taskId/agent-consumptions` 只给当前父Task读者原回接投影，隐藏原thread/session/credential。原采用接口新增认证external answer来源分支，固定source.external.response，不伪造assist Run。
+
+经典stdio requester现15工具（旧9 + bind/get_consumption/consume_answer/ack_consumption/cancel_consumption/wait_answer），receiver仍4；schema仍唯一在tools.ts。原host环境固定thread/session，工具参数不能提升或改绑。wait最多30秒/每秒一次；读取不启动/唤醒模型。真实模型及跨回合恢复、MCP2 Events尚未接入。

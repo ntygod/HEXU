@@ -896,4 +896,34 @@ CREATE TRIGGER requester_task_scope_changed AFTER UPDATE OF body ON tasks
 END;
 `,
   },
+  {
+    version: 39,
+    sql: `
+-- Immutable original-work and answer provenance; cancellation/observations are separate.
+CREATE TABLE agent_original_work_bindings (
+ id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE REFERENCES assistance_agent_requests(request_id),
+ task_id TEXT NOT NULL REFERENCES tasks(id), participant_id TEXT NOT NULL REFERENCES agent_participants(id),
+ credential_id TEXT NOT NULL REFERENCES agent_requester_credentials(id), body TEXT NOT NULL
+);
+CREATE TABLE agent_result_consumptions (
+ id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE REFERENCES assistance_agent_requests(request_id),
+ binding_id TEXT NOT NULL UNIQUE REFERENCES agent_original_work_bindings(id), body TEXT NOT NULL
+);
+CREATE TABLE agent_consumption_cancellations (
+ binding_id TEXT PRIMARY KEY REFERENCES agent_original_work_bindings(id), cancelled_at TEXT NOT NULL
+);
+CREATE TABLE agent_consumption_acknowledgements (
+ consumption_id TEXT PRIMARY KEY REFERENCES agent_result_consumptions(id), body TEXT NOT NULL
+);
+CREATE INDEX agent_original_work_task ON agent_original_work_bindings(task_id);
+CREATE TRIGGER agent_original_work_immutable_update BEFORE UPDATE ON agent_original_work_bindings BEGIN SELECT RAISE(ABORT,'original work is immutable'); END;
+CREATE TRIGGER agent_original_work_immutable_delete BEFORE DELETE ON agent_original_work_bindings BEGIN SELECT RAISE(ABORT,'original work is immutable'); END;
+CREATE TRIGGER agent_consumption_immutable_update BEFORE UPDATE ON agent_result_consumptions BEGIN SELECT RAISE(ABORT,'consumption is immutable'); END;
+CREATE TRIGGER agent_consumption_immutable_delete BEFORE DELETE ON agent_result_consumptions BEGIN SELECT RAISE(ABORT,'consumption is immutable'); END;
+CREATE TRIGGER agent_consumption_ack_immutable_update BEFORE UPDATE ON agent_consumption_acknowledgements BEGIN SELECT RAISE(ABORT,'observation is immutable'); END;
+CREATE TRIGGER agent_consumption_ack_immutable_delete BEFORE DELETE ON agent_consumption_acknowledgements BEGIN SELECT RAISE(ABORT,'observation is immutable'); END;
+CREATE TRIGGER agent_consumption_cancel_immutable_update BEFORE UPDATE ON agent_consumption_cancellations BEGIN SELECT RAISE(ABORT,'cancellation is immutable'); END;
+CREATE TRIGGER agent_consumption_cancel_immutable_delete BEFORE DELETE ON agent_consumption_cancellations BEGIN SELECT RAISE(ABORT,'cancellation is immutable'); END;
+`,
+  },
 ];

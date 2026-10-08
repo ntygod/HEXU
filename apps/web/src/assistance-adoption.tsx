@@ -236,6 +236,12 @@ function AdoptionEditor({
           {selectionError || contentError}
         </p>
       )}
+      {base.source.external && (
+        <p className="hint">
+          已认证外部 Agent 回答 · 输入修订 {base.source.external.response.inputRevision}；不是受管
+          assist Run 的成功证明。采用仅在你明确保存后修改说明。
+        </p>
+      )}
       <label className="field">
         建议采用方式
         <select

@@ -37,10 +37,17 @@ export function isAgentRequesterPath(path: string, method: string) {
         '/agent-requester/v1/materials',
         '/agent-requester/v1/requests',
       ].includes(path) ||
-        /^\/agent-requester\/v1\/(requests|receipts)\/[^/]+$/.test(path))) ||
+        /^\/agent-requester\/v1\/(requests|receipts)\/[^/]+$/.test(path) ||
+        /^\/agent-requester\/v1\/requests\/[^/]+\/consumption$/.test(path))) ||
     (method === 'POST' &&
-      (['/agent-requester/v1/preview', '/agent-requester/v1/requests'].includes(path) ||
-        /^\/agent-requester\/v1\/requests\/[^/]+\/(input-revisions|cancel)$/.test(path)))
+      ([
+        '/agent-requester/v1/preview',
+        '/agent-requester/v1/requests',
+        '/agent-requester/v1/bound-requests',
+      ].includes(path) ||
+        /^\/agent-requester\/v1\/requests\/[^/]+\/(input-revisions|cancel|binding|consume|ack|cancel-consumption)$/.test(
+          path,
+        )))
   );
 }
 function current(

@@ -236,7 +236,12 @@ export class AgentRequesterStore {
     const cap = JSON.parse(c.body);
     return { items: [{ ...actor.bound.target, label: cap.title, description: cap.description }] };
   }
-  create(actor: AgentRequesterPrincipal, input: unknown, key: string) {
+  create(
+    actor: AgentRequesterPrincipal,
+    input: unknown,
+    key: string,
+    onCreated?: (requestId: string) => void,
+  ) {
     const data = C.parseAgentRequesterCreate(input),
       p = this.fullPreview(actor, data);
     return this.store.agentAssistance.create(
@@ -251,6 +256,7 @@ export class AgentRequesterStore {
       },
       key,
       actor,
+      onCreated,
     );
   }
   get(actor: AgentRequesterPrincipal, requestId: string) {
