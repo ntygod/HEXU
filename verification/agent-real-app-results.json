@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-08",
+  "sourceCommit": "d5f19a00aec3f637d0d0397d2244e95d4044efaf",
+  "runtime": "Node v24.19.0",
+  "authImplementation": "BetterAuth 1.7.6 via unchanged createIdentity",
+  "commands": [
+    {
+      "command": "node --test verification/agent-real-identity.test.mjs",
+      "exitCode": 0,
+      "passed": 1,
+      "failed": 0,
+      "coverage": "Actual in-memory BetterAuth setup, signed Cookie lookup, missing/invalid Cookie, Bearer non-substitution, sign-out revocation"
+    },
+    {
+      "command": "node --test verification/agent-real-app.test.mjs",
+      "exitCode": 0,
+      "passed": 8,
+      "failed": 0,
+      "subtests": 7,
+      "durationMs": 821.558847,
+      "coverage": [
+        "Unmodified createApp, attachIdentity, Store and all original route registration",
+        "Actual setup and invitation APIs create two ephemeral BetterAuth members",
+        "Original Host, Origin and client-header guards remain active",
+        "Concurrent requests retain session-derived owners; spoofed header/body ownership and cross-owner writes cannot succeed",
+        "Endpoint, capability and scoped grant APIs expose the capability as discoverable but non-callable",
+        "Actual signed browser Cookie and independent Agent Bearer are not interchangeable; mixed credentials, Origin, query and out-of-scope project are rejected",
+        "Current project role downgrade invalidates previously issued Agent credential and hides the grant",
+        "Sign-out invalidates the real Cookie on Agent resource management"
+      ]
+    }
+  ],
+  "boundaries": [
+    "Two isolated in-memory SQLite databases; ephemeral fake accounts and random test-only secrets",
+    "Fastify.inject only; no HTTP listener, public binding, external request or real account",
+    "Team mode disables NativeRuntime and does not call native.initialize; empty continuation table cannot dispatch work",
+    "No model, native runner, file-apply/restore diagnostic, identity late-response diagnostic, browser or full original test suite run",
+    "This validates server registration and authentication integration, not a real external Agent interoperability or remote deployment milestone",
+    "No production source edits or publication"
+  ]
+}

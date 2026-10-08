@@ -151,3 +151,14 @@ CI187 历史补记（最终 CI188 见上表）：`11eaddbd` 的工程 622/622、
 - 未实现/未验证：MCP/A2A桥、实际接收、双向请求/澄清、结果消费、真实客户端、跨设备与远程模型/部署。目录保持callable=false；独立能力读取不等于请求/执行或双Agent自主协作。没有真实账号激活或付费外连。
 
 细节与前置版本探测见[本轮记录](history/2026-10-08-agent-capability-entry.md)；下一项只看[22](22-next-delivery.md)。本候选仍待运行/界面补验，不以旧PR77或原普通候选通过记录替代新增代码验证。
+
+
+## 2026-10-08 补验：完整原server与真实身份应用API
+
+仅新增验证，生产代码未变。完整原server依赖闭包恢复，260份固定候选原TS文件逐blob一致；原tsconfig.server.json/include/exclude不变，`tsc -p tsconfig.server.json`退出0。257根文件、276仓库输入、803外部声明的来源记录用于核对检查范围，不是新增验收数量门槛。
+
+真实createApp + 原Better Auth + Store + 完整路由注册的API集成8/8（7子+1父）通过；没有fakePrincipal/Store/route替身，使用内存假账号和签名Cookie，覆盖setup/invite双用户、原身份hook、host/origin/client、两所有者隔离、token互斥/降权与signout。另真实Better Auth内存session基础1/1通过。这两组补齐上节“未覆盖Better Auth/完整control/全server编译”的历史缺口；原18/15/4组检查的替身边界不变。
+
+未监听端口，没有真实浏览器、模型、真实账户或外部服务；原99测试/native构建helper、整仓构建与full CI仍未运行。当前主要剩余是真实浏览器UI及用户所选“本机Codex+当前dot、双方经HEXU”的前置条件；HEXU MCP插件/events订阅/本机访问未接通，不能声称自动接收可用。原server编译和完整应用API现已通过，不因尚缺浏览器而退写为server全部不可运行。
+
+本轮状态维持3完成/82部分/17未实现。当前路线为同一用户两个Agent跨环境，跨成员里程碑仍需第二真实成员；账户、版本、费用与部署/持久权限另行核对授权。证据和官方接口来源见[补验记录](history/2026-10-08-agent-capability-entry.md#原server与真实身份完整应用api补验)与[前置路径](history/2026-10-08-agent-capability-entry.md#切片-1-前置技术探测)。
