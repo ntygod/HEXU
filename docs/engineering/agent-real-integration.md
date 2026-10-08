@@ -78,7 +78,7 @@
 
 ## 4. 原线程接回的具体探测任务（尚待用户本机接入）
 
-先只读核对选定设备、Codex版本和用户指明的已有聊天。只用该客户端支持的thread列表/读取/事件接口；**不读受禁会话目录、不猜ID、不从标题或cwd推导**。宿主由实际返回值建立绑定。读取不到该原聊天就记录 `existing_chat_access = blocked`，不能偷偷执行 `thread/start` 替代。
+先只读核对选定设备、Codex版本和用户指明的已有聊天。只用该客户端支持的thread列表/读取/事件接口；**不读受禁会话目录、不猜ID、不从标题或cwd推导**。宿主由实际返回值建立绑定。读取不到该原聊天就记录 `existing_chat_runtime_binding` 闸门为 blocked，不能偷偷执行 `thread/start` 替代。
 
 需要分别证明：
 
@@ -91,7 +91,7 @@
 
 可选技术路径：可访问同一线程存储的app-server宿主，从真实thread/read或start/resume结果取ID，在求助工具调用前完成绑定；消费保持原调用，必要时按已验证的同一thread/resume再turn/start。后者有额外恢复/费用/并发权限，不能自动开启。已有桌面聊天若不受该宿主支持，该路径判blocked。
 
-[Hooks文档](https://learn.chatgpt.com/docs/hooks)提供runtime session/turn/tool-use字段，可作为关联线索，但子Agent的session信息不能替代exact thread证据。没有在此承诺hook能动态更改已运行MCP配置；安装hook也需获准。新SDK测试会话可另做适配器冒烟，记录 `origin_kind = new_controlled_test_thread`，**绝不能报作用户既有聊天接回**。
+[Hooks文档](https://learn.chatgpt.com/docs/hooks)提供runtime session/turn/tool-use字段，可作为关联线索，但子Agent的session信息不能替代exact thread证据。没有在此承诺hook能动态更改已运行MCP配置；安装hook也需获准。新SDK测试会话可另做适配器冒烟，记录 `origin.kind = new_controlled_test_thread`，**绝不能报作用户既有聊天接回**。
 
 ## 5. 获准后的真实闭环步骤
 
@@ -106,7 +106,7 @@
 7. A在同一原工作中产出使用B知识的结果；从真实runtime观察相关item/turn和终态后核对ACK。原Task投影记录回答、claim与自报输出，人工采用非必要，不为了验收改Task完成状态。
 8. 审核证据并输出分项结论；按批准范围停止测试订阅/连接，记录撤销或自然到期的实际状态。停止外部执行只能按各客户端真实终态确认，不能用HEXU取消当证明。
 
-全过程只有人提供起始目标、批准与最终审核；人若在中间复制问题、澄清或答案给另一端，`human_relay_observed = true`，首个里程碑判fail。收集证据不得主动产生中间业务消息。
+全过程只有人提供起始目标、批准与最终审核；人若在中间复制问题、澄清或答案给另一端，`exchange.humanRelayObserved = true`，首个里程碑判fail。收集证据不得主动产生中间业务消息。
 
 ## 6. 证据模板的填写与判定
 
@@ -123,7 +123,7 @@
 | 答案有用 | B独有事实未提前传给A；产物应用该事实的局部语义检查 | 只在输出里机械重复答案或双方初始prompt已包含答案 |
 | 无重复执行 | 同一operation/request/claim，后续runtime调用数与原计划一致 | unknown后换key/新开线程，未查状态就重跑模型 |
 
-`verdict.real_cross_member_loop`仅在所有核心断言均有可审查证据且通过时填pass；其中任一真实环节未跑即not_run/blocked，证据不足为inconclusive。`existing_desktop_chat_continued`、`real_browser`和`production_deployment`独立判定，不能互相提升。
+`verdict.realCrossMemberLoop`仅在所有核心断言均有可审查证据且通过时填pass；其中任一真实环节未跑即not_run/blocked，证据不足为inconclusive。`verdict.existingDesktopChatContinued`、`verdict.realBrowser`和`verdict.productionDeployment`独立判定，不能互相提升。
 
 模板只保存脱敏索引，不自动证明来源。审核者必须在授权来源实际核对相关原始运行时/服务记录，再登记核对者与时间。哈希/别名/UTC先后或boolean都不是密码学证明；不建立伪造provider签名。
 
