@@ -30,14 +30,14 @@ const baseline = (task: Task): Baseline => ({
   title: task.title,
   description: task.description,
   attention: task.attention ?? null,
-  targetDate: task.targetDate ?? null,
+  targetDate: task.targetDate,
 });
 const initial = (task: Task, editorId: string): Draft => ({
   base: baseline(task),
   title: task.title,
   description: task.description,
   attention: task.attention ?? null,
-  targetDate: task.targetDate ?? null,
+  targetDate: task.targetDate,
   editorId,
   error: '',
 });
@@ -134,7 +134,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
     (draft.title.trim() !== draft.base.title ||
       draft.description.trim() !== draft.base.description ||
       (draft.attention?.trim() || null) !== draft.base.attention ||
-      (draft.targetDate ?? null) !== (draft.base.targetDate ?? null));
+      (draft.targetDate !== undefined && draft.targetDate !== draft.base.targetDate));
   const contentChanged =
     !!draft &&
     (current.title !== draft.base.title ||
@@ -179,7 +179,10 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
             title: local.title,
             description: local.description,
             attention: local.attention || null,
-            targetDate: local.targetDate || null,
+            // Missing projections are not an instruction to clear a stored date.
+            ...(local.targetDate !== undefined && local.targetDate !== local.base.targetDate
+              ? { targetDate: local.targetDate || null }
+              : {}),
           },
           key: crypto.randomUUID(),
         };
@@ -203,7 +206,8 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
       if (
         receipt.id !== local.base.taskId ||
         receipt.revision !== attempt.body.expectedRevision + 1 ||
-        (receipt.targetDate ?? null) !== (attempt.body.targetDate ?? null)
+        (Object.hasOwn(attempt.body, 'targetDate') &&
+          (receipt.targetDate ?? null) !== (attempt.body.targetDate ?? null))
       )
         throw new ApiError('服务未返回可核对的原修改回执，请确认原请求', 'INVALID_RESPONSE', 502);
       put(null);
@@ -311,7 +315,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
                 </Button>
               </div>
               <p className="hint">
-                保留草稿不会立即保存；再次保存会提交输入框中的全部标题、说明、关注内容和目标日期。
+                保留草稿不会立即保存；再次保存会提交输入框中的标题、说明、关注内容，以及相对所选基线有变化的目标日期。
               </p>
             </section>
           )}

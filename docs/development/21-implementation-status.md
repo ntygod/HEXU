@@ -30,9 +30,15 @@
 
 实际验证提交为`ab8c81e4fac2c904e969492c5771eccf1811babb`。新目录按该提交恢复198个所需文件，逐一核对Git blob SHA；735条import/资源引用完整解析，闭包仅Web/client/UI与共享契约/纯领域模块，不含db/control/runner实现。按原锁文件从npm官方源以`npm ci --ignore-scripts`安装依赖，未修改源码、配置或锁文件。
 
-Node24.19.0下，直接执行原`tsc -p apps/web/tsconfig.json --noEmit`通过；原Vite8.3.1配置的`vite build --config apps/web/vite.config.ts`也通过，处理166个模块。未使用替身或排除文件来运行这两项完整Web检查，也未通过顶层脚本执行server。主JS为686.48kB（gzip194.98kB），超过默认500kB的是非阻断体积警告，构建退出0。后续本次补证提交仅修改21/22文档，生产/配置blob与实际编译版本保持一致。
+Node24.19.0下，直接执行原`tsc -p apps/web/tsconfig.json --noEmit`通过；原Vite8.3.1配置的`vite build --config apps/web/vite.config.ts`也通过，处理166个模块。未使用替身或排除文件来运行这两项完整Web检查，也未通过顶层脚本执行server。主JS为686.48kB（gzip194.98kB），超过默认500kB的是非阻断体积警告，构建退出0。随后文档补证提交`35b825e`仅修改21/22文档，当时生产/配置blob与实际编译版本保持一致。
 
 前述各独立切片记录中的完整类型/构建未跑是其当时边界；当前统一候选已补齐完整Web类型与前端构建。server类型/构建、真实HTTP/浏览器/中文输入法、全工程/Playwright/CI仍未运行；静态编译不等于认证或文件操作诊断、功能执行或安全复核。
+
+### 组件缺失日期投影输入保护
+
+正常TaskPage经Store.detail/taskForRead已有日期投影，未证实用户正常入口实际丢日期。组件边界测试发现：输入缺失targetDate时，仅改说明可能把undefined变成null清掉存储日期。现编辑器保留缺失与明确空值区别，undefined在新请求中始终省略；明确null/日期仅在相对用户所选基线有变化时发送。原未知请求不重建，日期ACK只对原请求含日期时校验；原内容、修订、ownership和明确保留草稿语义保持。
+
+最终新增19项真实React＋Store/SQLite回归及原55项/组全部通过，包含评审发现的“缺失日期草稿→较新有日期基线→明确保留草稿→保存”路径。完整原Web类型及Vite构建重新通过（166模块，JS686.61kB/gzip195.03kB，500kB非阻断体积提示仍在）；198个Web输入只改变编辑器，未改配置/锁文件。生产改动仅该编辑器，工程/历史说明见[目标日期](../engineering/task-target-dates.md)和[保护记录](history/2026-10-08-task-target-dates.md#整合候选补充组件缺失投影输入保护)。server、浏览器及全CI未跑，不把组件替身检查等同真实HTTP或普通入口事故。
 
 ## 当前源码能力与主线边界
 
