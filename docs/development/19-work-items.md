@@ -2,7 +2,7 @@
 
 > D1：17 个工作包 × 6 项 = 102 个原工作项。保持原 ID、标题、状态/依据/剩余范围；不是 GitHub Issues 或人员排期。
 
-OAuth两步补充原03-01/03/06、16-04/05/06、17-01的实现依据：[认证库/发现/同意契约](history/2026-10-08-agent-oauth-contract.md)与[有限receiver绑定/challenge/逐次及订阅撤权](history/2026-10-08-agent-oauth-receiver.md)。均为默认关闭的内部契约与临时SQLite/虚构成员验证，现有listener未启用，未完成真实dot/部署。保留全部原条目和完成状态，102项仍3完成/85部分/14未实现。
+OAuth两步补充原03-01/03/06、16-04/05/06、17-01的实现依据：[认证库/发现/同意契约](history/2026-10-08-agent-oauth-contract.md)与[有限receiver绑定/challenge/逐次及订阅撤权](history/2026-10-08-agent-oauth-receiver.md)。均以临时SQLite/虚构成员验证；后续[窄路由与页面接线](history/2026-10-08-agent-oauth-wiring.md)默认关闭，未完成真实dot/部署。保留全部原条目和完成状态，102项仍3完成/85部分/14未实现。
 
 ## 1. 状态口径
 
@@ -161,3 +161,5 @@ OAuth两步补充原03-01/03/06、16-04/05/06、17-01的实现依据：[认证�
 
 
 2026-10-08 OAuth第二步为原03-01/03/06、16-04/05/06与17-01增加默认关闭的有限receiver绑定、独立scope交集、MCP challenge、业务回执及订阅撤权证据，见[记录](history/2026-10-08-agent-oauth-receiver.md)。不改变原102项ID/状态，当前3完成/85部分/14未实现；不是正式OAuth部署、真实插件接入或跨成员模型闭环。标准refresh/revoke、浏览器同意页面、真实注册与持久授权及HTTPS接线仍缺。
+
+2026-10-08 OAuth接线为上述原项补充默认关闭的独立TLS组合、Request/Response桥、原生登录/同意与原authorize回跳；不改变102项ID/状态。300秒限制保留，无refresh/真实浏览器/客户端/部署验收，见[本片记录](history/2026-10-08-agent-oauth-wiring.md)。

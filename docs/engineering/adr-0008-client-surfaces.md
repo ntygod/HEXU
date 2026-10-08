@@ -73,3 +73,5 @@ Windows 是需要独立解决的原生执行兼容问题。桌面壳跨平台，
 ## 7. 有限协作独立服务增量（2026-10-08）
 
 切片5增加单实例、直接TLS的有限协作listener，复用原team数据库及Assistance业务服务；仅允许独立有限Agent认证，不公开Web管理/原生或节点控制。preview/team-local仍回环。远端requester走经典MCP薄桥，receiver走独立MCP2工具/Events与bootstrap。此变化不是桌面/完整团队远程部署完成，也不是OAuth或真实dot联调证明。[配置与待验边界](agent-remote-events.md)。
+
+后续OAuth接线只扩展同一独立TLS协作服务的显式opt-in窄浏览器身份面，复用原identity数据库/secret及同一business授权，不公开原team-local应用、不新增身份/任务系统。MCP拒绝Cookie/Origin/query的边界保留，最小页面复用W1 tokens。默认关闭与未部署/真实客户端未验收边界见[接线说明](agent-oauth-wiring.md)。

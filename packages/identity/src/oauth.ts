@@ -9,6 +9,7 @@ import { getOAuthProviderState } from '@better-auth/oauth-provider';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
 import { z } from 'zod';
 import { verifyJwsAccessToken } from 'better-auth/oauth2';
+import { renderOAuthConsent, renderOAuthSignIn, renderOAuthError } from './oauth-pages.js';
 import {
   OAuthReceiverBindings,
   oauthDenied,
@@ -17,12 +18,12 @@ import {
 
 export const OAUTH_SCOPES = ['hexu:material_read', 'hexu:respond'] as const;
 export const OAUTH_PATH = '/collaboration-auth';
-/** Internal opt-in contract only. No CLI/env flag or listener mounts it in this delivery. */
+/** Explicit opt-in only; the independent remote service never enables this by default. */
 export interface OAuthIssuerOptions {
   origin: string;
   resource: string;
   client: { id: string; name: string; redirectUris: string[] };
-  /** Internal fixture/authorized deployment wiring only; never populated from HTTP or environment. */
+  /** Server-owned business handle, never populated from HTTP or client input. */
   receiverDatabase?: DatabaseSync;
 }
 const queryDigest = (value: string) =>
@@ -138,6 +139,17 @@ export async function createOAuthIssuer(
       {
         id: 'hexu-oauth-consent-contract',
         endpoints: {
+          hexuLoginContext: createAuthEndpoint(
+            '/hexu/login-context',
+            { method: 'POST', body: z.object({ oauth_query: z.string().min(1).max(12000) }) },
+            async () => {
+              // The official provider before-hook verifies the signature and expiry, without
+              // requiring a session on the login page. Never expose this helper as an HTTP route.
+              const state = await getOAuthProviderState();
+              if (!state?.query) throw new APIError('BAD_REQUEST');
+              return { query: state.query };
+            },
+          ),
           hexuConsentContext: createAuthEndpoint(
             '/hexu/consent-context',
             {
@@ -153,6 +165,10 @@ export async function createOAuthIssuer(
                 userId: ctx.context.session.user.id,
                 sessionId: ctx.context.session.session.id,
                 expiresAt: ctx.context.session.session.expiresAt,
+                account: {
+                  name: ctx.context.session.user.name,
+                  email: ctx.context.session.user.email,
+                },
               };
             },
           ),
@@ -314,6 +330,7 @@ export async function createOAuthIssuer(
     return Response.json({
       view: 'consent',
       client: { id: options.client.id, name: options.client.name },
+      account: current.account,
       resource: options.resource,
       redirectUri: params.get('redirect_uri'),
       scopes: params.get('scope')!.split(' '),
@@ -411,6 +428,28 @@ export async function createOAuthIssuer(
     }
   }
 
+  const pages = new WeakSet<Response>();
+  const page = (html: string, status = 200) => {
+    const response = new Response(html, {
+      status,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+    pages.add(response);
+    return response;
+  };
+  const loginReturn = async (request: Request, query: string) => {
+    if (!validQuery(new URLSearchParams(query), true)) throw new Error('Invalid login flow');
+    const context = await auth.api.hexuLoginContext({
+      headers: request.headers,
+      body: { oauth_query: query },
+    });
+    const original = new URLSearchParams(context.query);
+    original.delete('ba_param');
+    if (!validQuery(original)) throw new Error('Invalid authorization return');
+    // Never accept a returnTo/callback supplied by the browser. Only this issuer's authorize.
+    return issuer + '/oauth2/authorize?' + original;
+  };
+
   async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url),
       path = url.pathname;
@@ -431,14 +470,56 @@ export async function createOAuthIssuer(
       path === `${issuer.slice(options.origin.length)}/consent` ||
       path === OAUTH_PATH + '/sign-in' ||
       path === OAUTH_PATH + '/receiver-binding/revoke';
+    const form =
+      request.method === 'POST' &&
+      [OAUTH_PATH + '/sign-in', OAUTH_PATH + '/consent'].includes(path) &&
+      request.headers.get('content-type')?.split(';')[0] === 'application/x-www-form-urlencoded';
+    const html = /(?:^|[,\s])text\/html(?:[;,\s]|$)/.test(request.headers.get('accept') ?? '');
     if (
       browser &&
       request.method === 'POST' &&
       (request.headers.get('origin') !== options.origin ||
-        request.headers.get('content-type')?.split(';')[0] !== 'application/json' ||
+        (!form && request.headers.get('content-type')?.split(';')[0] !== 'application/json') ||
         request.headers.has('authorization'))
     )
       return failure(403);
+    let signedLoginQuery: string | undefined;
+    let returnToAuthorize: string | undefined;
+    if (form) {
+      const fields = new URLSearchParams(await request.text());
+      const login = path === OAUTH_PATH + '/sign-in';
+      const allowed = login
+        ? ['email', 'password', 'oauthQuery']
+        : ['consentId', 'oauthQuery', 'accept', 'scopes', 'receiver'];
+      if (
+        [...fields.keys()].some(
+          (key) => !allowed.includes(key) || (key !== 'scopes' && fields.getAll(key).length !== 1),
+        )
+      )
+        return failure(400);
+      let body: Record<string, unknown>;
+      if (login) {
+        signedLoginQuery = fields.get('oauthQuery') ?? '';
+        returnToAuthorize = await loginReturn(request, signedLoginQuery);
+        body = { email: fields.get('email'), password: fields.get('password') };
+      } else {
+        if (!['true', 'false'].includes(fields.get('accept') ?? '')) return failure(400);
+        body = {
+          consentId: fields.get('consentId'),
+          oauthQuery: fields.get('oauthQuery'),
+          accept: fields.get('accept') === 'true',
+          scopes: fields.getAll('scopes'),
+        };
+        if (fields.has('receiver')) body.receiver = JSON.parse(fields.get('receiver')!);
+      }
+      const headers = new Headers(request.headers);
+      headers.set('content-type', 'application/json');
+      headers.delete('content-length');
+      // Consent must return a JSON URL from the provider for the atomic binding/code check.
+      headers.set('accept', 'application/json');
+      headers.delete('sec-fetch-mode');
+      request = new Request(request.url, { method: 'POST', headers, body: JSON.stringify(body) });
+    }
     if (
       browser &&
       request.headers.get('sec-fetch-site') === 'cross-site' &&
@@ -505,6 +586,10 @@ export async function createOAuthIssuer(
     }
     if (path === OAUTH_PATH + '/jwks' && request.method === 'GET' && !url.search)
       return auth.handler(request);
+    if (path === OAUTH_PATH + '/sign-in' && request.method === 'GET' && html) {
+      await loginReturn(request, url.search.slice(1));
+      return page(renderOAuthSignIn(url.search.slice(1)));
+    }
     if (path === OAUTH_PATH + '/sign-in' && request.method === 'GET')
       return Response.json({ view: 'sign-in', registration: 'existing_invited_account_only' });
     if (path === OAUTH_PATH + '/sign-in' && request.method === 'POST' && !url.search) {
@@ -525,6 +610,15 @@ export async function createOAuthIssuer(
       );
       const headers = new Headers();
       for (const cookie of response.headers.getSetCookie()) headers.append('set-cookie', cookie);
+      if (form) {
+        if (!response.ok)
+          return page(
+            renderOAuthSignIn(signedLoginQuery!, '登录未成功，请核对邮箱和密码后重试。'),
+            response.status,
+          );
+        headers.set('Location', returnToAuthorize!);
+        return new Response(null, { status: 303, headers });
+      }
       // No raw session token or user record in browser-readable JSON.
       return Response.json(response.ok ? { ok: true } : { error: 'login_failed' }, {
         status: response.status,
@@ -547,10 +641,21 @@ export async function createOAuthIssuer(
       url.searchParams.set('prompt', 'consent');
       return auth.handler(new Request(url, request));
     }
-    if (path === OAUTH_PATH + '/consent' && request.method === 'GET')
-      return consentView(request, url.search.slice(1));
-    if (path === OAUTH_PATH + '/consent' && request.method === 'POST' && !url.search)
-      return consent(request);
+    if (path === OAUTH_PATH + '/consent' && request.method === 'GET') {
+      const response = await consentView(request, url.search.slice(1));
+      return html && response.ok
+        ? page(renderOAuthConsent(await response.json(), url.search.slice(1)))
+        : response;
+    }
+    if (path === OAUTH_PATH + '/consent' && request.method === 'POST' && !url.search) {
+      const response = await consent(request);
+      if (!form || !response.ok) return response;
+      const value = await response.json();
+      const callback = new URL(value.url);
+      if (!options.client.redirectUris.includes(callback.origin + callback.pathname))
+        return failure(400);
+      return new Response(null, { status: 303, headers: { Location: callback.href } });
+    }
     if (path === OAUTH_PATH + '/oauth2/token' && request.method === 'POST' && !url.search) {
       if (
         request.headers.has('cookie') ||
@@ -721,7 +826,7 @@ export async function createOAuthIssuer(
         }
         // Never let an unfinished client stream hold the shared DB/provider queue.
         response = await serial(() => handle(request));
-        if (response.status >= 400 && response.status < 500) {
+        if (response.status >= 400 && response.status < 500 && !pages.has(response)) {
           const body = await response
             .clone()
             .json()
@@ -743,11 +848,26 @@ export async function createOAuthIssuer(
       } catch {
         response = failure(bodyFailure ?? 400);
       }
+      if (
+        response.status >= 400 &&
+        !pages.has(response) &&
+        /(?:^|[,\s])text\/html(?:[;,\s]|$)/.test(request.headers.get('accept') ?? '') &&
+        [
+          OAUTH_PATH + '/sign-in',
+          OAUTH_PATH + '/consent',
+          OAUTH_PATH + '/oauth2/authorize',
+        ].includes(new URL(request.url).pathname)
+      ) {
+        response = page(renderOAuthError(response.status), response.status);
+      }
       const headers = new Headers(response.headers);
       headers.set('Cache-Control', 'no-store');
       headers.set('Referrer-Policy', 'no-referrer');
       headers.set('X-Content-Type-Options', 'nosniff');
-      headers.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+      headers.set(
+        'Content-Security-Policy',
+        `default-src 'none'; style-src 'self'; form-action 'self' ${options.client.redirectUris.join(' ')}; base-uri 'none'; frame-ancestors 'none'`,
+      );
       return new Response(response.body, { status: response.status, headers });
     },
   };

@@ -231,3 +231,9 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 OAuth资源adapter只有显式程序化注入才启用；现有本机/remote listener、CLI与环境变量均未开放。公开仅必要metadata/工具描述，无匿名业务权限；401/403与工具级challenge已实现。订阅保存有限验证上下文，不存JWT，TTL不超过JWT；缺少原验证器的重启失败关闭。标准refresh/revoke与无人干预长期OAuth订阅未交付。
 
 无真实凭据fixture及原receiver/events/MCP/Assistance回归、原server/Web类型/构建分别记录在[本片历史](history/2026-10-08-agent-oauth-receiver.md)，实现/使用边界见[工程说明](../engineering/agent-oauth-receiver.md)。未部署、安装真实插件、迁移活动库、接用户电脑、第二真实成员或模型；已有浏览器拒绝与原聊天残余保留。原102项状态不提高。
+
+## OAuth接线：默认关闭的TLS组合与原生页面（2026-10-08）
+
+基于第二步精确提交 `1e03b5f`，独立remote服务可显式复用现有identity文件/secret及同一business handle，区分浏览器OAuth与原有限MCP边界；登录/同意有无脚本HTML、原signed-query验证/authorize回跳和精确Request/Response桥。默认关闭，启动不注册client，不开放原Web/signup/节点/执行接口。
+
+代码/定向HTTP fixture检查见[本片记录](history/2026-10-08-agent-oauth-wiring.md)，配置和最小刷新后续定义见[接线说明](../engineering/agent-oauth-wiring.md)。实际浏览器、真实HTTPS部署/注册/插件/持久订阅、本机原聊天、第二成员及模型均未验收；token和OAuth订阅最长300秒，没有长期无人值守能力声明。旧各片的验证边界仍是其当时事实，不追溯改写。

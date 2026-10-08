@@ -6,7 +6,7 @@
 
 - 本机 Codex：既有经典 stdio MCP `2025-11-25`。发起者显式设置 `HEXU_TRANSPORT=remote`、`HEXU_CONTROL_URL=https://明确的服务地址` 后，经有限 requester API；仍须原 owner-issued `hexu_requester_` 凭据及原 thread/session 配置。默认仍只准回环 HTTP。经典 receiver 仅保留本机单请求预置兼容方式，不接受 remote 模式。
 - dot：独立 `/collaboration/mcp`，MCP2 `2026-07-28`。每次独立认证，不要求旧 initialize；支持 server/discover、tools/list/call 与 events/list/subscribe/unsubscribe。请求需现代 MCP-Protocol-Version、Mcp-Method、工具调用 Mcp-Name 及 params._meta 的协议版本/clientCapabilities。
-- 实现了有限 bearer 协议面，没有实现 OAuth 授权服务器或证明某真实 ChatGPT 账号接受该认证配置。正式接入必须核对插件支持的认证配置；不能把本机合成 bearer 证明当成真实安装成功。后续[OAuth第一步](agent-oauth-contract.md)已有默认关闭的独立认证契约，但本远端listener没有挂载它，后续[第二步](agent-oauth-receiver.md)已有默认关闭的有限主体映射/challenge/逐次及订阅撤权契约；本远端listener仍未挂载。
+- 原切片5交付有限 bearer 协议面；后续独立OAuth默认关闭接线不代表某真实 ChatGPT 账号已经接受该认证配置。正式接入必须核对插件支持的认证配置；不能把本机合成 bearer 证明当成真实安装成功。后续[OAuth第一步](agent-oauth-contract.md)已有默认关闭的独立认证契约，但默认关闭，后续[第二步](agent-oauth-receiver.md)已有默认关闭的有限主体映射/challenge/逐次及订阅撤权契约；本远端listener现可通过[显式接线配置](agent-oauth-wiring.md)组合上述契约和最小登录/同意页，默认保持关闭，未实际部署。
 
 官方依据：[Events](https://developers.openai.com/plugins/build/mcp-events)、[MCP server](https://developers.openai.com/plugins/build/mcp-server)、[现代 HTTP](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)。
 
@@ -34,7 +34,7 @@ URL和签名材料使用外部32字节key AES-256-GCM加密入库；AAD绑定订
 
 ## 独立 TLS 服务配置（不等于已部署）
 
-`preview`/`team-local` 主入口和loopback规则完全保留。额外入口只公开有限协作API，没有Web管理、注册、原生/节点控制或任意转发。使用现有已配置的 team 数据库；不把preview数据库转换为团队库，不自动开户或开放登录。
+`preview`/`team-local` 主入口和loopback规则完全保留。额外入口只公开有限协作API，没有Web管理、注册、原生/节点控制或任意转发；只有另行显式opt-in的OAuth登录/同意窄页面。使用现有已配置的 team 数据库；不把preview数据库转换为团队库，不自动开户；OAuth登录只可由独立显式配置开启。
 
 运行 `node dist/apps/control/src/remote-main.js` 需要：
 
@@ -45,7 +45,7 @@ URL和签名材料使用外部32字节key AES-256-GCM加密入库；AAD绑定订
 - HEXU_TLS_CERT_FILE / HEXU_TLS_KEY_FILE：服务证书与0600私钥文件
 - HEXU_EVENT_KEY_FILE：0600文件，恰好32原始字节；需独立备份并限制访问
 
-服务直接终止TLS，固定Host，不信任/接受forwarded headers，没有通用反向代理部署模式。服务进程与数据目录按最小OS权限运行；单实例，不运行两台投递协调器，不允许两个进程同时派发同一outbox。节点app-server端口留在个人设备内部。没有自动续期、OAuth、托管运营或Kubernetes能力声明。
+服务直接终止TLS，固定Host，不信任/接受forwarded headers，没有通用反向代理部署模式。服务进程与数据目录按最小OS权限运行；单实例，不运行两台投递协调器，不允许两个进程同时派发同一outbox。节点app-server端口留在个人设备内部。OAuth配置与300秒限制见[接线说明](agent-oauth-wiring.md)；没有自动续期、托管运营或Kubernetes能力声明。
 
 ## 备份、恢复与诊断
 

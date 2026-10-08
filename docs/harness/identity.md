@@ -25,4 +25,4 @@ Use request-scoped principals and PermissionService for direct objects, lists, s
 
 ## 有限远端协作边界
 
-独立 `remote-collaboration` TLS listener 只开放有限 requester/receiver/MCP2 协作面，不开放原Web登录、human API、节点或原生控制。preview/team-local host/origin边界继续不变；不以反向代理或隧道替代此入口。当前bearer作用域不是OAuth实现，真实插件认证另验。凭据、订阅与每次投递均重新验证当前身份/期限；receiver bootstrap只派生请求专属权限。详见[使用与部署边界](../engineering/agent-remote-events.md)。
+独立 `remote-collaboration` TLS listener 只开放有限 requester/receiver/MCP2 协作面，不开放原Web登录、human API、节点或原生控制；另行显式opt-in的OAuth只开放隔离登录/同意窄页面，与MCP边界分开。preview/team-local host/origin边界继续不变；不以反向代理或隧道替代此入口。原bearer作用域不是OAuth；独立OAuth组合默认关闭，真实插件认证另验。凭据、订阅与每次投递均重新验证当前身份/期限；receiver bootstrap只派生请求专属权限。详见[使用与部署边界](../engineering/agent-remote-events.md)。

@@ -12,7 +12,7 @@
 
 因此，**当前 owner-issued `hexu_receiver_` token 不符合官方所述的 ChatGPT 插件接入方式**。不是说所有未来平台方案都不可能，也不是一次真实安装失败的观测。预定义 OAuth client credentials 不是让 ChatGPT 任意携带 HEXU 静态 API token。
 
-仓库事实：`agent-mcp-http.ts` 在 discovery 前也调用有限 receiver Bearer 认证；工具无 OAuth `securitySchemes`，缺资源 metadata 和工具 `_meta["mcp/www_authenticate"]`；`remote-collaboration.ts` 只开放现有有限路径。这是可定位的兼容缺口，不是把 token 粘进插件设置即可补齐。
+准备片基线的可定位缺口是discovery前静态Bearer认证及缺少OAuth metadata/challenge。后续两步OAuth契约和[默认关闭接线](agent-oauth-wiring.md)已补代码，但真实客户端消费仍未验；不能把静态token粘进插件设置冒充完成接入。
 
 ### Codex 是另一条客户端路径
 
@@ -35,7 +35,7 @@
 | 环境 | 用户指定并批准测试 HTTPS origin、服务目标、证书和持久目录，明确到期/费用 | 未指定、未批准；不监听公网，不将现有 loopback 经代理/隧道公开 |
 | 两个成员 | 两个独立真实成员分别授权其 Agent；身份映射来自认证记录 | 未配置；用户本人 Codex + 本人 dot 只能先算同成员跨环境，不可改名伪装第二人 |
 | 有限分享 | 一个可丢弃 Task、A 的固定输入版本、B 可分享的专业知识及明确接收对象 | 未配置；不导出私人历史、整仓或其他成员资料 |
-| dot 认证 | 真客户端完成受支持 OAuth，映射到 B 的有限 receiver authority | 当前无 OAuth 代码；止于兼容准备，不能降为匿名或借 browser Cookie |
+| dot 认证 | 真客户端完成受支持 OAuth，映射到 B 的有限 receiver authority | OAuth契约和默认关闭的接线已有代码；真实客户端仍未验，不能降为匿名或借 browser Cookie |
 | 客户端接入 | 本机 Codex 与当前 dot 实际版本/资格、批准的插件/MCP配置 | 未配置；不修改用户设备、安装插件或持续凭据 |
 | 原工作身份 | 受支持宿主接口返回已选原聊天的 thread/session，绑定在求助前成立 | 当前仅环境变量自报；没有实际原聊天接口证据就停止消费验收 |
 | Events | 用户批准持久订阅，真实客户端返回订阅ID/期限，challenge成功 | 未启用；不手造平台订阅，不把合成 callback 当 dot |
@@ -43,9 +43,9 @@
 
 批准部署、OAuth注册、用户连接授权、有限资料分享、订阅及模型使用是不同决定。提供一个地址不等于批准全部动作。已有浏览器访问拒绝及暂停的原生/文件审阅仍有效。
 
-## 3. 最小 OAuth 桥接契约（两步已实现，真实接线未启用）
+## 3. 最小 OAuth 桥接契约（两步与默认关闭接线已实现，真实实例未启用）
 
-范围归属原 03-01/03/06、16-04/05/06、17-01；不新建工作项编号。第一步已交付默认关闭的认证库组合、discovery、session绑定同意及PKCE/resource契约，见[实现与边界](agent-oauth-contract.md)。后续[第二步](agent-oauth-receiver.md)已实现有限业务绑定/challenge/逐次及订阅撤权的默认关闭契约；没有开启任何现有服务入口，真实注册/授权、部署仍未交付。
+范围归属原 03-01/03/06、16-04/05/06、17-01；不新建工作项编号。第一步已交付默认关闭的认证库组合、discovery、session绑定同意及PKCE/resource契约，见[实现与边界](agent-oauth-contract.md)。后续[第二步](agent-oauth-receiver.md)已实现有限业务绑定/challenge/逐次及订阅撤权的默认关闭契约；独立TLS服务已有默认关闭的显式接线，但没有在真实实例启用；真实注册/授权、部署仍未交付。
 
 ### 是否复用 Better Auth
 
@@ -62,7 +62,7 @@
 5. consent/refresh不能扩大项目、材料、能力、到期或连接代次；连接被撤销、成员退出再加入、能力改版均不可因旧 refresh token 复活。OAuth access token轮换不得变成新业务身份或重建订阅/重放工作。OAuth撤销如何抑制既有订阅需明确实现并验证，不能只依赖短 access-token TTL。
 6. MCP2工具补 OAuth metadata/认证challenge，匿名只可读取必要公开discovery，不暴露工具调用结果、收件或材料。保留旧本机Bearer适配器，不将OAuth token塞给仅接受 `hexu_receiver_` 格式的旧函数；两种认证适配后才进入同一有限领域服务。不得变为通用HTTP代理。
 
-交付拆成两个小提交：A“认证库组合与discovery/consent契约”已实现为默认关闭的内部Request/Response模块；B“有限主体映射、MCP challenge与订阅撤权”的[内部契约](agent-oauth-receiver.md)已实现，仍未挂载listener。标准refresh/revoke均未开放；业务binding撤销会逐次阻止旧JWT及投递，不能将库的JWT短时到期当成即时撤权，细节见[实现说明](agent-oauth-contract.md#有限业务接入与未完成范围)。只有代码/fixture与文档，未获准前不注册真实client、保存凭据、连接账号、迁移活动库或开启订阅。
+交付拆成两个小提交：A“认证库组合与discovery/consent契约”已实现为默认关闭的内部Request/Response模块；B“有限主体映射、MCP challenge与订阅撤权”的[内部契约](agent-oauth-receiver.md)已实现，后续[最小接线](agent-oauth-wiring.md)已提供默认关闭的TLS组合和原生登录/同意页面。标准refresh/revoke均未开放；业务binding撤销会逐次阻止旧JWT及投递，不能将库的JWT短时到期当成即时撤权，细节见[实现说明](agent-oauth-contract.md#有限业务接入与未完成范围)。只有代码/fixture与文档，未获准前不注册真实client、保存凭据、连接账号、迁移活动库或开启订阅。
 
 ### 无真实凭据的可测验收
 

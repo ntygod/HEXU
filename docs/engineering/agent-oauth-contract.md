@@ -1,6 +1,6 @@
 # OAuth 第一步：认证库、发现与同意契约
 
-本页说明默认关闭的第一步协议组合。后续[第二步有限receiver绑定](agent-oauth-receiver.md)已实现独立主体映射、scope交集、MCP challenge及逐次/订阅撤权的内部契约；仍未给现有listener启用OAuth，没有真实账号连接、部署、持久订阅或模型调用。完整真实联调闸门仍见[联调手册](agent-real-integration.md)。
+本页说明默认关闭的第一步协议组合。后续[第二步有限receiver绑定](agent-oauth-receiver.md)已实现独立主体映射、scope交集、MCP challenge及逐次/订阅撤权的内部契约；现有独立TLS服务新增默认关闭的[窄路由/页面接线](agent-oauth-wiring.md)，没有真实账号连接、部署、持久订阅或模型调用。完整真实联调闸门仍见[联调手册](agent-real-integration.md)。
 
 ## 依赖与实现选择
 
@@ -14,11 +14,11 @@
 
 ## 关闭状态与隔离
 
-[createIdentity](../../packages/identity/src/index.ts)新增可选内部 `oauth` 配置；省略时返回 `oauth: null`，不会迁移 OAuth/JWKS/interaction 表，也不会注册客户端。既有 `localIdentityOptions`、主应用、remote listener、CLI和环境变量都没有开启该配置的入口。没有启动新 listener，现有本机/远端路由总闸不变。
+[createIdentity](../../packages/identity/src/index.ts)新增可选内部 `oauth` 配置；省略时返回 `oauth: null`，不会迁移 OAuth/JWKS/interaction 表，也不会注册客户端。既有 `localIdentityOptions` 与主应用不启用；独立remote listener/CLI只有显式新配置才组合OAuth，详见[接线](agent-oauth-wiring.md)。默认不启动新listener，本机及旧MCP/requester/receiver总闸不变。
 
-程序化 opt-in 使用同一个 identity SQLite 中已有的 user/account，复用既有密码/受邀开户记录；不复制用户，不用 email/display name 充当新的 subject 映射。issuer 固定为配置 HTTPS origin + `/collaboration-auth`，resource 固定为同 origin `/collaboration/mcp`。后续公开部署仍需专用 TLS、人机登录/同意页面及新的部署安全评审，不能把本机 handler 暴露出去。
+程序化 opt-in 使用同一个 identity SQLite 中已有的 user/account，复用既有密码/受邀开户记录；不复制用户，不用 email/display name 充当新的 subject 映射。issuer 固定为配置 HTTPS origin + `/collaboration-auth`，resource 固定为同 origin `/collaboration/mcp`。后续公开部署仍需获准TLS目标、真实浏览器/客户端验收与部署安全评审；原生登录/同意页面已有默认关闭实现，不能把本机handler暴露出去。
 
-OAuth cookie 使用独立 `__Secure-hexu-oauth` 命名、路径 `/collaboration-auth`、Secure/HttpOnly/SameSite=Lax。签名 secret 由原 identity secret 与 issuer 的固定 context 派生，避免仅改 cookie 名即可移植本机会话。原 team-local secret/cookie/会话流程不变。新登录仅窄 JSON 登录契约，返回 `{ok:true}` 与 HttpOnly cookie，不把 library session token/user 记录返给页面；浏览器表单/UI尚未交付。
+OAuth cookie 使用独立 `__Secure-hexu-oauth` 命名、路径 `/collaboration-auth`、Secure/HttpOnly/SameSite=Lax。签名 secret 由原 identity secret 与 issuer 的固定 context 派生，避免仅改 cookie 名即可移植本机会话。原 team-local secret/cookie/会话流程不变。窄JSON登录返回 `{ok:true}` 与 HttpOnly cookie，不暴露library session token；新增原生HTML表单沿同一handler登录后回原authorize。页面没有注册/重置能力；真实浏览器尚未验收。
 
 ## 迁移与静态注册
 
@@ -30,17 +30,17 @@ OAuth cookie 使用独立 `__Secure-hexu-oauth` 命名、路径 `/collaboration-
 
 ## Request/Response allowlist
 
-`oauth.handler(Request)` 是待集成的内部契约，固定 origin/host、不接受 Forwarded/x-forwarded，正文上限16KiB、URL上限12KiB。无业务数据路由、无公开 signup/setup/invite、无原始整个 Better Auth handler。
+`oauth.handler(Request)` 是经显式remote适配器接入的窄契约，固定 origin/host、不接受 Forwarded/x-forwarded，正文上限16KiB、URL上限12KiB。无业务数据路由、无公开 signup/setup/invite、无原始整个 Better Auth handler。
 
 - GET `/.well-known/oauth-authorization-server/collaboration-auth`，及 `/collaboration-auth/.well-known/oauth-authorization-server` 别名
 - GET `/.well-known/oauth-protected-resource`，及其 `/collaboration/mcp` 后缀别名
 - GET `/collaboration-auth/jwks`
-- GET/POST `/collaboration-auth/sign-in`：已有账户登录契约；没有 HTML界面
+- GET/POST `/collaboration-auth/sign-in`：已有账户登录契约；Accept HTML提供原生页面
 - GET `/collaboration-auth/oauth2/authorize`
 - GET/POST `/collaboration-auth/consent`：经验证的同意视图与明确决定
 - POST `/collaboration-auth/oauth2/token`：只收 form-urlencoded，public client，不接受Cookie/Origin/Authorization头
 
-同意/登录写入必须同源JSON；内部 provider consent 与 context 验证端点不能从allowlist直接调用。错误仅保留允许的 OAuth error code，响应 no-store/no-referrer，不能把token、code、signed query、cookie或内部错误正文写日志。
+同意/登录写入必须同源JSON或窄原生form-urlencoded表单（只有这两条路径）；内部 provider consent 与 context 验证端点不能从allowlist直接调用。错误仅保留允许的 OAuth error code，响应 no-store/no-referrer，不能把token、code、signed query、cookie或内部错误正文写日志。
 
 1.7.6 discovery 对纯静态 public client漏报 `none`，因此在窄wrapper中准确归一化为 `['none']`，不为修metadata而开启DCR。元数据删除未开放的 introspection、revoke、userinfo、backchannel logout和DPoP宣告。实际端点、issuer、resource与S256由fixture核对。
 

@@ -70,9 +70,9 @@
 
 **切片7：首个真实异构闭环的前置条件与获准联调。** 切片1—6本地代码已有相应证据；不能将无模型fixture或React renderer抬为真实跨成员/跨环境/浏览器验收。接手前由当前协调者确认环境和唯一owner，不自动开启第二个并行实现。
 
-真实HTTPS测试地址或部署目标尚待用户选择；这项信息征询不等于部署批准。dot插件认证（OAuth两步内部契约已实现，现有listener仍未启用）/持久授权订阅、本机Codex接入、第二真实成员及实际模型费用仍需明确批准。不能以重新打开两个聊天窗口、预置标识或新建替代Codex线程冒充原工作继续；双方必须经HEXU。已有浏览器拒绝继续不重试，不通过地址别名、代理、隧道、提权或真实部署绕开。
+真实HTTPS测试地址或部署目标尚待用户选择；这项信息征询不等于部署批准。dot插件认证（OAuth两步契约及默认关闭的窄路由/页面接线已实现，未在真实实例启用）/持久授权订阅、本机Codex接入、第二真实成员及实际模型费用仍需明确批准。不能以重新打开两个聊天窗口、预置标识或新建替代Codex线程冒充原工作继续；双方必须经HEXU。已有浏览器拒绝继续不重试，不通过地址别名、代理、隧道、提权或真实部署绕开。
 
-片7准备已形成[可执行顺序、停止条件与脱敏证据模板](../engineering/agent-real-integration.md)，尚未实际联调。官方当前ChatGPT插件认证不接受用户自供静态API token，现有限Bearer与dot接入之间确有OAuth兼容缺口。受控OAuth组合、discovery与session绑定consent的[第一步契约](../engineering/agent-oauth-contract.md)，以及[第二步有限receiver绑定、scope交集、MCP challenge与逐次/订阅撤权](../engineering/agent-oauth-receiver.md)均已有无真实凭据fixture实现；默认关闭，现有listener未启用。标准refresh/revoke尚未开放；自定义binding撤销不等于库JWT撤销。下一项仍是核定真实HTTPS目标、用户实例client/redirect与明确权限后，按联调手册完成隔离登录/同意页面及获准部署接线；不自行部署或安装插件。真实注册/用户授权/持久订阅和部署仍待确认。原聊天运行时身份适配需在用户指定设备/客户端获准后验证；不能以新SDK会话冒充。本文仍只有切片7一个下一项，未转入切片8。
+片7准备已形成[可执行顺序、停止条件与脱敏证据模板](../engineering/agent-real-integration.md)，尚未实际联调。官方当前ChatGPT插件认证不接受用户自供静态API token，现有限Bearer与dot接入之间确有OAuth兼容缺口。受控OAuth组合、discovery与session绑定consent的[第一步契约](../engineering/agent-oauth-contract.md)，以及[第二步有限receiver绑定、scope交集、MCP challenge与逐次/订阅撤权](../engineering/agent-oauth-receiver.md)均已有无真实凭据fixture实现；后续[窄路由与页面](../engineering/agent-oauth-wiring.md)已补默认关闭的显式组合，没有启用真实实例。标准refresh/revoke尚未开放；自定义binding撤销不等于库JWT撤销。下一项仍是核定真实HTTPS目标、用户实例client/redirect与明确权限后，按联调手册完成真实浏览器、客户端配置与获准部署验收；不自行部署或安装插件。真实注册/用户授权/持久订阅和部署仍待确认。原聊天运行时身份适配需在用户指定设备/客户端获准后验证；不能以新SDK会话冒充。本文仍只有切片7一个下一项，未转入切片8。
 
 ## 开始时读取
 
