@@ -3,11 +3,12 @@ import type { Task } from '../../../packages/contracts/src/index.js';
 import { ApiError, request } from '../../../packages/client/src/index.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { canEditTask, useApp } from './state.js';
+import { isValidTaskTargetDate } from '../../../packages/contracts/src/task-target-date.js';
 import './task-content-editor.css';
 
 // Owned by the current identity/space Provider. TaskPage also clears it on a denied detail read.
 export const TASK_EDIT_DRAFT = 'task-edit';
-type Content = Pick<Task, 'title' | 'description' | 'attention'>;
+type Content = Pick<Task, 'title' | 'description' | 'attention' | 'targetDate'>;
 type Baseline = Content & { taskId: string; shortId: string; revision: number };
 type Patch = Content & { expectedRevision: number };
 interface Attempt {
@@ -29,12 +30,14 @@ const baseline = (task: Task): Baseline => ({
   title: task.title,
   description: task.description,
   attention: task.attention ?? null,
+  targetDate: task.targetDate ?? null,
 });
 const initial = (task: Task, editorId: string): Draft => ({
   base: baseline(task),
   title: task.title,
   description: task.description,
   attention: task.attention ?? null,
+  targetDate: task.targetDate ?? null,
   editorId,
   error: '',
 });
@@ -55,6 +58,8 @@ function ContentComparison({ label, content }: { label: string; content: Content
         <dd>{content.title}</dd>
         <dt>说明</dt>
         <dd>{content.description || '未填写说明'}</dd>
+        <dt>目标日期</dt>
+        <dd>{content.targetDate || '未设置'}</dd>
         <dt>需要关注什么</dt>
         <dd>{content.attention || '未填写'}</dd>
       </dl>
@@ -128,12 +133,16 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
     !!draft &&
     (draft.title.trim() !== draft.base.title ||
       draft.description.trim() !== draft.base.description ||
-      (draft.attention?.trim() || null) !== draft.base.attention);
+      (draft.attention?.trim() || null) !== draft.base.attention ||
+      (draft.targetDate ?? null) !== (draft.base.targetDate ?? null));
   const contentChanged =
     !!draft &&
     (current.title !== draft.base.title ||
       current.description !== draft.base.description ||
-      (current.attention ?? null) !== draft.base.attention);
+      (current.attention ?? null) !== draft.base.attention ||
+      (current.targetDate ?? null) !== (draft.base.targetDate ?? null));
+
+  const validDate = !draft?.targetDate || isValidTaskTargetDate(draft.targetDate);
 
   function close() {
     if (!ownsEditor()) return;
@@ -160,7 +169,8 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
   async function send(confirm = false) {
     const local = latestDraft.current;
     if (!local || !ownsEditor() || inFlight.current) return;
-    if (!confirm && (local.attempt || blocked || !dirty || !local.title.trim())) return;
+    if (!confirm && (local.attempt || blocked || !dirty || !local.title.trim() || !validDate))
+      return;
     const packet = confirm
       ? local.attempt
       : {
@@ -169,6 +179,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
             title: local.title,
             description: local.description,
             attention: local.attention || null,
+            targetDate: local.targetDate || null,
           },
           key: crypto.randomUUID(),
         };
@@ -191,7 +202,8 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
       if (!matches()) return;
       if (
         receipt.id !== local.base.taskId ||
-        receipt.revision !== attempt.body.expectedRevision + 1
+        receipt.revision !== attempt.body.expectedRevision + 1 ||
+        (receipt.targetDate ?? null) !== (attempt.body.targetDate ?? null)
       )
         throw new ApiError('服务未返回可核对的原修改回执，请确认原请求', 'INVALID_RESPONSE', 502);
       put(null);
@@ -246,7 +258,9 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
               {draft.base.shortId} · 本次编辑基于任务修订 {draft.base.revision}
             </strong>
             <p>{draft.base.title}</p>
-            <p>只修改标题、说明与关注内容，不会自动发送给正在运行的模型。</p>
+            <p>
+              修改标题、说明、关注内容与可选目标日期。目标日期只用于人工规划，不会自动启动或停止执行；本次修改不会自动发送给正在运行的模型。
+            </p>
           </section>
           {blocked && (
             <section className="task-edit-conflict" aria-label="工作说明版本冲突">
@@ -258,7 +272,9 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
                 不会自动覆盖草稿或调整提交基线。
               </p>
               {changed && !contentChanged && (
-                <p>标题、说明与关注内容未变，任务的其他信息已有更新，仍需明确选择编辑基线。</p>
+                <p>
+                  标题、说明、关注内容与目标日期未变，任务的其他信息已有更新，仍需明确选择编辑基线。
+                </p>
               )}
               <div className="task-edit-comparison">
                 <ContentComparison label="本次原内容" content={draft.base} />
@@ -295,7 +311,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
                 </Button>
               </div>
               <p className="hint">
-                保留草稿不会立即保存；再次保存会提交输入框中的全部标题、说明和关注内容。
+                保留草稿不会立即保存；再次保存会提交输入框中的全部标题、说明、关注内容和目标日期。
               </p>
             </section>
           )}
@@ -333,6 +349,26 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
               placeholder="例如：等待接口字段确认"
             />
           </label>
+          <label className="field">
+            目标日期 <span>可选</span>
+            <input
+              aria-label="目标日期"
+              type="date"
+              min="0001-01-01"
+              max="9999-12-31"
+              value={draft.targetDate ?? ''}
+              disabled={locked}
+              onChange={(event) => put({ ...draft, targetDate: event.target.value || null })}
+            />
+          </label>
+          <p className="hint">
+            按当前浏览器本地日历判断今天；逾期只指目标日期已过的待处理或进行中任务。清空日期后保存即可移除。
+          </p>
+          {!validDate && (
+            <p className="form-error" role="alert">
+              请输入 0001–9999 年的真实日历日期。
+            </p>
+          )}
           {draft.error && (
             <p className="form-error" role="alert">
               {draft.error}
@@ -361,7 +397,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
             type="submit"
             variant="primary"
             busy={busy}
-            disabled={blocked || !!draft.attempt || !dirty || !draft.title.trim()}
+            disabled={blocked || !!draft.attempt || !dirty || !draft.title.trim() || !validDate}
           >
             保存修改
           </Button>

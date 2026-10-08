@@ -34,6 +34,8 @@ export interface Project {
   revision: number;
 }
 export interface Task {
+  /** Human planning read projection; absent from stored Task JSON and model material. */
+  targetDate?: string | null;
   /** Explicitly accepted handoff operator; absent on older tasks, never an access grant. */
   operatorUserId?: string | null;
   operatorName?: string | null;

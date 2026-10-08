@@ -1,3 +1,4 @@
+import { TaskTargetDate } from './task-target-date.js';
 import { TaskCheckpoints } from './checkpoints.js';
 import { TaskHandoffs } from './handoffs.js';
 import { TaskWorkBranches } from './work-branches.js';
@@ -168,6 +169,7 @@ export function TaskPage({ id }: { id: string }) {
         <div className="task-title">
           <h1>{task.title}</h1>
           <StatusBadge status={task.status} />
+          <TaskTargetDate task={task} />
           <button
             className="icon-button"
             aria-label="编辑工作说明"

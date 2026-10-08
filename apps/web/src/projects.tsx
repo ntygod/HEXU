@@ -6,6 +6,8 @@ import { TaskLabelChips } from './task-labels.js';
 import { ProjectTaskFilters, useProjectTaskFilters } from './project-task-filters.js';
 import { matchesProjectTaskStatus, projectTaskStatusColumns } from './project-task-status.js';
 import { matchesProjectTaskAttention } from './project-task-attention.js';
+import { matchesProjectTaskTargetDate } from './project-task-target-date.js';
+import { TaskTargetDate, useLocalCalendarDate } from './task-target-date.js';
 import { matchesTaskPeopleFilters } from '../../../packages/domain/src/index.js';
 import type { TaskStatus } from '../../../packages/contracts/src/index.js';
 import { Avatar, Button, Empty, Icon, StatusBadge } from '../../../packages/ui/src/index.js';
@@ -152,8 +154,11 @@ function ProjectPageContent({ id }: { id: string }) {
     setAttention,
     label,
     setLabel,
+    targetDate,
+    setTargetDate,
     clear,
   } = useProjectTaskFilters();
+  const today = useLocalCalendarDate();
   const [creating, setCreating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const project = data.projects.find((item) => item.id === id);
@@ -171,14 +176,27 @@ function ProjectPageContent({ id }: { id: string }) {
     canOrder: !!project && project.access !== 'view',
     tasks: visibleTasks,
     editableIds: visibleTasks.filter((task) => canEditTask(data, task)).map((task) => task.id),
-    scope: JSON.stringify([tab, view, filters, status, attention, label]),
+    scope: JSON.stringify([
+      tab,
+      view,
+      filters,
+      status,
+      attention,
+      label,
+      targetDate,
+      targetDate.kind === 'targetDate' &&
+      (targetDate.targetDate === 'today' || targetDate.targetDate === 'overdue')
+        ? today
+        : null,
+    ]),
   });
   const tasks = order.orderedTasks.filter(
     (task) =>
       label.kind !== 'invalid' &&
       matchesTaskPeopleFilters(task, filters) &&
       matchesProjectTaskStatus(task, status) &&
-      matchesProjectTaskAttention(task, attention),
+      matchesProjectTaskAttention(task, attention) &&
+      matchesProjectTaskTargetDate(task, targetDate, today),
   );
   const orderControls = useProjectOrderControls(order, tasks, view);
   if (!project)
@@ -343,12 +361,17 @@ function ProjectPageContent({ id }: { id: string }) {
               setLabel={setLabel}
               attention={attention}
               setAttention={setAttention}
+              targetDate={targetDate}
+              setTargetDate={setTargetDate}
               clear={clear}
             />
             <span className="muted">{tasks.length} 项任务</span>
           </div>
           <ProjectTaskOrderPanel controls={orderControls} />
-          {status.kind === 'invalid' || attention.kind === 'invalid' || label.kind === 'invalid' ? (
+          {status.kind === 'invalid' ||
+          attention.kind === 'invalid' ||
+          label.kind === 'invalid' ||
+          targetDate.kind === 'invalid' ? (
             <div role="alert">
               {label.kind === 'invalid' && (
                 <Empty icon="list" title="标签筛选无效" description="请重新选择标签或清除筛选。" />
@@ -361,6 +384,13 @@ function ProjectPageContent({ id }: { id: string }) {
                   icon="list"
                   title="关注筛选无效"
                   description="请重新选择关注情况或清除筛选。"
+                />
+              )}
+              {targetDate.kind === 'invalid' && (
+                <Empty
+                  icon="list"
+                  title="目标日期筛选无效"
+                  description="请重新选择目标日期条件或清除筛选；空白、重复和未知条件不会返回任务。"
                 />
               )}
             </div>
@@ -393,6 +423,7 @@ function ProjectPageContent({ id }: { id: string }) {
                               <p>{task.description || '打开任务查看讨论与成果。'}</p>
                             )}
                             <TaskLabelChips labels={task.labelNames} />
+                            <TaskTargetDate task={task} today={today} />
                             {task.attention && (
                               <span className="badge amber">{task.attention}</span>
                             )}
@@ -440,6 +471,7 @@ function ProjectPageContent({ id }: { id: string }) {
                   >
                     <TaskRow
                       task={task}
+                      today={today}
                       descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
                     />
                     <ProjectTaskOrderActions task={task} controls={orderControls} />
@@ -448,6 +480,7 @@ function ProjectPageContent({ id }: { id: string }) {
                   <TaskRow
                     key={task.id}
                     task={task}
+                    today={today}
                     descriptionMatch={taskDescriptionMatchSnippet(task, filters.q)}
                   />
                 ),

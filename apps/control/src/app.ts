@@ -1,3 +1,4 @@
+import { parseTaskTargetDate } from '../../../packages/contracts/src/task-target-date.js';
 import { attachCheckpoints } from './checkpoints.js';
 import { attachHandoffs } from './handoffs.js';
 import { attachWorkBranches } from './work-branches.js';
@@ -469,7 +470,7 @@ export async function createApp(
       items = items.filter((task) => task.projectId === id);
     }
     items = items
-      .map((task) => store.taskLabels.decorate(store.taskParticipants.decorate(task)))
+      .map((task) => store.taskForRead(task))
       .filter((task) => matchesTaskPeopleFilters(task, peopleFilters));
     if (query.cursor) {
       const position = items.findIndex((task) => task.id === query.cursor);
@@ -553,12 +554,14 @@ export async function createApp(
       title?: string;
       description?: string;
       attention?: string | null;
+      targetDate?: string | null;
     } = { expectedRevision: revision(body.expectedRevision) };
     if (body.status !== undefined)
       throw new DomainError('INVALID_INPUT', '请使用明确的完成或重新打开操作');
     if (
       Object.keys(body).some(
-        (field) => !['expectedRevision', 'title', 'description', 'attention'].includes(field),
+        (field) =>
+          !['expectedRevision', 'title', 'description', 'attention', 'targetDate'].includes(field),
       )
     )
       throw new DomainError(
@@ -570,6 +573,7 @@ export async function createApp(
       data.description = text(body.description, '说明', 12000, true);
     if (body.attention !== undefined)
       data.attention = body.attention === null ? null : text(body.attention, '等待原因', 300, true);
+    if (body.targetDate !== undefined) data.targetDate = parseTaskTargetDate(body.targetDate);
     return store.patchTask(param(request.params, 'taskId'), data, key(request.headers));
   });
   for (const [action, status] of [

@@ -656,4 +656,14 @@ CREATE TRIGGER task_label_event_immutable_delete BEFORE DELETE ON task_label_eve
  BEGIN SELECT RAISE(ABORT,'task label events are immutable'); END;
 `,
   },
+  {
+    version: 35,
+    sql: `
+-- Human-only planning metadata. Legacy tasks remain undated without backfill.
+CREATE TABLE task_target_dates (
+ task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+ target_date TEXT NOT NULL CHECK(length(target_date)=10)
+);
+`,
+  },
 ];
