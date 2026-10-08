@@ -1,4 +1,5 @@
 import { TaskLabelChips } from './task-labels.js';
+import { TaskTargetDate } from './task-target-date.js';
 import type { Result, Task } from '../../../packages/contracts/src/index.js';
 import { Avatar, Icon, RunBadge, StatusBadge } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp } from './state.js';
@@ -9,9 +10,11 @@ import type { TextMatchSnippet } from './text-match-snippet.js';
 export function TaskRow({
   task,
   descriptionMatch,
+  today,
 }: {
   task: Task;
   descriptionMatch?: TaskMatchSnippet | null;
+  today?: string;
 }) {
   const { data } = useApp();
   const run = data.runs
@@ -31,6 +34,7 @@ export function TaskRow({
             '个人工作'}
         </small>
         <TaskLabelChips labels={task.labelNames} />
+        <TaskTargetDate task={task} today={today} />
         {descriptionMatch && <TaskDescriptionMatch snippet={descriptionMatch} />}
       </div>
       {run && (

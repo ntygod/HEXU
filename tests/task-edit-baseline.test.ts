@@ -72,7 +72,7 @@ test('任务内容编辑只写Task、通知和原回执，保留模拟执行、�
         revision: before.revision,
         updatedAt: before.updatedAt,
       },
-      before,
+      { ...before, targetDate: null },
     );
     assert.equal(next.revision, before.revision + 1);
     assert.equal(next.title, '新标题');

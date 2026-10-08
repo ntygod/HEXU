@@ -1,3 +1,4 @@
+import { parseTaskTargetDate } from '../../contracts/src/task-target-date.js';
 import { AssistanceAdoptionsStore } from './assistance-adoption.js';
 import { ResultRevisions } from './result-revisions.js';
 import { AssistanceStore } from './assistance.js';
@@ -332,6 +333,19 @@ export class Store {
     if (this.teamMode) this.permissions.task(task, write);
     return task;
   }
+  /** Human-facing projection only; internal getTask/tasks remain unchanged. */
+  taskForRead(task: Task): Task {
+    return {
+      ...this.taskLabels.decorate(this.taskParticipants.decorate(task)),
+      targetDate: this.readTargetDate(task.id),
+    };
+  }
+  private readTargetDate(id: string): string | null {
+    const row = this.db
+      .prepare('SELECT target_date AS targetDate FROM task_target_dates WHERE task_id=?')
+      .get(id) as { targetDate: string } | undefined;
+    return row?.targetDate ?? null;
+  }
   private saveTask(task: Task) {
     this.db
       .prepare('UPDATE tasks SET body=?,project_id=? WHERE id=? AND space_id=?')
@@ -389,6 +403,7 @@ export class Store {
       title?: string;
       description?: string;
       attention?: string | null;
+      targetDate?: string | null;
     },
     key: string,
   ) {
@@ -400,13 +415,26 @@ export class Store {
       () => {
         const task = this.getTask(id, true);
         assertRevision(task.revision, data.expectedRevision);
-        const { expectedRevision: _, ...changes } = data;
-        return this.saveTask({
+        const { expectedRevision: _, targetDate, ...changes } = data;
+        if (targetDate !== undefined) {
+          const date = parseTaskTargetDate(targetDate);
+          if (date === null)
+            this.db.prepare('DELETE FROM task_target_dates WHERE task_id=?').run(id);
+          else
+            this.db
+              .prepare(
+                'INSERT INTO task_target_dates(task_id,target_date) VALUES(?,?) ON CONFLICT(task_id) DO UPDATE SET target_date=excluded.target_date',
+              )
+              .run(id, date);
+        }
+        const next = this.saveTask({
           ...task,
           ...changes,
           revision: task.revision + 1,
           updatedAt: now(),
         });
+        // Capture inside mutate: replays must retain this date, never today's projection.
+        return { ...next, targetDate: this.readTargetDate(id) };
       },
       () => {
         this.getTask(id, true);
@@ -981,7 +1009,7 @@ export class Store {
   }
   detail(id: string) {
     return {
-      task: this.taskLabels.decorate(this.taskParticipants.decorate(this.getTask(id))),
+      task: this.taskForRead(this.getTask(id)),
       messages: this.messages(id),
       runs: this.runs(id),
       results: this.results(id),
@@ -1000,9 +1028,7 @@ export class Store {
         ? this.collaboration.members().map((user) => this.profile(user))
         : demoMembers,
       projects: this.projects(),
-      tasks: this.tasks().map((task) =>
-        this.taskLabels.decorate(this.taskParticipants.decorate(task)),
-      ),
+      tasks: this.tasks().map((task) => this.taskForRead(task)),
       results: this.results(),
       runs: this.tasks().flatMap((task) => this.runs(task.id)),
     };

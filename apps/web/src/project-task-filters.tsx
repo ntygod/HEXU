@@ -12,6 +12,11 @@ import {
   type ProjectTaskAttentionSelection,
 } from './project-task-attention.js';
 import { parseProjectTaskLabel, type ProjectTaskLabelSelection } from './project-task-label.js';
+import {
+  parseProjectTaskTargetDate,
+  type ProjectTaskTargetDate,
+  type ProjectTaskTargetDateSelection,
+} from './project-task-target-date.js';
 import { useApp, useLoad } from './state.js';
 import './project-task-filters.css';
 
@@ -28,6 +33,7 @@ function readFilters() {
     },
     status: parseProjectTaskStatus(query),
     attention: parseProjectTaskAttention(query),
+    targetDate: parseProjectTaskTargetDate(query),
     view: query.get('view') === 'list' ? 'list' : 'board',
   };
 }
@@ -56,6 +62,7 @@ export function useProjectTaskFilters() {
     setStatus: (status: TaskStatus | '') => update({ status }),
     setLabel: (label: string) => update({ label }),
     setAttention: (attention: ProjectTaskAttention | '') => update({ attention }),
+    setTargetDate: (targetDate: ProjectTaskTargetDate | '') => update({ targetDate }),
     clear: () =>
       update({
         q: '',
@@ -64,10 +71,15 @@ export function useProjectTaskFilters() {
         status: '',
         attention: '',
         label: '',
+        targetDate: '',
       }),
   };
 }
-const ownerLabels = { available: '', read_only: ' · 当前只读', removed: ' · 已退出项目' };
+const ownerLabels = {
+  available: '',
+  read_only: ' · 当前只读',
+  removed: ' · 已退出项目',
+};
 // This placeholder exceeds the maximum label length, so a real label cannot collide.
 const invalidLabelValue = '__invalid_label_query_placeholder__';
 export function ProjectTaskFilters({
@@ -80,6 +92,8 @@ export function ProjectTaskFilters({
   setAttention,
   label,
   setLabel,
+  targetDate,
+  setTargetDate,
   clear,
 }: {
   projectId: string;
@@ -91,6 +105,8 @@ export function ProjectTaskFilters({
   setLabel(label: string): void;
   attention: ProjectTaskAttentionSelection;
   setAttention(attention: ProjectTaskAttention | ''): void;
+  targetDate: ProjectTaskTargetDateSelection;
+  setTargetDate(targetDate: ProjectTaskTargetDate | ''): void;
   clear(): void;
 }) {
   const { data, refresh } = useApp();
@@ -147,6 +163,31 @@ export function ProjectTaskFilters({
             )}
             <option value="present">有关注内容</option>
             <option value="absent">无关注内容</option>
+          </select>
+        </label>
+        <label>
+          目标日期
+          <select
+            aria-label="目标日期筛选"
+            value={
+              targetDate.kind === 'targetDate'
+                ? targetDate.targetDate
+                : targetDate.kind === 'invalid'
+                  ? 'invalid'
+                  : ''
+            }
+            onChange={(event) => setTargetDate(event.target.value as ProjectTaskTargetDate | '')}
+          >
+            <option value="">全部目标日期</option>
+            {targetDate.kind === 'invalid' && (
+              <option value="invalid" disabled>
+                链接中的目标日期筛选无效
+              </option>
+            )}
+            <option value="present">已设目标日期</option>
+            <option value="absent">未设目标日期</option>
+            <option value="today">今天（本地日期）</option>
+            <option value="overdue">逾期（待处理、进行中）</option>
           </select>
         </label>
         <label>
@@ -234,7 +275,14 @@ export function ProjectTaskFilters({
         filters.participantUserId ||
         label.kind !== 'default' ||
         status.kind !== 'default' ||
-        attention.kind !== 'default') && <Button onClick={clear}>清除筛选</Button>}
+        attention.kind !== 'default' ||
+        targetDate.kind !== 'default') && <Button onClick={clear}>清除筛选</Button>}
+      {targetDate.kind === 'targetDate' &&
+        (targetDate.targetDate === 'today' || targetDate.targetDate === 'overdue') && (
+          <span className="hint">
+            今天按浏览器本地日期判断；逾期只包括目标日期早于今天的待处理、进行中任务。
+          </span>
+        )}
       {error && (
         <span className="project-filter-error" role="alert">
           成员筛选信息读取失败{' '}

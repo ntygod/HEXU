@@ -11,6 +11,7 @@ import {
 import { ApiError, request } from '../../../packages/client/src/index.js';
 import { Button, Dialog } from '../../../packages/ui/src/index.js';
 import { canEditTask, useApp } from './state.js';
+import { handleTaskLabelKeyDown } from './task-label-input.js';
 import './task-labels.css';
 
 export function TaskLabelChips({ labels = [] }: { labels?: string[] }) {
@@ -282,12 +283,7 @@ function LabelEditor({
                   maxLength={32}
                   disabled={locked || labels.length >= TASK_LABEL_LIMIT}
                   onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      add();
-                    }
-                  }}
+                  onKeyDown={(event) => handleTaskLabelKeyDown(event, add)}
                 />
               </label>
               <Button

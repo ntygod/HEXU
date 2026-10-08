@@ -6,24 +6,42 @@ import { Button, Dialog, Icon, ToolMark } from '../../../packages/ui/src/index.j
 import { useApp, go, useTaskDraft } from './state.js';
 import { canCreateTask } from './task-creation.js';
 import './task-creation.css';
-export function NewTask({ onClose, projectId }: { onClose: () => void; projectId?: string }) {
+export interface NewTaskSource {
+  title: string;
+  description: string;
+  projectId: string;
+  available: boolean;
+}
+export function NewTask({
+  onClose,
+  projectId,
+  source,
+}: {
+  onClose: () => void;
+  projectId?: string;
+  source?: NewTaskSource;
+}) {
   const { data, taskCreation, notice } = useApp();
   const { view, open, close, detach, submit } = taskCreation;
   const [id] = useState(() => crypto.randomUUID());
   const closeCallback = useRef(onClose);
   closeCallback.current = onClose;
   const closeEntry = useCallback(() => closeCallback.current(), []);
-  const [title, setTitle] = useState(''),
-    [description, setDescription] = useState(''),
-    [project, setProject] = useState(projectId ?? '');
+  const [title, setTitle] = useState(source?.title ?? ''),
+    [description, setDescription] = useState(source?.description ?? ''),
+    [project, setProject] = useState(source?.projectId ?? projectId ?? '');
   useLayoutEffect(() => {
     open(id, closeEntry);
     return () => detach(id);
   }, [id, open, detach, closeEntry]);
   const pending = view.pending;
-  const body = pending?.packet.body ?? { title, description, projectId: project || null };
+  const body = pending?.packet.body ?? {
+    title,
+    description,
+    projectId: project || null,
+  };
   const busy = !!pending?.operationId;
-  const editable = canCreateTask(data, body.projectId);
+  const editable = canCreateTask(data, body.projectId) && (!source || source.available);
   useEffect(() => {
     if (view.blocked || !editable) {
       setTitle('');
@@ -32,7 +50,7 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
     }
     if (!editable && view.sessionId === id) {
       close(id);
-      notice('项目当前不可编辑，已清除本次任务输入', true);
+      notice('项目或所选来源当前不可用，已清除本次任务输入', true);
     }
   }, [editable, view.blocked, view.sessionId, id, close, notice]);
   useEffect(() => {
@@ -59,13 +77,24 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
         className="task-creation-form"
         onSubmit={(event) => {
           event.preventDefault();
-          void submit(id, { title, description, projectId: project || null }, !!pending);
+          if (!editable || (!pending && description.length > 12000)) return;
+          void submit(
+            id,
+            {
+              title,
+              description,
+              projectId: source?.projectId ?? (project || null),
+            },
+            !!pending,
+          );
         }}
       >
         <div className="dialog-body">
           {!pending && (
             <p className="muted">
-              一句话就可以开始，细节在工作中慢慢补充。创建只保存任务，不会启动执行。
+              {source
+                ? '已带入所选版本的反馈，请编辑要做的工作。后续任务保留在同一项目，只创建任务，不会启动执行或改变原任务状态。'
+                : '一句话就可以开始，细节在工作中慢慢补充。创建只保存任务，不会启动执行。'}
             </p>
           )}
           {pending && (
@@ -102,11 +131,15 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
             放在哪里
             <select
               value={body.projectId ?? ''}
-              disabled={!!pending}
+              disabled={!!pending || !!source}
               onChange={(e) => setProject(e.target.value)}
             >
               {pending ? (
                 <option value={body.projectId ?? ''}>{pending.packet.projectName}</option>
+              ) : source ? (
+                <option value={source.projectId}>
+                  {data.projects.find((item) => item.id === source.projectId)?.name}
+                </option>
               ) : (
                 <>
                   <option value="">我的个人工作</option>
@@ -121,6 +154,12 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
               )}
             </select>
           </label>
+          {!pending && description.length > 12000 && (
+            <p className="form-error" role="alert">
+              反馈与来源说明共 {description.length} 字符，超过 12000
+              字符；请明确精简后再创建，内容不会自动截断。
+            </p>
+          )}
           <label className="field">
             补充说明 <span>可选</span>
             <textarea
@@ -148,7 +187,12 @@ export function NewTask({ onClose, projectId }: { onClose: () => void; projectId
           <Button onClick={() => close(id)} type="button">
             {pending ? '暂时关闭' : '取消'}
           </Button>
-          <Button variant="primary" type="submit" busy={busy} disabled={!body.title.trim()}>
+          <Button
+            variant="primary"
+            type="submit"
+            busy={busy}
+            disabled={!body.title.trim() || (!pending && description.length > 12000)}
+          >
             {!pending && <Icon name="plus" />}
             {pending ? (pending.receipt ? '刷新已创建任务' : '确认原创建结果') : '创建任务'}
           </Button>
