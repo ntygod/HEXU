@@ -11,13 +11,17 @@ import {
   type ProjectTaskAttention,
   type ProjectTaskAttentionSelection,
 } from './project-task-attention.js';
+import { parseProjectTaskLabel, type ProjectTaskLabelSelection } from './project-task-label.js';
 import { useApp, useLoad } from './state.js';
 import './project-task-filters.css';
 
 function readFilters() {
   const query = new URLSearchParams(location.search);
+  const label = parseProjectTaskLabel(query);
   return {
+    label,
     filters: {
+      ...(label.kind === 'label' ? { label: label.label } : {}),
       q: query.get('q') ?? '',
       ownerUserId: query.get('ownerUserId')?.trim() ?? '',
       participantUserId: query.get('participantUserId')?.trim() ?? '',
@@ -50,12 +54,22 @@ export function useProjectTaskFilters() {
     setFilter: (key: keyof TaskPeopleFilters, value: string) =>
       update({ [key]: value }, key === 'q'),
     setStatus: (status: TaskStatus | '') => update({ status }),
+    setLabel: (label: string) => update({ label }),
     setAttention: (attention: ProjectTaskAttention | '') => update({ attention }),
     clear: () =>
-      update({ q: '', ownerUserId: '', participantUserId: '', status: '', attention: '' }),
+      update({
+        q: '',
+        ownerUserId: '',
+        participantUserId: '',
+        status: '',
+        attention: '',
+        label: '',
+      }),
   };
 }
 const ownerLabels = { available: '', read_only: ' · 当前只读', removed: ' · 已退出项目' };
+// This placeholder exceeds the maximum label length, so a real label cannot collide.
+const invalidLabelValue = '__invalid_label_query_placeholder__';
 export function ProjectTaskFilters({
   projectId,
   filters,
@@ -64,6 +78,8 @@ export function ProjectTaskFilters({
   setStatus,
   attention,
   setAttention,
+  label,
+  setLabel,
   clear,
 }: {
   projectId: string;
@@ -71,11 +87,20 @@ export function ProjectTaskFilters({
   setFilter(key: keyof TaskPeopleFilters, value: string): void;
   status: ProjectTaskStatusSelection;
   setStatus(status: TaskStatus | ''): void;
+  label: ProjectTaskLabelSelection;
+  setLabel(label: string): void;
   attention: ProjectTaskAttentionSelection;
   setAttention(attention: ProjectTaskAttention | ''): void;
   clear(): void;
 }) {
-  const { refresh } = useApp();
+  const { data, refresh } = useApp();
+  const labelOptions = [
+    ...new Set(
+      data.tasks
+        .filter((task) => task.projectId === projectId && task.visibility === 'project')
+        .flatMap((task) => task.labelNames ?? []),
+    ),
+  ].sort();
   const { value, error } = useLoad<ProjectTaskPeople>(`/projects/${projectId}/task-people`);
   return (
     <>
@@ -122,6 +147,35 @@ export function ProjectTaskFilters({
             )}
             <option value="present">有关注内容</option>
             <option value="absent">无关注内容</option>
+          </select>
+        </label>
+        <label>
+          标签
+          <select
+            aria-label="标签筛选"
+            value={
+              label.kind === 'label'
+                ? label.label
+                : label.kind === 'invalid'
+                  ? invalidLabelValue
+                  : ''
+            }
+            onChange={(event) => setLabel(event.target.value)}
+          >
+            <option value="">全部标签</option>
+            {label.kind === 'invalid' && (
+              <option value={invalidLabelValue} disabled>
+                链接中的标签无效
+              </option>
+            )}
+            {label.kind === 'label' && !labelOptions.includes(label.label) && (
+              <option value={label.label}>链接中的标签：{label.label}</option>
+            )}
+            {labelOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -178,6 +232,7 @@ export function ProjectTaskFilters({
       {(filters.q ||
         filters.ownerUserId ||
         filters.participantUserId ||
+        label.kind !== 'default' ||
         status.kind !== 'default' ||
         attention.kind !== 'default') && <Button onClick={clear}>清除筛选</Button>}
       {error && (

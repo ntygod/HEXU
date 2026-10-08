@@ -3,6 +3,7 @@ import { ResultRevisions } from './result-revisions.js';
 import { AssistanceStore } from './assistance.js';
 import { TaskAssignmentStore } from './task-assignment.js';
 import { TaskParticipantsStore } from './task-participants.js';
+import { TaskLabelsStore } from './task-labels.js';
 import { ProjectLifecycleStore } from './project-lifecycle.js';
 import { ProjectSettingsStore } from './project-settings.js';
 import { ProjectSourcesStore } from './project-sources.js';
@@ -68,6 +69,7 @@ export class Store {
   readonly projectLifecycle: ProjectLifecycleStore;
   readonly taskAssignment: TaskAssignmentStore;
   readonly taskParticipants: TaskParticipantsStore;
+  readonly taskLabels: TaskLabelsStore;
   readonly projectSources: ProjectSourcesStore;
   readonly projectAgreements: ProjectAgreementsStore;
   readonly projectMaterials: ProjectMaterialsStore;
@@ -110,6 +112,7 @@ export class Store {
     this.projectLifecycle = new ProjectLifecycleStore(this);
     this.taskAssignment = new TaskAssignmentStore(this);
     this.taskParticipants = new TaskParticipantsStore(this);
+    this.taskLabels = new TaskLabelsStore(this);
     this.projectSources = new ProjectSourcesStore(this);
     this.projectAgreements = new ProjectAgreementsStore(this);
     this.projectMaterials = new ProjectMaterialsStore(this);
@@ -978,7 +981,7 @@ export class Store {
   }
   detail(id: string) {
     return {
-      task: this.taskParticipants.decorate(this.getTask(id)),
+      task: this.taskLabels.decorate(this.taskParticipants.decorate(this.getTask(id))),
       messages: this.messages(id),
       runs: this.runs(id),
       results: this.results(id),
@@ -997,7 +1000,9 @@ export class Store {
         ? this.collaboration.members().map((user) => this.profile(user))
         : demoMembers,
       projects: this.projects(),
-      tasks: this.tasks().map((task) => this.taskParticipants.decorate(task)),
+      tasks: this.tasks().map((task) =>
+        this.taskLabels.decorate(this.taskParticipants.decorate(task)),
+      ),
       results: this.results(),
       runs: this.tasks().flatMap((task) => this.runs(task.id)),
     };

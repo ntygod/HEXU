@@ -6,6 +6,7 @@ import {
 } from '../../contracts/src/index.js';
 import type { TaskPeopleFilters } from '../../contracts/src/task-participants.js';
 export function matchesTaskPeopleFilters(task: Task, filters: TaskPeopleFilters): boolean {
+  if (filters.label && !task.labelNames?.includes(filters.label)) return false;
   if (filters.ownerUserId && task.ownerUserId !== filters.ownerUserId) return false;
   if (filters.participantUserId && !task.participantUserIds?.includes(filters.participantUserId))
     return false;

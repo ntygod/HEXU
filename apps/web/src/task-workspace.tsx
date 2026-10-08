@@ -5,6 +5,7 @@ import { TaskIntegrations } from './integrations.js';
 import { TaskAssistances } from './assistance.js';
 import { TaskOwner, recordedPerson } from './task-assignment.js';
 import { TaskParticipants } from './task-participants.js';
+import { TaskLabels } from './task-labels.js';
 import { TaskAgreements } from './project-agreements.js';
 import { RunProjectMaterials } from './project-materials.js';
 import { TaskDrafts } from './ai-drafts.js';
@@ -242,6 +243,7 @@ export function TaskPage({ id }: { id: string }) {
           <span>{task.visibility === 'private' ? '仅自己可见' : '项目成员可见'}</span>
           <TaskOwner task={task} />
           <TaskParticipants task={task} />
+          <TaskLabels task={task} />
           <TaskAgreements task={task} />
           <TaskDrafts task={task} />
           <TaskAssistances task={task} />

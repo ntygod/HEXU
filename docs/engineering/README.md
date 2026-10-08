@@ -27,6 +27,7 @@
 | 普通 Task 创建的未知结果确认与已接受后刷新 | [创建恢复](task-creation-request-recovery.md) |
 | Task 工作说明固定基线、冲突与原请求确认 | [工作说明编辑](task-edit-baseline.md) |
 | Task 完成/取消、已取消重开与未知结果确认 | [状态确认](task-completion-confirmation.md) |
+| 项目Task标签维护与精确筛选 | [任务标签](task-labels.md) |
 | 改派与参与者/筛选 | [负责人](task-assignment.md)、[参与](task-participants.md) |
 | 文本/链接资料、版本与删除恢复 | [项目资料](project-sources.md) |
 | 从讨论明确发布/替代约定 | [项目约定](project-agreements.md) |
