@@ -43,15 +43,15 @@
 
 批准部署、OAuth注册、用户连接授权、有限资料分享、订阅及模型使用是不同决定。提供一个地址不等于批准全部动作。已有浏览器访问拒绝及暂停的原生/文件审阅仍有效。
 
-## 3. 可交接的最小 OAuth 桥接任务（仅设计，未实现）
+## 3. 最小 OAuth 桥接任务（第一步契约已实现，第二步待交付）
 
-范围归属原 03-01/03/06、16-04/05/06、17-01；不新建工作项编号。先交付无真实账号可测试的代码，再等待真实注册/授权和部署决定。
+范围归属原 03-01/03/06、16-04/05/06、17-01；不新建工作项编号。第一步已交付默认关闭的认证库组合、discovery、session绑定同意及PKCE/resource契约，见[实现与边界](agent-oauth-contract.md)。没有开启任何现有服务入口；有限业务绑定/challenge/逐次撤权和真实注册/授权、部署仍未交付。
 
 ### 是否复用 Better Auth
 
 可以优先复用现有 Better Auth 身份引擎与经明确映射的 HEXU 用户，**不能直接公开现有 team-local handler**。当前锁定 `better-auth@1.7.6`，`packages/identity/src/index.ts` 仅允许 loopback，只有密码/会话与受邀开户，不包含 OAuth provider。
 
-[Better Auth MCP](https://better-auth.com/docs/plugins/mcp)现提供独立 `@better-auth/mcp`，配合 `@better-auth/cimd` 与 OAuth provider 实现 discovery、PKCE、资源绑定及刷新；[1.7迁移说明](https://better-auth.com/docs/guides/1-7-upgrade-guide)指出 MCP 已迁出核心包。本仓库未安装这些包，也未验证其精确版本与现有 SQLite adapter 的兼容。后续先核 1.7.6 匹配包与迁移，不复制旧 1.6 示例、不自行编写密码/OAuth引擎，不无关升级全仓。
+[Better Auth MCP](https://better-auth.com/docs/plugins/mcp)现提供独立 `@better-auth/mcp`，配合 `@better-auth/cimd` 与 OAuth provider 实现 discovery、PKCE、资源绑定及刷新；[1.7迁移说明](https://better-auth.com/docs/guides/1-7-upgrade-guide)指出 MCP 已迁出核心包。本片已核实并锁定 `@better-auth/mcp` 与 `@better-auth/oauth-provider@1.7.6`，组合 `jwt()+mcp()`，验证原SQLite账号迁移复用。暂选单个预配置public client，不安装/启用CIMD或DCR；实际dot入口仍待核对。未复制旧1.6示例，没有自行编写密码/OAuth引擎或无关升级全仓。
 
 ### 最小拆分与不扩权机制
 
@@ -62,7 +62,7 @@
 5. consent/refresh不能扩大项目、材料、能力、到期或连接代次；连接被撤销、成员退出再加入、能力改版均不可因旧 refresh token 复活。OAuth access token轮换不得变成新业务身份或重建订阅/重放工作。OAuth撤销如何抑制既有订阅需明确实现并验证，不能只依赖短 access-token TTL。
 6. MCP2工具补 OAuth metadata/认证challenge，匿名只可读取必要公开discovery，不暴露工具调用结果、收件或材料。保留旧本机Bearer适配器，不将OAuth token塞给仅接受 `hexu_receiver_` 格式的旧函数；两种认证适配后才进入同一有限领域服务。不得变为通用HTTP代理。
 
-建议交接切成两个小提交：A“认证库组合与discovery/consent契约”，B“有限主体映射、MCP challenge与订阅撤权”。只有代码/fixture与文档，未获准前不注册真实client、保存凭据、连接账号、迁移活动库或开启订阅。
+交付拆成两个小提交：A“认证库组合与discovery/consent契约”已实现为默认关闭的内部Request/Response模块；B“有限主体映射、MCP challenge与订阅撤权”仍是下一代码步骤。A不开放refresh/revoke，不能将库的JWT短时到期当成撤权，细节见[实现说明](agent-oauth-contract.md#第二步接口与未完成范围)。只有代码/fixture与文档，未获准前不注册真实client、保存凭据、连接账号、迁移活动库或开启订阅。
 
 ### 无真实凭据的可测验收
 

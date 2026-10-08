@@ -8,6 +8,7 @@ import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { getMigrations } from 'better-auth/db/migration';
 import { DomainError } from '../../contracts/src/index.js';
 import type { IdentityUser } from '../../contracts/src/identity.js';
+import { createOAuthIssuer, type OAuthIssuerOptions } from './oauth.js';
 
 export interface IdentityOptions {
   databasePath: string;
@@ -15,6 +16,7 @@ export interface IdentityOptions {
   setupCode: string;
   baseURL: string;
   trustedOrigins: string[];
+  oauth?: OAuthIssuerOptions;
 }
 export interface CurrentIdentity {
   user: IdentityUser;
@@ -93,6 +95,13 @@ export async function createIdentity(options: IdentityOptions) {
     db.close();
     throw error;
   }
+  let oauth = null;
+  try {
+    oauth = options.oauth ? await createOAuthIssuer(db, options.secret, options.oauth) : null;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
   const userCount = () => Number(db.prepare('SELECT count(*) AS n FROM "user"').get()!.n);
   const current = async (headers: Headers, refresh = true): Promise<CurrentIdentity | null> => {
     const response = await auth.api.getSession({
@@ -127,6 +136,7 @@ export async function createIdentity(options: IdentityOptions) {
     };
   };
   return {
+    oauth,
     setupRequired: () => userCount() === 0,
     current,
     async setup(

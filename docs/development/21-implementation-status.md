@@ -215,3 +215,10 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 在片6精确远端基线上新增[执行手册与脱敏证据模板](../engineering/agent-real-integration.md)。核对官方当前ChatGPT插件认证与代码后，确认现有限静态Bearer不能直接用于该插件路径；OAuth库组合、有限身份映射/challenge/撤权已有最小后续代码定义，尚未实现。Better Auth现有本机身份可以作为复用基础，不能据此开放原loopback handler。
 
 原工作验收要求真实宿主返回exact thread/session、求助前绑定、同原thread接收工具答案及继续产物/turn终态；新SDK受控会话不冒充用户已有桌面聊天，host_reported/claim/ACK保持原语义。当前未接用户电脑、平台插件、真实订阅、第二成员或模型，HTTPS目标与相应授权仍缺。仅文档/空模板检查，无运行时代码变化或状态提升；详细依据与边界见[准备记录](history/2026-10-08-agent-real-integration-readiness.md)。
+
+
+## OAuth第一步：默认关闭的认证与同意契约（2026-10-08）
+
+在真实联调准备基线 `8ace878` 上，锁定1.7.6匹配包并复用既有Better Auth身份SQLite；隔离issuer/cookie签名、精确静态public client、发现/JWKS/S256/resource绑定、签名同意query的session绑定及单次nonce，新增内部Request/Response allowlist。实现入口：[OAuth契约](../../packages/identity/src/oauth.ts)，使用/限制：[工程说明](../engineering/agent-oauth-contract.md)。
+
+默认 `oauth:null`，现有本机/远端listener没有启用代码。仅完成第一步；没有OAuth receiver主体、业务scope交集、MCP challenge、逐次撤权或订阅撤权；refresh/revoke未开放。真实dot/Codex配置、浏览器同意、HTTPS部署、跨成员及原桌面聊天继续均未验收。实际检查、独立审查及修正见[本片记录](history/2026-10-08-agent-oauth-contract.md)。原102项状态不提高。
