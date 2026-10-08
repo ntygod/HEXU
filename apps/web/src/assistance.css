@@ -179,3 +179,11 @@
     padding: var(--hx-space-3);
   }
 }
+.assistance-pending {
+  margin-block: var(--hx-space-2);
+  padding-inline-start: var(--hx-space-4);
+  overflow-wrap: anywhere;
+}
+.assistance-pending li + li {
+  margin-top: var(--hx-space-2);
+}

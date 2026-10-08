@@ -44,3 +44,9 @@ The W1 adoption editor keeps explicit multi-ranges and baseline on conflicts/tra
 ## 有限接收连接与 Events
 
 receiver连接明确绑定当前project/participant/endpoint/capability/delegation grant，接收以后新建请求无需人工逐条搬token；各业务事务仍核请求专属材料scope和当前权限。旧capability_read不扩权。原outbox同事务生成ID-only事件；2xx仅收件，未知只能重试相同eventId，不能重复启动原工作。Events签名材料和callback必须加密保存，不输出到payload/日志；每连接前校验公共HTTPS地址并pin DNS，撤权后停止投递。协议/测试入口见[有限远端说明](../engineering/agent-remote-events.md)。
+
+## Task协作体验
+
+Task内协作投影复用Assistance/Events/消费事实，没有独立可写进度。callback 2xx只确认通知收件；accepted业务状态、Agent回答、claim、host_reported绑定及external_self_report输出各自展示。缺失收件时间保持未知；能力元数据不能当在线状态。父Task-only观测不进入受限接收详情，不呈现callback/secret/native session。
+
+创建/补充/回应未发送草稿仅在当前身份和空间的Provider内存保留，收起/短暂GET失败不丢输入或改基线；权限变化清除，硬刷新不持久化。未知写保持原包/原键，已收成功ACK后的刷新只GET。协助深链接位于原Task，普通往返折叠而需人问题与回答单列；人工采用仍是明确动作。检查入口为[只读投影测试](../../tests/task-agent-collaborations.test.ts)、[状态语义测试](../../tests/task-collaboration-status.test.ts)与[片6记录](../development/history/2026-10-08-task-collaboration-experience.md)。

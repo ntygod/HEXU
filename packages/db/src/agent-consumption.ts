@@ -318,4 +318,27 @@ export class AgentConsumptionStore {
       }),
     };
   }
+  /** A single safe original-work view for an authorized parent Task reader. */
+  getForTask(taskId: string, requestId: string): C.AgentTaskConsumption | null {
+    this.store.getTask(taskId);
+    if (
+      !this.store.db
+        .prepare('SELECT 1 FROM agent_original_work_bindings WHERE task_id=? AND request_id=?')
+        .get(taskId, requestId)
+    )
+      return null;
+    const { binding, consumption } = this.view(requestId);
+    const b = binding!;
+    return {
+      requestId,
+      binding: {
+        id: b.id,
+        requesterParticipantId: b.requesterParticipantId,
+        provider: b.origin.provider,
+        createdAt: b.createdAt,
+        cancelledAt: b.cancelledAt,
+      },
+      consumption,
+    };
+  }
 }

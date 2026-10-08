@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 import { ApiError, request } from '../../../packages/client/src/index.js';
 import type { AssistanceDetail } from '../../../packages/contracts/src/assistance.js';
@@ -21,14 +22,33 @@ type State = {
   conflict: boolean;
   receiptId?: string;
 };
+type DraftAccess =
+  | { kind: 'create'; taskId: string; messageId: string }
+  | { kind: 'input'; id: string; taskId: string }
+  | { kind: 'respond'; id: string };
+type Draft = { access: DraftAccess; value: unknown };
 const empty: State = { pending: null, busy: false, error: '', denied: false, conflict: false };
 function createStore() {
   const entries = new Map<string, State>();
+  const drafts = new Map<string, Draft>();
   const listeners = new Set<() => void>();
   let revision = 0;
   return {
     active: true,
     entries: () => [...entries.entries()],
+    drafts: () => [...drafts.entries()],
+    getDraft: (key: string) => drafts.get(key)?.value,
+    setDraft: (key: string, value: unknown, access: DraftAccess) => {
+      if (entries.get(key)?.denied) return;
+      if (!drafts.has(key)) revision++;
+      drafts.set(key, { value, access });
+      listeners.forEach((fn) => fn());
+    },
+    clearDraft: (key: string) => {
+      if (!drafts.delete(key)) return;
+      revision++;
+      listeners.forEach((fn) => fn());
+    },
     revision: () => revision,
     get: (key: string) => entries.get(key) ?? empty,
     subscribe: (fn: () => void) => {
@@ -39,18 +59,21 @@ function createStore() {
     },
     set: (key: string, next: State) => {
       entries.set(key, next);
+      if (next.denied) drafts.delete(key);
       revision++;
       listeners.forEach((fn) => fn());
     },
     clear: () => {
       entries.clear();
+      drafts.clear();
       revision++;
       listeners.forEach((fn) => fn());
     },
   };
 }
 const Context = createContext<ReturnType<typeof createStore> | null>(null);
-/** Separate business packets, in memory only; never stores credential responses. */
+/** Business packets and unsent editor drafts belong to the mounted identity/space only.
+ * Never store credential responses or use browser persistence here. */
 export function AgentAssistanceProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createStore);
   const { data, version } = useApp();
@@ -62,7 +85,7 @@ export function AgentAssistanceProvider({ children }: { children: ReactNode }) {
       store.clear();
     };
   }, [store]);
-  // Continue read-only access validation for collapsed uncertain packets.
+  // Continue read-only access validation while drawers and their drafts are collapsed.
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -94,10 +117,54 @@ export function AgentAssistanceProvider({ children }: { children: ReactNode }) {
         }
         try {
           const current = await request<AssistanceDetail>(path, { signal: controller.signal });
-          if (assistance && current.assistance.accessEnded) revoke();
+          if (assistance) {
+            const item = current.assistance;
+            if (
+              item.accessEnded ||
+              (packet.path.endsWith('/responses') && item.state === 'open' && !item.canReply) ||
+              (packet.path.endsWith('/input-revisions') &&
+                (!item.canManage || !item.canEditTask)) ||
+              (packet.path.endsWith('/state') && !item.canManage)
+            )
+              revoke();
+          }
         } catch (cause) {
           if (cause instanceof ApiError && [401, 403, 404].includes(cause.status)) revoke();
           // Transient reads never discard a fixed package.
+        }
+      }
+      for (const [scope, draft] of store.drafts()) {
+        const { access } = draft;
+        const revoke = (accessDenied = true) => {
+          if (controller.signal.aborted || !store.active || store.getDraft(scope) === undefined)
+            return;
+          const pending = store.get(scope).pending;
+          if (access.kind !== 'respond' || (accessDenied && pending?.path.endsWith('/responses')))
+            store.set(scope, { ...empty, denied: true });
+          else store.clearDraft(scope);
+        };
+        if (access.kind !== 'respond') {
+          const task = data.tasks.find((item) => item.id === access.taskId);
+          if (!task || !canEditTask(data, task)) {
+            revoke();
+            continue;
+          }
+        }
+        const path =
+          access.kind === 'create'
+            ? `/tasks/${encodeURIComponent(access.taskId)}/messages/${encodeURIComponent(access.messageId)}/assistance-preview`
+            : `/assistances/${encodeURIComponent(access.id)}`;
+        try {
+          const current = await request<AssistanceDetail>(path, { signal: controller.signal });
+          if (access.kind !== 'create') {
+            const item = current.assistance;
+            if (item.accessEnded) revoke();
+            else if (access.kind === 'respond' && !item.canReply) revoke(item.state === 'open');
+            else if (access.kind === 'input' && (!item.canManage || !item.canEditTask)) revoke();
+          }
+        } catch (cause) {
+          if (cause instanceof ApiError && [401, 403, 404, 422].includes(cause.status)) revoke();
+          // Failed GETs preserve both the text and its original editing baseline.
         }
       }
       if (!controller.signal.aborted) timer = setTimeout(() => void verify(), 5000);
@@ -110,12 +177,37 @@ export function AgentAssistanceProvider({ children }: { children: ReactNode }) {
   }, [store, revision, version, data]);
   return <Context.Provider value={store}>{children}</Context.Provider>;
 }
+/** Only editor text, selection and fixed business baselines may use this memory. */
+export function useAgentAssistanceDraft<T>(scope: string, initial: T, access: DraftAccess) {
+  const context = useContext(Context);
+  const [local] = useState(createStore);
+  const store = context ?? local;
+  const fallback = useRef({ scope, value: initial });
+  if (fallback.current.scope !== scope) fallback.current = { scope, value: initial };
+  const value = useSyncExternalStore(
+    store.subscribe,
+    () => (store.getDraft(scope) as T | undefined) ?? fallback.current.value,
+    () => (store.getDraft(scope) as T | undefined) ?? fallback.current.value,
+  );
+  function setValue(next: SetStateAction<T>) {
+    if (!store.active) return;
+    const previous = (store.getDraft(scope) as T | undefined) ?? fallback.current.value;
+    store.setDraft(
+      scope,
+      typeof next === 'function' ? (next as (value: T) => T)(previous) : next,
+      access,
+    );
+  }
+  return [value, setValue, () => store.clearDraft(scope)] as const;
+}
 export function useAgentAssistanceCommand<T>(scope: string, onSaved: (value: T) => void) {
   const context = useContext(Context);
   const [local] = useState(createStore);
   const store = context ?? local;
   const current = useRef(onSaved);
+  const currentScope = useRef(scope);
   current.current = onSaved;
+  currentScope.current = scope;
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -143,8 +235,9 @@ export function useAgentAssistanceCommand<T>(scope: string, onSaved: (value: T) 
         result && typeof result === 'object' && 'assistance' in result
           ? (result as { assistance?: { id?: string } }).assistance?.id
           : undefined;
+      store.clearDraft(scope);
       store.set(scope, receiptId ? { ...empty, receiptId } : empty);
-      if (alive.current) current.current(result);
+      if (alive.current && currentScope.current === scope) current.current(result);
     } catch (cause) {
       if (!store.active || store.get(scope).pending !== packet) return;
       const known = cause instanceof ApiError && cause.status >= 400 && cause.status < 500;
@@ -180,6 +273,7 @@ export function AgentAssistanceFeedback({
 }) {
   return (
     <>
+      {command.busy && <p role="status">正在确认本次操作，请稍候…</p>}
       {command.error && (
         <p role="alert" className="form-error">
           {command.error}

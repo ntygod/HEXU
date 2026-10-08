@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { DomainError, record, revision, text } from '../../../packages/contracts/src/index.js';
 import type { AssistanceDetail } from '../../../packages/contracts/src/assistance.js';
 import type { Store } from '../../../packages/db/src/store.js';
+import { TaskAgentCollaborationsStore } from '../../../packages/db/src/task-agent-collaborations.js';
+import { parseTaskAgentCollaborationList } from '../../../packages/contracts/src/task-agent-collaborations.js';
 import {
   authenticateAgentAssistanceConnection,
   isAgentAssistancePath,
@@ -55,9 +57,18 @@ export function requestView(detail: AssistanceDetail) {
 
 /** Explicitly selected text only; this transport never acquires the owner's human permissions. */
 export function attachAgentAssistance(app: FastifyInstance, store: Store) {
+  const collaborations = new TaskAgentCollaborationsStore(store);
   const body = { bodyLimit: 64 * 1024 };
   const id = (r: FastifyRequest, name: string) => text(record(r.params)[name], name, 150);
   const key = (r: FastifyRequest) => text(r.headers['idempotency-key'], '操作标识', 128);
+  app.get('/api/v1/tasks/:taskId/agent-collaborations', async (r, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return collaborations.list(id(r, 'taskId'), parseTaskAgentCollaborationList(r.query));
+  });
+  app.get('/api/v1/tasks/:taskId/agent-collaborations/:assistanceId', async (r, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return collaborations.get(id(r, 'taskId'), id(r, 'assistanceId'));
+  });
   app.post('/api/v1/tasks/:taskId/agent-assistance-preview', body, async (r) =>
     store.agentAssistance.preview(id(r, 'taskId'), r.body),
   );

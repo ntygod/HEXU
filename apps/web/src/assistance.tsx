@@ -1,3 +1,4 @@
+import { useTaskAssistanceLocation } from './task-assistance-location.js';
 import { AgentAssistanceThread, agentPhase } from './agent-assistance-thread.js';
 import { AdoptAssistance, AssistanceAdoptionHistory } from './assistance-adoption.js';
 import { useEffect, useState } from 'react';
@@ -33,35 +34,29 @@ function assistanceState(item: Pick<Assistance, 'ai' | 'agent' | 'state'>) {
 }
 export function TaskAssistances({ task }: { task: Task }) {
   const { data } = useApp();
-  const [open, setOpen] = useState(false),
-    [id, setId] = useState<string | null>(null),
-    [busy, setBusy] = useState(false);
+  const location = useTaskAssistanceLocation(task.id);
+  const [busy, setBusy] = useState(false);
+  const id = location.selected === 'all' ? null : location.selected;
   if (data.mode !== 'team-local') return null;
   return (
     <>
-      <button
-        className="text-button"
-        onClick={() => {
-          setId(null);
-          setOpen(true);
-        }}
-      >
+      <button className="text-button" onClick={() => location.open('all')}>
         协助记录
       </button>
-      {open && (
-        <Dialog title="任务协助" drawer onClose={() => !busy && setOpen(false)}>
+      {location.selected && (
+        <Dialog title="任务协助" drawer onClose={() => !busy && location.close()}>
           <div className="assistance-drawer">
             {id ? (
               <>
                 <div className="assistance-tabs">
-                  <Button type="button" disabled={busy} onClick={() => setId(null)}>
+                  <Button type="button" disabled={busy} onClick={() => location.open('all')}>
                     返回协助记录
                   </Button>
                 </div>
                 <AssistanceThread id={id} onBusy={setBusy} />
               </>
             ) : (
-              <AssistanceItems taskId={task.id} onSelect={setId} />
+              <AssistanceItems taskId={task.id} onSelect={location.open} />
             )}
           </div>
         </Dialog>
@@ -72,12 +67,69 @@ export function TaskAssistances({ task }: { task: Task }) {
 export function AssistanceWorkbench() {
   const { data } = useApp();
   if (data.mode !== 'team-local') return null;
+  return <AssistanceWorkbenchContent />;
+}
+function AssistanceWorkbenchContent() {
+  const sent = useAssistanceRead<AssistanceList>(
+    '/assistances?box=sent&state=agent_attention',
+    5000,
+  );
+  const received = useAssistanceRead<AssistanceList>(
+    '/assistances?box=received&state=agent_attention',
+    5000,
+  );
+  const items = [
+    ...new Map(
+      [...(sent.value?.items ?? []), ...(received.value?.items ?? [])].map((item) => [
+        item.id,
+        item,
+      ]),
+    ).values(),
+  ];
+  const pending = items;
   return (
     <section className="assistance-entry">
       <Icon name="chat" />
       <div>
         <strong>同事与 AI 协助</strong>
         <p>查看收到的片段和回复，或继续你发起的问题。</p>
+        {pending.length > 0 && (
+          <ul className="assistance-pending" aria-label="协作待补充与范围决定">
+            {pending.slice(0, 3).map((item) => (
+              <li key={item.id}>
+                <Link
+                  to={
+                    item.taskLink
+                      ? `/tasks/${encodeURIComponent(item.taskLink.id)}?assistance=${encodeURIComponent(item.id)}`
+                      : `/assistances/${encodeURIComponent(item.id)}`
+                  }
+                >
+                  待补充或确认范围：
+                  {item.question}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {(pending.length > 3 || sent.value?.nextCursor || received.value?.nextCursor) && (
+          <p className="hint">
+            <Link to="/assistances?box=sent&attention=1">查看全部待补充事项</Link>
+          </p>
+        )}
+        {(sent.error || received.error) && (
+          <p className="hint">
+            待处理暂时无法刷新。
+            <Button
+              type="button"
+              onClick={() => {
+                sent.retry();
+                received.retry();
+              }}
+            >
+              重读待处理
+            </Button>
+          </p>
+        )}
         <Link to="/assistances">
           打开我的协助 <Icon name="arrow" size={14} />
         </Link>
@@ -110,11 +162,13 @@ export function AssistancePage({ id }: { id?: string }) {
   );
 }
 function AssistanceItems({ taskId, onSelect }: { taskId?: string; onSelect?(id: string): void }) {
-  const [box, setBox] = useState('received'),
+  const params = new URLSearchParams(location.search);
+  const [box, setBox] = useState(!taskId && params.get('box') === 'sent' ? 'sent' : 'received'),
     [all, setAll] = useState(!!taskId),
+    [attentionOnly, setAttentionOnly] = useState(!taskId && params.get('attention') === '1'),
     [cursor, setCursor] = useState<string | null>(null);
   const read = useAssistanceRead<AssistanceList>(
-    `${taskId ? '/tasks/' + taskId : ''}/assistances?box=${box}&state=${all ? 'all' : 'active'}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
+    `${taskId ? '/tasks/' + taskId : ''}/assistances?box=${box}&state=${attentionOnly ? 'agent_attention' : all ? 'all' : 'active'}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`,
     5000,
   );
   return (
@@ -144,9 +198,23 @@ function AssistanceItems({ taskId, onSelect }: { taskId?: string; onSelect?(id: 
             </Button>
           </>
         )}
+        {!taskId && (
+          <label className="assistance-consent">
+            <input
+              type="checkbox"
+              checked={attentionOnly}
+              onChange={(event) => {
+                setAttentionOnly(event.target.checked);
+                setCursor(null);
+              }}
+            />
+            只看待补充或确认范围
+          </label>
+        )}
         <label className="assistance-consent">
           <input
             type="checkbox"
+            disabled={attentionOnly}
             checked={all}
             onChange={(e) => {
               setAll(e.target.checked);
@@ -199,7 +267,9 @@ function AssistanceItems({ taskId, onSelect }: { taskId?: string; onSelect?(id: 
         })}
         {read.value?.items.length === 0 && (
           <p className="work-empty-text">
-            这里还没有协助记录。可以在任务的一条讨论下选择“请同事协助”。
+            {attentionOnly
+              ? '当前没有待补充或确认范围的协作。'
+              : '这里还没有协助记录。可以在任务的一条讨论下选择协助入口。'}
           </p>
         )}
         {!read.value && !read.error && <p role="status">正在读取协助记录…</p>}

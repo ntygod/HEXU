@@ -1,3 +1,4 @@
+import { TaskCollaboration } from './task-collaboration.js';
 import { TaskTargetDate } from './task-target-date.js';
 import { TaskCheckpoints } from './checkpoints.js';
 import { TaskHandoffs } from './handoffs.js';
@@ -402,6 +403,7 @@ export function TaskPage({ id }: { id: string }) {
                 <RunProjectMaterials key={lastRun.id} run={lastRun} />
               )}
               <MessageList messages={messages} />
+              {team && <TaskCollaboration key={id} taskId={id} />}
               {lastRun?.provider === 'native' && <NativeEvents run={lastRun} />}
               {!messages.length && (
                 <Empty

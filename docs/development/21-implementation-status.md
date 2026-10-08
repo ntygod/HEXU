@@ -199,3 +199,13 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 基于片4 `bb1c6be` 增加先授权后新请求bootstrap，无逐请求token搬运；独立MCP2 HTTP `2026-07-28`与原业务读/澄清/回答；持久订阅、加密callback/secret、原outbox原子ID-only投递及未知收件恢复。单独直接TLS有限listener与显式remote requester桥不放宽preview/team-local；没有OAuth、真实插件安装或部署完成声明。
 
 实际证据及跨进程全链见[片5历史](history/2026-10-08-agent-remote-events.md)，配置/恢复见[工程说明](../engineering/agent-remote-events.md)。全部账号、key、callback和模型行为为可丢弃fixture；2xx仅收件，真实本机Codex/当前dot、第二真实成员、真实remote/模型继续及浏览器残余不变。原状态/片1—4证据不追溯覆盖。
+
+## 切片6：原 Task 内协作体验（2026-10-08）
+
+基于片5 `0d4cbf57`，复用既有协助创建/固定材料预览、协商、人工采用、W1抽屉和Task。新增当前父Task权限下的只读协作聚合与单项查询，不新增数据库表、Task/Run或第二业务状态。原过程内每请求一条摘要；澄清/范围决定突出，普通往返折叠，回答及原工作消费分开；工作台有限待处理由持久Assistance去重投影。
+
+送达仅显示最新协作通知的callback观测，2xx不等于Agent接受、回答或执行；旧表没有收件时间，明确未知，不拿事件时间替代。原工作绑定为host_reported，claim不是使用确认，后续输出为external_self_report；取消未来回接不等于外部停止。配置/可请求能力从不显示已在线。
+
+选择器保留后端允许发现但不可请求的能力及安全阻碍；问题/选区/固定基线在同身份/空间Provider内存中跨抽屉收起和读失败保留，权限变化清除，硬刷新不持久化私人输入。Task内请求深链接与Back/Forward复用原Dialog；有限接收方详情仍不读取或透露父Task/Project、callback、密钥和原生会话引用。
+
+实际检查与剩余见[片6历史](history/2026-10-08-task-collaboration-experience.md)。真实浏览器路线仍受此前明确拒绝而未重试，无视觉或真实键盘焦点验收；本机Codex/当前dot/第二真实成员/HTTPS部署/真实模型仍待明确授权和环境。原片1—5历史不追溯改写。本轮15-03仅有限协作链投影升部分实现，当前3完成/85部分/14未实现，无整项完成提升。

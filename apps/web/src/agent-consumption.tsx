@@ -1,3 +1,4 @@
+import { time } from './state.js';
 import { Button } from '../../../packages/ui/src/index.js';
 import { useAssistanceRead } from './assistance-common.js';
 import type { AgentResultConsumption } from '../../../packages/contracts/src/agent-consumption.js';
@@ -30,6 +31,7 @@ export function AgentConsumptionStatus({
           <Button onClick={read.retry}>重读回接记录</Button>
         </p>
       )}
+      {read.denied && <p>原工作回接记录已隐藏；当前访问权限不允许读取。</p>}
       {!read.denied && (
         <>
           <p>
@@ -47,9 +49,14 @@ export function AgentConsumptionStatus({
                       ? '结果已领取，后续使用尚未确认；恢复时只核对，不重复启动。'
                       : '原工作已绑定，等待回答或发起 Agent 取用。'}
           </p>
+          {item?.binding && (
+            <p className="hint">
+              原工作关联来源：接入端报告（host_reported） · {time(item.binding.createdAt)}
+            </p>
+          )}
           {consumed && (
             <p className="hint">
-              来源回应 {consumed.responseId} · 固定输入修订 {consumed.inputRevision}
+              固定输入修订 {consumed.inputRevision} · 领取时间 {time(consumed.claimedAt)}
             </p>
           )}
           {ack && (
@@ -61,6 +68,9 @@ export function AgentConsumptionStatus({
                     : '请求结束或输入改变后的迟到观测，未启动新工作。'}
                 </p>
               )}
+              <p className="hint">
+                后续输出来源：external_self_report · {time(ack.observedAt)}，未获提供方独立验证。
+              </p>
               <pre>{ack.output}</pre>
             </>
           )}

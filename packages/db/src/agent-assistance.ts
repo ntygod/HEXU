@@ -222,8 +222,9 @@ export class AgentAssistanceStore {
     id: string,
     action: 'read' | 'respond' | 'manage' | 'credential',
     actor?: AssistanceActor,
+    persistExpiry = true,
   ) {
-    this.expire();
+    if (persistExpiry) this.expire();
     const { item, env } = this.raw(id),
       task = this.task(item);
     const requesterActor = actor && isRequester(actor) ? actor : undefined;
@@ -733,7 +734,25 @@ export class AgentAssistanceStore {
     return this.get(receipt.id, actor);
   }
   get(id: string, actor?: AssistanceActor): AssistanceDetail {
-    const { item, env, task, valid, parent, requester, owner } = this.access(id, 'read', actor),
+    return this.detail(id, actor);
+  }
+  /** Current human Assistance visibility without persisting expiry as a read side effect. */
+  getReadOnly(id: string): AssistanceDetail {
+    return this.detail(id, undefined, false);
+  }
+  /** Strict parent authority and no expiry writes for the Task-only read projection. */
+  getForTask(taskId: string, id: string): AssistanceDetail {
+    this.store.getTask(taskId);
+    if (this.raw(id).item.taskId !== taskId) throw missing();
+    return this.detail(id, undefined, false);
+  }
+  private detail(id: string, actor?: AssistanceActor, persistExpiry = true): AssistanceDetail {
+    const { item, env, task, valid, parent, requester, owner } = this.access(
+        id,
+        'read',
+        actor,
+        persistExpiry,
+      ),
       input = this.inputRaw(id, env.input_revision),
       stage = this.stage(item, env);
     let sourceChanged: boolean | null = null;

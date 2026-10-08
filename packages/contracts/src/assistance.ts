@@ -166,7 +166,7 @@ export function parseAssistanceList(value: unknown) {
     state:
       b.state === undefined
         ? ('active' as const)
-        : enumValue(b.state, ['active', 'all'] as const, '协助状态'),
+        : enumValue(b.state, ['active', 'all', 'agent_attention'] as const, '协助状态'),
   };
 }
 export function parseAssistanceRecipients(value: unknown) {

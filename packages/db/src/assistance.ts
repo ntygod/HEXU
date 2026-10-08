@@ -401,6 +401,7 @@ export class AssistanceStore {
   list(query: ReturnType<typeof parseAssistanceList>, taskId?: string): AssistanceList {
     this.team();
     if (taskId) this.store.getTask(taskId);
+    if (query.state === 'agent_attention') return this.agentAttention(query, taskId);
     const filter = taskId
       ? 'task_id=?'
       : `${query.box === 'received' ? 'recipient_id' : 'requester_id'}=?`;
@@ -420,6 +421,47 @@ export class AssistanceStore {
       const { snapshot: _snapshot, ...item } = this.get(id, { before: null, limit: 1 }).assistance;
       return item;
     });
+    return { items, nextCursor: visible.length > query.limit ? items.at(-1)!.id : null };
+  }
+  /** Unresolved clarification/scope negotiation the current requester can manage.
+   * Agent acceptance/answering is not an implicit human todo. Filter before pagination.
+   */
+  private agentAttention(
+    query: ReturnType<typeof parseAssistanceList>,
+    taskId?: string,
+  ): AssistanceList {
+    const filter = taskId
+      ? 'a.task_id=?'
+      : `a.${query.box === 'received' ? 'recipient_id' : 'requester_id'}=?`;
+    const rows = this.store.db
+      .prepare(
+        `SELECT a.id FROM assistances a JOIN assistance_agent_requests r ON r.assistance_id=a.id
+       WHERE a.space_id=? AND ${filter} AND a.state='open' ORDER BY a.rowid DESC`,
+      )
+      .all(this.store.spaceId, taskId ?? this.store.actorId) as { id: string }[];
+    let visible: AssistanceList['items'] = [];
+    for (const { id } of rows) {
+      try {
+        const { snapshot: _snapshot, ...item } =
+          this.store.agentAssistance.getReadOnly(id).assistance;
+        if (
+          item.state === 'open' &&
+          !item.accessEnded &&
+          item.canManage &&
+          item.agent?.phase === 'waiting_input'
+        )
+          visible.push(item);
+      } catch (error) {
+        // A previously visible request may lose current source, membership or recipient authority.
+        if (!(error instanceof DomainError && error.status === 404)) throw error;
+      }
+    }
+    if (query.cursor) {
+      const at = visible.findIndex((item) => item.id === query.cursor);
+      if (at < 0) throw new DomainError('INVALID_CURSOR', '协助列表已变化，请返回首页', 409);
+      visible = visible.slice(at + 1);
+    }
+    const items = visible.slice(0, query.limit);
     return { items, nextCursor: visible.length > query.limit ? items.at(-1)!.id : null };
   }
   private replyActor(id: string) {

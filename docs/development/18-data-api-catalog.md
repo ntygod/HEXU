@@ -482,3 +482,13 @@ GET `/api/v1/tasks/:taskId/agent-consumptions` 只给当前父Task读者原回�
 `POST /collaboration/mcp` 是独立MCP2 `2026-07-28`，不是旧stdio握手。提供server/discover、tools/list/call、events/list/subscribe/unsubscribe；工具4项复用receiver原业务。`hexu.assistance.changed`的input为空object，payload仅requestId，无replay cursor。订阅/回调验证、加密静态secret、轮换、同ID bounded retry与当前权限再验在[实现](../../apps/control/src/agent-events.ts)及[安全发送](../../apps/control/src/event-webhook.ts)。传输accepted不改Assistance业务完成。
 
 独立TLS应用只允许上述MCP及requester/receiver有限REST，拒绝human API、原生/runner、旧request-token远程receiver及不匹配Host/forwarded/browser headers。原createApp仍loopback。真实插件OAuth/账号连接、HTTPS部署及跨成员模型闭环未验；不要把协议fixture视为这些能力已完成。
+
+## 切片6：Task内只读协作投影
+
+契约 [task-agent-collaborations.ts](../../packages/contracts/src/task-agent-collaborations.ts)。GET `/api/v1/tasks/:taskId/agent-collaborations?limit=20&cursor=...` 返回 `{items,nextCursor}`，limit最多50；GET同路径 `/:assistanceId` 返回单项。两者当前Task读取权限优先，拒绝跨Task ID，仅父Task渠道可用；不扩受限receiver/requester通道。
+
+投影组合原Assistance/不可变输入、已有Events投递、原工作绑定和消费记录；SQLite只读模式下可查询，不补写到期状态，不新增迁移。字段明确区分业务phase、waitingFor、callback delivery和consumption，并保留source及真实已存时间。callback确认时间原表未保存，因此为null；事件创建时间不能当作收件时间。无callback URL、签名/认证材料、原thread/session或原生端点地址。
+
+`canManage`等只是UI投影，所有写动作继续走原服务在事务内重验当前权限/版本与幂等键；投影不授权新执行或请求重放。
+
+既有 `/api/v1/assistances` 列表新增 `state=agent_attention`：只包括当前有权发起方仍需补充或确认范围的open Agent协助，先权限/待处理过滤再分页。sent/received/task范围保持不变；不把接收Agent的正常接受/等答过程变成所有者人工待办。

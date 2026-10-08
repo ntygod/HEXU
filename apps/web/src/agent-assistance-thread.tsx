@@ -1,16 +1,22 @@
+import { CollaborationObservations } from './task-collaboration.js';
 import { AdoptAssistance, AssistanceAdoptionHistory } from './assistance-adoption.js';
 import { AgentConsumptionStatus } from './agent-consumption.js';
 import { AgentAssistanceCredentials } from './agent-assistance-credentials.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import type { AssistanceDetail } from '../../../packages/contracts/src/assistance.js';
 import type {
   AgentAssistancePhase,
   AgentAssistanceResponseType,
+  AgentAssistanceResponseRecord,
 } from '../../../packages/contracts/src/agent-assistance.js';
 import { Button } from '../../../packages/ui/src/index.js';
 import { Link, time, useApp } from './state.js';
 import { AgentAssistanceEditor } from './agent-assistance-create.js';
-import { AgentAssistanceFeedback, useAgentAssistanceCommand } from './agent-assistance-state.js';
+import {
+  AgentAssistanceFeedback,
+  useAgentAssistanceCommand,
+  useAgentAssistanceDraft,
+} from './agent-assistance-state.js';
 export const agentPhase: Record<AgentAssistancePhase, string> = {
   awaiting_acceptance: '等待接受本轮输入',
   accepted: '本轮已接受（业务确认）',
@@ -39,15 +45,47 @@ export function AgentAssistanceThread({
   const { data } = useApp();
   const item = value.assistance,
     agent = item.agent!;
-  const [base, setBase] = useState(item),
-    [body, setBody] = useState(''),
-    [type, setType] = useState<AgentAssistanceResponseType>('accept'),
-    [question, setQuestion] = useState(''),
-    [materialIds, setMaterialIds] = useState<string[]>(agent.materials.map((m) => m.id)),
-    [editing, setEditing] = useState(false),
+  const [draft, setDraft, clearDraft] = useAgentAssistanceDraft(
+    `respond:${item.id}`,
+    {
+      base: item,
+      body: '',
+      type: (agent.phase === 'accepted' ? 'answer' : 'accept') as AgentAssistanceResponseType,
+      question: '',
+      materialIds: agent.materials.map((material) => material.id),
+    },
+    { kind: 'respond', id: item.id },
+  );
+  const { base, body, type, question, materialIds } = draft;
+  function change<K extends keyof typeof draft>(
+    field: K,
+    value: SetStateAction<(typeof draft)[K]>,
+  ) {
+    setDraft((previous) => ({
+      ...previous,
+      [field]:
+        typeof value === 'function'
+          ? (value as (old: (typeof draft)[K]) => (typeof draft)[K])(previous[field])
+          : value,
+    }));
+  }
+  const setBase = (value: typeof item) => change('base', value);
+  const setBody = (value: string) => change('body', value);
+  const setType = (value: AgentAssistanceResponseType) => change('type', value);
+  const setQuestion = (value: string) => change('question', value);
+  const setMaterialIds = (value: SetStateAction<string[]>) => change('materialIds', value);
+  const [editing, setEditing] = useState(false),
     [end, setEnd] = useState<'close' | 'cancel' | null>(null),
+    [endRevision, setEndRevision] = useState(item.revision),
     [adoptReplyId, setAdoptReplyId] = useState<string | null>(null),
     [adoptionBusy, setAdoptionBusy] = useState(false);
+  const supplementButton = useRef<HTMLButtonElement | null>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (!editing && wasEditing.current && supplementButton.current?.isConnected)
+      supplementButton.current.focus();
+    wasEditing.current = editing;
+  }, [editing]);
   const command = useAgentAssistanceCommand<AssistanceDetail>(`respond:${item.id}`, (next) => {
     setBase(next.assistance);
     setBody('');
@@ -59,21 +97,31 @@ export function AgentAssistanceThread({
   const [editorBusy, setEditorBusy] = useState(false),
     [credentialBusy, setCredentialBusy] = useState(false);
   const locked = command.busy || !!command.pending || editorBusy || credentialBusy || adoptionBusy;
-  const conflict = base.revision !== item.revision;
+  const conflict = end
+    ? endRevision !== item.revision
+    : item.canReply && base.revision !== item.revision;
   useEffect(() => {
     onBusy?.(command.busy || editorBusy || credentialBusy || adoptionBusy);
     return () => onBusy?.(false);
   }, [command.busy, editorBusy, credentialBusy, adoptionBusy, onBusy]);
   useEffect(() => {
-    if (!body && !question && !end && !editing && !locked) {
+    if (
+      item.canReply &&
+      !body &&
+      !question &&
+      !end &&
+      !editing &&
+      !locked &&
+      base.revision !== item.revision
+    ) {
       setBase(item);
       setMaterialIds(agent.materials.map((m) => m.id));
     }
   }, [item.revision, body, question, end, editing, locked]);
   useEffect(() => {
     if (!item.canReply) {
-      setBody('');
-      setQuestion('');
+      clearDraft();
+      if (item.state === 'open' && command.pending?.path.endsWith('/responses')) command.revoke();
     }
     if (!item.canManage) {
       setEnd(null);
@@ -81,9 +129,16 @@ export function AgentAssistanceThread({
     }
     if (!item.canEditTask || item.accessEnded) setAdoptReplyId(null);
     if (item.accessEnded) command.revoke();
-  }, [item.canReply, item.canManage, item.canEditTask, item.accessEnded]);
+  }, [item.canReply, item.canManage, item.canEditTask, item.accessEnded, item.state]);
   if (command.denied)
-    return <p role="alert">当前请求授权已结束，编辑内容已清除。请重新读取协助。</p>;
+    return (
+      <div role="alert">
+        <p>当前请求授权已结束，编辑内容已清除。</p>
+        <Button type="button" onClick={onRetry}>
+          重读 Agent 协助权限
+        </Button>
+      </div>
+    );
   const task = item.taskLink ? data.tasks.find((t) => t.id === item.taskLink!.id) : undefined;
   const sendResponse = () => {
     if (
@@ -92,7 +147,11 @@ export function AgentAssistanceThread({
       readError ||
       !base.agent ||
       !item.canReply ||
-      (type !== 'accept' && !body.trim())
+      (type !== 'accept' && !body.trim()) ||
+      (type === 'accept' && agent.phase !== 'awaiting_acceptance') ||
+      (type === 'answer' && agent.phase !== 'accepted') ||
+      ((type === 'request_input' || type === 'propose_scope') && agent.phase === 'waiting_input') ||
+      (type === 'propose_scope' && !question.trim())
     )
       return;
     const common = {
@@ -111,6 +170,66 @@ export function AgentAssistanceThread({
           : { ...common, body },
     );
   };
+  const pendingResponse = agent.responses.find(
+    (response) =>
+      response.id === agent.pendingResponseId &&
+      response.inputRevision === agent.currentInputRevision &&
+      (response.type === 'request_input' || response.type === 'propose_scope'),
+  );
+  const answers = agent.responses.filter((response) => response.type === 'answer');
+  const negotiation = agent.responses.filter(
+    (response) => response.type !== 'answer' && response.id !== pendingResponse?.id,
+  );
+  function responseRecord(response: AgentAssistanceResponseRecord) {
+    return (
+      <article key={response.id} className="assistance-reply">
+        <strong>
+          {labels[response.type]} · 输入修订 {response.inputRevision}
+          {response.inputRevision !== agent.currentInputRevision ? '（历史输入）' : ''}
+        </strong>
+        <p className="hint">
+          来源：
+          {response.actor.kind === 'human'
+            ? `真人 ${response.actor.userId === item.requester.id ? item.requester.name : response.actor.userId === item.recipient.id ? item.recipient.name : response.actor.userId}`
+            : response.actor.kind === 'agent'
+              ? `Agent ${response.actor.participantId}`
+              : '所有者预授权策略'}
+          {' · '}
+          {time(response.createdAt)}
+        </p>
+        {response.actor.kind === 'policy' && (
+          <p className="hint">预授权接受只确认本轮输入，不证明远端在线、取件或执行。</p>
+        )}
+        {response.body && <pre>{response.body}</pre>}
+        {response.scope && (
+          <>
+            <p>待发起者明确确认的问题：{response.scope.question}</p>
+            <p>
+              提议保留材料：
+              {response.scope.materialIds
+                .map((id) => agent.materials.find((material) => material.id === id)?.label ?? id)
+                .join('、')}
+            </p>
+            <p className="hint">范围提议尚未更改当前材料，需要有权发起者明确确认新修订。</p>
+          </>
+        )}
+        {item.canEditTask &&
+          !item.accessEnded &&
+          item.state !== 'cancelled' &&
+          response.type === 'answer' &&
+          response.actor.kind === 'agent' &&
+          response.inputRevision === agent.currentInputRevision && (
+            <Button
+              type="button"
+              disabled={locked || !!readError}
+              onClick={() => setAdoptReplyId(response.id)}
+            >
+              选择外部回答采用到任务说明
+            </Button>
+          )}
+      </article>
+    );
+  }
   return (
     <div className="dialog-body assistance-content">
       <div className="assistance-card-meta">
@@ -130,10 +249,25 @@ export function AgentAssistanceThread({
       <p>
         当前输入修订 {agent.currentInputRevision} · 授权修订 {agent.accessRevision}
       </p>
-      <p className="assistance-warning">
-        not_integrated · callable=false。保存、接受或预授权自动接受均是业务记录，不代表真实 Agent
-        收件或模型运行；原工作消费记录与人工采用分开核对，不以保存回答证明模型已继续。
+      <p className="hint">
+        请求记录更新：{time(item.updatedAt)}
+        。保存或接受只确认本轮请求；远端取件、返回成果、原工作继续和人工采用分别记录。
       </p>
+      {agent.phase === 'accepted' && (
+        <p role="status">本轮输入已接受，等待返回成果；尚不能据此确认远端在线或执行已开始。</p>
+      )}
+      {agent.phase === 'waiting_input' && (
+        <section className="assistance-warning" aria-label="需要人处理的协作问题">
+          <h3>{pendingResponse?.type === 'propose_scope' ? '需要人确认范围' : '需要人补充信息'}</h3>
+          <p>{item.requester.name}需要核对当前问题与有限材料，再明确提交下一轮输入。</p>
+          {pendingResponse ? (
+            responseRecord(pendingResponse)
+          ) : (
+            <p>当前请求正在等待补充，具体问题以重新读取的回应记录为准。</p>
+          )}
+          {!item.canManage && <p className="hint">由有权发起者处理；当前身份不能修改分享范围。</p>}
+        </section>
+      )}
       <section aria-label="Agent 当前固定输入" className="assistance-snapshot">
         {agent.clarification && <p>{agent.clarification}</p>}
         {agent.materials.map((material) => (
@@ -162,45 +296,27 @@ export function AgentAssistanceThread({
           </Button>
         </p>
       )}
-      <section className="assistance-replies" aria-label="Agent 类型回应记录">
-        <h3>协商与回答</h3>
-        {agent.responses.map((response) => (
-          <article key={response.id} className="assistance-reply">
-            <strong>
-              {labels[response.type]} · 输入修订 {response.inputRevision}
-            </strong>
-            <p className="hint">
-              {response.actor.kind === 'human'
-                ? `真人 ${response.actor.userId}`
-                : response.actor.kind === 'agent'
-                  ? `Agent ${response.actor.participantId}`
-                  : '所有者预授权策略（非 Agent 收件）'}{' '}
-              · {time(response.createdAt)}
-            </p>
-            {response.body && <pre>{response.body}</pre>}
-            {item.canEditTask &&
-              !item.accessEnded &&
-              item.state !== 'cancelled' &&
-              response.type === 'answer' &&
-              response.actor.kind === 'agent' &&
-              response.inputRevision === agent.currentInputRevision && (
-                <Button
-                  type="button"
-                  disabled={locked || !!readError}
-                  onClick={() => setAdoptReplyId(response.id)}
-                >
-                  选择外部回答采用到任务说明
-                </Button>
-              )}
-            {response.scope && (
-              <>
-                <p>待发起者明确确认的问题：{response.scope.question}</p>
-                <p>仅提议已有材料：{response.scope.materialIds.join('、')}</p>
-              </>
-            )}
-          </article>
-        ))}
+      <section className="assistance-replies" aria-label="Agent 返回成果">
+        <h3>返回成果</h3>
+        {answers.length ? (
+          answers.map(responseRecord)
+        ) : (
+          <p className="hint">还没有已保存的文本成果。</p>
+        )}
+        {answers.length > 0 && (
+          <p className="hint">
+            返回文本已保存。采用到任务说明需明确选择；原工作是否继续请查看其单独记录。
+          </p>
+        )}
       </section>
+      <details className="assistance-replies" aria-label="Agent 类型回应记录">
+        <summary>协商往返记录（{negotiation.length}）</summary>
+        {negotiation.length ? (
+          negotiation.map(responseRecord)
+        ) : (
+          <p className="hint">没有其他协商记录。</p>
+        )}
+      </details>
       {item.canReply && item.state === 'open' && (
         <form
           onSubmit={(e) => {
@@ -323,21 +439,32 @@ export function AgentAssistanceThread({
         </section>
       )}
       {item.canManage && item.state === 'open' && task && agent.editInput && (
-        <Button type="button" disabled={locked} onClick={() => setEditing((v) => !v)}>
-          {editing ? '关闭补充编辑' : '补充或确认范围'}
+        <Button
+          type="button"
+          disabled={locked}
+          aria-expanded={editing}
+          aria-controls={`agent-supplement-${item.id}`}
+          onClick={(event) => {
+            supplementButton.current = event.currentTarget;
+            setEditing((value) => !value);
+          }}
+        >
+          {editing ? '收起补充编辑' : '补充或确认范围'}
         </Button>
       )}
       {editing && task && agent.editInput && (
-        <AgentAssistanceEditor
-          task={task}
-          messageId={agent.editInput.message.sourceMessageId}
-          existing={value}
-          onBusy={setEditorBusy}
-          onSaved={() => {
-            setEditing(false);
-            onRetry();
-          }}
-        />
+        <div id={`agent-supplement-${item.id}`}>
+          <AgentAssistanceEditor
+            task={task}
+            messageId={agent.editInput.message.sourceMessageId}
+            existing={value}
+            onBusy={setEditorBusy}
+            onSaved={() => {
+              setEditing(false);
+              onRetry();
+            }}
+          />
+        </div>
       )}
       {item.canManage && item.state !== 'cancelled' && (
         <div className="assistance-actions">
@@ -346,7 +473,7 @@ export function AgentAssistanceThread({
               type="button"
               disabled={locked}
               onClick={() => {
-                setBase(item);
+                setEndRevision(item.revision);
                 setEnd('close');
               }}
             >
@@ -357,7 +484,7 @@ export function AgentAssistanceThread({
             type="button"
             disabled={locked}
             onClick={() => {
-              setBase(item);
+              setEndRevision(item.revision);
               setEnd('cancel');
             }}
           >
@@ -377,7 +504,7 @@ export function AgentAssistanceThread({
             disabled={locked || conflict || !!readError}
             onClick={() =>
               void command.send(`/assistances/${item.id}/state`, {
-                expectedRevision: base.revision,
+                expectedRevision: endRevision,
                 action: end,
               })
             }
@@ -388,6 +515,9 @@ export function AgentAssistanceThread({
             暂不操作
           </Button>
         </section>
+      )}
+      {item.taskLink && (
+        <CollaborationObservations taskId={item.taskLink.id} assistanceId={item.id} />
       )}
       {item.taskLink && (
         <AgentConsumptionStatus taskId={item.taskLink.id} requestId={agent.requestId} />
