@@ -1,3 +1,4 @@
+import { AgentRequestProvider } from './agent-resource-state.js';
 import { AssistancePage } from './assistance.js';
 import { useEffect, useState } from 'react';
 import { Empty } from '../../../packages/ui/src/index.js';
@@ -30,7 +31,7 @@ export function App() {
   const segment = path.split('/').filter(Boolean);
   const active = segment[0] ?? 'workbench';
   return (
-    <>
+    <AgentRequestProvider>
       <AppShell key={path} onSearch={() => setSearchOpen(true)}>
         {active === 'workbench' ? (
           segment[1] === 'members' ? (
@@ -82,6 +83,6 @@ export function App() {
         />
       )}
       {newTaskOpen && <NewTask onClose={() => setNewTaskOpen(false)} />}
-    </>
+    </AgentRequestProvider>
   );
 }

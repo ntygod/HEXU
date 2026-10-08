@@ -666,4 +666,117 @@ CREATE TABLE task_target_dates (
 );
 `,
   },
+  {
+    version: 36,
+    sql: `
+CREATE TABLE agent_participants (
+ id TEXT PRIMARY KEY, space_id TEXT NOT NULL REFERENCES collab_spaces(id),
+ owner_user_id TEXT NOT NULL REFERENCES collab_people(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ revoked_at TEXT, body TEXT NOT NULL
+);
+CREATE INDEX agent_participants_owner ON agent_participants(space_id,owner_user_id);
+CREATE TABLE agent_endpoints (
+ participant_id TEXT PRIMARY KEY REFERENCES agent_participants(id), id TEXT NOT NULL UNIQUE,
+ revision INTEGER NOT NULL CHECK(revision>=1), body TEXT NOT NULL
+);
+CREATE TABLE agent_capabilities (
+ participant_id TEXT PRIMARY KEY REFERENCES agent_participants(id), id TEXT NOT NULL UNIQUE,
+ version INTEGER NOT NULL CHECK(version>=1), body TEXT NOT NULL
+);
+CREATE TABLE agent_capability_versions (
+ capability_id TEXT NOT NULL REFERENCES agent_capabilities(id), version INTEGER NOT NULL,
+ body TEXT NOT NULL, PRIMARY KEY(capability_id,version)
+);
+CREATE TRIGGER agent_capability_version_immutable_update BEFORE UPDATE ON agent_capability_versions
+ BEGIN SELECT RAISE(ABORT,'agent capability versions are immutable'); END;
+CREATE TRIGGER agent_capability_version_immutable_delete BEFORE DELETE ON agent_capability_versions
+ BEGIN SELECT RAISE(ABORT,'agent capability versions are immutable'); END;
+CREATE TABLE agent_delegation_grants (
+ id TEXT PRIMARY KEY, participant_id TEXT NOT NULL REFERENCES agent_participants(id),
+ project_id TEXT NOT NULL REFERENCES projects(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ revoked_at TEXT, body TEXT NOT NULL
+);
+CREATE INDEX agent_grants_project ON agent_delegation_grants(project_id,revoked_at);
+-- Permanent invalidation is in the membership transaction, including direct DB deletion.
+-- Project-wide grants are conservatively withdrawn when any eligible member loses access;
+-- rejoining or promoting a member never revives an old authorization.
+CREATE TRIGGER agent_project_member_removed AFTER DELETE ON collab_project_members BEGIN
+ UPDATE agent_delegation_grants SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=OLD.project_id AND revoked_at IS NULL AND (
+ participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=OLD.user_id)
+ OR json_extract(body,'$.audience')='project_members'
+ OR EXISTS (SELECT 1 FROM json_each(body,'$.requesterUserIds') WHERE value=OLD.user_id));
+END;
+CREATE TRIGGER agent_project_member_downgraded AFTER UPDATE OF role ON collab_project_members
+ WHEN NEW.role='view' AND OLD.role!='view' BEGIN
+ UPDATE agent_delegation_grants SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=NEW.project_id AND revoked_at IS NULL AND (
+ participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=NEW.user_id)
+ OR json_extract(body,'$.audience')='project_members'
+ OR EXISTS (SELECT 1 FROM json_each(body,'$.requesterUserIds') WHERE value=NEW.user_id));
+END;
+CREATE TRIGGER agent_space_member_removed AFTER DELETE ON collab_memberships BEGIN
+ UPDATE agent_participants SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE space_id=OLD.space_id AND owner_user_id=OLD.user_id AND revoked_at IS NULL;
+ UPDATE agent_delegation_grants SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE revoked_at IS NULL AND project_id IN (SELECT id FROM projects WHERE space_id=OLD.space_id)
+ AND (participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=OLD.user_id)
+ OR json_extract(body,'$.audience')='project_members'
+ OR EXISTS (SELECT 1 FROM json_each(body,'$.requesterUserIds') WHERE value=OLD.user_id));
+END;
+CREATE TRIGGER agent_participant_revoked AFTER UPDATE OF revoked_at ON agent_participants
+ WHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL BEGIN
+ UPDATE agent_delegation_grants SET revoked_at=NEW.revoked_at,revision=revision+1
+ WHERE participant_id=NEW.id AND revoked_at IS NULL;
+ INSERT INTO outbox(kind,created_at,space_id) VALUES('agent.resources_changed',NEW.revoked_at,NEW.space_id);
+END;
+CREATE TRIGGER agent_grant_revoked AFTER UPDATE OF revoked_at ON agent_delegation_grants
+ WHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL BEGIN
+ INSERT INTO outbox(kind,created_at,space_id,project_id)
+ SELECT 'agent.capabilities_changed',NEW.revoked_at,p.space_id,NEW.project_id FROM projects p WHERE p.id=NEW.project_id;
+END;
+
+CREATE TABLE agent_connections (
+ participant_id TEXT PRIMARY KEY REFERENCES agent_participants(id), id TEXT NOT NULL UNIQUE,
+ project_id TEXT NOT NULL REFERENCES projects(id), revision INTEGER NOT NULL CHECK(revision>=1),
+ endpoint_revision INTEGER NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+ expires_at TEXT NOT NULL, revoked_at TEXT, body TEXT NOT NULL
+);
+CREATE TRIGGER agent_connection_project_removed AFTER DELETE ON collab_project_members BEGIN
+ UPDATE agent_connections SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=OLD.project_id AND revoked_at IS NULL
+ AND participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=OLD.user_id);
+END;
+CREATE TRIGGER agent_connection_project_downgraded AFTER UPDATE OF role ON collab_project_members
+ WHEN NEW.role='view' AND OLD.role!='view' BEGIN
+ UPDATE agent_connections SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=NEW.project_id AND revoked_at IS NULL
+ AND participant_id IN (SELECT id FROM agent_participants WHERE owner_user_id=NEW.user_id);
+END;
+CREATE TRIGGER agent_connection_participant_revoked AFTER UPDATE OF revoked_at ON agent_participants
+ WHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL BEGIN
+ UPDATE agent_connections SET revoked_at=NEW.revoked_at,revision=revision+1
+ WHERE participant_id=NEW.id AND revoked_at IS NULL;
+END;
+CREATE TRIGGER agent_connection_endpoint_changed AFTER UPDATE OF revision ON agent_endpoints
+ WHEN NEW.revision!=OLD.revision BEGIN
+ UPDATE agent_connections SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE participant_id=NEW.participant_id AND revoked_at IS NULL;
+END;
+CREATE TRIGGER agent_connection_revoked AFTER UPDATE OF revoked_at ON agent_connections
+ WHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL BEGIN
+ INSERT INTO outbox(kind,created_at,space_id,project_id)
+ SELECT 'agent.connection_changed',NEW.revoked_at,p.space_id,NEW.project_id FROM projects p WHERE p.id=NEW.project_id;
+END;
+
+CREATE TRIGGER agent_project_archived AFTER UPDATE OF body ON projects
+ WHEN json_extract(OLD.body,'$.archivedAt') IS NULL
+ AND json_extract(NEW.body,'$.archivedAt') IS NOT NULL BEGIN
+ UPDATE agent_delegation_grants SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=NEW.id AND revoked_at IS NULL;
+ UPDATE agent_connections SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1
+ WHERE project_id=NEW.id AND revoked_at IS NULL;
+END;
+`,
+  },
 ];

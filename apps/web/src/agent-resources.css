@@ -1,0 +1,67 @@
+.agent-resources,
+.agent-grid,
+.agent-editor,
+.agent-editor fieldset,
+.agent-member-options {
+  display: grid;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.agent-editor fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.agent-editor .field {
+  margin: 0;
+  min-width: 0;
+}
+.agent-editor input:not([type='checkbox']),
+.agent-editor select,
+.agent-editor textarea {
+  width: 100%;
+  min-width: 0;
+}
+.agent-editor label {
+  overflow-wrap: anywhere;
+}
+.agent-editor input[type='checkbox'] {
+  margin-right: var(--hx-space-2);
+}
+.agent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-3);
+}
+.agent-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--hx-space-3);
+  margin: var(--hx-space-3) 0;
+}
+.agent-facts dt,
+.agent-grant p {
+  color: var(--hx-text-secondary);
+  font-size: var(--hx-font-secondary);
+}
+.agent-facts dd {
+  margin: var(--hx-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+.agent-grants,
+.agent-grant {
+  border-top: 1px solid var(--hx-border-subtle);
+  margin-top: var(--hx-space-3);
+  padding-top: var(--hx-space-3);
+}
+.agent-resources p,
+.agent-resources h3 {
+  overflow-wrap: anywhere;
+}
+.agent-selection {
+  padding: var(--hx-space-3);
+  background: var(--hx-brand-soft);
+  border-radius: var(--hx-radius-control);
+  overflow-wrap: anywhere;
+}

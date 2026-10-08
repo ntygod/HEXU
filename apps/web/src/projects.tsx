@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ProjectAgentCapabilities } from './project-agent-capabilities.js';
 import { ProjectSettings } from './project-settings.js';
 import { ProjectSources } from './project-sources.js';
 import { ProjectAgreements } from './project-agreements.js';
@@ -118,7 +119,9 @@ function ProjectPageContent({ id }: { id: string }) {
   const readLocation = () => {
     const query = new URLSearchParams(location.search);
     return {
-      tab: ['overview', 'results', 'sources', 'agreements'].includes(query.get('tab') ?? '')
+      tab: ['overview', 'results', 'sources', 'agreements', 'agents'].includes(
+        query.get('tab') ?? '',
+      )
         ? query.get('tab')!
         : 'tasks',
       sourceId: query.get('source') ?? '',
@@ -261,13 +264,16 @@ function ProjectPageContent({ id }: { id: string }) {
           ['sources', '项目资料'],
           ['agreements', '项目约定'],
           ['results', '项目成果'],
+          ['agents', 'Agent 能力'],
         ].map(([key, label]) => (
           <button key={key} aria-pressed={tab === key} onClick={() => setTab(key!)}>
             {label}
           </button>
         ))}
       </div>
-      {tab === 'agreements' ? (
+      {tab === 'agents' ? (
+        <ProjectAgentCapabilities key={id} projectId={id} />
+      ) : tab === 'agreements' ? (
         <ProjectAgreements
           key={id}
           project={project}

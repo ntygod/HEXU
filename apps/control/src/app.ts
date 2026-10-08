@@ -1,3 +1,5 @@
+import { attachAgentCapabilities } from './agent-capabilities.js';
+import { attachAgentConnections } from './agent-connections.js';
 import { parseTaskTargetDate } from '../../../packages/contracts/src/task-target-date.js';
 import { attachCheckpoints } from './checkpoints.js';
 import { attachHandoffs } from './handoffs.js';
@@ -183,6 +185,8 @@ export async function createApp(
     if (request.url.startsWith('/api/') || nodeProtocol) reply.header('Cache-Control', 'no-store');
   });
   attachIdentity(app, store, identity);
+  attachAgentCapabilities(app, store);
+  attachAgentConnections(app, store);
   attachAssistance(app, store);
   const nodeExecution = attachNodes(app, store);
   attachCheckpoints(app, store);

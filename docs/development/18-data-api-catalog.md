@@ -7,7 +7,7 @@
 
 ## D2：跨 Agent 协作的最小公共契约
 
-以下配合 [25 的交付拆分](25-agent-collaboration-delivery.md)，均是新增草案，不是已上线接口。先实现有限只读协助，再扩展分支/接手；一个逻辑操作在 HTTP、MCP 或所选远端协议上调用同一业务服务。
+以下配合 [25 的交付拆分](25-agent-collaboration-delivery.md)，描述完整目标草案；本轮实际身份/能力/只读连接子集单列在下一节，不由逻辑工具名推定已上线接口。先实现有限只读协助，再扩展分支/接手；一个逻辑操作在 HTTP、MCP 或所选远端协议上调用同一业务服务。
 
 | 概念 | 最小字段/关系 | 归属与边界 |
 | --- | --- | --- |
@@ -377,3 +377,30 @@ Workbench只读响应新增可选projectAgreementVersions数组 `{projectId,vers
 baseline绑定当前可读有序ID及状态；当前修订或基线变化返回 `PROJECT_TASK_ORDER_CONFLICT/409`。一次移动仅改变指定Task的位置，其余任务相对顺序保持，包括UI筛选隐藏项。稳定整数rank必要时同事务重排间距；实际移动、独立修订、项目outbox和回执原子提交。无变化不增修订、不发事件或建立rank，但保留原回执。
 
 返回 `{projectId,taskId,anchorTaskId,placement,revision,baseline,changed}`，不携带历史可见ID列表。原始解码请求用于幂等指纹；相同包重放确认原回执，不重做移动，改包同键拒绝。普通Task内容变化不会改排序基线；新任务追加在已有rank之后，未排序的新任务彼此仍沿原rowid顺序。协议与UI限制见[项目任务排序](../engineering/project-task-order.md)。
+
+## 2026-10-08：身份、能力与独立只读连接的实际候选子集
+
+
+新增契约为 AgentParticipant、AgentEndpoint、AgentCapability、DelegationGrant、AgentConnection 及 Listing/Selection/Issue 读取形状；AgentProfile 仍表示执行配置，Task 负责人仍是真人。
+
+迁移 36 承接原迁移 35 的日期功能，增加 agent_participants、agent_endpoints、agent_capabilities、agent_capability_versions、agent_delegation_grants、agent_connections。能力历史不可变；登记/更新/撤销、幂等回执与 outbox 原子提交，当前权限先于旧回执。
+
+本人资源管理仍经真实浏览器身份的 `/api/v1` 通道：
+
+- GET/POST `/api/v1/agent-participants`。
+- PATCH `/api/v1/agent-participants/:agentId`；POST 同资源 `/revoke`。
+- POST 同资源 `/endpoint`、`/capability`、`/grants`、`/grants/:grantId/revoke`。
+- POST 同资源 `/connection`（首次创建或固定修订轮换）、`/connection/revoke`。
+- GET `/api/v1/projects/:projectId/agent-capabilities`；POST 同目录 `/:capabilityId/select`，仅复核版本/权限和准备标识，不创建请求或启动执行。
+
+独立 Agent 只读通道只有 GET `/agent/v1/identity` 与 GET `/agent/v1/projects/:projectId/capabilities`。连接为稳定 participant/connection ID、单项目 `capability_read`、最长 24 小时、独立 Bearer 凭据；只存摘要，首次提交响应一次返回 token，旧键重试只返回当前资源元数据与 null token。凭据轮换立即废止旧代；撤销、端点更新、项目归档、所有者项目/空间撤权使旧连接永久失效，重新加入或恢复归档不复活。查询每次重新认证及核对当前权限。
+
+专用通道不接受浏览器 Cookie、Origin、浏览器/节点标记、空间覆盖，不开放 body/query 或 allowlist 外动作。不会把浏览器会话或节点令牌转换成 Agent 身份。当前仍受 preview/team-local 回环边界约束，无外部连接或正式远端部署。
+
+端点只保存 HTTPS 元数据，不拨号或验证远端。首轮能力固定 `text_expertise`、文本输入/输出，提供方支持 `unverified`、HEXU 接收适配 `not_integrated`、环境/授权条件单列，`callable=false`。预授权包含项目/参与者、可发现/可请求、自动接受意向、固定能力版本与端点修订、所有者费用主体、期限与并发；execution/externalEffects 均 false。请求/自动接受只记录后续条件，不已有协商或模型执行。
+
+独立连接凭据只允许上述项目能力读取，不授予请求/执行/材料读取权限。MCP/A2A 桥、双向协商、真实接收、结果消费、跨设备部署及双独立 Agent 闭环仍待后续切片。
+
+实现见[契约](../../packages/contracts/src/agent-capabilities.ts)、[数据事务](../../packages/db/src/agent-capabilities.ts)、[连接认证](../../packages/identity/src/agent-connections.ts)、[资源 HTTP](../../apps/control/src/agent-capabilities.ts)与[独立 HTTP](../../apps/control/src/agent-connections.ts)。检查边界见[本轮记录](history/2026-10-08-agent-capability-entry.md)。
+
+本轮并发1—4、费用主体与autoAccept只保存策略，没有执行器强制并发/费用联调；endpoint.authentication的not_integrated指接收适配，入站capability_read认证不能推导为可调用端点。

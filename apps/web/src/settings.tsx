@@ -1,4 +1,5 @@
 import { useAppearance } from './appearance.js';
+import { AgentResources } from './agent-resources.js';
 import { NativeResources } from './native.js';
 import { NodeResources } from './nodes.js';
 import { TeamSettings } from './team.js';
@@ -21,6 +22,10 @@ export function Settings() {
         <a href="#settings-resources">
           <Icon name="monitor" size={16} />
           {team ? '节点与目录' : '工具与目录'}
+        </a>
+        <a href="#settings-agents">
+          <Icon name="spark" size={16} />
+          我的 Agent
         </a>
         <a href="#settings-appearance">
           <Icon name="density" size={16} />
@@ -66,6 +71,9 @@ export function Settings() {
               </article>
             </>
           )}
+        </section>
+        <section id="settings-agents">
+          <AgentResources />
         </section>
         <section id="settings-appearance" className="preferences-surface">
           <h2>外观与连接</h2>
