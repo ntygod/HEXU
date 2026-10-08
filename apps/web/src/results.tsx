@@ -5,6 +5,7 @@ import { Link, time, useApp, canEditTask, go } from './state.js';
 import { useAssistanceRead } from './assistance-common.js';
 import { ResultSource } from './result-source.js';
 import { ResultReferencePanel } from './result-references.js';
+import { ResultFeedbackFollowup } from './result-feedback-followup-view.js';
 import { PrepareIntegration } from './integrations.js';
 import { MessageComposer, MessageList } from './discussion.js';
 import { OrderPreview } from './preview.js';
@@ -318,6 +319,12 @@ export function ResultPage({ id, revisionId }: { id: string; revisionId?: string
             </details>
           )}
           <p className="result-source">反馈保存在原任务，不会自动发送给执行工具。</p>
+          <ResultFeedbackFollowup
+            key={`${data.mode}:${data.user.id}:${data.space?.id ?? 'preview'}:${version.id}`}
+            task={task}
+            version={version}
+            messages={messages}
+          />
         </aside>
       </div>
       <ResultReferencePanel
