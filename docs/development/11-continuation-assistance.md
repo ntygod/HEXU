@@ -3,6 +3,8 @@
 > D1 · M2 · 关联 HX-F05/F06/F08 · 依赖：05、07、08、09、10。  
 > [计划入口](README.md) · [跨人接手](12-handoff-sharing.md) · [并行](13-parallel-exploration.md)
 
+**D2 增量：** 本包增加独立 Agent 的主动请求、接受/拒绝/澄清、结果返回与原工作继续，按 [25 切片 2—4](25-agent-collaboration-delivery.md#slice-2)交付；具体 API 草案见 18。外部协作依赖 03/05 和 16 的接入子集，不要求先完成全部 08/09。既有真人/Claude 协助与原生接续边界保留。
+
 ## 1. 两个动作，不能混淆
 
 **继续：**替换接下来推进当前主工作的人/工具，保留 Task 与必要代码现场。  
@@ -48,10 +50,10 @@ AI 协助默认文本材料、真正只读环境或隔离副本。不支持可�
 | --- | --- | --- | --- |
 | HX-DEV-11-01 | 继续命令、目标配置、预检 blockers、幂等操作状态 | continuation service/API | 05、07、08、09 |
 | HX-DEV-11-02 | 同机复用现场、原生恢复/新会话、停止后接续与重新打开 | continuation runner integration | 11-01、06、10 |
-| HX-DEV-11-03 | Assistance、选中快照、受邀范围与有限 AccessGrant | assistance API、schema | 05、03 权限 |
-| HX-DEV-11-04 | 真人回复与 AI assist Run、只读/隔离限制和结果回写 | assistance execution/thread | 11-03、07 |
-| HX-DEV-11-05 | 继续/协助面板、模型配置、材料预览和就地回复 | 两类 ActionDrawer | 02、10、11-01/03 |
-| HX-DEV-11-06 | 采纳/追问/取消、过期快照提示、失败后保留材料 | assistance actions、恢复 UI | 11-02—05 |
+| HX-DEV-11-03 | Assistance、固定输入版本、受邀主体与有限授权；增加 Agent 发起/接收和不扩大范围的协商 | assistance API、schema、请求信封关联 | 05、03 权限、D2 16 参与身份 |
+| HX-DEV-11-04 | 真人/受管 AI 路径保留；增加外部 Agent 接受/拒绝/澄清/回应、真实来源和实际消费回接 | assistance execution/thread、外部执行引用 | 11-03、07、16 的所选接收适配 |
+| HX-DEV-11-05 | 继续/协助面板、能力选择、材料预览、协商与原生入口呈现 | ActionDrawer、请求详情与必要状态 | 02、10、11-01/03 |
+| HX-DEV-11-06 | 人工采用与 Agent 消费分开；追问/取消、过期材料、未知结果确认和回接恢复 | assistance actions、回接/恢复 UI | 11-02—05；原生恢复按实际支持 |
 
 ## 7. 场景走读
 
