@@ -144,8 +144,11 @@ const code = (expected: string) => (error: unknown) =>
 test('migration 36 preserves versions 1–35 and adds no fictional people, tasks or profiles', () => {
   const f = fixture();
   try {
-    assert.equal(migrations.at(-1)?.version, 36);
-    assert.equal(new Set(migrations.map((m) => m.version)).size, 36);
+    assert.deepEqual(
+      migrations.slice(0, 36).map((m) => m.version),
+      Array.from({ length: 36 }, (_, index) => index + 1),
+    );
+    assert.equal(new Set(migrations.map((m) => m.version)).size, migrations.length);
     assert.equal(f.counts()[0], 0);
     assert.deepEqual(f.counts().slice(-2), [0, 0]);
     assert.equal(

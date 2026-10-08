@@ -83,6 +83,7 @@ export interface AgentParticipantView extends AgentParticipant {
   grants: DelegationGrant[];
 }
 export interface AgentCapabilityListing {
+  endpointRevision: number;
   participantId: string;
   participantName: string;
   ownerUserId: string;

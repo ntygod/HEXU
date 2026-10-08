@@ -1,3 +1,4 @@
+import { AgentAssistanceThread, agentPhase } from './agent-assistance-thread.js';
 import { AdoptAssistance, AssistanceAdoptionHistory } from './assistance-adoption.js';
 import { useEffect, useState } from 'react';
 import type { Task } from '../../../packages/contracts/src/index.js';
@@ -23,7 +24,8 @@ const states: Record<AssistanceState, string> = {
   closed: '已结束',
   cancelled: '已撤销分享',
 };
-function assistanceState(item: Pick<Assistance, 'ai' | 'state'>) {
+function assistanceState(item: Pick<Assistance, 'ai' | 'agent' | 'state'>) {
+  if (item.agent) return agentPhase[item.agent.phase];
   if (!item.ai) return states[item.state];
   if (item.state === 'cancelled') return '已取消协助';
   if (item.state === 'closed') return '已结束';
@@ -239,6 +241,16 @@ export function AssistanceThread({ id, onBusy }: { id: string; onBusy?(busy: boo
           </Button>
         )}
       </div>
+    );
+  if (read.value.assistance.recipientKind === 'agent')
+    return (
+      <AgentAssistanceThread
+        key={id}
+        value={read.value}
+        readError={read.error}
+        onRetry={read.retry}
+        onBusy={onBusy}
+      />
     );
   return (
     <ThreadContent

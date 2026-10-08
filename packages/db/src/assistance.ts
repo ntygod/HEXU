@@ -33,7 +33,7 @@ import type { Store } from './store.js';
 const hash = (value: unknown) => createHash('sha256').update(canonicalJson(value)).digest('hex');
 const now = () => new Date().toISOString();
 export interface AssistanceRecord {
-  recipientKind?: 'ai';
+  recipientKind?: 'ai' | 'agent';
   ai?: { runId: string; inputText: string; inputHash: string };
   id: string;
   taskId: string;
@@ -144,6 +144,10 @@ export class AssistanceStore {
   }
   canRead(id: string) {
     try {
+      if (this.store.agentAssistance.isAgent(id)) {
+        this.store.agentAssistance.get(id);
+        return true;
+      }
       this.read(id);
       return true;
     } catch (cause) {
@@ -152,11 +156,15 @@ export class AssistanceStore {
     }
   }
   belongsToTask(id: string, taskId: string) {
+    if (this.store.agentAssistance.isAgent(id))
+      return this.store.agentAssistance.get(id).assistance.taskLink?.id === taskId;
     return this.read(id).item.taskId === taskId;
   }
   /** Internal task-scoped adoption boundary; snapshot_reply never satisfies task access. */
   adoptionContext(taskId: string, id: string, write = false) {
     this.store.getTask(taskId, write);
+    if (this.store.agentAssistance.isAgent(id))
+      throw new DomainError('AGENT_ADOPTION_UNSUPPORTED', '外部答案本片不支持采用或自动接续', 422);
     const data = this.read(id);
     if (data.item.taskId !== taskId)
       throw new DomainError('NOT_FOUND', '协助不属于当前任务或不可访问', 404);
@@ -329,6 +337,7 @@ export class AssistanceStore {
     id: string,
     query: ReturnType<typeof parseAssistanceHistory> = { before: null, limit: 20 },
   ): AssistanceDetail {
+    if (this.store.agentAssistance.isAgent(id)) return this.store.agentAssistance.get(id);
     const { item, task, grant } = this.read(id);
     const visibleTask = this.store.permissions.canTask(task),
       writer = this.store.permissions.canTask(task, true);
@@ -414,6 +423,8 @@ export class AssistanceStore {
     return { items, nextCursor: visible.length > query.limit ? items.at(-1)!.id : null };
   }
   private replyActor(id: string) {
+    if (this.store.agentAssistance.isAgent(id))
+      throw new DomainError('USE_TYPED_RESPONSE', 'Agent 协助请使用类型回应', 422);
     const { item, task, grant } = this.read(id);
     if (item.recipientKind === 'ai')
       throw new DomainError(
@@ -475,6 +486,8 @@ export class AssistanceStore {
     return data;
   }
   change(id: string, input: unknown, key: string): AssistanceDetail {
+    if (this.store.agentAssistance.isAgent(id))
+      return this.store.agentAssistance.change(id, input, key);
     this.manager(id);
     const data = parseAssistanceStateChange(input);
     this.store.mutate(`assistance.state:${id}`, key, data, () => {

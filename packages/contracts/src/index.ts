@@ -189,3 +189,5 @@ export function parseRunCreate(value: unknown) {
     reopenTask: body.reopenTask === true,
   };
 }
+
+export * from './agent-assistance.js';

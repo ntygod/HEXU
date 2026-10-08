@@ -1,3 +1,4 @@
+import { RequestAgentAssistance } from './agent-assistance-create.js';
 import { RequestAiAssistance } from './ai-assistance.js';
 import { RequestAssistance } from './assistance-create.js';
 import { useState, type FormEvent } from 'react';
@@ -123,6 +124,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
             <PublishAgreement message={message} />
             <DraftFromMessage message={message} />
             <RequestAssistance message={message} />
+            <RequestAgentAssistance message={message} />
             <RequestAiAssistance message={message} />
           </div>
         </article>

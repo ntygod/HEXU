@@ -17,6 +17,7 @@ export function capabilityListing(
     ownerUserId: agent.ownerUserId,
     capabilityId: capability.id,
     capabilityVersion: capability.version,
+    endpointRevision: grant.endpointRevision,
     title: capability.title,
     description: capability.description,
     kind: 'text_expertise',

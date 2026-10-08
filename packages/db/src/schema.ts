@@ -779,4 +779,67 @@ CREATE TRIGGER agent_project_archived AFTER UPDATE OF body ON projects
 END;
 `,
   },
+  {
+    version: 37,
+    sql: `
+CREATE TABLE assistance_agent_requests (
+ assistance_id TEXT PRIMARY KEY REFERENCES assistances(id), request_id TEXT NOT NULL UNIQUE,
+ recipient_participant_id TEXT NOT NULL REFERENCES agent_participants(id), requester_participant_id TEXT REFERENCES agent_participants(id),
+ grant_id TEXT NOT NULL REFERENCES agent_delegation_grants(id), capability_id TEXT NOT NULL,
+ capability_version INTEGER NOT NULL, endpoint_revision INTEGER NOT NULL, grant_revision INTEGER NOT NULL,
+ input_revision INTEGER NOT NULL, access_revision INTEGER NOT NULL, revoked_at TEXT, body TEXT NOT NULL
+);
+CREATE TABLE assistance_input_revisions (
+ assistance_id TEXT NOT NULL REFERENCES assistances(id), revision INTEGER NOT NULL,
+ input_hash TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(assistance_id,revision)
+);
+CREATE TRIGGER assistance_input_immutable_update BEFORE UPDATE ON assistance_input_revisions
+ BEGIN SELECT RAISE(ABORT,'assistance inputs are immutable'); END;
+CREATE TRIGGER assistance_input_immutable_delete BEFORE DELETE ON assistance_input_revisions
+ BEGIN SELECT RAISE(ABORT,'assistance inputs are immutable'); END;
+CREATE TABLE assistance_input_grants (
+ assistance_id TEXT NOT NULL REFERENCES assistances(id), input_revision INTEGER NOT NULL,
+ subject_id TEXT NOT NULL, scope TEXT NOT NULL CHECK(scope IN ('material_read','respond')),
+ input_hash TEXT NOT NULL, access_revision INTEGER NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT,
+ PRIMARY KEY(assistance_id,input_revision,subject_id,scope)
+);
+CREATE TABLE assistance_agent_capacity (
+ assistance_id TEXT PRIMARY KEY REFERENCES assistances(id), grant_id TEXT NOT NULL REFERENCES agent_delegation_grants(id),
+ input_revision INTEGER NOT NULL, accepted_at TEXT NOT NULL
+);
+CREATE TABLE assistance_agent_credentials (
+ id TEXT PRIMARY KEY, assistance_id TEXT NOT NULL UNIQUE REFERENCES assistances(id), participant_id TEXT NOT NULL REFERENCES agent_participants(id),
+ revision INTEGER NOT NULL, token_hash TEXT NOT NULL UNIQUE, scopes TEXT NOT NULL,
+ expires_at TEXT NOT NULL, revoked_at TEXT, body TEXT NOT NULL
+);
+CREATE TRIGGER assistance_agent_revoked AFTER UPDATE OF revoked_at ON assistance_agent_requests
+ WHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL BEGIN
+ UPDATE assistance_input_grants SET revoked_at=NEW.revoked_at WHERE assistance_id=NEW.assistance_id AND revoked_at IS NULL;
+ UPDATE assistance_agent_credentials SET revoked_at=NEW.revoked_at,revision=revision+1 WHERE assistance_id=NEW.assistance_id AND revoked_at IS NULL;
+ DELETE FROM assistance_agent_capacity WHERE assistance_id=NEW.assistance_id;
+ UPDATE assistances SET state='cancelled',body=json_set(body,'$.state','cancelled','$.revision',json_extract(body,'$.revision')+1,'$.updatedAt',NEW.revoked_at)
+ WHERE id=NEW.assistance_id AND state!='cancelled';
+ INSERT INTO assistance_events(assistance_id,revision,actor_id,action,created_at)
+ SELECT id,json_extract(body,'$.revision'),COALESCE(json_extract(NEW.body,'$.actorId'),'policy'),COALESCE(json_extract(NEW.body,'$.terminalReason'),'access_revoked'),NEW.revoked_at FROM assistances WHERE id=NEW.assistance_id;
+ INSERT INTO outbox(kind,created_at,space_id,assistance_id)
+ SELECT 'assistance.updated',NEW.revoked_at,space_id,id FROM assistances WHERE id=NEW.assistance_id;
+END;
+CREATE TRIGGER assistance_agent_grant_changed AFTER UPDATE ON agent_delegation_grants
+ WHEN NEW.revoked_at IS NOT NULL OR NEW.revision!=OLD.revision BEGIN
+ UPDATE assistance_agent_requests SET revoked_at=COALESCE(NEW.revoked_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE grant_id=NEW.id AND revoked_at IS NULL;
+END;
+CREATE TRIGGER assistance_agent_endpoint_changed AFTER UPDATE OF revision ON agent_endpoints
+ WHEN NEW.revision!=OLD.revision BEGIN
+ UPDATE assistance_agent_requests SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE recipient_participant_id=NEW.participant_id AND revoked_at IS NULL;
+END;
+CREATE TRIGGER assistance_agent_capability_changed AFTER UPDATE OF version ON agent_capabilities
+ WHEN NEW.version!=OLD.version BEGIN
+ UPDATE assistance_agent_requests SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE capability_id=NEW.id AND revoked_at IS NULL;
+END;
+CREATE TRIGGER assistance_agent_requester_revoked AFTER UPDATE OF revoked_at ON agent_participants
+ WHEN NEW.revoked_at IS NOT NULL BEGIN
+ UPDATE assistance_agent_requests SET revoked_at=NEW.revoked_at WHERE requester_participant_id=NEW.id AND revoked_at IS NULL;
+END;
+`,
+  },
 ];

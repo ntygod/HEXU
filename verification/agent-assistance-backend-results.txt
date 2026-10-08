@@ -1,0 +1,28 @@
+Captured verification summary, 2026-10-08 UTC
+
+Command:
+./node_modules/.bin/tsc -p tsconfig.server.json
+Result: exit 0; original server configuration, no stub or replacement configuration.
+
+Command:
+node --test dist/tests/agent-assistance-contracts.test.js dist/tests/agent-assistance-store.test.js dist/tests/agent-assistance-http.test.js dist/tests/assistance.test.js dist/tests/ai-assistance.test.js dist/tests/assistance-adoption.test.js
+Recorded terminal result:
+ℹ tests 47
+ℹ suites 0
+ℹ pass 47
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2936.965071
+
+Breakdown: contracts 8; real SQLite Store 12; real BetterAuth/createApp HTTP 1; adjacent human/Claude/adoption 26.
+
+Prettier check:
+All matched files use Prettier code style!
+
+Migration preservation:
+migrations_1_36_byte_identical True
+base_sha256 d8c2fab9fd145212b7f24eadb9989dad3241a10c857b881ec468b6f89d5814c6
+
+Additional existing agent-capabilities suite initially passed 17 behavioral tests and failed one migration-history test whose latest/count=36 assumptions predated migration37. The final integration changed only those assertions to require the original 1-36 sequence and uniqueness across all migrations; the rerun passed 18/18. No production behavior was changed to satisfy the test.

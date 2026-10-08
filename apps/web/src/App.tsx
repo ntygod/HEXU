@@ -1,3 +1,4 @@
+import { AgentAssistanceProvider } from './agent-assistance-state.js';
 import { AgentRequestProvider } from './agent-resource-state.js';
 import { AssistancePage } from './assistance.js';
 import { useEffect, useState } from 'react';
@@ -32,57 +33,59 @@ export function App() {
   const active = segment[0] ?? 'workbench';
   return (
     <AgentRequestProvider>
-      <AppShell key={path} onSearch={() => setSearchOpen(true)}>
-        {active === 'workbench' ? (
-          segment[1] === 'members' ? (
-            <MemberWork memberId={segment[2]} key={path} />
+      <AgentAssistanceProvider>
+        <AppShell key={path} onSearch={() => setSearchOpen(true)}>
+          {active === 'workbench' ? (
+            segment[1] === 'members' ? (
+              <MemberWork memberId={segment[2]} key={path} />
+            ) : (
+              <Workbench />
+            )
+          ) : active === 'projects' ? (
+            segment[1] ? (
+              <ProjectPage id={segment[1]} key={segment[1]} />
+            ) : (
+              <Projects />
+            )
+          ) : active === 'tasks' && segment[1] ? (
+            segment[2] === 'compare' && segment[3] ? (
+              <BranchComparisonPage taskId={segment[1]} groupId={segment[3]} key={path} />
+            ) : (
+              <TaskPage id={segment[1]} key={segment[1]} />
+            )
+          ) : active === 'results' ? (
+            segment[1] ? (
+              <ResultPage
+                id={segment[1]}
+                revisionId={segment[2] === 'versions' ? segment[3] : undefined}
+                key={path}
+              />
+            ) : (
+              <Results />
+            )
+          ) : active === 'assistances' ? (
+            <AssistancePage id={segment[1]} key={segment[1] ?? 'inbox'} />
+          ) : active === 'settings' ? (
+            <Settings />
           ) : (
-            <Workbench />
-          )
-        ) : active === 'projects' ? (
-          segment[1] ? (
-            <ProjectPage id={segment[1]} key={segment[1]} />
-          ) : (
-            <Projects />
-          )
-        ) : active === 'tasks' && segment[1] ? (
-          segment[2] === 'compare' && segment[3] ? (
-            <BranchComparisonPage taskId={segment[1]} groupId={segment[3]} key={path} />
-          ) : (
-            <TaskPage id={segment[1]} key={segment[1]} />
-          )
-        ) : active === 'results' ? (
-          segment[1] ? (
-            <ResultPage
-              id={segment[1]}
-              revisionId={segment[2] === 'versions' ? segment[3] : undefined}
-              key={path}
-            />
-          ) : (
-            <Results />
-          )
-        ) : active === 'assistances' ? (
-          <AssistancePage id={segment[1]} key={segment[1] ?? 'inbox'} />
-        ) : active === 'settings' ? (
-          <Settings />
-        ) : (
-          <Empty title="没有找到这个页面">
-            <Link to="/" className="button primary">
-              返回工作台
-            </Link>
-          </Empty>
+            <Empty title="没有找到这个页面">
+              <Link to="/" className="button primary">
+                返回工作台
+              </Link>
+            </Empty>
+          )}
+        </AppShell>
+        {searchOpen && (
+          <Search
+            onClose={() => setSearchOpen(false)}
+            onNewTask={() => {
+              setSearchOpen(false);
+              setNewTaskOpen(true);
+            }}
+          />
         )}
-      </AppShell>
-      {searchOpen && (
-        <Search
-          onClose={() => setSearchOpen(false)}
-          onNewTask={() => {
-            setSearchOpen(false);
-            setNewTaskOpen(true);
-          }}
-        />
-      )}
-      {newTaskOpen && <NewTask onClose={() => setNewTaskOpen(false)} />}
+        {newTaskOpen && <NewTask onClose={() => setNewTaskOpen(false)} />}
+      </AgentAssistanceProvider>
     </AgentRequestProvider>
   );
 }

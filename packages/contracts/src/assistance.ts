@@ -29,7 +29,8 @@ export interface AssistancePreview {
   createdAt: string;
 }
 export interface Assistance {
-  recipientKind?: 'ai';
+  recipientKind?: 'ai' | 'agent';
+  agent?: import('./agent-assistance.js').AgentAssistanceMetadata;
   ai?: { run: import('./index.js').Run; inputText: string; inputHash: string };
   id: string;
   question: string;

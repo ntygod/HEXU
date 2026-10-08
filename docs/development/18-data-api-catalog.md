@@ -404,3 +404,29 @@ baseline绑定当前可读有序ID及状态；当前修订或基线变化返回 
 实现见[契约](../../packages/contracts/src/agent-capabilities.ts)、[数据事务](../../packages/db/src/agent-capabilities.ts)、[连接认证](../../packages/identity/src/agent-connections.ts)、[资源 HTTP](../../apps/control/src/agent-capabilities.ts)与[独立 HTTP](../../apps/control/src/agent-connections.ts)。检查边界见[本轮记录](history/2026-10-08-agent-capability-entry.md)。
 
 本轮并发1—4、费用主体与autoAccept只保存策略，没有执行器强制并发/费用联调；endpoint.authentication的not_integrated指接收适配，入站capability_read认证不能推导为可调用端点。
+
+
+## 2026-10-08 切片2：有限材料与类型协商候选
+
+以下是基线37d6095上的实际代码候选，已有本轮分组定向/静态检查；不改25原规划，也不把拟定设计当作已验收API。入口见[契约](../../packages/contracts/src/agent-assistance.ts)、[领域规则](../../packages/domain/src/agent-assistance.ts)、[原Store协商增量](../../packages/db/src/agent-assistance.ts)、[HTTP](../../apps/control/src/agent-assistance.ts)、[有限连接认证](../../packages/identity/src/agent-assistance-connections.ts)。
+
+- 原Assistance增加recipientKind=agent，仍只有open/responded/closed/cancelled四态。awaiting_acceptance/accepted/waiting_input/answered/terminal从当前输入与类型回应推导，不设第二套可写生命周期。
+- 迁移37追加assistance_agent_requests、assistance_input_revisions、assistance_input_grants、assistance_agent_capacity、assistance_agent_credentials；原1—36与旧真人/Claude记录保留。输入历史不可变，回应保存inputRevision/inputHash/accessRevision与服务端真实human/agent/policy来源。
+- 输入只含固定既有消息摘录和明确选择的项目纯文本source版本；最多16项、每项最多8000字符，附加项目文本合计10000、完整输入20000，HTTP正文64KiB。链接、文件/diff、完整会话与任意URL不作为输入。
+- accept、decline、request_input、propose_scope、answer是五种明确类型。scope提案必须保留主消息摘录锚点，只能删去额外项目文本；重述问题须发起者明确确认成新输入，不会自动扩权。材料过期阻断accept/answer；当前请求权限仍有效时可decline或request_input要求更新，不把业务拒绝记成provider失败。
+- 自动接受只在当前有限预授权允许时写policy接受事实，按固定grant计容量，尚无投递、执行器、模型或费用动作。补充输入释放旧接受并重新竞争；answer/decline/close/cancel/撤权释放容量。
+- 所有写入在事务内先核当前权限再看ID-only回执；输入/授权/容量/回应/事件/outbox/幂等一起提交。旧包同键确认不重复创建，异包拒绝；当前撤权优先于旧回执。
+
+浏览器/真实成员路径：
+
+- POST `/api/v1/tasks/:taskId/agent-assistance-preview`，预览固定材料，不保存。
+- POST `/api/v1/tasks/:taskId/agent-assistances`，显式确认分享后保存原Assistance。
+- POST `/api/v1/assistances/:assistanceId/responses`、POST同资源`/input-revisions`；GET同资源`/input-revisions/:revision`读取逐版本获授权快照。
+- POST同资源`/credentials`、`/credentials/revoke`，显式发行/轮换/撤销请求限定凭据。
+- 原协助详情/列表/state路径复用；旧replies与采用路径不把新Agent分支冒充真人或成功Claude assist Run。
+
+独立请求通道仅开放GET `/agent-assistance/v1/identity`、GET `/agent-assistance/v1/requests/:requestId`、GET同请求`/input-revisions/:revision`、POST同请求`/responses`。请求token最多24小时，scopes仅material_read或material_read+respond，凭据仅摘要保存、首次响应返回一次明文；不是原capability_read token，不接受Cookie/Origin/节点/空间/浏览器身份覆盖。身份和请求最小投影不暴露父Task/Project IDs、源ID与所有者principal；外部/不存在requestId给同类opaque404。
+
+正常补充输入不必轮换仍有效的request token，但每次访问重新核对应input grant；旧输入respond被撤销，新输入明确授权，获准历史read继续逐版本判定。轮换/显式撤权、原授权/端点/能力/成员失效会永久终止旧token，重新加入不复活。
+
+本片仍callable=false、0 Run、0模型；没有MCP桥、真实收件进程、events订阅、远端投递或自动结果消费。检查与剩余见[切片2记录](history/2026-10-08-agent-assistance-negotiation.md)。

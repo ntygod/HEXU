@@ -1,3 +1,5 @@
+import { attachAgentAssistance } from './agent-assistance.js';
+import { isAgentAssistancePath } from '../../../packages/identity/src/agent-assistance-connections.js';
 import { attachAgentCapabilities } from './agent-capabilities.js';
 import { attachAgentConnections } from './agent-connections.js';
 import { parseTaskTargetDate } from '../../../packages/contracts/src/task-target-date.js';
@@ -144,6 +146,10 @@ export async function createApp(
     const nodeProtocol = new URL(request.url, 'http://localhost').pathname.startsWith(
       '/runner/v1/',
     );
+    const assistanceProtocol = isAgentAssistancePath(
+      new URL(request.url, 'http://localhost').pathname,
+      request.method,
+    );
     if (nodeProtocol) {
       if (!store.teamMode)
         throw new DomainError('TEAM_MODE_REQUIRED', '节点配对仅在真实账号模式启用', 404);
@@ -163,6 +169,7 @@ export async function createApp(
     }
     if (
       !nodeProtocol &&
+      !assistanceProtocol &&
       identity &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       !request.headers.origin
@@ -174,6 +181,7 @@ export async function createApp(
       throw new DomainError('ORIGIN_REJECTED', '不允许跨站访问本地预览', 403);
     if (
       !nodeProtocol &&
+      !assistanceProtocol &&
       !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
       request.headers['x-hexu-client'] !== 'web'
     )
@@ -187,6 +195,7 @@ export async function createApp(
   attachIdentity(app, store, identity);
   attachAgentCapabilities(app, store);
   attachAgentConnections(app, store);
+  attachAgentAssistance(app, store);
   attachAssistance(app, store);
   const nodeExecution = attachNodes(app, store);
   attachCheckpoints(app, store);

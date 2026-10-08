@@ -1,3 +1,4 @@
+import { AgentAssistanceStore } from './agent-assistance.js';
 import { parseTaskTargetDate } from '../../contracts/src/task-target-date.js';
 import { AssistanceAdoptionsStore } from './assistance-adoption.js';
 import { ResultRevisions } from './result-revisions.js';
@@ -76,6 +77,7 @@ export class Store {
   readonly projectMaterials: ProjectMaterialsStore;
   readonly aiDrafts: AiDraftsStore;
   readonly assistance: AssistanceStore;
+  readonly agentAssistance: AgentAssistanceStore;
   readonly assistanceAdoptions: AssistanceAdoptionsStore;
   readonly teamMode: boolean;
   private readonly previewActorId: string;
@@ -119,6 +121,7 @@ export class Store {
     this.projectMaterials = new ProjectMaterialsStore(this);
     this.aiDrafts = new AiDraftsStore(this);
     this.assistance = new AssistanceStore(this);
+    this.agentAssistance = new AgentAssistanceStore(this);
     this.assistanceAdoptions = new AssistanceAdoptionsStore(this);
     // Do not relabel or adopt the old demo database as real team data.
     if (
