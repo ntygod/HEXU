@@ -42,3 +42,5 @@
 - [非交互模式](https://learn.chatgpt.com/docs/non-interactive-mode)：可指定既有session恢复，但本片未调用真实命令或账户。
 
 当前未接实际Codex模型、用户电脑、dot插件/Events，未启用跨回合唤起或SDK/app-server恢复。无模型进程夹具证明同一原工作引用及一次消费/ACK协议，不证明真实模型已经使用回答。经典stdio不是MCP2 Events；新请求自动bootstrap、远程身份/投递和持久唤起属于片5，真实两成员/跨环境闭环仍需片7。
+
+片7的[原线程证据规则](agent-real-integration.md#original-thread-evidence)进一步区分当前用户已有桌面聊天与另建SDK测试会话。exact thread与session必须从获准宿主接口实际读取并在求助前绑定，再用真实tool/item/turn及产物核对；环境变量、session相同、claim或ACK单独均不能证明原工作继续。现有代码没有自动取得桌面原聊天ID的适配，不假定SDK能访问它。

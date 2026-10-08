@@ -209,3 +209,9 @@ scope提案保留主消息摘录，只能减额外文本；补充需明确分享
 选择器保留后端允许发现但不可请求的能力及安全阻碍；问题/选区/固定基线在同身份/空间Provider内存中跨抽屉收起和读失败保留，权限变化清除，硬刷新不持久化私人输入。Task内请求深链接与Back/Forward复用原Dialog；有限接收方详情仍不读取或透露父Task/Project、callback、密钥和原生会话引用。
 
 实际检查与剩余见[片6历史](history/2026-10-08-task-collaboration-experience.md)。真实浏览器路线仍受此前明确拒绝而未重试，无视觉或真实键盘焦点验收；本机Codex/当前dot/第二真实成员/HTTPS部署/真实模型仍待明确授权和环境。原片1—5历史不追溯改写。本轮15-03仅有限协作链投影升部分实现，当前3完成/85部分/14未实现，无整项完成提升。
+
+## 切片7：真实联调准备，尚未实测（2026-10-08）
+
+在片6精确远端基线上新增[执行手册与脱敏证据模板](../engineering/agent-real-integration.md)。核对官方当前ChatGPT插件认证与代码后，确认现有限静态Bearer不能直接用于该插件路径；OAuth库组合、有限身份映射/challenge/撤权已有最小后续代码定义，尚未实现。Better Auth现有本机身份可以作为复用基础，不能据此开放原loopback handler。
+
+原工作验收要求真实宿主返回exact thread/session、求助前绑定、同原thread接收工具答案及继续产物/turn终态；新SDK受控会话不冒充用户已有桌面聊天，host_reported/claim/ACK保持原语义。当前未接用户电脑、平台插件、真实订阅、第二成员或模型，HTTPS目标与相应授权仍缺。仅文档/空模板检查，无运行时代码变化或状态提升；详细依据与边界见[准备记录](history/2026-10-08-agent-real-integration-readiness.md)。

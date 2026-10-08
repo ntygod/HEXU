@@ -35,6 +35,7 @@
 | AI 回复整理与片段采用 | [AI 草稿](ai-drafts.md) |
 | 请同事或 AI 分析固定片段 | [真人协助](human-assistance.md)、[AI 文本协助](ai-text-assistance.md) |
 | 将已保存建议采用到原任务 | [协助建议采用](assistance-adoption.md) |
+| 准备真实 Codex/dot 联调与核对原线程证据 | [真实 Agent 联调](agent-real-integration.md)（前置准备，尚未实测） |
 | 本机提交引用、另行确认的对象保留 | [提交检查点](commit-checkpoints.md)、[对象保留](checkpoint-retention.md) |
 | 只读检查新目录恢复材料，不实际写入 | [恢复预检](checkpoint-restore-plan.md) |
 | 本机暂存写入、不覆盖发布与明确清理 | [新目录恢复](checkpoint-restore.md) |

@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "kind": "hexu-real-integration-evidence-template",
+  "templateOnly": true,
+  "sourceCommit": "6b9dfb5500dbf0fb8e35c4d28d3b627069c1d66a",
+  "runAlias": null,
+  "startedAtUtc": null,
+  "endedAtUtc": null,
+  "authorizationRefs": {
+    "environmentAndDeployment": null,
+    "requesterClientInstallation": null,
+    "receiverOAuthConnection": null,
+    "receiverPersistentSubscription": null,
+    "twoMembersAndMaterialSharing": null,
+    "modelBudgetAndStopConditions": null,
+    "evidenceCollectionAndSharing": null
+  },
+  "participants": {
+    "requester": {
+      "memberAlias": null,
+      "agentAlias": null,
+      "environmentAlias": null,
+      "clientAndVersion": null,
+      "protocolVersion": null,
+      "authenticatedIdentityEvidenceRef": null
+    },
+    "receiver": {
+      "memberAlias": null,
+      "agentAlias": null,
+      "environmentAlias": null,
+      "clientAndVersion": null,
+      "protocolVersion": null,
+      "authenticatedIdentityEvidenceRef": null
+    },
+    "distinctRealMembersVerified": null,
+    "distinctRealEnvironmentsVerified": null,
+    "realModelsInvoked": null
+  },
+  "gates": [
+    { "name": "https_environment", "status": "not_run", "evidenceRefs": [] },
+    { "name": "two_member_authorization", "status": "not_run", "evidenceRefs": [] },
+    { "name": "bounded_material_sharing", "status": "not_run", "evidenceRefs": [] },
+    {
+      "name": "dot_oauth_compatibility",
+      "status": "blocked",
+      "evidenceRefs": [],
+      "blocker": "Current source has finite static Bearer only, no OAuth implementation."
+    },
+    { "name": "real_client_installation", "status": "not_run", "evidenceRefs": [] },
+    {
+      "name": "existing_chat_runtime_binding",
+      "status": "blocked",
+      "evidenceRefs": [],
+      "blocker": "Current origin is host-reported; selected desktop chat runtime access is unverified."
+    },
+    { "name": "real_platform_subscription", "status": "not_run", "evidenceRefs": [] },
+    { "name": "model_budget", "status": "not_run", "evidenceRefs": [] }
+  ],
+  "origin": {
+    "kind": null,
+    "runtimeObservationEvidenceRef": null,
+    "observedAtUtc": null,
+    "threadAlias": null,
+    "sessionAlias": null,
+    "originalGoalEvidenceRef": null,
+    "preRequestTurnAlias": null,
+    "hostBindingEvidenceRef": null,
+    "bindingAlias": null,
+    "bindingPrecedesAnswer": null,
+    "runtimeThreadMatchesBinding": null,
+    "runtimeSessionMatchesBinding": null,
+    "existingDesktopChatAccessVerified": null,
+    "forkOrReplacementObserved": null
+  },
+  "exchange": {
+    "taskAlias": null,
+    "requestAlias": null,
+    "creationOperationAlias": null,
+    "creationReceiptEvidenceRef": null,
+    "subscriptionAlias": null,
+    "subscriptionExpiresAtUtc": null,
+    "subscriptionEvidenceRef": null,
+    "callbackReceiptEvidenceRef": null,
+    "dotWakeEvidenceRef": null,
+    "receiverToolCallEvidenceRef": null,
+    "initialInputAlias": null,
+    "clarificationResponseAlias": null,
+    "clarificationToolEvidenceRef": null,
+    "revisedInputAlias": null,
+    "revisionCauseMatchesClarification": null,
+    "revisionToolEvidenceRef": null,
+    "answerResponseAlias": null,
+    "answerInputMatchesRevision": null,
+    "answerActorMatchesReceiver": null,
+    "answerToolEvidenceRef": null,
+    "sameTaskAndRequestThroughout": null,
+    "humanRelayObserved": null
+  },
+  "consumption": {
+    "claimAlias": null,
+    "delivery": null,
+    "claimEvidenceRef": null,
+    "answerRuntimeToolResultEvidenceRef": null,
+    "continuationThreadMatchesOriginal": null,
+    "continuationSessionMatchesOriginal": null,
+    "continuationTurnAlias": null,
+    "continuationItemAlias": null,
+    "continuationRuntimeEvidenceRef": null,
+    "providerTurnStatus": null,
+    "providerTerminalEvidenceRef": null,
+    "approvedArtifactAlias": null,
+    "approvedArtifactDigest": null,
+    "knowledgeUseReviewEvidenceRef": null,
+    "receiverOnlyKnowledgeUsed": null,
+    "ackEvidenceRef": null,
+    "ackMatchesObservedOutput": null,
+    "duplicateContinuationObserved": null,
+    "unknownExecutionRemains": null
+  },
+  "cost": {
+    "authorizedLimit": null,
+    "currency": null,
+    "source": null,
+    "observedUsage": null,
+    "observedCost": null,
+    "unknownCostReason": null,
+    "budgetOrDeadlineStopEvidenceRef": null
+  },
+  "negativeChecks": [
+    { "name": "decline", "status": "not_run", "evidenceRefs": [] },
+    { "name": "offline_reconcile", "status": "not_run", "evidenceRefs": [] },
+    { "name": "revocation", "status": "not_run", "evidenceRefs": [] },
+    { "name": "unknown_response_no_model_replay", "status": "not_run", "evidenceRefs": [] },
+    { "name": "duplicate_response_idempotency", "status": "not_run", "evidenceRefs": [] }
+  ],
+  "evidence": [],
+  "review": {
+    "reviewerAlias": null,
+    "reviewedAtUtc": null,
+    "authorizedSourceRecordsActuallyInspected": null,
+    "redactionChecked": null,
+    "remainingBlockers": [],
+    "stopReason": null,
+    "connectionAndSubscriptionEndStateEvidenceRef": null
+  },
+  "verdict": {
+    "realCrossMemberLoop": "not_run",
+    "existingDesktopChatContinued": "not_run",
+    "newControlledThreadSmokeOnly": "not_run",
+    "realBrowser": "not_run",
+    "productionDeployment": "not_run"
+  }
+}
