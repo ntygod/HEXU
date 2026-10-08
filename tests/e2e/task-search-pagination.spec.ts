@@ -164,7 +164,7 @@ async function fixture(page: Page, taskCount: number) {
       });
       expect(response.ok(), await response.text()).toBe(true);
       const saved = (await response.json()) as Task;
-      const { participantUserIds, ...storedBefore } = before.task;
+      const { participantUserIds, labelNames, labelsRevision, ...storedBefore } = before.task;
       expect(saved).toEqual({
         ...storedBefore,
         ...changes,
@@ -174,7 +174,10 @@ async function fixture(page: Page, taskCount: number) {
       expect(Number.isFinite(Date.parse(saved.updatedAt))).toBe(true);
       // The PATCH receipt is the stored Task; detail reads also retain the
       // unchanged participant projection. No other detail field may change.
-      const after = { ...before, task: { ...saved, participantUserIds } };
+      const after = {
+        ...before,
+        task: { ...saved, participantUserIds, labelNames, labelsRevision },
+      };
       expect(await get<TaskDetail>(page, `tasks/${task.id}`)).toEqual(after);
       expected.set(task.id, after);
       return after.task;

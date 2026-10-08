@@ -304,7 +304,12 @@ async function captureCancelled(
     .filter({ has: page.locator(`a[href="/tasks/${task.id}"]`) });
   const link = card.getByRole('link');
   await statusFilter(page).scrollIntoViewIfNeeded();
-  await link.scrollIntoViewIfNeeded();
+  // The label selector adds another filter row on narrow screens. Frame the
+  // complete card, including its read-only footer, instead of only its link.
+  await card.scrollIntoViewIfNeeded();
+  await card.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' }),
+  );
   await expect(statusFilter(page)).toHaveValue('cancelled');
   await expect(statusFilter(page)).toBeInViewport({ ratio: 1 });
   await expect(card).toBeInViewport({ ratio: 1 });
